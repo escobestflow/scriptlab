@@ -141,7 +141,9 @@ export function Studio({
   return (
     <div className="page-enter">
       <div className="topbar">
-        <button className="btn-icon" onClick={onBack} aria-label="Back">‹</button>
+        <button className="topbar-btn" onClick={onBack} aria-label="Back">
+          <svg viewBox="0 0 24 24" style={{width:22,height:22,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
         <div style={{ textAlign: "center", flex: 1 }}>
           <div className="eyebrow">{story.settings.framework.replace(/-/g, " ")}</div>
           <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.01em", marginTop: 2 }}>
@@ -160,17 +162,6 @@ export function Studio({
           {tab === "cost"      && <CostTab reports={reports} totalSpent={totalSpent} />}
           {tab === "configure" && <ConfigureTab story={story} setStory={setStory} run={run} busy={busy} />}
         </div>
-      </div>
-
-      {/* Mic */}
-      <div className="mic-wrap">
-        <button
-          className={`mic ${recording ? "recording" : ""}`}
-          onClick={toggleRecord}
-          aria-label="Record idea"
-        >
-          <div className="core">{recording ? "■" : "●"}</div>
-        </button>
       </div>
 
       {/* Tab bar */}
@@ -220,19 +211,19 @@ function WriteTab({
 }: { story: Story; run: (a: ActionRequest, title: string) => void; busy: boolean }) {
   return (
     <>
-      <div className="neu-raised card">
+      <div className="card">
         <span className="eyebrow">Studio</span>
         <div className="stack" style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 4 }}>
-          <button className="btn-chrome" disabled={busy}
+          <button className="btn-primary" disabled={busy}
             onClick={() => run({ type: "generate_beats", payload: {} }, "Beat sheet")}
             style={{ flex: "1 1 100%" }}>
             ✦ Generate beat sheet
           </button>
-          <button className="btn-soft" disabled={busy}
+          <button className="btn-secondary" disabled={busy}
             onClick={() => run({ type: "add_twist", payload: {} }, "Twist")}>
             ⚡ Add twist
           </button>
-          <button className="btn-soft" disabled={busy}
+          <button className="btn-secondary" disabled={busy}
             onClick={() => run(
               { type: "brainstorm", payload: { prompt: "unexpected openings" } },
               "Brainstorm"
@@ -240,7 +231,7 @@ function WriteTab({
             ✎ Brainstorm
           </button>
           {story.beats[0] && (
-            <button className="btn-soft" disabled={busy}
+            <button className="btn-secondary" disabled={busy}
               onClick={() => run(
                 { type: "generate_scene", payload: { beatIndex: 0 } },
                 "Scene · Beat 1"
@@ -251,7 +242,7 @@ function WriteTab({
         </div>
       </div>
 
-      <div className="neu-raised card">
+      <div className="card">
         <span className="eyebrow">Beat sheet</span>
         {story.beats.length === 0 && (
           <div style={{ color: "var(--ink-mute)", fontSize: 14, marginTop: 4 }}>
@@ -259,7 +250,7 @@ function WriteTab({
           </div>
         )}
         {story.beats.map((b, i) => (
-          <div className="neu-inset-sm" style={{ padding: 14, marginTop: 10 }} key={b.id}>
+          <div className="inset-card" style={{ padding: 14, marginTop: 10 }} key={b.id}>
             <div className="eyebrow">Beat {i + 1} · {b.name}</div>
             <div style={{ fontSize: 14, marginTop: 4 }}>{b.summary}</div>
           </div>
@@ -271,7 +262,7 @@ function WriteTab({
 
 function SnippetsTab({ story }: { story: Story }) {
   return (
-    <div className="neu-raised card">
+    <div className="card">
       <span className="eyebrow">Snippets</span>
       {story.snippets.length === 0 ? (
         <div style={{ color: "var(--ink-mute)", fontSize: 14, marginTop: 4 }}>
@@ -279,7 +270,7 @@ function SnippetsTab({ story }: { story: Story }) {
         </div>
       ) : (
         story.snippets.map(sn => (
-          <div className="neu-inset-sm" style={{ padding: 14, marginTop: 10 }} key={sn.id}>
+          <div className="inset-card" style={{ padding: 14, marginTop: 10 }} key={sn.id}>
             <div className="eyebrow">{sn.title} · {sn.tags.join(" · ")}</div>
             <div style={{ fontSize: 14, marginTop: 4 }}>{sn.content}</div>
           </div>
@@ -292,16 +283,16 @@ function SnippetsTab({ story }: { story: Story }) {
 function CostTab({ reports, totalSpent }: { reports: Report[]; totalSpent: number }) {
   return (
     <>
-      <div className="neu-raised card" style={{ textAlign: "center" }}>
+      <div className="card" style={{ textAlign: "center" }}>
         <span className="eyebrow">Session total</span>
-        <div className="big-cost iris-text" style={{ marginTop: 8 }}>
+        <div className="big-cost " style={{ marginTop: 8 }}>
           ${totalSpent.toFixed(4)}
         </div>
         <div style={{ color: "var(--ink-mute)", fontSize: 13, marginTop: 8 }}>
           Cached reads in green — that's where the savings live.
         </div>
       </div>
-      <div className="neu-raised card">
+      <div className="card">
         <span className="eyebrow">Requests</span>
         {reports.length === 0 && (
           <div style={{ color: "var(--ink-mute)", fontSize: 14, marginTop: 4 }}>
@@ -309,7 +300,7 @@ function CostTab({ reports, totalSpent }: { reports: Report[]; totalSpent: numbe
           </div>
         )}
         {reports.map((r, i) => (
-          <div key={i} className="neu-inset-sm report" style={{ marginTop: 10 }}>
+          <div key={i} className="inset-card report" style={{ marginTop: 10 }}>
             <div className="meta">{r.action} · {r.model.replace("claude-","")} · {r.ms}ms</div>
             <div className="tokens">
               in {r.tokens.input} · out {r.tokens.output}
@@ -338,7 +329,7 @@ function ConfigureTab({
 
   return (
     <>
-      <div className="neu-raised card">
+      <div className="card">
         <span className="eyebrow">Project</span>
         <div className="stack">
           <input className="field" value={story.title}
@@ -350,7 +341,7 @@ function ConfigureTab({
         </div>
       </div>
 
-      <div className="neu-raised card">
+      <div className="card">
         <span className="eyebrow">Shape</span>
         <div className="stack">
           <div className="select-wrap">
@@ -381,7 +372,7 @@ function ConfigureTab({
         </div>
       </div>
 
-      <div className="neu-raised card">
+      <div className="card">
         <span className="eyebrow">Dials</span>
         <div className="stack" style={{ marginTop: 8 }}>
           <Slider label="Unpredictability" value={s.unpredictability} onChange={v => set("unpredictability", v)} />
@@ -390,10 +381,10 @@ function ConfigureTab({
         </div>
       </div>
 
-      <div className="neu-raised card">
+      <div className="card">
         <span className="eyebrow">Ingredients</span>
         {story.ingredients.map(ing => (
-          <div key={ing.id} className="neu-inset-sm" style={{ padding: 14, marginTop: 10 }}>
+          <div key={ing.id} className="inset-card" style={{ padding: 14, marginTop: 10 }}>
             <div className="eyebrow">{ing.label} {ing.locked && "· locked"}</div>
             <div style={{ fontSize: 14, marginTop: 4 }}>{ing.description}</div>
             <button className="chip" style={{ marginTop: 10 }} disabled={busy}

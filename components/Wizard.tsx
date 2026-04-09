@@ -44,12 +44,16 @@ export function Wizard({
   return (
     <div className="page-enter">
       <div className="topbar">
-        <button className="btn-icon" onClick={back} aria-label="Back">‹</button>
-        <div className="eyebrow">{STEPS[step]}</div>
-        <button className="btn-icon" onClick={onCancel} aria-label="Close">✕</button>
+        <button className="topbar-btn" onClick={back} aria-label="Back">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div className="topbar-center">{STEPS[step]}</div>
+        <button className="topbar-btn" onClick={onCancel} aria-label="Close">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
 
-      <div className="progress">
+      <div className="progress-dots">
         {STEPS.map((_, i) => (
           <div key={i} className={`dot ${i === step ? "active" : i < step ? "done" : ""}`} />
         ))}
@@ -71,14 +75,14 @@ export function Wizard({
       <div className="wizard-bar">
         {step < STEPS.length - 1 ? (
           <button
-            className="btn-chrome"
+            className="btn-primary"
             onClick={next}
             disabled={!canAdvance(step, draft)}
           >
             Continue
           </button>
         ) : (
-          <button className="btn-chrome" onClick={onFinish}>
+          <button className="btn-primary" onClick={onFinish}>
             Enter the studio
           </button>
         )}
@@ -244,13 +248,13 @@ function StepIngredients({ draft, setDraft }: { draft: Story; setDraft: (u: (s: 
       <div className="stack">
         <input className="field" placeholder="Type (setting, object, rule…)" value={label} onChange={e => setLabel(e.target.value)} />
         <textarea className="field" placeholder="Describe it" value={desc} onChange={e => setDesc(e.target.value)} rows={2} />
-        <button className="btn-soft" onClick={add} disabled={!desc.trim()}>+ Add ingredient</button>
+        <button className="btn-secondary" onClick={add} disabled={!desc.trim()}>+ Add ingredient</button>
       </div>
 
       <div style={{ height: 16 }} />
 
       {draft.ingredients.map(i => (
-        <div key={i.id} className="neu-raised-sm" style={{ padding: 16, marginBottom: 10 }}>
+        <div key={i.id} className="card" style={{ padding: 16, marginBottom: 10 }}>
           <div className="eyebrow">{i.label} {i.locked && "· locked"}</div>
           <div style={{ fontSize: 14, marginTop: 4 }}>{i.description}</div>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -306,7 +310,7 @@ function StepReady({ draft }: { draft: Story }) {
       <div className="hero-sub">
         Your creative brief is ready. In the studio you can generate your beat sheet, add twists, write scenes, and keep refining.
       </div>
-      <div className="neu-raised-sm" style={{ padding: 20 }}>
+      <div className="card" style={{ padding: 20 }}>
         <div className="eyebrow">Brief</div>
         <div style={{ fontSize: 16, fontWeight: 900, marginTop: 6 }}>{draft.title}</div>
         {draft.logline && <div style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 4 }}>{draft.logline}</div>}
