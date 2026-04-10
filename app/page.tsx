@@ -54,6 +54,7 @@ export default function Page() {
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
   const [editingMoment, setEditingMoment] = useState<Moment | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
   const recognitionRef = useRef<any>(null);
   const capturedRef = useRef("");
 
@@ -107,18 +108,20 @@ export default function Page() {
     setRecording(false);
   }
 
-  function saveDraftMoment(text: string, type: Moment["type"], tags: string[]) {
+  function saveDraftMoment(text: string, type: Moment["type"]) {
     const m: Moment = {
       id: "m_" + Math.random().toString(36).slice(2),
       text,
       type,
-      tags,
+      tags: [],
       createdAt: new Date().toISOString(),
     };
     setMoments(prev => [m, ...prev]);
     setRecordSheetOpen(false);
     setLiveTranscript("");
-    setMainTab("moments");
+    // Show toast
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), 2000);
   }
 
   function updateMoment(id: string, patch: Partial<Moment>) {
@@ -307,6 +310,9 @@ export default function Page() {
           )}
         </div>
       </div>
+
+      {/* Success toast */}
+      <div className={`toast ${toastVisible ? "show" : ""}`}>Moment added!</div>
     </div>
   );
 }
@@ -324,18 +330,10 @@ function RecordingForm({
   setLiveTranscript: (v: string) => void;
   recording: boolean;
   onToggleRecord: () => void;
-  onSave: (text: string, type: Moment["type"], tags: string[]) => void;
+  onSave: (text: string, type: Moment["type"]) => void;
 }) {
   const [type, setType] = useState<Moment["type"]>("scene");
-  const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
   const [cleaning, setCleaning] = useState(false);
-
-  function addTag() {
-    const t = tagInput.trim().toLowerCase();
-    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
-    setTagInput("");
-  }
 
   async function cleanUp() {
     if (!liveTranscript.trim()) return;
@@ -378,7 +376,6 @@ function RecordingForm({
 
   return (
     <div className="stack">
-      {/* Live transcript / text area */}
       <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
         <button
           className={`record-fab ${recording ? "recording" : ""}`}
@@ -397,8 +394,14 @@ function RecordingForm({
 
       {liveTranscript.trim() && (
         <>
+          {/* Clean up — associated with the text above */}
+          <button className="btn-secondary" onClick={cleanUp} disabled={cleaning}
+            style={{ fontSize: 13, width: "100%" }}>
+            {cleaning ? "Cleaning…" : "✨ Clean up with AI"}
+          </button>
+
           {/* Type picker */}
-          <div className="eyebrow" style={{ marginTop: 4 }}>Type</div>
+          <div className="eyebrow" style={{ marginTop: 8 }}>Type</div>
           <div className="chip-row">
             {MOMENT_TYPES.map(t => (
               <button key={t} className={`chip ${type === t ? "selected" : ""}`}
@@ -408,37 +411,8 @@ function RecordingForm({
             ))}
           </div>
 
-          {/* Tags */}
-          <div className="eyebrow" style={{ marginTop: 8 }}>Tags</div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input className="field" placeholder="Add tag" value={tagInput}
-              onChange={e => setTagInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addTag()}
-              style={{ flex: 1, fontSize: 13, padding: "10px 12px" }} />
-            <button className="btn-secondary" onClick={addTag}
-              style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}>+</button>
-          </div>
-          {tags.length > 0 && (
-            <div className="chip-row" style={{ marginTop: 4 }}>
-              {tags.map(t => (
-                <button key={t} className="chip selected" style={{ fontSize: 11, padding: "4px 10px" }}
-                  onClick={() => setTags(prev => prev.filter(x => x !== t))}>
-                  {t} ✕
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button className="btn-secondary" onClick={cleanUp} disabled={cleaning}
-              style={{ flex: 1, fontSize: 13 }}>
-              {cleaning ? "Cleaning…" : "✨ Clean up"}
-            </button>
-          </div>
-
-          <button className="btn-primary" style={{ marginTop: 4, fontSize: 14 }}
-            onClick={() => onSave(liveTranscript.trim(), type, tags)}>
+          <button className="btn-primary" style={{ marginTop: 12, fontSize: 14 }}
+            onClick={() => onSave(liveTranscript.trim(), type)}>
             Save moment
           </button>
         </>

@@ -394,6 +394,7 @@ function DesignTab({
   const [editValue, setEditValue] = useState("");
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
+  const [ghostY, setGhostY] = useState(0);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartY = useRef(0);
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -449,6 +450,7 @@ function DesignTab({
                     longPressTimer.current = setTimeout(() => {
                       setDraggingIdx(i);
                       setDropTargetIdx(i);
+                      setGhostY(e.touches[0].clientY - 30);
                       setExpanded(null);
                     }, 300);
                   }}
@@ -460,6 +462,7 @@ function DesignTab({
                     if (draggingIdx == null) return;
                     e.preventDefault();
                     const y = e.touches[0].clientY;
+                    setGhostY(y - 30);
                     // Find which gap the finger is over
                     let target = draggingIdx;
                     for (let j = 0; j < beats.length; j++) {
@@ -616,6 +619,13 @@ function DesignTab({
         );
       })}
 
+      {/* Drag ghost */}
+      {draggingIdx != null && beats[draggingIdx] && (
+        <div className="beat-drag-ghost" style={{ top: ghostY }}>
+          <div className="ghost-number">{draggingIdx + 1}</div>
+          <div className="ghost-name">{beats[draggingIdx].name || "Untitled beat"}</div>
+        </div>
+      )}
     </>
   );
 }
