@@ -51,7 +51,11 @@ export default function Page() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [recordSheetOpen, setRecordSheetOpen] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [editingMoment, setEditingMoment] = useState<Moment | null>(null);
   const recognitionRef = useRef<any>(null);
+  const capturedRef = useRef("");
 
   useEffect(() => {
     setProjects(loadProjects());
@@ -66,54 +70,64 @@ export default function Page() {
     setProjects(ps => ps.map(p => p.id === id ? { ...u(p), updatedAt: new Date().toISOString() } : p));
 
   // ── Voice capture ──
-  function toggleRecord() {
+  function startRecording() {
+    setRecordSheetOpen(true);
+    setLiveTranscript("");
+    capturedRef.current = "";
+
     const SR: any =
       typeof window !== "undefined"
         ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
         : null;
     if (!SR) {
-      // Fallback: open text input sheet for manual entry
-      const text = prompt("Type your moment:");
-      if (text?.trim()) {
-        addMoment(text.trim(), "scene");
-      }
-      return;
-    }
-    if (recording) {
-      recognitionRef.current?.stop();
-      setRecording(false);
+      // No speech API — just show the sheet for manual typing
       return;
     }
     const rec = new SR();
     rec.continuous = true;
-    rec.interimResults = false;
+    rec.interimResults = true;
     rec.lang = "en-US";
-    let captured = "";
     rec.onresult = (e: any) => {
+      let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) captured += e.results[i][0].transcript + " ";
+        if (e.results[i].isFinal) capturedRef.current += e.results[i][0].transcript + " ";
+        else interim += e.results[i][0].transcript;
       }
+      setLiveTranscript((capturedRef.current + interim).trim());
     };
-    rec.onend = () => {
-      setRecording(false);
-      if (captured.trim()) addMoment(captured.trim(), "scene");
-    };
+    rec.onend = () => setRecording(false);
     rec.onerror = () => setRecording(false);
     recognitionRef.current = rec;
     rec.start();
     setRecording(true);
   }
 
-  function addMoment(text: string, type: Moment["type"]) {
+  function stopRecording() {
+    recognitionRef.current?.stop();
+    setRecording(false);
+  }
+
+  function saveDraftMoment(text: string, type: Moment["type"], tags: string[]) {
     const m: Moment = {
       id: "m_" + Math.random().toString(36).slice(2),
       text,
       type,
-      tags: [],
+      tags,
       createdAt: new Date().toISOString(),
     };
     setMoments(prev => [m, ...prev]);
+    setRecordSheetOpen(false);
+    setLiveTranscript("");
     setMainTab("moments");
+  }
+
+  function updateMoment(id: string, patch: Partial<Moment>) {
+    setMoments(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m));
+  }
+
+  function deleteMoment(id: string) {
+    setMoments(prev => prev.filter(m => m.id !== id));
+    setEditingMoment(null);
   }
 
   function projectProgress(p: Story): number {
@@ -188,7 +202,7 @@ export default function Page() {
               />
             )}
             {mainTab === "moments" && (
-              <MomentsTab moments={moments} />
+              <MomentsTab moments={moments} onEdit={(m) => setEditingMoment(m)} />
             )}
           </div>
         </div>
@@ -214,7 +228,7 @@ export default function Page() {
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             <button
               className={`record-fab ${recording ? "recording" : ""}`}
-              onClick={toggleRecord}
+              onClick={startRecording}
               aria-label="Record a moment"
             >
               <div className="red-dot" />
@@ -252,6 +266,305 @@ export default function Page() {
           </button>
         ))}
       </div>
+
+      {/* Recording sheet */}
+      <div className={`sheet-backdrop ${recordSheetOpen ? "open" : ""}`}
+        onClick={() => { stopRecording(); setRecordSheetOpen(false); }} />
+      <div className={`sheet ${recordSheetOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">{recording ? "Recording…" : "New moment"}</div>
+          <button className="chip" onClick={() => { stopRecording(); setRecordSheetOpen(false); }}>Close</button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <RecordingForm
+            liveTranscript={liveTranscript}
+            setLiveTranscript={setLiveTranscript}
+            recording={recording}
+            onToggleRecord={() => recording ? stopRecording() : startRecording()}
+            onSave={saveDraftMoment}
+          />
+        </div>
+      </div>
+
+      {/* Moment edit sheet */}
+      <div className={`sheet-backdrop ${!!editingMoment ? "open" : ""}`}
+        onClick={() => setEditingMoment(null)} />
+      <div className={`sheet ${!!editingMoment ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">Edit moment</div>
+          <button className="chip" onClick={() => setEditingMoment(null)}>Close</button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          {editingMoment && (
+            <MomentEditForm
+              moment={editingMoment}
+              onUpdate={(patch) => { updateMoment(editingMoment.id, patch); setEditingMoment({ ...editingMoment, ...patch }); }}
+              onDelete={() => deleteMoment(editingMoment.id)}
+              onClose={() => setEditingMoment(null)}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================ */
+/* ============ RECORDING FORM ================ */
+/* ============================================ */
+
+const MOMENT_TYPES: Moment["type"][] = ["scene","dialogue","joke","memory","character","image"];
+
+function RecordingForm({
+  liveTranscript, setLiveTranscript, recording, onToggleRecord, onSave,
+}: {
+  liveTranscript: string;
+  setLiveTranscript: (v: string) => void;
+  recording: boolean;
+  onToggleRecord: () => void;
+  onSave: (text: string, type: Moment["type"], tags: string[]) => void;
+}) {
+  const [type, setType] = useState<Moment["type"]>("scene");
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [cleaning, setCleaning] = useState(false);
+
+  function addTag() {
+    const t = tagInput.trim().toLowerCase();
+    if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
+    setTagInput("");
+  }
+
+  async function cleanUp() {
+    if (!liveTranscript.trim()) return;
+    setCleaning(true);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story: { id: "", title: "", logline: "", projectType: "feature", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], updatedAt: "" },
+          action: { type: "clean_moment", payload: { rawText: liveTranscript } },
+        }),
+      });
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "", full = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
+        }
+      }
+      try {
+        const match = full.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.text) setLiveTranscript(parsed.text);
+        }
+      } catch {}
+    } finally {
+      setCleaning(false);
+    }
+  }
+
+  return (
+    <div className="stack">
+      {/* Live transcript / text area */}
+      <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
+        <button
+          className={`record-fab ${recording ? "recording" : ""}`}
+          onClick={onToggleRecord}
+          style={{ position: "static", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}
+        >
+          <div className="red-dot" />
+        </button>
+      </div>
+      <div className="caption" style={{ textAlign: "center", marginBottom: 4 }}>
+        {recording ? "Listening… tap to stop" : "Tap to record, or type below"}
+      </div>
+
+      <textarea className="field" placeholder="Your moment…"
+        value={liveTranscript} onChange={e => setLiveTranscript(e.target.value)} rows={4} />
+
+      {liveTranscript.trim() && (
+        <>
+          {/* Type picker */}
+          <div className="eyebrow" style={{ marginTop: 4 }}>Type</div>
+          <div className="chip-row">
+            {MOMENT_TYPES.map(t => (
+              <button key={t} className={`chip ${type === t ? "selected" : ""}`}
+                onClick={() => setType(t)} style={{ fontSize: 12, padding: "8px 14px" }}>
+                {t}
+              </button>
+            ))}
+          </div>
+
+          {/* Tags */}
+          <div className="eyebrow" style={{ marginTop: 8 }}>Tags</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input className="field" placeholder="Add tag" value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addTag()}
+              style={{ flex: 1, fontSize: 13, padding: "10px 12px" }} />
+            <button className="btn-secondary" onClick={addTag}
+              style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}>+</button>
+          </div>
+          {tags.length > 0 && (
+            <div className="chip-row" style={{ marginTop: 4 }}>
+              {tags.map(t => (
+                <button key={t} className="chip selected" style={{ fontSize: 11, padding: "4px 10px" }}
+                  onClick={() => setTags(prev => prev.filter(x => x !== t))}>
+                  {t} ✕
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button className="btn-secondary" onClick={cleanUp} disabled={cleaning}
+              style={{ flex: 1, fontSize: 13 }}>
+              {cleaning ? "Cleaning…" : "✨ Clean up"}
+            </button>
+          </div>
+
+          <button className="btn-primary" style={{ marginTop: 4, fontSize: 14 }}
+            onClick={() => onSave(liveTranscript.trim(), type, tags)}>
+            Save moment
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ============================================ */
+/* ============ MOMENT EDIT FORM ============== */
+/* ============================================ */
+
+function MomentEditForm({
+  moment, onUpdate, onDelete, onClose,
+}: {
+  moment: Moment;
+  onUpdate: (patch: Partial<Moment>) => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const [text, setText] = useState(moment.text);
+  const [type, setType] = useState(moment.type);
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>(moment.tags);
+  const [cleaning, setCleaning] = useState(false);
+
+  function addTag() {
+    const t = tagInput.trim().toLowerCase();
+    if (t && !tags.includes(t)) {
+      const next = [...tags, t];
+      setTags(next);
+      onUpdate({ tags: next });
+    }
+    setTagInput("");
+  }
+  function removeTag(tag: string) {
+    const next = tags.filter(t => t !== tag);
+    setTags(next);
+    onUpdate({ tags: next });
+  }
+
+  async function cleanUp() {
+    if (!text.trim()) return;
+    setCleaning(true);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story: { id: "", title: "", logline: "", projectType: "feature", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], updatedAt: "" },
+          action: { type: "clean_moment", payload: { rawText: text } },
+        }),
+      });
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "", full = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
+        }
+      }
+      try {
+        const match = full.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.text) { setText(parsed.text); onUpdate({ text: parsed.text }); }
+        }
+      } catch {}
+    } finally { setCleaning(false); }
+  }
+
+  return (
+    <div className="stack">
+      <textarea className="field" value={text} rows={5}
+        onChange={e => { setText(e.target.value); onUpdate({ text: e.target.value }); }} />
+
+      <div className="eyebrow">Type</div>
+      <div className="chip-row">
+        {MOMENT_TYPES.map(t => (
+          <button key={t} className={`chip ${type === t ? "selected" : ""}`}
+            onClick={() => { setType(t); onUpdate({ type: t }); }}
+            style={{ fontSize: 12, padding: "8px 14px" }}>
+            {t}
+          </button>
+        ))}
+      </div>
+
+      <div className="eyebrow" style={{ marginTop: 8 }}>Tags</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input className="field" placeholder="Add tag" value={tagInput}
+          onChange={e => setTagInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && addTag()}
+          style={{ flex: 1, fontSize: 13, padding: "10px 12px" }} />
+        <button className="btn-secondary" onClick={addTag}
+          style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}>+</button>
+      </div>
+      {tags.length > 0 && (
+        <div className="chip-row" style={{ marginTop: 4 }}>
+          {tags.map(t => (
+            <button key={t} className="chip selected" style={{ fontSize: 11, padding: "4px 10px" }}
+              onClick={() => removeTag(t)}>
+              {t} ✕
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button className="btn-secondary" onClick={cleanUp} disabled={cleaning}
+          style={{ flex: 1, fontSize: 13 }}>
+          {cleaning ? "Cleaning…" : "✨ Clean up"}
+        </button>
+      </div>
+
+      <button className="btn-secondary"
+        style={{ color: "var(--record)", borderColor: "var(--record)", fontSize: 13, marginTop: 4 }}
+        onClick={onDelete}>
+        Delete moment
+      </button>
     </div>
   );
 }
@@ -312,7 +625,7 @@ function ProjectsTab({
 
 const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image"] as const;
 
-function MomentsTab({ moments }: { moments: Moment[] }) {
+function MomentsTab({ moments, onEdit }: { moments: Moment[]; onEdit: (m: Moment) => void }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All");
 
@@ -368,7 +681,7 @@ function MomentsTab({ moments }: { moments: Moment[] }) {
       )}
 
       {filtered.map(m => (
-        <div key={m.id} className="moment-card">
+        <div key={m.id} className="moment-card" onClick={() => onEdit(m)} style={{ cursor: "pointer" }}>
           <div className="moment-type">{m.type}</div>
           <div className="moment-text">{m.text}</div>
           {m.tags.length > 0 && (

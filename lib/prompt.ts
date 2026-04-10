@@ -41,7 +41,9 @@ export type ActionType =
   | "rewrite_beat"
   | "generate_scene"
   | "brainstorm"
-  | "clean_beat";
+  | "clean_beat"
+  | "generate_beat"
+  | "clean_moment";
 
 export interface ActionRequest {
   type: ActionType;
@@ -59,6 +61,8 @@ export function modelForAction(type: ActionType): string {
     case "add_twist":
     case "brainstorm":
     case "clean_beat":
+    case "generate_beat":
+    case "clean_moment":
     default:
       return "claude-haiku-4-5"; // fast + cheap for structure work
   }

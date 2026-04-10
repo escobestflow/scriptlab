@@ -316,12 +316,12 @@ export function Studio({
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <BeatCreationForm
+            story={story}
             onSave={(name, summary) => {
               addBeat(name, summary, beatTrayInsertAt ?? undefined);
               setBeatTrayOpen(false);
               setBeatTrayInsertAt(null);
             }}
-            run={run}
             busy={busy}
           />
         </div>
@@ -672,45 +672,65 @@ function ExecuteTab({
 /* ============ BEAT CREATION FORM ============ */
 /* ============================================ */
 
+interface BeatAISettings {
+  weirdness: number;
+  darkness: number;
+  humor: number;
+  length: number;
+}
+
+const DEFAULT_BEAT_AI: BeatAISettings = { weirdness: 5, darkness: 5, humor: 3, length: 5 };
+const BEAT_AI_KEY = "scriptlab.beatAISettings";
+
+function loadBeatAISettings(): BeatAISettings {
+  if (typeof window === "undefined") return DEFAULT_BEAT_AI;
+  try { return { ...DEFAULT_BEAT_AI, ...JSON.parse(localStorage.getItem(BEAT_AI_KEY) || "{}") }; }
+  catch { return DEFAULT_BEAT_AI; }
+}
+function saveBeatAISettings(s: BeatAISettings) {
+  if (typeof window !== "undefined") localStorage.setItem(BEAT_AI_KEY, JSON.stringify(s));
+}
+
 function BeatCreationForm({
-  onSave, run, busy,
+  story, onSave, busy,
 }: {
+  story: Story;
   onSave: (name: string, summary: string) => void;
-  run: (a: ActionRequest, title: string) => void;
   busy: boolean;
 }) {
   const [name, setName] = useState("");
   const [summary, setSummary] = useState("");
   const [recording, setRecording] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
+  const [aiSettings, setAISettings] = useState<BeatAISettings>(loadBeatAISettings);
   const recognitionRef = useRef<any>(null);
+  const capturedRef = useRef("");
 
   function toggleRecord() {
     const SR: any =
       typeof window !== "undefined"
         ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
         : null;
-    if (!SR) {
-      // Fallback to text
-      return;
-    }
+    if (!SR) return;
     if (recording) {
       recognitionRef.current?.stop();
       setRecording(false);
       return;
     }
+    capturedRef.current = "";
     const rec = new SR();
     rec.continuous = true;
     rec.interimResults = true;
     rec.lang = "en-US";
-    let captured = "";
     rec.onresult = (e: any) => {
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) captured += e.results[i][0].transcript + " ";
+        if (e.results[i].isFinal) capturedRef.current += e.results[i][0].transcript + " ";
         else interim += e.results[i][0].transcript;
       }
-      setSummary((captured + interim).trim());
+      setSummary((capturedRef.current + interim).trim());
     };
     rec.onend = () => setRecording(false);
     rec.onerror = () => setRecording(false);
@@ -719,49 +739,61 @@ function BeatCreationForm({
     setRecording(true);
   }
 
+  async function callAI(actionType: string, payload: Record<string, any>,
+    onResult: (parsed: any) => void) {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ story, action: { type: actionType, payload } }),
+    });
+    if (!res.ok || !res.body) return;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", full = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
+      }
+    }
+    try {
+      const match = full.match(/\{[\s\S]*\}/);
+      if (match) onResult(JSON.parse(match[0]));
+    } catch {}
+  }
+
   async function cleanUp() {
     if (!summary.trim() || busy) return;
     setCleaning(true);
     try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          story: { id: "", title: "", logline: "", projectType: "feature", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], updatedAt: "" },
-          action: { type: "clean_beat", payload: { rawText: summary } },
-        }),
+      await callAI("clean_beat", { rawText: summary }, (parsed) => {
+        if (parsed.name) setName(parsed.name);
+        if (parsed.summary) setSummary(parsed.summary);
       });
-      if (!res.ok || !res.body) { setCleaning(false); return; }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let full = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const msg = JSON.parse(line);
-            if (msg.type === "text") full += msg.value;
-          } catch {}
-        }
-      }
-      // Try to parse JSON
-      try {
-        const match = full.match(/\{[\s\S]*\}/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          if (parsed.name) setName(parsed.name);
-          if (parsed.summary) setSummary(parsed.summary);
-        }
-      } catch {}
-    } finally {
-      setCleaning(false);
-    }
+    } finally { setCleaning(false); }
+  }
+
+  async function createWithAI() {
+    setGenerating(true);
+    saveBeatAISettings(aiSettings);
+    setShowAISettings(false);
+    try {
+      await callAI("generate_beat", {
+        position: story.beats.length,
+        weirdness: aiSettings.weirdness,
+        darkness: aiSettings.darkness,
+        humor: aiSettings.humor,
+        length: aiSettings.length,
+      }, (parsed) => {
+        if (parsed.name) setName(parsed.name);
+        if (parsed.summary) setSummary(parsed.summary);
+      });
+    } finally { setGenerating(false); }
   }
 
   return (
@@ -786,17 +818,61 @@ function BeatCreationForm({
       <textarea className="field" placeholder="Or type the beat description here"
         value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
 
-      {summary.trim() && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-secondary" onClick={cleanUp} disabled={cleaning || busy}
-            style={{ fontSize: 13, flex: 1 }}>
-            {cleaning ? "Cleaning up…" : "✨ Clean up"}
-          </button>
+      {/* Actions row */}
+      <div style={{ display: "flex", gap: 8 }}>
+        {summary.trim() && (
+          <>
+            <button className="btn-secondary" onClick={cleanUp}
+              disabled={cleaning || busy || generating}
+              style={{ fontSize: 13, flex: 1 }}>
+              {cleaning ? "Cleaning…" : "✨ Clean up"}
+            </button>
+            <button className="btn-secondary"
+              onClick={() => { setName(""); setSummary(""); }}
+              style={{ fontSize: 13 }}>
+              ↺ Redo
+            </button>
+          </>
+        )}
+        {!summary.trim() && (
           <button className="btn-secondary"
-            onClick={() => { setName(""); setSummary(""); }}
-            style={{ fontSize: 13 }}>
-            ↺ Redo
+            onClick={() => setShowAISettings(true)}
+            disabled={busy || generating}
+            style={{ fontSize: 13, flex: 1 }}>
+            {generating ? "Creating…" : "✦ Create with AI"}
           </button>
+        )}
+      </div>
+
+      {/* AI settings popup */}
+      {showAISettings && (
+        <div className="card" style={{ marginTop: 4, border: "1px solid var(--border-strong)" }}>
+          <div className="eyebrow" style={{ marginBottom: 12 }}>AI beat settings</div>
+          {[
+            { key: "weirdness" as const, label: "Weirdness" },
+            { key: "darkness" as const,  label: "Darkness" },
+            { key: "humor" as const,     label: "Humor" },
+            { key: "length" as const,    label: "Length" },
+          ].map(({ key, label }) => (
+            <div key={key} style={{ marginBottom: 12 }}>
+              <div className="slider-row">
+                <div className="label">{label}</div>
+                <div className="value">{aiSettings[key]}</div>
+              </div>
+              <input type="range" min={1} max={10} value={aiSettings[key]}
+                onChange={e => setAISettings(s => ({ ...s, [key]: Number(e.target.value) }))} />
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn-primary" onClick={createWithAI}
+              disabled={generating} style={{ flex: 1, fontSize: 13, padding: "12px 16px", minHeight: 0 }}>
+              {generating ? "Creating…" : "Create"}
+            </button>
+            <button className="btn-secondary" onClick={() => setShowAISettings(false)}
+              style={{ fontSize: 13, padding: "12px 16px", minHeight: 0 }}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 

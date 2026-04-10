@@ -148,6 +148,32 @@ Return STRICT JSON: { "name": string, "summary": string }
 - "name" = a short beat label (2-4 words, like "The Revelation" or "First Contact")
 - "summary" = the cleaned-up description`;
 
+    case "generate_beat": {
+      const p = action.payload;
+      return `Generate one new beat for this story. The beat should fit naturally into the existing beat sheet at position ${p.position ?? "next"}.
+
+Creative settings for this beat:
+- Weirdness: ${p.weirdness ?? 5}/10
+- Darkness: ${p.darkness ?? 5}/10
+- Humor: ${p.humor ?? 3}/10
+- Length: ${p.length ?? 5}/10 (1 = ultra-brief, 10 = detailed)
+
+Existing beats for context:
+${story.beats.map((b, i) => `${i + 1}. ${b.name}: ${b.summary}`).join("\n") || "(none yet)"}
+
+Return STRICT JSON: { "name": string, "summary": string }
+- "name" = a short beat label (2-4 words)
+- "summary" = what happens in this beat, matching the length setting`;
+    }
+
+    case "clean_moment":
+      return `The user recorded a creative moment via speech-to-text. Clean it up — fix grammar, add clarity, tighten the prose — but preserve the original intent, voice, and raw creative energy. This is a captured idea, not a polished script.
+
+Raw transcription: "${action.payload.rawText}"
+
+Return STRICT JSON: { "text": string }
+- "text" = the cleaned-up moment`;
+
     default:
       return `Unknown action.`;
   }
