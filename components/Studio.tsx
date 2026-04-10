@@ -152,27 +152,6 @@ export function Studio({
     ));
   }
 
-  // Drag state
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-
-  function handleDragStart(index: number) {
-    setDragIdx(index);
-  }
-  function handleDragOver(e: React.DragEvent, index: number) {
-    e.preventDefault();
-    if (dragIdx == null || dragIdx === index) return;
-    setBeats(bs => {
-      const arr = [...bs];
-      const [moved] = arr.splice(dragIdx, 1);
-      arr.splice(index, 0, moved);
-      return arr.map((b, i) => ({ ...b, position: i }));
-    });
-    setDragIdx(index);
-  }
-  function handleDragEnd() {
-    setDragIdx(null);
-  }
-
   // Back handler
   function handleBack() {
     if (showSetup) { setShowSetup(false); return; }
@@ -287,10 +266,6 @@ export function Studio({
               openBeatTray={(insertAt) => { setBeatTrayInsertAt(insertAt); setBeatTrayOpen(true); }}
               run={run}
               busy={busy}
-              dragIdx={dragIdx}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd}
             />
           )}
           {section === "execute" && (
@@ -401,7 +376,6 @@ function ProjectHeader({
 function DesignTab({
   beats, moments, addBeat, updateBeat, moveBeat, removeBeat,
   unlinkMoment, openMomentPicker, openBeatTray, run, busy,
-  dragIdx, onDragStart, onDragOver, onDragEnd,
 }: {
   beats: Beat[];
   moments: Moment[];
@@ -414,14 +388,14 @@ function DesignTab({
   openBeatTray: (insertAt: number) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
-  dragIdx: number | null;
-  onDragStart: (index: number) => void;
-  onDragOver: (e: React.DragEvent, index: number) => void;
-  onDragEnd: () => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartY = useRef(0);
+  const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   function startEdit(beatId: string, field: "name" | "summary", currentValue: string) {
     setEditingField({ beatId, field });
@@ -441,19 +415,12 @@ function DesignTab({
           <div style={{ fontSize: 36, marginBottom: 8 }}>◆</div>
           <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No beats yet</div>
           <div className="caption" style={{ marginBottom: 16 }}>
-            Add beats manually, or let AI generate a starting structure.
+            Start building your story structure — add your first beat.
           </div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn-primary" style={{ fontSize: 14, padding: "14px 22px", minHeight: 0 }}
-              onClick={() => openBeatTray(0)}>
-              + Add beat
-            </button>
-            <button className="btn-secondary" disabled={busy}
-              onClick={() => run({ type: "generate_beats", payload: {} }, "Generate beat sheet")}
-              style={{ fontSize: 14, padding: "14px 22px", minHeight: 0 }}>
-              AI generate
-            </button>
-          </div>
+          <button className="btn-primary" style={{ fontSize: 14, padding: "14px 22px", minHeight: 0 }}
+            onClick={() => openBeatTray(0)}>
+            + Add beat
+          </button>
         </div>
       )}
 
@@ -462,21 +429,63 @@ function DesignTab({
         const linkedMoments = beat.momentIds
           .map(id => moments.find(m => m.id === id))
           .filter(Boolean) as Moment[];
-        const isDragging = dragIdx === i;
+        const isDragging = draggingIdx === i;
 
         return (
-          <div key={beat.id}>
+          <div key={beat.id} ref={el => { beatRefs.current[i] = el; }}>
             <div
               className={`beat-card ${isExpanded ? "expanded" : ""} ${isDragging ? "dragging" : ""}`}
-              draggable
-              onDragStart={() => onDragStart(i)}
-              onDragOver={(e) => onDragOver(e, i)}
-              onDragEnd={onDragEnd}
             >
-              <button
-                className="beat-header"
-                onClick={() => setExpanded(isExpanded ? null : beat.id)}
-              >
+              <div className="beat-header" style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                {/* Drag grip */}
+                <button
+                  className="beat-grip"
+                  aria-label="Drag to reorder"
+                  onTouchStart={(e) => {
+                    touchStartY.current = e.touches[0].clientY;
+                    longPressTimer.current = setTimeout(() => {
+                      setDraggingIdx(i);
+                      setExpanded(null);
+                    }, 300);
+                  }}
+                  onTouchMove={(e) => {
+                    if (longPressTimer.current) {
+                      clearTimeout(longPressTimer.current);
+                      longPressTimer.current = null;
+                    }
+                    if (draggingIdx == null) return;
+                    e.preventDefault();
+                    const y = e.touches[0].clientY;
+                    const delta = y - touchStartY.current;
+                    // Check if we've moved enough to swap
+                    if (Math.abs(delta) > 50) {
+                      if (delta > 0 && draggingIdx < beats.length - 1) {
+                        moveBeat(draggingIdx, "down");
+                        setDraggingIdx(draggingIdx + 1);
+                        touchStartY.current = y;
+                      } else if (delta < 0 && draggingIdx > 0) {
+                        moveBeat(draggingIdx, "up");
+                        setDraggingIdx(draggingIdx - 1);
+                        touchStartY.current = y;
+                      }
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    if (longPressTimer.current) {
+                      clearTimeout(longPressTimer.current);
+                      longPressTimer.current = null;
+                    }
+                    setDraggingIdx(null);
+                  }}
+                  onMouseDown={() => setDraggingIdx(i)}
+                  onMouseUp={() => setDraggingIdx(null)}
+                >
+                  ⠿
+                </button>
+                <button
+                  style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
+                  onClick={() => setExpanded(isExpanded ? null : beat.id)}
+                >
                 <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
                   {i + 1}
                 </div>
@@ -492,7 +501,8 @@ function DesignTab({
                   </span>
                 )}
                 <span className="beat-expand">›</span>
-              </button>
+                </button>
+              </div>
 
               {isExpanded && (
                 <div className="beat-body">
@@ -584,14 +594,6 @@ function DesignTab({
         );
       })}
 
-      {beats.length > 0 && (
-        <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
-          <button className="btn-secondary" disabled={busy} style={{ flex: 1, fontSize: 13 }}
-            onClick={() => run({ type: "generate_beats", payload: {} }, "AI generate beats")}>
-            AI generate
-          </button>
-        </div>
-      )}
     </>
   );
 }
@@ -785,10 +787,17 @@ function BeatCreationForm({
         value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
 
       {summary.trim() && (
-        <button className="btn-secondary" onClick={cleanUp} disabled={cleaning || busy}
-          style={{ fontSize: 13 }}>
-          {cleaning ? "Cleaning up…" : "✨ Clean up with AI"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-secondary" onClick={cleanUp} disabled={cleaning || busy}
+            style={{ fontSize: 13, flex: 1 }}>
+            {cleaning ? "Cleaning up…" : "✨ Clean up"}
+          </button>
+          <button className="btn-secondary"
+            onClick={() => { setName(""); setSummary(""); }}
+            style={{ fontSize: 13 }}>
+            ↺ Redo
+          </button>
+        </div>
       )}
 
       <button className="btn-primary" onClick={() => onSave(name || "Untitled beat", summary)}

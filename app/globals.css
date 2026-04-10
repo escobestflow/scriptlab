@@ -917,10 +917,29 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .beat-insert-btn:active { opacity: 1; background: var(--bg-secondary); }
 
+/* Drag grip handle */
+.beat-grip {
+  width: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+  color: var(--ink-ghost);
+  padding: 16px 4px 16px 12px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+  letter-spacing: 1px;
+}
+.beat-grip:active { color: var(--ink-mute); }
+
 /* Drag state */
 .beat-card.dragging {
   opacity: 0.5;
   border-style: dashed;
+  background: var(--bg-secondary);
 }
 
 /* Scene content in Execute tab */
