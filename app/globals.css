@@ -635,6 +635,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding-bottom: env(safe-area-inset-bottom);
 }
 .sheet.open { transform: translateY(0); }
+.sheet.open.sheet-tall { min-height: 70vh; }
 .sheet-handle {
   width: 40px; height: 4px;
   border-radius: 999px;

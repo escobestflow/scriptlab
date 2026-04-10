@@ -308,11 +308,11 @@ export function Studio({
       {/* Beat creation tray */}
       <div className={`sheet-backdrop ${beatTrayOpen ? "open" : ""}`}
         onClick={() => setBeatTrayOpen(false)} />
-      <div className={`sheet ${beatTrayOpen ? "open" : ""}`}>
+      <div className={`sheet sheet-tall ${beatTrayOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">New beat</div>
-          <button className="chip" onClick={() => setBeatTrayOpen(false)}>Close</button>
+          <button className="chip" onClick={() => setBeatTrayOpen(false)}>Cancel</button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <BeatCreationForm
@@ -838,48 +838,38 @@ function BeatCreationForm({
       <input className="field" placeholder="Beat name" value={name}
         onChange={e => setName(e.target.value)} />
 
-      {/* Record button */}
-      <div style={{ display: "flex", justifyContent: "center", padding: "12px 0" }}>
+      {/* Description + record button to the right */}
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+        <textarea className="field" placeholder="Describe this beat"
+          value={summary} onChange={e => setSummary(e.target.value)} rows={4}
+          style={{ flex: 1, marginBottom: 0 }} />
         <button
           className={`record-fab ${recording ? "recording" : ""}`}
           onClick={toggleRecord}
-          style={{ position: "static", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}
+          style={{ position: "static", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", width: 52, height: 52, flexShrink: 0 }}
         >
-          <div className="red-dot" />
+          <div className="red-dot" style={{ width: 22, height: 22 }} />
         </button>
       </div>
-      <div className="caption" style={{ textAlign: "center" }}>
-        {recording ? "Listening… tap to stop" : "Tap to describe this beat by voice"}
-      </div>
+      {recording && (
+        <div className="caption" style={{ textAlign: "right" }}>Listening… tap to stop</div>
+      )}
 
-      <textarea className="field" placeholder="Or type the beat description here"
-        value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
-
-      {/* Actions row */}
-      <div style={{ display: "flex", gap: 8 }}>
-        {summary.trim() && (
-          <>
-            <button className="btn-secondary" onClick={cleanUp}
-              disabled={cleaning || busy || generating}
-              style={{ fontSize: 13, flex: 1 }}>
-              {cleaning ? "Cleaning…" : "✨ Clean up"}
-            </button>
-            <button className="btn-secondary"
-              onClick={() => { setName(""); setSummary(""); }}
-              style={{ fontSize: 13 }}>
-              ↺ Redo
-            </button>
-          </>
-        )}
-        {!summary.trim() && (
-          <button className="btn-secondary"
-            onClick={() => setShowAISettings(true)}
-            disabled={busy || generating}
+      {/* Clean up + redo when text exists */}
+      {summary.trim() && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn-secondary" onClick={cleanUp}
+            disabled={cleaning || busy || generating}
             style={{ fontSize: 13, flex: 1 }}>
-            {generating ? "Creating…" : "✦ Create with AI"}
+            {cleaning ? "Cleaning…" : "✨ Clean up"}
           </button>
-        )}
-      </div>
+          <button className="btn-secondary"
+            onClick={() => { setName(""); setSummary(""); }}
+            style={{ fontSize: 13 }}>
+            ↺ Redo
+          </button>
+        </div>
+      )}
 
       {/* AI settings popup */}
       {showAISettings && (
@@ -913,10 +903,20 @@ function BeatCreationForm({
         </div>
       )}
 
-      <button className="btn-primary" onClick={() => onSave(name || "Untitled beat", summary)}
-        disabled={!summary.trim()} style={{ fontSize: 14 }}>
-        Save beat
-      </button>
+      {/* Bottom row: Create with AI (left) + Save (right) */}
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button className="btn-secondary"
+          onClick={() => setShowAISettings(true)}
+          disabled={busy || generating}
+          style={{ fontSize: 13, flex: 1 }}>
+          {generating ? "Creating…" : "✦ Create with AI"}
+        </button>
+        <button className="btn-primary" onClick={() => onSave(name || "Untitled beat", summary)}
+          disabled={!summary.trim()}
+          style={{ fontSize: 13, padding: "12px 20px", minHeight: 0 }}>
+          Save
+        </button>
+      </div>
     </div>
   );
 }
