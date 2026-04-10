@@ -394,10 +394,11 @@ function DesignTab({
   const [editValue, setEditValue] = useState("");
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
-  const [ghostY, setGhostY] = useState(0);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartY = useRef(0);
+  const touchOffsetY = useRef(0);
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const cloneRef = useRef<HTMLDivElement | null>(null);
 
   function startEdit(beatId: string, field: "name" | "summary", currentValue: string) {
     setEditingField({ beatId, field });
@@ -446,12 +447,24 @@ function DesignTab({
                   className="beat-grip"
                   aria-label="Drag to reorder"
                   onTouchStart={(e) => {
-                    touchStartY.current = e.touches[0].clientY;
+                    const y = e.touches[0].clientY;
+                    touchStartY.current = y;
+                    const cardEl = beatRefs.current[i]?.querySelector(".beat-card") as HTMLElement | null;
                     longPressTimer.current = setTimeout(() => {
                       setDraggingIdx(i);
                       setDropTargetIdx(i);
-                      setGhostY(e.touches[0].clientY - 30);
                       setExpanded(null);
+                      // Clone the actual card DOM and attach as fixed overlay
+                      if (cardEl) {
+                        const rect = cardEl.getBoundingClientRect();
+                        touchOffsetY.current = y - rect.top;
+                        const clone = cardEl.cloneNode(true) as HTMLDivElement;
+                        clone.className = "beat-drag-clone";
+                        clone.style.top = `${rect.top}px`;
+                        clone.style.width = `${rect.width}px`;
+                        document.body.appendChild(clone);
+                        cloneRef.current = clone;
+                      }
                     }, 300);
                   }}
                   onTouchMove={(e) => {
@@ -462,7 +475,10 @@ function DesignTab({
                     if (draggingIdx == null) return;
                     e.preventDefault();
                     const y = e.touches[0].clientY;
-                    setGhostY(y - 30);
+                    // Move the clone
+                    if (cloneRef.current) {
+                      cloneRef.current.style.top = `${y - touchOffsetY.current}px`;
+                    }
                     // Find which gap the finger is over
                     let target = draggingIdx;
                     for (let j = 0; j < beats.length; j++) {
@@ -473,7 +489,6 @@ function DesignTab({
                       if (y < mid) { target = j; break; }
                       target = j + 1;
                     }
-                    // Clamp and skip self (no-op positions)
                     target = Math.max(0, Math.min(beats.length, target));
                     setDropTargetIdx(target);
                   }}
@@ -482,12 +497,15 @@ function DesignTab({
                       clearTimeout(longPressTimer.current);
                       longPressTimer.current = null;
                     }
+                    // Remove clone
+                    if (cloneRef.current) {
+                      cloneRef.current.remove();
+                      cloneRef.current = null;
+                    }
                     if (draggingIdx != null && dropTargetIdx != null && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1) {
-                      // Perform the move
                       const fromIdx = draggingIdx;
                       const toIdx = dropTargetIdx > fromIdx ? dropTargetIdx - 1 : dropTargetIdx;
                       if (fromIdx !== toIdx) {
-                        // Use direct setBeats via a sequence of moves
                         let diff = toIdx - fromIdx;
                         let cur = fromIdx;
                         while (diff > 0) { moveBeat(cur, "down"); cur++; diff--; }
@@ -619,13 +637,6 @@ function DesignTab({
         );
       })}
 
-      {/* Drag ghost */}
-      {draggingIdx != null && beats[draggingIdx] && (
-        <div className="beat-drag-ghost" style={{ top: ghostY }}>
-          <div className="ghost-number">{draggingIdx + 1}</div>
-          <div className="ghost-name">{beats[draggingIdx].name || "Untitled beat"}</div>
-        </div>
-      )}
     </>
   );
 }

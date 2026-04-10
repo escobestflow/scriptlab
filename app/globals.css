@@ -938,20 +938,33 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .beat-grip:active { color: var(--ink-mute); }
 
-/* Drag state — lifted card */
+/* Drag state — the original card becomes a ghost placeholder */
 .beat-card.dragging {
-  opacity: 0.92;
-  transform: scale(1.02);
-  box-shadow: 0 8px 30px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1);
-  z-index: 10;
-  position: relative;
-  border-color: var(--ink-mute);
+  opacity: 0.15;
+  border-style: dashed;
+  border-color: var(--ink-ghost);
+  background: var(--bg-secondary);
+}
+
+/* The lifted clone that follows the finger */
+.beat-drag-clone {
+  position: fixed;
+  left: 20px; right: 20px;
+  z-index: 100;
+  pointer-events: none;
+  transform: scale(1.03);
+  box-shadow: 0 16px 50px rgba(0,0,0,0.22), 0 4px 14px rgba(0,0,0,0.12);
+  border-radius: 16px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  overflow: hidden;
+  transition: none;
 }
 
 /* Drop indicator — thin line between beats */
 .beat-drop-indicator {
   height: 3px;
-  margin: 0 16px;
+  margin: 2px 16px;
   border-radius: 999px;
   background: var(--ink);
   opacity: 0;
@@ -959,36 +972,6 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .beat-drop-indicator.active {
   opacity: 1;
-}
-
-/* Drag ghost — follows finger */
-.beat-drag-ghost {
-  position: fixed;
-  left: 20px; right: 20px;
-  z-index: 100;
-  pointer-events: none;
-  opacity: 0.88;
-  transform: scale(1.03);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.12);
-  border-radius: 16px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: none;
-}
-.beat-drag-ghost .ghost-number {
-  width: 32px; height: 32px;
-  border-radius: 10px;
-  background: var(--ink);
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 900; flex-shrink: 0;
-}
-.beat-drag-ghost .ghost-name {
-  font-size: 15px; font-weight: 900;
 }
 
 /* Success toast */
