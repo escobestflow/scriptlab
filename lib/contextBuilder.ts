@@ -56,12 +56,12 @@ ${story.logline || "(none yet)"}
 
 ## Settings
 - Framework: ${settings.framework}
-- Genre: ${settings.genre}
+- Genres: ${(settings as any).genres?.join(", ") || (settings as any).genre || "none"}
 - Vibe: ${settings.vibe}
 - Unpredictability: ${settings.unpredictability}/10
 - Darkness: ${settings.darkness}/10
 - Pace: ${settings.pace}/10
-- Ending type: ${settings.endingType}
+- Ending types: ${(settings as any).endingTypes?.join(", ") || (settings as any).endingType || "none"}
 
 ## Characters
 ${characters.map(c => `- ${c.name} (${c.role}) — wants: ${c.want}; needs: ${c.need}${c.notes ? `; ${c.notes}` : ""}`).join("\n") || "(none)"}
@@ -100,7 +100,7 @@ Rules:
 - Use every locked ingredient meaningfully.
 - Weave in at least one snippet where it fits naturally (reference by title in the purpose field).
 - Match the darkness/pace/unpredictability levels.
-- Respect the ending type: "${story.settings.endingType}".`;
+- Respect the ending types: "${(story.settings as any).endingTypes?.join(", ") || (story.settings as any).endingType || "any"}".`;
 
     case "swap_ingredient": {
       const id = action.payload.ingredientId;
@@ -131,13 +131,22 @@ Return STRICT JSON: { "beat": { "name": string, "summary": string, "purpose": st
       const idx = action.payload.beatIndex;
       const beat = story.beats[idx];
       return `Write the full scene for beat #${idx + 1} ("${beat?.name}" — ${beat?.summary}).
-Match the vibe "${story.settings.vibe}" and genre "${story.settings.genre}".
+Match the vibe "${story.settings.vibe}" and genres "${(story.settings as any).genres?.join(", ") || (story.settings as any).genre || "drama"}".
 Return prose in screenplay-adjacent format. No JSON, no preamble.`;
     }
 
     case "brainstorm":
       return `The user wants to brainstorm: "${action.payload.prompt}"
 Respond with 5 concrete, specific ideas grounded in this project's bible. Return STRICT JSON: { "ideas": [ { "title": string, "description": string } ] }`;
+
+    case "clean_beat":
+      return `The user recorded a beat description via speech-to-text. Clean it up — fix grammar, add clarity, tighten the prose — but preserve the original intent and voice. Keep it concise (2-4 sentences max).
+
+Raw transcription: "${action.payload.rawText}"
+
+Return STRICT JSON: { "name": string, "summary": string }
+- "name" = a short beat label (2-4 words, like "The Revelation" or "First Contact")
+- "summary" = the cleaned-up description`;
 
     default:
       return `Unknown action.`;

@@ -50,7 +50,7 @@ export function Home({
                     {p.title || "Untitled"}
                   </div>
                   <div className="meta">
-                    {p.settings.genre} · {p.settings.framework.replace(/-/g, " ")}
+                    {p.settings.genres?.join(", ")} · {p.settings.framework.replace(/-/g, " ")}
                     {p.beats.length > 0 && ` · ${p.beats.length} beats`}
                   </div>
                 </div>

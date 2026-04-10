@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Story, Beat } from "@/lib/story";
+import { useRef, useState } from "react";
+import { Story, Beat, Episode } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
 
-type Tab = "design" | "execute" | "setup";
+type Section = "design" | "execute";
 
 export function Studio({
   story,
@@ -18,14 +18,37 @@ export function Studio({
   moments: Moment[];
   onBack: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("design");
+  const [section, setSection] = useState<Section>("design");
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState("");
-  // Moment picker state
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerBeatId, setPickerBeatId] = useState<string | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
+  const [beatTrayOpen, setBeatTrayOpen] = useState(false);
+  const [beatTrayInsertAt, setBeatTrayInsertAt] = useState<number | null>(null);
+  // TV show episode drill-in
+  const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
+
+  // Determine which beats we're editing
+  const isTV = story.projectType === "tv-show";
+  const activeEpisode = isTV ? story.episodes?.find(ep => ep.id === activeEpisodeId) : null;
+  const beats = isTV
+    ? (activeEpisode?.beats ?? [])
+    : story.beats;
+  const setBeats = (updater: (bs: Beat[]) => Beat[]) => {
+    if (isTV && activeEpisodeId) {
+      setStory(s => ({
+        ...s,
+        episodes: s.episodes?.map(ep =>
+          ep.id === activeEpisodeId ? { ...ep, beats: updater(ep.beats) } : ep
+        ),
+      }));
+    } else {
+      setStory(s => ({ ...s, beats: updater(s.beats) }));
+    }
+  };
 
   async function run(action: ActionRequest, title: string) {
     if (busy) return;
@@ -68,15 +91,11 @@ export function Studio({
         }
       }
 
-      // If this was a scene generation, save the content to the beat
       if (action.type === "generate_scene" && action.payload.beatIndex != null) {
         const idx = action.payload.beatIndex;
-        setStory(s => ({
-          ...s,
-          beats: s.beats.map((b, i) =>
-            i === idx ? { ...b, status: "written" as const, sceneContent: fullText } : b
-          ),
-        }));
+        setBeats(bs => bs.map((b, i) =>
+          i === idx ? { ...b, status: "written" as const, sceneContent: fullText } : b
+        ));
       }
     } finally {
       setBusy(false);
@@ -84,130 +103,204 @@ export function Studio({
   }
 
   // Beat management
-  function addBeat(name: string, summary: string) {
+  function addBeat(name: string, summary: string, insertAt?: number) {
     const newBeat: Beat = {
       id: "b_" + Math.random().toString(36).slice(2),
-      name,
-      summary,
-      purpose: "",
-      position: story.beats.length,
-      momentIds: [],
-      status: "design",
+      name, summary, purpose: "",
+      position: 0, momentIds: [], status: "design",
     };
-    setStory(s => ({ ...s, beats: [...s.beats, newBeat] }));
+    setBeats(bs => {
+      const idx = insertAt != null ? insertAt : bs.length;
+      const updated = [...bs];
+      updated.splice(idx, 0, newBeat);
+      return updated.map((b, i) => ({ ...b, position: i }));
+    });
+  }
+
+  function updateBeat(id: string, patch: Partial<Beat>) {
+    setBeats(bs => bs.map(b => b.id === id ? { ...b, ...patch } : b));
   }
 
   function moveBeat(index: number, direction: "up" | "down") {
     const target = direction === "up" ? index - 1 : index + 1;
-    setStory(s => {
-      const beats = [...s.beats];
-      [beats[index], beats[target]] = [beats[target], beats[index]];
-      return { ...s, beats: beats.map((b, i) => ({ ...b, position: i })) };
+    setBeats(bs => {
+      const arr = [...bs];
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return arr.map((b, i) => ({ ...b, position: i }));
     });
   }
 
   function removeBeat(id: string) {
-    setStory(s => ({
-      ...s,
-      beats: s.beats.filter(b => b.id !== id).map((b, i) => ({ ...b, position: i })),
-    }));
+    setBeats(bs => bs.filter(b => b.id !== id).map((b, i) => ({ ...b, position: i })));
   }
 
   function linkMoment(beatId: string, momentId: string) {
-    setStory(s => ({
-      ...s,
-      beats: s.beats.map(b =>
-        b.id === beatId && !b.momentIds.includes(momentId)
-          ? { ...b, momentIds: [...b.momentIds, momentId] }
-          : b
-      ),
-    }));
+    setBeats(bs => bs.map(b =>
+      b.id === beatId && !b.momentIds.includes(momentId)
+        ? { ...b, momentIds: [...b.momentIds, momentId] }
+        : b
+    ));
     setPickerOpen(false);
     setPickerBeatId(null);
   }
 
   function unlinkMoment(beatId: string, momentId: string) {
-    setStory(s => ({
-      ...s,
-      beats: s.beats.map(b =>
-        b.id === beatId
-          ? { ...b, momentIds: b.momentIds.filter(id => id !== momentId) }
-          : b
-      ),
-    }));
+    setBeats(bs => bs.map(b =>
+      b.id === beatId
+        ? { ...b, momentIds: b.momentIds.filter(id => id !== momentId) }
+        : b
+    ));
   }
 
-  function openMomentPicker(beatId: string) {
-    setPickerBeatId(beatId);
-    setPickerOpen(true);
+  // Drag state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  function handleDragStart(index: number) {
+    setDragIdx(index);
   }
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    if (dragIdx == null || dragIdx === index) return;
+    setBeats(bs => {
+      const arr = [...bs];
+      const [moved] = arr.splice(dragIdx, 1);
+      arr.splice(index, 0, moved);
+      return arr.map((b, i) => ({ ...b, position: i }));
+    });
+    setDragIdx(index);
+  }
+  function handleDragEnd() {
+    setDragIdx(null);
+  }
+
+  // Back handler
+  function handleBack() {
+    if (showSetup) { setShowSetup(false); return; }
+    if (isTV && activeEpisodeId) { setActiveEpisodeId(null); return; }
+    onBack();
+  }
+
+  // TV Show episode view
+  if (isTV && !activeEpisodeId && !showSetup) {
+    return (
+      <>
+        <ProjectHeader
+          story={story}
+          onBack={onBack}
+          onSetup={() => setShowSetup(true)}
+          subtitle={`${story.episodes?.length ?? 0} episodes`}
+        />
+        <div className="section-tabs">
+          <button className="section-tab active">Episodes</button>
+        </div>
+        <div className="screen-scroll">
+          <div className="page-enter">
+            {(story.episodes ?? []).map(ep => (
+              <button
+                key={ep.id}
+                className="project-card"
+                onClick={() => setActiveEpisodeId(ep.id)}
+                style={{ width: "100%", textAlign: "left" }}
+              >
+                <div className="project-thumb" style={{ width: 42, height: 42, borderRadius: 12, fontSize: 14 }}>
+                  {ep.number}
+                </div>
+                <div className="project-info">
+                  <div className="project-title">{ep.title}</div>
+                  <div className="caption">{ep.beats.length} beats</div>
+                </div>
+                <div className="project-arrow">›</div>
+              </button>
+            ))}
+            <button className="btn-secondary" style={{ width: "100%", marginTop: 12 }}
+              onClick={() => {
+                setStory(s => ({
+                  ...s,
+                  episodes: [
+                    ...(s.episodes ?? []),
+                    {
+                      id: "ep_" + Math.random().toString(36).slice(2),
+                      title: `Episode ${(s.episodes?.length ?? 0) + 1}`,
+                      number: (s.episodes?.length ?? 0) + 1,
+                      beats: [],
+                    },
+                  ],
+                }));
+              }}>
+              + Add episode
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Setup view
+  if (showSetup) {
+    return (
+      <>
+        <ProjectHeader
+          story={story}
+          onBack={() => setShowSetup(false)}
+          subtitle="Setup"
+        />
+        <div className="screen-scroll">
+          <div className="page-enter">
+            <ConfigureTab story={story} setStory={setStory} />
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  const sorted = [...beats].sort((a, b) => a.position - b.position);
 
   return (
     <>
-      {/* Top bar */}
-      <div className="topbar">
-        <button className="topbar-btn" onClick={onBack} aria-label="Back">
-          <svg viewBox="0 0 24 24" style={{width:22,height:22,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <div style={{ textAlign: "center", flex: 1 }}>
-          <div className="eyebrow">{story.settings.framework.replace(/-/g, " ")}</div>
-          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.01em", marginTop: 2 }}>
-            {story.title || "Untitled"}
-          </div>
-        </div>
-        <div style={{ width: 44 }} />
+      <ProjectHeader
+        story={story}
+        onBack={handleBack}
+        onSetup={() => setShowSetup(true)}
+        subtitle={isTV && activeEpisode ? activeEpisode.title : undefined}
+      />
+
+      {/* Section tabs at top */}
+      <div className="section-tabs">
+        <button className={`section-tab ${section === "design" ? "active" : ""}`}
+          onClick={() => setSection("design")}>Design</button>
+        <button className={`section-tab ${section === "execute" ? "active" : ""}`}
+          onClick={() => setSection("execute")}>Execute</button>
       </div>
 
-      {/* Content */}
-      <div className="screen-scroll" key={tab}>
+      <div className="screen-scroll" key={section}>
         <div className="page-enter">
-          {tab === "design" && (
+          {section === "design" && (
             <DesignTab
-              story={story}
+              beats={sorted}
               moments={moments}
               addBeat={addBeat}
+              updateBeat={updateBeat}
               moveBeat={moveBeat}
               removeBeat={removeBeat}
               unlinkMoment={unlinkMoment}
-              openMomentPicker={openMomentPicker}
+              openMomentPicker={(id) => { setPickerBeatId(id); setPickerOpen(true); }}
+              openBeatTray={(insertAt) => { setBeatTrayInsertAt(insertAt); setBeatTrayOpen(true); }}
               run={run}
               busy={busy}
+              dragIdx={dragIdx}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
             />
           )}
-          {tab === "execute" && (
-            <ExecuteTab story={story} run={run} busy={busy} />
-          )}
-          {tab === "setup" && (
-            <ConfigureTab story={story} setStory={setStory} />
+          {section === "execute" && (
+            <ExecuteTab beats={sorted} run={run} busy={busy} />
           )}
         </div>
       </div>
 
-      {/* Tab bar */}
-      <nav className="tabbar">
-        <div className="tabbar-inner">
-          {[
-            { id: "design",  icon: "◆", label: "Design" },
-            { id: "execute", icon: "▶", label: "Execute" },
-            { id: "setup",   icon: "⚙", label: "Setup" },
-          ].map(t => (
-            <button
-              key={t.id}
-              className={`tab ${tab === t.id ? "active" : ""}`}
-              onClick={() => setTab(t.id as Tab)}
-            >
-              <span className="icon">{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </nav>
-
       {/* Streaming output sheet */}
-      <div
-        className={`sheet-backdrop ${sheetOpen ? "open" : ""}`}
-        onClick={() => setSheetOpen(false)}
-      />
+      <div className={`sheet-backdrop ${sheetOpen ? "open" : ""}`} onClick={() => setSheetOpen(false)} />
       <div className={`sheet ${sheetOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-header">
@@ -220,10 +313,8 @@ export function Studio({
       </div>
 
       {/* Moment picker sheet */}
-      <div
-        className={`sheet-backdrop ${pickerOpen ? "open" : ""}`}
-        onClick={() => { setPickerOpen(false); setPickerBeatId(null); }}
-      />
+      <div className={`sheet-backdrop ${pickerOpen ? "open" : ""}`}
+        onClick={() => { setPickerOpen(false); setPickerBeatId(null); }} />
       <div className={`sheet ${pickerOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-header">
@@ -233,8 +324,30 @@ export function Studio({
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <MomentPicker
             moments={moments}
-            linkedIds={pickerBeatId ? (story.beats.find(b => b.id === pickerBeatId)?.momentIds ?? []) : []}
-            onLink={(momentId) => pickerBeatId && linkMoment(pickerBeatId, momentId)}
+            linkedIds={pickerBeatId ? (beats.find(b => b.id === pickerBeatId)?.momentIds ?? []) : []}
+            onLink={(mid) => pickerBeatId && linkMoment(pickerBeatId, mid)}
+          />
+        </div>
+      </div>
+
+      {/* Beat creation tray */}
+      <div className={`sheet-backdrop ${beatTrayOpen ? "open" : ""}`}
+        onClick={() => setBeatTrayOpen(false)} />
+      <div className={`sheet ${beatTrayOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">New beat</div>
+          <button className="chip" onClick={() => setBeatTrayOpen(false)}>Close</button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <BeatCreationForm
+            onSave={(name, summary) => {
+              addBeat(name, summary, beatTrayInsertAt ?? undefined);
+              setBeatTrayOpen(false);
+              setBeatTrayInsertAt(null);
+            }}
+            run={run}
+            busy={busy}
           />
         </div>
       </div>
@@ -243,47 +356,87 @@ export function Studio({
 }
 
 /* ============================================ */
+/* ============ PROJECT HEADER ================ */
+/* ============================================ */
+
+function ProjectHeader({
+  story, onBack, onSetup, subtitle,
+}: {
+  story: Story;
+  onBack: () => void;
+  onSetup?: () => void;
+  subtitle?: string;
+}) {
+  return (
+    <div className="topbar">
+      <button className="topbar-btn" onClick={onBack} aria-label="Back">
+        <svg viewBox="0 0 24 24" style={{width:22,height:22,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <div style={{ textAlign: "center", flex: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.01em" }}>
+          {story.title || "Untitled"}
+        </div>
+        {subtitle && <div className="caption">{subtitle}</div>}
+      </div>
+      {onSetup ? (
+        <button className="topbar-btn" onClick={onSetup} aria-label="Setup">
+          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        </button>
+      ) : (
+        <div style={{ width: 44 }} />
+      )}
+    </div>
+  );
+}
+
+/* ============================================ */
 /* ============ DESIGN TAB ==================== */
 /* ============================================ */
 
 function DesignTab({
-  story, moments, addBeat, moveBeat, removeBeat, unlinkMoment, openMomentPicker, run, busy,
+  beats, moments, addBeat, updateBeat, moveBeat, removeBeat,
+  unlinkMoment, openMomentPicker, openBeatTray, run, busy,
+  dragIdx, onDragStart, onDragOver, onDragEnd,
 }: {
-  story: Story;
+  beats: Beat[];
   moments: Moment[];
-  addBeat: (name: string, summary: string) => void;
+  addBeat: (name: string, summary: string, insertAt?: number) => void;
+  updateBeat: (id: string, patch: Partial<Beat>) => void;
   moveBeat: (index: number, direction: "up" | "down") => void;
   removeBeat: (id: string) => void;
   unlinkMoment: (beatId: string, momentId: string) => void;
   openMomentPicker: (beatId: string) => void;
+  openBeatTray: (insertAt: number) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
+  dragIdx: number | null;
+  onDragStart: (index: number) => void;
+  onDragOver: (e: React.DragEvent, index: number) => void;
+  onDragEnd: () => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [addingBeat, setAddingBeat] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newSummary, setNewSummary] = useState("");
+  const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
+  const [editValue, setEditValue] = useState("");
 
-  function handleAddBeat() {
-    if (!newName.trim()) return;
-    addBeat(newName.trim(), newSummary.trim());
-    setNewName("");
-    setNewSummary("");
-    setAddingBeat(false);
+  function startEdit(beatId: string, field: "name" | "summary", currentValue: string) {
+    setEditingField({ beatId, field });
+    setEditValue(currentValue);
   }
-
-  const sorted = [...story.beats].sort((a, b) => a.position - b.position);
+  function saveEdit() {
+    if (editingField) {
+      updateBeat(editingField.beatId, { [editingField.field]: editValue });
+      setEditingField(null);
+    }
+  }
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
-        <div className="display">Design</div>
-      </div>
-      <div className="caption" style={{ marginBottom: 18 }}>
-        Structure your story before writing. Add beats, reorder them, link your Moments.
-      </div>
-
-      {sorted.length === 0 && !addingBeat && (
+      {beats.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>◆</div>
           <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No beats yet</div>
@@ -292,7 +445,7 @@ function DesignTab({
           </div>
           <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
             <button className="btn-primary" style={{ fontSize: 14, padding: "14px 22px", minHeight: 0 }}
-              onClick={() => setAddingBeat(true)}>
+              onClick={() => openBeatTray(0)}>
               + Add beat
             </button>
             <button className="btn-secondary" disabled={busy}
@@ -304,136 +457,139 @@ function DesignTab({
         </div>
       )}
 
-      {sorted.map((beat, i) => {
+      {beats.map((beat, i) => {
         const isExpanded = expanded === beat.id;
         const linkedMoments = beat.momentIds
           .map(id => moments.find(m => m.id === id))
           .filter(Boolean) as Moment[];
+        const isDragging = dragIdx === i;
 
         return (
-          <div key={beat.id} className={`beat-card ${isExpanded ? "expanded" : ""}`}>
-            <button
-              className="beat-header"
-              onClick={() => setExpanded(isExpanded ? null : beat.id)}
+          <div key={beat.id}>
+            <div
+              className={`beat-card ${isExpanded ? "expanded" : ""} ${isDragging ? "dragging" : ""}`}
+              draggable
+              onDragStart={() => onDragStart(i)}
+              onDragOver={(e) => onDragOver(e, i)}
+              onDragEnd={onDragEnd}
             >
-              <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
-                {i + 1}
-              </div>
-              <div className="beat-info">
-                <div className="beat-name">{beat.name}</div>
-                {!isExpanded && (
-                  <div className="beat-summary-preview">{beat.summary || "No summary"}</div>
-                )}
-              </div>
-              {beat.momentIds.length > 0 && (
-                <span className="caption" style={{ flexShrink: 0 }}>
-                  {beat.momentIds.length}m
-                </span>
-              )}
-              <span className="beat-expand">›</span>
-            </button>
-
-            {isExpanded && (
-              <div className="beat-body">
-                {/* Summary */}
-                <div className="beat-section-label">Summary</div>
-                <div className="beat-text">{beat.summary || <span className="beat-text muted">No summary yet</span>}</div>
-
-                {/* Purpose */}
-                {beat.purpose && (
-                  <>
-                    <div className="beat-section-label">Purpose</div>
-                    <div className="beat-text">{beat.purpose}</div>
-                  </>
-                )}
-
-                {/* Linked moments */}
-                <div className="beat-section-label">
-                  Linked moments · {linkedMoments.length}
+              <button
+                className="beat-header"
+                onClick={() => setExpanded(isExpanded ? null : beat.id)}
+              >
+                <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
+                  {i + 1}
                 </div>
-                {linkedMoments.length > 0 ? (
-                  <div className="beat-moments">
-                    {linkedMoments.map(m => (
-                      <div key={m.id} className="linked-moment">
-                        <div className="moment-type-dot" />
-                        <div className="moment-preview">{m.text}</div>
-                        <button
-                          className="btn-icon"
-                          style={{ width: 28, height: 28, fontSize: 14 }}
-                          onClick={() => unlinkMoment(beat.id, m.id)}
-                          aria-label="Unlink moment"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                <div className="beat-info">
+                  <div className="beat-name">{beat.name || "Untitled beat"}</div>
+                  {!isExpanded && (
+                    <div className="beat-summary-preview">{beat.summary || "No summary"}</div>
+                  )}
+                </div>
+                {beat.momentIds.length > 0 && (
+                  <span className="caption" style={{ flexShrink: 0 }}>
+                    {beat.momentIds.length}m
+                  </span>
+                )}
+                <span className="beat-expand">›</span>
+              </button>
+
+              {isExpanded && (
+                <div className="beat-body">
+                  {/* Editable name */}
+                  <div className="beat-section-label">Name</div>
+                  {editingField?.beatId === beat.id && editingField.field === "name" ? (
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input className="field" value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        onBlur={saveEdit}
+                        onKeyDown={e => e.key === "Enter" && saveEdit()}
+                        autoFocus
+                        style={{ fontSize: 14, padding: "10px 12px" }} />
+                    </div>
+                  ) : (
+                    <div className="beat-text" onClick={() => startEdit(beat.id, "name", beat.name)}
+                      style={{ cursor: "text" }}>
+                      {beat.name || <span className="beat-text muted">Tap to edit</span>}
+                    </div>
+                  )}
+
+                  {/* Editable summary */}
+                  <div className="beat-section-label">Summary</div>
+                  {editingField?.beatId === beat.id && editingField.field === "summary" ? (
+                    <textarea className="field" value={editValue}
+                      onChange={e => setEditValue(e.target.value)}
+                      onBlur={saveEdit}
+                      autoFocus rows={4}
+                      style={{ fontSize: 14, padding: "10px 12px" }} />
+                  ) : (
+                    <div className="beat-text" onClick={() => startEdit(beat.id, "summary", beat.summary)}
+                      style={{ cursor: "text" }}>
+                      {beat.summary || <span className="beat-text muted">Tap to edit</span>}
+                    </div>
+                  )}
+
+                  {beat.purpose && (
+                    <>
+                      <div className="beat-section-label">Purpose</div>
+                      <div className="beat-text">{beat.purpose}</div>
+                    </>
+                  )}
+
+                  <div className="beat-section-label">Linked moments · {linkedMoments.length}</div>
+                  {linkedMoments.length > 0 ? (
+                    <div className="beat-moments">
+                      {linkedMoments.map(m => (
+                        <div key={m.id} className="linked-moment">
+                          <div className="moment-type-dot" />
+                          <div className="moment-preview">{m.text}</div>
+                          <button className="btn-icon" style={{ width: 28, height: 28, fontSize: 14 }}
+                            onClick={() => unlinkMoment(beat.id, m.id)} aria-label="Unlink">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="caption">No moments linked.</div>
+                  )}
+
+                  <div className="beat-actions">
+                    <button className="btn-secondary" style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}
+                      onClick={() => openMomentPicker(beat.id)}>+ Link moment</button>
+                    <button className="btn-secondary"
+                      style={{ fontSize: 12, padding: "8px 14px", minHeight: 0, color: "var(--ink-mute)" }}
+                      onClick={() => removeBeat(beat.id)}>Remove</button>
                   </div>
-                ) : (
-                  <div className="caption">No moments linked yet.</div>
-                )}
 
-                {/* Actions */}
-                <div className="beat-actions">
-                  <button className="btn-secondary" style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}
-                    onClick={() => openMomentPicker(beat.id)}>
-                    + Link moment
-                  </button>
-                  <button className="btn-secondary" style={{ fontSize: 12, padding: "8px 14px", minHeight: 0, color: "var(--ink-mute)" }}
-                    onClick={() => removeBeat(beat.id)}>
-                    Remove
-                  </button>
+                  <div className="beat-reorder">
+                    <button className="reorder-btn" disabled={i === 0}
+                      onClick={() => moveBeat(i, "up")} aria-label="Move up">↑</button>
+                    <button className="reorder-btn" disabled={i === beats.length - 1}
+                      onClick={() => moveBeat(i, "down")} aria-label="Move down">↓</button>
+                  </div>
                 </div>
+              )}
+            </div>
 
-                {/* Reorder */}
-                <div className="beat-reorder">
-                  <button className="reorder-btn" disabled={i === 0}
-                    onClick={() => moveBeat(i, "up")} aria-label="Move up">
-                    ↑
-                  </button>
-                  <button className="reorder-btn" disabled={i === sorted.length - 1}
-                    onClick={() => moveBeat(i, "down")} aria-label="Move down">
-                    ↓
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Inline + button between beats */}
+            <div className="beat-insert-row">
+              <button
+                className="beat-insert-btn"
+                onClick={() => openBeatTray(i + 1)}
+                aria-label="Insert beat here"
+              >
+                +
+              </button>
+            </div>
           </div>
         );
       })}
 
-      {/* Add beat area */}
-      {sorted.length > 0 && !addingBeat && (
-        <div className="add-beat-area" style={{ display: "flex", gap: 10 }}>
-          <button className="btn-secondary" style={{ flex: 1, fontSize: 13 }}
-            onClick={() => setAddingBeat(true)}>
-            + Add beat
-          </button>
-          <button className="btn-secondary" disabled={busy} style={{ fontSize: 13 }}
+      {beats.length > 0 && (
+        <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+          <button className="btn-secondary" disabled={busy} style={{ flex: 1, fontSize: 13 }}
             onClick={() => run({ type: "generate_beats", payload: {} }, "AI generate beats")}>
             AI generate
           </button>
-        </div>
-      )}
-
-      {addingBeat && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="eyebrow" style={{ marginBottom: 10 }}>New beat</div>
-          <div className="stack">
-            <input className="field" placeholder="Beat name" value={newName}
-              onChange={e => setNewName(e.target.value)} autoFocus />
-            <textarea className="field" placeholder="What happens in this beat?" value={newSummary}
-              onChange={e => setNewSummary(e.target.value)} rows={3} />
-            <div style={{ display: "flex", gap: 10 }}>
-              <button className="btn-primary" style={{ flex: 1, fontSize: 13, padding: "12px 16px", minHeight: 0 }}
-                onClick={handleAddBeat} disabled={!newName.trim()}>
-                Add
-              </button>
-              <button className="btn-secondary" style={{ fontSize: 13, padding: "12px 16px", minHeight: 0 }}
-                onClick={() => { setAddingBeat(false); setNewName(""); setNewSummary(""); }}>
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </>
@@ -445,54 +601,41 @@ function DesignTab({
 /* ============================================ */
 
 function ExecuteTab({
-  story, run, busy,
+  beats, run, busy,
 }: {
-  story: Story;
+  beats: Beat[];
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
 }) {
-  const sorted = [...story.beats].sort((a, b) => a.position - b.position);
-  const designCount = sorted.filter(b => b.status === "design").length;
-  const writtenCount = sorted.filter(b => b.status === "written").length;
+  const writtenCount = beats.filter(b => b.status === "written").length;
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 6 }}>
-        <div className="display">Execute</div>
-      </div>
-      <div className="caption" style={{ marginBottom: 18 }}>
-        Write scenes from your design. {writtenCount}/{sorted.length} beats written.
+      <div className="caption" style={{ marginBottom: 14 }}>
+        {writtenCount}/{beats.length} beats written.
       </div>
 
-      {sorted.length === 0 && (
+      {beats.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-          <div className="caption">
-            No beats to execute yet. Go to <b>Design</b> to structure your story first.
-          </div>
+          <div className="caption">No beats yet. Go to <b>Design</b> to structure first.</div>
         </div>
       )}
 
-      {sorted.map((beat, i) => (
+      {beats.map((beat, i) => (
         <div key={beat.id} className="beat-card">
           <div className="beat-header" style={{ cursor: "default" }}>
-            <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
-              {i + 1}
-            </div>
+            <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>{i + 1}</div>
             <div className="beat-info">
               <div className="beat-name">{beat.name}</div>
               <div className="beat-summary-preview">{beat.summary}</div>
             </div>
-            <span className={`beat-status-badge ${beat.status}`}>
-              {beat.status}
-            </span>
+            <span className={`beat-status-badge ${beat.status}`}>{beat.status}</span>
           </div>
-
           {beat.status === "written" && beat.sceneContent && (
             <div style={{ padding: "0 16px 16px" }}>
               <div className="scene-content">{beat.sceneContent}</div>
             </div>
           )}
-
           {beat.status === "design" && (
             <div style={{ padding: "0 16px 16px" }}>
               <button className="btn-primary" disabled={busy}
@@ -508,22 +651,151 @@ function ExecuteTab({
         </div>
       ))}
 
-      {sorted.length > 0 && (
+      {beats.length > 0 && (
         <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
           <button className="btn-secondary" disabled={busy} style={{ flex: 1, fontSize: 13 }}
-            onClick={() => run({ type: "add_twist", payload: {} }, "Add twist")}>
-            ⚡ Add twist
-          </button>
+            onClick={() => run({ type: "add_twist", payload: {} }, "Add twist")}>⚡ Add twist</button>
           <button className="btn-secondary" disabled={busy} style={{ flex: 1, fontSize: 13 }}
             onClick={() => run(
               { type: "brainstorm", payload: { prompt: "ways to deepen the conflict" } },
               "Brainstorm"
-            )}>
-            ✎ Brainstorm
-          </button>
+            )}>✎ Brainstorm</button>
         </div>
       )}
     </>
+  );
+}
+
+/* ============================================ */
+/* ============ BEAT CREATION FORM ============ */
+/* ============================================ */
+
+function BeatCreationForm({
+  onSave, run, busy,
+}: {
+  onSave: (name: string, summary: string) => void;
+  run: (a: ActionRequest, title: string) => void;
+  busy: boolean;
+}) {
+  const [name, setName] = useState("");
+  const [summary, setSummary] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  function toggleRecord() {
+    const SR: any =
+      typeof window !== "undefined"
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+    if (!SR) {
+      // Fallback to text
+      return;
+    }
+    if (recording) {
+      recognitionRef.current?.stop();
+      setRecording(false);
+      return;
+    }
+    const rec = new SR();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = "en-US";
+    let captured = "";
+    rec.onresult = (e: any) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) captured += e.results[i][0].transcript + " ";
+        else interim += e.results[i][0].transcript;
+      }
+      setSummary((captured + interim).trim());
+    };
+    rec.onend = () => setRecording(false);
+    rec.onerror = () => setRecording(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setRecording(true);
+  }
+
+  async function cleanUp() {
+    if (!summary.trim() || busy) return;
+    setCleaning(true);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story: { id: "", title: "", logline: "", projectType: "feature", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], updatedAt: "" },
+          action: { type: "clean_beat", payload: { rawText: summary } },
+        }),
+      });
+      if (!res.ok || !res.body) { setCleaning(false); return; }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let full = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.type === "text") full += msg.value;
+          } catch {}
+        }
+      }
+      // Try to parse JSON
+      try {
+        const match = full.match(/\{[\s\S]*\}/);
+        if (match) {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.name) setName(parsed.name);
+          if (parsed.summary) setSummary(parsed.summary);
+        }
+      } catch {}
+    } finally {
+      setCleaning(false);
+    }
+  }
+
+  return (
+    <div className="stack">
+      <input className="field" placeholder="Beat name" value={name}
+        onChange={e => setName(e.target.value)} />
+
+      {/* Record button */}
+      <div style={{ display: "flex", justifyContent: "center", padding: "12px 0" }}>
+        <button
+          className={`record-fab ${recording ? "recording" : ""}`}
+          onClick={toggleRecord}
+          style={{ position: "static", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}
+        >
+          <div className="red-dot" />
+        </button>
+      </div>
+      <div className="caption" style={{ textAlign: "center" }}>
+        {recording ? "Listening… tap to stop" : "Tap to describe this beat by voice"}
+      </div>
+
+      <textarea className="field" placeholder="Or type the beat description here"
+        value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
+
+      {summary.trim() && (
+        <button className="btn-secondary" onClick={cleanUp} disabled={cleaning || busy}
+          style={{ fontSize: 13 }}>
+          {cleaning ? "Cleaning up…" : "✨ Clean up with AI"}
+        </button>
+      )}
+
+      <button className="btn-primary" onClick={() => onSave(name || "Untitled beat", summary)}
+        disabled={!summary.trim()} style={{ fontSize: 14 }}>
+        Save beat
+      </button>
+    </div>
   );
 }
 
@@ -569,22 +841,20 @@ function ConfigureTab({
               <option value="story-circle">Story Circle</option>
             </select>
           </div>
-          <div className="select-wrap">
-            <select className="field" value={s.genre}
-              onChange={e => set("genre", e.target.value as any)}>
-              {["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"].map(g =>
-                <option key={g} value={g}>{g}</option>)}
-            </select>
+          <div className="eyebrow" style={{ marginTop: 8 }}>Genres</div>
+          <div className="chip-row">
+            {(["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"] as const).map(g => (
+              <button key={g}
+                className={`chip ${s.genres.includes(g) ? "selected" : ""}`}
+                onClick={() => set("genres",
+                  s.genres.includes(g) ? s.genres.filter(x => x !== g) : [...s.genres, g]
+                )}>
+                {g}
+              </button>
+            ))}
           </div>
           <input className="field" value={s.vibe}
             onChange={e => set("vibe", e.target.value)} placeholder="Vibe" />
-          <div className="select-wrap">
-            <select className="field" value={s.endingType}
-              onChange={e => set("endingType", e.target.value as any)}>
-              {["happy","bittersweet","tragic","ambiguous","twist"].map(g =>
-                <option key={g} value={g}>ending: {g}</option>)}
-            </select>
-          </div>
         </div>
       </div>
 
@@ -598,19 +868,6 @@ function ConfigureTab({
       </div>
 
       <div className="card">
-        <span className="eyebrow">Ingredients</span>
-        {story.ingredients.length === 0 && (
-          <div className="caption" style={{ marginTop: 4 }}>No ingredients yet.</div>
-        )}
-        {story.ingredients.map(ing => (
-          <div key={ing.id} className="inset-card">
-            <div className="eyebrow">{ing.label} {ing.locked && "· locked"}</div>
-            <div style={{ fontSize: 14, marginTop: 4 }}>{ing.description}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card">
         <span className="eyebrow">Characters</span>
         {story.characters.length === 0 && (
           <div className="caption" style={{ marginTop: 4 }}>No characters yet.</div>
@@ -621,7 +878,19 @@ function ConfigureTab({
             <div className="caption" style={{ marginTop: 4 }}>
               {ch.role} · wants: {ch.want || "—"} · needs: {ch.need || "—"}
             </div>
-            {ch.notes && <div className="caption" style={{ marginTop: 2 }}>{ch.notes}</div>}
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <span className="eyebrow">Ingredients</span>
+        {story.ingredients.length === 0 && (
+          <div className="caption" style={{ marginTop: 4 }}>No ingredients yet.</div>
+        )}
+        {story.ingredients.map(ing => (
+          <div key={ing.id} className="inset-card">
+            <div className="eyebrow">{ing.label} {ing.locked && "· locked"}</div>
+            <div style={{ fontSize: 14, marginTop: 4 }}>{ing.description}</div>
           </div>
         ))}
       </div>
@@ -642,7 +911,6 @@ function MomentPicker({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
-
   const filters = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image"];
   const filtered = moments.filter(m => {
     if (filter !== "All" && m.type !== filter.toLowerCase()) return false;
@@ -657,43 +925,29 @@ function MomentPicker({
         <svg viewBox="0 0 24 24" style={{width:18,height:18,stroke:"var(--ink-mute)",strokeWidth:1.8,fill:"none"}}>
           <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/>
         </svg>
-        <input placeholder="Search moments" value={search}
-          onChange={e => setSearch(e.target.value)} />
+        <input placeholder="Search moments" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-
       <div className="filter-row" style={{ marginBottom: 12 }}>
         {filters.map(f => (
-          <button key={f}
-            className={`filter-pill ${filter === f ? "active" : ""}`}
-            onClick={() => setFilter(f)}
-            style={{ fontSize: 12, padding: "6px 12px" }}>
-            {f}
-          </button>
+          <button key={f} className={`filter-pill ${filter === f ? "active" : ""}`}
+            onClick={() => setFilter(f)} style={{ fontSize: 12, padding: "6px 12px" }}>{f}</button>
         ))}
       </div>
-
       {filtered.length === 0 && (
-        <div className="caption" style={{ textAlign: "center", padding: "20px 0" }}>
-          No moments match your search.
-        </div>
+        <div className="caption" style={{ textAlign: "center", padding: "20px 0" }}>No moments match.</div>
       )}
-
       {filtered.map(m => {
         const isLinked = linkedIds.includes(m.id);
         return (
-          <button
-            key={m.id}
+          <button key={m.id}
             className={`moment-picker-item ${isLinked ? "linked" : ""}`}
             onClick={() => !isLinked && onLink(m.id)}
-            style={{ width: "100%", textAlign: "left" }}
-          >
+            style={{ width: "100%", textAlign: "left" }}>
             <div style={{ flex: 1 }}>
               <div className="mp-type">{m.type}</div>
               <div className="mp-text">{m.text}</div>
               {m.tags.length > 0 && (
-                <div className="mp-tags">
-                  {m.tags.map(t => <span key={t}>{t}</span>)}
-                </div>
+                <div className="mp-tags">{m.tags.map(t => <span key={t}>{t}</span>)}</div>
               )}
             </div>
             {isLinked && <div className="mp-linked-badge">Linked</div>}
@@ -708,17 +962,14 @@ function MomentPicker({
 /* ============ SHARED ======================== */
 /* ============================================ */
 
-function Slider({
-  label, value, onChange,
-}: { label: string; value: number; onChange: (v: number) => void }) {
+function Slider({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <div>
       <div className="slider-row">
         <div className="label">{label}</div>
         <div className="value">{value}</div>
       </div>
-      <input type="range" min={1} max={10} value={value}
-        onChange={e => onChange(Number(e.target.value))} />
+      <input type="range" min={1} max={10} value={value} onChange={e => onChange(Number(e.target.value))} />
     </div>
   );
 }

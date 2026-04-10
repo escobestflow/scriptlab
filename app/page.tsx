@@ -129,10 +129,20 @@ export default function Page() {
 
   if (!hydrated) return <div className="app" />;
 
-  /* ── WIZARD ── */
-  if (view.kind === "wizard") {
-    return (
-      <div className="app">
+  const studioProject = view.kind === "studio"
+    ? projects.find(p => p.id === (view as any).projectId) ?? null
+    : null;
+
+  // If studio project not found, fall back
+  if (view.kind === "studio" && !studioProject) {
+    setView({ kind: "main" });
+    return <div className="app" />;
+  }
+
+  /* ── Content area (changes with view, tab bar stays) ── */
+  function renderContent() {
+    if (view.kind === "wizard") {
+      return (
         <Wizard
           draft={(view as any).draft}
           setDraft={(u: any) => setView(v => v.kind === "wizard" ? { ...v, draft: u(v.draft) } : v)}
@@ -143,59 +153,60 @@ export default function Page() {
             setView({ kind: "studio", projectId: saved.id });
           }}
         />
-      </div>
-    );
-  }
+      );
+    }
 
-  /* ── STUDIO ── */
-  if (view.kind === "studio") {
-    const project = projects.find(p => p.id === (view as any).projectId);
-    if (!project) { setView({ kind: "main" }); return null; }
-    return (
-      <div className="app">
+    if (view.kind === "studio" && studioProject) {
+      return (
         <Studio
-          story={project}
-          setStory={(u: any) => updateProject(project.id, u)}
+          story={studioProject}
+          setStory={(u: any) => updateProject(studioProject.id, u)}
           moments={moments}
           onBack={() => setView({ kind: "main" })}
         />
-      </div>
+      );
+    }
+
+    // Main view
+    return (
+      <>
+        <div className="topbar">
+          <button className="topbar-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
+            <IconMenu />
+          </button>
+          <div className="topbar-center">ScriptLab</div>
+          <div style={{ width: 44 }} />
+        </div>
+        <div className="screen-scroll" key={mainTab}>
+          <div className="page-enter">
+            {mainTab === "projects" && (
+              <ProjectsTab
+                projects={projects}
+                onOpen={(id) => setView({ kind: "studio", projectId: id })}
+                onNew={() => setView({ kind: "wizard", draft: newBlankProject() })}
+                progress={projectProgress}
+              />
+            )}
+            {mainTab === "moments" && (
+              <MomentsTab moments={moments} />
+            )}
+          </div>
+        </div>
+      </>
     );
   }
 
-  /* ── MAIN VIEW (Projects / Moments) ── */
   return (
     <div className="app">
-      {/* Top bar */}
-      <div className="topbar">
-        <button className="topbar-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
-          <IconMenu />
-        </button>
-        <div className="topbar-center">ScriptLab</div>
-        <div style={{ width: 44 }} />
-      </div>
+      {renderContent()}
 
-      {/* Content */}
-      <div className="screen-scroll" key={mainTab}>
-        <div className="page-enter">
-          {mainTab === "projects" && (
-            <ProjectsTab
-              projects={projects}
-              onOpen={(id) => setView({ kind: "studio", projectId: id })}
-              onNew={() => setView({ kind: "wizard", draft: newBlankProject() })}
-              progress={projectProgress}
-            />
-          )}
-          {mainTab === "moments" && (
-            <MomentsTab moments={moments} />
-          )}
-        </div>
-      </div>
-
-      {/* Tab bar with centered Record FAB */}
+      {/* Tab bar — ALWAYS visible */}
       <nav className="tabbar">
         <div className="tabbar-inner">
-          <button className={`tab ${mainTab === "projects" ? "active" : ""}`} onClick={() => setMainTab("projects")}>
+          <button
+            className={`tab ${view.kind === "main" && mainTab === "projects" ? "active" : ""}`}
+            onClick={() => { setView({ kind: "main" }); setMainTab("projects"); }}
+          >
             <span className="icon"><IconFolder /></span>
             Projects
           </button>
@@ -211,7 +222,10 @@ export default function Page() {
             <div className="record-label">Record</div>
           </div>
 
-          <button className={`tab ${mainTab === "moments" ? "active" : ""}`} onClick={() => setMainTab("moments")}>
+          <button
+            className={`tab ${view.kind === "main" && mainTab === "moments" ? "active" : ""}`}
+            onClick={() => { setView({ kind: "main" }); setMainTab("moments"); }}
+          >
             <span className="icon"><IconStar /></span>
             Moments
           </button>
@@ -273,7 +287,10 @@ function ProjectsTab({
             <div className="project-info">
               <div className="project-title">{p.title || "Untitled"}</div>
               <div className="project-genre">
-                <span className="genre-pill">{p.settings.genre}</span>
+                {(p.settings as any).genres?.length > 0
+                  ? (p.settings as any).genres.map((g: string) => <span key={g} className="genre-pill">{g}</span>)
+                  : (p.settings as any).genre && <span className="genre-pill">{(p.settings as any).genre}</span>
+                }
                 <span className="genre-pill">{p.settings.framework.replace(/-/g, " ")}</span>
               </div>
               <div className="project-summary">{p.logline || "No logline yet"}</div>

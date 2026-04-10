@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Story, Ingredient } from "@/lib/story";
+import { Story, Genre, EndingType, Ingredient, ProjectType } from "@/lib/story";
 
-const GENRES = ["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"];
-const ENDINGS: { value: Story["settings"]["endingType"]; label: string; desc: string }[] = [
+const ALL_GENRES: Genre[] = ["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"];
+const ENDINGS: { value: EndingType; label: string; desc: string }[] = [
   { value: "happy",       label: "Happy",       desc: "Resolution and light." },
   { value: "bittersweet", label: "Bittersweet", desc: "Won, but it cost them." },
   { value: "tragic",      label: "Tragic",      desc: "The worst comes true." },
@@ -17,9 +17,14 @@ const FRAMEWORKS: { value: Story["settings"]["framework"]; title: string; sub: s
   { value: "three-act",    title: "Three Act",   sub: "Setup, conflict, resolution." },
   { value: "story-circle", title: "Story Circle",sub: "8 steps. Character-driven." },
 ];
+const PROJECT_TYPES: { value: ProjectType; title: string; sub: string }[] = [
+  { value: "feature",  title: "Feature Film", sub: "90-120 min. Full story arc." },
+  { value: "short",    title: "Short Film",   sub: "Under 40 min. Tight & focused." },
+  { value: "tv-show",  title: "TV Show",      sub: "Episodes. Serialized story." },
+];
 
 const STEPS = [
-  "Name", "Shape", "Genre", "Vibe", "Character", "Ingredients", "Dials", "Ready",
+  "Type", "Name", "Shape", "Genre", "Vibe", "Character", "Ingredients", "Dials", "Ready",
 ];
 
 export function Wizard({
@@ -40,9 +45,12 @@ export function Wizard({
     if (step === 0) onCancel();
     else setStep(s => s - 1);
   };
+  const skip = () => next();
+
+  const isFinal = step === STEPS.length - 1;
 
   return (
-    <div className="page-enter">
+    <>
       <div className="topbar">
         <button className="topbar-btn" onClick={back} aria-label="Back">
           <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
@@ -59,53 +67,98 @@ export function Wizard({
         ))}
       </div>
 
-      <div className="screen-scroll" key={step /* remount to retrigger step animation */}>
+      <div className="screen-scroll" key={step}>
         <div className="step">
-          {step === 0 && <StepName draft={draft} setDraft={setDraft} />}
-          {step === 1 && <StepFramework draft={draft} setDraft={setDraft} />}
-          {step === 2 && <StepGenre draft={draft} setDraft={setDraft} />}
-          {step === 3 && <StepVibe draft={draft} setDraft={setDraft} />}
-          {step === 4 && <StepCharacter draft={draft} setDraft={setDraft} />}
-          {step === 5 && <StepIngredients draft={draft} setDraft={setDraft} />}
-          {step === 6 && <StepDials draft={draft} setDraft={setDraft} />}
-          {step === 7 && <StepReady draft={draft} />}
+          {step === 0 && <StepType draft={draft} setDraft={setDraft} />}
+          {step === 1 && <StepName draft={draft} setDraft={setDraft} />}
+          {step === 2 && <StepFramework draft={draft} setDraft={setDraft} />}
+          {step === 3 && <StepGenre draft={draft} setDraft={setDraft} />}
+          {step === 4 && <StepVibe draft={draft} setDraft={setDraft} />}
+          {step === 5 && <StepCharacter draft={draft} setDraft={setDraft} />}
+          {step === 6 && <StepIngredients draft={draft} setDraft={setDraft} />}
+          {step === 7 && <StepDials draft={draft} setDraft={setDraft} />}
+          {step === 8 && <StepReady draft={draft} />}
         </div>
       </div>
 
       <div className="wizard-bar">
-        {step < STEPS.length - 1 ? (
-          <button
-            className="btn-primary"
-            onClick={next}
-            disabled={!canAdvance(step, draft)}
-          >
-            Continue
-          </button>
+        {!isFinal ? (
+          <>
+            <button
+              className="btn-secondary"
+              onClick={skip}
+              style={{ minWidth: 70, fontSize: 14 }}
+            >
+              Skip
+            </button>
+            <button className="btn-primary" onClick={next}>
+              Continue
+            </button>
+          </>
         ) : (
           <button className="btn-primary" onClick={onFinish}>
             Enter the studio
           </button>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
-function canAdvance(step: number, d: Story) {
-  if (step === 0) return d.title.trim().length > 0;
-  if (step === 4) return d.characters.length > 0 && !!d.characters[0].name.trim();
-  return true;
-}
-
 /* ========= STEPS ========= */
+
+function StepType({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story) => Story) => void }) {
+  return (
+    <>
+      <div className="display heading">What are you making?</div>
+      <div className="body-text">Pick the format. This shapes how the project is organized.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {PROJECT_TYPES.map(pt => (
+          <button
+            key={pt.value}
+            className={`choice ${draft.projectType === pt.value ? "selected" : ""}`}
+            onClick={() => setDraft(s => ({ ...s, projectType: pt.value }))}
+            style={{ textAlign: "left" }}
+          >
+            <div className="choice-title">{pt.title}</div>
+            <div className="choice-sub">{pt.sub}</div>
+          </button>
+        ))}
+      </div>
+      {draft.projectType === "tv-show" && (
+        <div style={{ marginTop: 16 }}>
+          <div className="caption" style={{ marginBottom: 8 }}>How many episodes to start with?</div>
+          <input
+            className="field"
+            type="number"
+            min={1}
+            max={24}
+            placeholder="e.g. 8"
+            value={draft.episodes?.length ?? ""}
+            onChange={e => {
+              const count = Math.max(1, Math.min(24, parseInt(e.target.value) || 1));
+              setDraft(s => ({
+                ...s,
+                episodes: Array.from({ length: count }, (_, i) => ({
+                  id: `ep_${i + 1}`,
+                  title: `Episode ${i + 1}`,
+                  number: i + 1,
+                  beats: [],
+                })),
+              }));
+            }}
+          />
+        </div>
+      )}
+    </>
+  );
+}
 
 function StepName({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story) => Story) => void }) {
   return (
     <>
       <div className="display heading">Let's name it.</div>
-      <div className="hero-sub">
-        Give your story a working title. You can change it later — nothing here is permanent.
-      </div>
+      <div className="body-text">Give your story a working title. You can change it later.</div>
       <input
         className="field"
         placeholder="The Quiet Room"
@@ -129,9 +182,7 @@ function StepFramework({ draft, setDraft }: { draft: Story; setDraft: (u: (s: St
   return (
     <>
       <div className="display heading">Choose a shape.</div>
-      <div className="hero-sub">
-        Every classic story has bones. Pick the skeleton that fits your instinct — you can swap later.
-      </div>
+      <div className="body-text">Every classic story has bones. Pick the skeleton that fits your instinct.</div>
       <div className="choice-grid">
         {FRAMEWORKS.map(f => (
           <button
@@ -149,23 +200,35 @@ function StepFramework({ draft, setDraft }: { draft: Story; setDraft: (u: (s: St
 }
 
 function StepGenre({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story) => Story) => void }) {
+  const toggleGenre = (g: Genre) => {
+    setDraft(s => {
+      const current = s.settings.genres;
+      const next = current.includes(g)
+        ? current.filter(x => x !== g)
+        : [...current, g];
+      return { ...s, settings: { ...s.settings, genres: next } };
+    });
+  };
   return (
     <>
       <div className="display heading">What flavor?</div>
-      <div className="hero-sub">
-        Tap a genre. This sets the emotional register, not the rules — you can defy convention later.
-      </div>
+      <div className="body-text">Tap one or more genres to blend together.</div>
       <div className="chip-row">
-        {GENRES.map(g => (
+        {ALL_GENRES.map(g => (
           <button
             key={g}
-            className={`chip ${draft.settings.genre === g ? "selected" : ""}`}
-            onClick={() => setDraft(s => ({ ...s, settings: { ...s.settings, genre: g as any } }))}
+            className={`chip ${draft.settings.genres.includes(g) ? "selected" : ""}`}
+            onClick={() => toggleGenre(g)}
           >
             {g}
           </button>
         ))}
       </div>
+      {draft.settings.genres.length > 1 && (
+        <div className="caption" style={{ marginTop: 12 }}>
+          Blend: {draft.settings.genres.join(" + ")}
+        </div>
+      )}
     </>
   );
 }
@@ -174,9 +237,7 @@ function StepVibe({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story) 
   return (
     <>
       <div className="display heading">Set the vibe.</div>
-      <div className="hero-sub">
-        Describe the atmosphere in a few words. Textures, lighting, the way the air feels.
-      </div>
+      <div className="body-text">Describe the atmosphere in a few words. Textures, lighting, the way the air feels.</div>
       <input
         className="field"
         placeholder="neon-lit, rainy, lonely"
@@ -201,9 +262,7 @@ function StepCharacter({ draft, setDraft }: { draft: Story; setDraft: (u: (s: St
   return (
     <>
       <div className="display heading">Your protagonist.</div>
-      <div className="hero-sub">
-        The engine of the story. What they want drives the plot. What they need is what the story is actually about.
-      </div>
+      <div className="body-text">What they want drives the plot. What they need is what the story is actually about.</div>
       <div className="stack">
         <input className="field" placeholder="Name" value={ch.name} onChange={e => update({ name: e.target.value })} />
         <input className="field" placeholder="What they want (external)" value={ch.want} onChange={e => update({ want: e.target.value })} />
@@ -232,37 +291,22 @@ function StepIngredients({ draft, setDraft }: { draft: Story; setDraft: (u: (s: 
   const remove = (id: string) =>
     setDraft(s => ({ ...s, ingredients: s.ingredients.filter(i => i.id !== id) }));
 
-  const toggleLock = (id: string) =>
-    setDraft(s => ({
-      ...s,
-      ingredients: s.ingredients.map(i => i.id === id ? { ...i, locked: !i.locked } : i),
-    }));
-
   return (
     <>
       <div className="display heading">Raw ingredients.</div>
-      <div className="hero-sub">
-        Specific things the story should include — a setting, an object, a rule, a recurring image. Lock anything non-negotiable.
-      </div>
-
+      <div className="body-text">Specific things the story should include. Lock anything non-negotiable.</div>
       <div className="stack">
         <input className="field" placeholder="Type (setting, object, rule…)" value={label} onChange={e => setLabel(e.target.value)} />
         <textarea className="field" placeholder="Describe it" value={desc} onChange={e => setDesc(e.target.value)} rows={2} />
         <button className="btn-secondary" onClick={add} disabled={!desc.trim()}>+ Add ingredient</button>
       </div>
-
       <div style={{ height: 16 }} />
-
       {draft.ingredients.map(i => (
-        <div key={i.id} className="card" style={{ padding: 16, marginBottom: 10 }}>
-          <div className="eyebrow">{i.label} {i.locked && "· locked"}</div>
+        <div key={i.id} className="inset-card" style={{ marginBottom: 10 }}>
+          <div className="eyebrow">{i.label}</div>
           <div style={{ fontSize: 14, marginTop: 4 }}>{i.description}</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button className="chip" onClick={() => toggleLock(i.id)}>
-              {i.locked ? "Unlock" : "Lock"}
-            </button>
-            <button className="chip" onClick={() => remove(i.id)}>Remove</button>
-          </div>
+          <button className="chip" style={{ marginTop: 8, fontSize: 11, padding: "4px 10px" }}
+            onClick={() => remove(i.id)}>Remove</button>
         </div>
       ))}
     </>
@@ -273,12 +317,21 @@ function StepDials({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story)
   const s = draft.settings;
   const set = <K extends keyof Story["settings"]>(k: K, v: Story["settings"][K]) =>
     setDraft(st => ({ ...st, settings: { ...st.settings, [k]: v } }));
+
+  const toggleEnding = (e: EndingType) => {
+    setDraft(st => {
+      const current = st.settings.endingTypes;
+      const next = current.includes(e)
+        ? current.filter(x => x !== e)
+        : [...current, e];
+      return { ...st, settings: { ...st.settings, endingTypes: next } };
+    });
+  };
+
   return (
     <>
       <div className="display heading">Fine-tune the feel.</div>
-      <div className="hero-sub">
-        These dials quietly shape every beat Claude writes. You can adjust them any time.
-      </div>
+      <div className="body-text">These dials shape every beat. You can adjust them any time.</div>
       <div className="stack">
         <Slider label="Unpredictability" value={s.unpredictability} onChange={v => set("unpredictability", v)} />
         <Slider label="Darkness"         value={s.darkness}         onChange={v => set("darkness", v)} />
@@ -286,19 +339,24 @@ function StepDials({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story)
       </div>
 
       <div style={{ height: 20 }} />
-      <div className="eyebrow" style={{ marginBottom: 10 }}>Ending</div>
+      <div className="eyebrow" style={{ marginBottom: 10 }}>Ending (select one or more)</div>
       <div className="choice-grid">
         {ENDINGS.map(e => (
           <button
             key={e.value}
-            className={`choice ${s.endingType === e.value ? "selected" : ""}`}
-            onClick={() => set("endingType", e.value)}
+            className={`choice ${s.endingTypes.includes(e.value) ? "selected" : ""}`}
+            onClick={() => toggleEnding(e.value)}
           >
             <div className="choice-title">{e.label}</div>
             <div className="choice-sub">{e.desc}</div>
           </button>
         ))}
       </div>
+      {s.endingTypes.length > 1 && (
+        <div className="caption" style={{ marginTop: 12 }}>
+          Blend: {s.endingTypes.join(" + ")}
+        </div>
+      )}
     </>
   );
 }
@@ -307,18 +365,21 @@ function StepReady({ draft }: { draft: Story }) {
   return (
     <>
       <div className="display heading">Everything's set.</div>
-      <div className="hero-sub">
-        Your creative brief is ready. In the studio you can generate your beat sheet, add twists, write scenes, and keep refining.
+      <div className="body-text">
+        Your creative brief is ready. In the studio you can build your beat sheet, link moments, and write scenes.
       </div>
-      <div className="card" style={{ padding: 20 }}>
+      <div className="card">
         <div className="eyebrow">Brief</div>
-        <div style={{ fontSize: 16, fontWeight: 900, marginTop: 6 }}>{draft.title}</div>
+        <div style={{ fontSize: 16, fontWeight: 900, marginTop: 6 }}>{draft.title || "Untitled"}</div>
+        <div className="caption" style={{ marginTop: 4 }}>{draft.projectType}</div>
         {draft.logline && <div style={{ fontSize: 13, color: "var(--ink-soft)", marginTop: 4 }}>{draft.logline}</div>}
-        <div style={{ fontSize: 12, color: "var(--ink-mute)", marginTop: 12 }}>
-          {draft.settings.framework.replace(/-/g, " ")} · {draft.settings.genre} · ending: {draft.settings.endingType}
+        <div className="caption" style={{ marginTop: 12 }}>
+          {draft.settings.framework.replace(/-/g, " ")}
+          {draft.settings.genres.length > 0 && ` · ${draft.settings.genres.join(", ")}`}
+          {draft.settings.endingTypes.length > 0 && ` · ending: ${draft.settings.endingTypes.join(", ")}`}
         </div>
         {draft.settings.vibe && (
-          <div style={{ fontSize: 12, color: "var(--ink-mute)", marginTop: 4 }}>Vibe: {draft.settings.vibe}</div>
+          <div className="caption" style={{ marginTop: 4 }}>Vibe: {draft.settings.vibe}</div>
         )}
       </div>
     </>

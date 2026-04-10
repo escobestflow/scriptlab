@@ -1,10 +1,9 @@
 import { Story, Beat } from "./story";
 import { Moment, SAMPLE_PROJECTS, SAMPLE_MOMENTS } from "./sampleData";
 
-const P_KEY = "scriptwriter.projects.v3";
+const P_KEY = "scriptwriter.projects.v4";
 const M_KEY = "scriptwriter.moments.v1";
 
-/** Ensure all beats have the new fields (backward compat) */
 function normalizeBeat(b: any, index: number): Beat {
   return {
     position: index,
@@ -17,7 +16,14 @@ function normalizeBeat(b: any, index: number): Beat {
 function normalizeStory(s: any): Story {
   return {
     ...s,
+    projectType: s.projectType ?? "feature",
+    settings: {
+      ...s.settings,
+      genres: s.settings?.genres ?? (s.settings?.genre ? [s.settings.genre] : ["thriller"]),
+      endingTypes: s.settings?.endingTypes ?? (s.settings?.endingType ? [s.settings.endingType] : ["bittersweet"]),
+    },
     beats: (s.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
+    episodes: s.episodes ?? undefined,
   };
 }
 
@@ -63,14 +69,15 @@ export function newBlankProject(): Story {
         : "p_" + Math.random().toString(36).slice(2),
     title: "",
     logline: "",
+    projectType: "feature",
     settings: {
       framework: "save-the-cat",
-      genre: "thriller",
+      genres: [],
       vibe: "",
       unpredictability: 5,
       darkness: 5,
       pace: 5,
-      endingType: "bittersweet",
+      endingTypes: [],
     },
     characters: [],
     ingredients: [],

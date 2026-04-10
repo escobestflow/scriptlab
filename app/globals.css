@@ -655,6 +655,29 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .sheet-body.placeholder { color: var(--ink-mute); }
 
+/* ======= SECTION TABS (inside project) ======= */
+
+.section-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.section-tab {
+  padding: 10px 20px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-mute);
+  border-bottom: 2px solid transparent;
+  transition: color 240ms var(--ease), border-color 240ms var(--ease);
+  letter-spacing: 0.02em;
+}
+.section-tab.active {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
 /* ======= BEAT EDITOR (Design Tab) ======= */
 
 .beat-card {
@@ -703,9 +726,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   font-size: 13px;
   color: var(--ink-mute);
   margin-top: 2px;
-  white-space: nowrap;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .beat-status-badge {
@@ -870,6 +895,32 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   flex-shrink: 0;
   margin-left: auto;
   padding-top: 2px;
+}
+
+/* Beat insert button between beats */
+.beat-insert-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px;
+}
+.beat-insert-btn {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  font-weight: 300;
+  color: var(--ink-mute);
+  background: var(--bg);
+  transition: all 220ms var(--ease);
+  opacity: 0.5;
+}
+.beat-insert-btn:active { opacity: 1; background: var(--bg-secondary); }
+
+/* Drag state */
+.beat-card.dragging {
+  opacity: 0.5;
+  border-style: dashed;
 }
 
 /* Scene content in Execute tab */
