@@ -74,7 +74,16 @@ ${snippets.map(s => `### ${s.title} [${s.tags.join(", ")}]\n${s.content}`).join(
 
 ## Current beat sheet
 ${beats.length
-  ? beats.map((b, i) => `${i + 1}. ${b.name}: ${b.summary}`).join("\n")
+  ? beats
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      .map((b, i) => {
+        let line = `${i + 1}. [${(b as any).status ?? "design"}] ${b.name}: ${b.summary}`;
+        if ((b as any).momentIds?.length) {
+          line += `\n   Linked moments: ${(b as any).momentIds.join(", ")}`;
+        }
+        return line;
+      })
+      .join("\n")
   : "(no beats yet)"}
 `;
 }

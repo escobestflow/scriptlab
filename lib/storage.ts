@@ -1,19 +1,35 @@
-import { Story } from "./story";
+import { Story, Beat } from "./story";
 import { Moment, SAMPLE_PROJECTS, SAMPLE_MOMENTS } from "./sampleData";
 
-const P_KEY = "scriptwriter.projects.v2";
+const P_KEY = "scriptwriter.projects.v3";
 const M_KEY = "scriptwriter.moments.v1";
+
+/** Ensure all beats have the new fields (backward compat) */
+function normalizeBeat(b: any, index: number): Beat {
+  return {
+    position: index,
+    momentIds: [],
+    status: "design",
+    ...b,
+  };
+}
+
+function normalizeStory(s: any): Story {
+  return {
+    ...s,
+    beats: (s.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
+  };
+}
 
 export function loadProjects(): Story[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(P_KEY);
     if (!raw) {
-      // Seed with sample data on first launch
       saveProjects(SAMPLE_PROJECTS);
       return SAMPLE_PROJECTS;
     }
-    return JSON.parse(raw);
+    return JSON.parse(raw).map(normalizeStory);
   } catch { return []; }
 }
 

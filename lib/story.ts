@@ -47,11 +47,17 @@ export interface Snippet {
   usedInBeats: string[];
 }
 
+export type BeatStatus = "design" | "written";
+
 export interface Beat {
   id: string;
   name: string;         // "Opening Image", "Catalyst", etc.
   summary: string;      // what happens
   purpose: string;      // why it exists in the structure
+  position: number;     // sequential order, updated on reorder
+  momentIds: string[];  // linked Moment IDs from global pool
+  status: BeatStatus;   // design = structured only, written = scene executed
+  sceneContent?: string; // written prose, populated during Execution
 }
 
 export interface Story {

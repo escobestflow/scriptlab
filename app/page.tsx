@@ -156,6 +156,7 @@ export default function Page() {
         <Studio
           story={project}
           setStory={(u: any) => updateProject(project.id, u)}
+          moments={moments}
           onBack={() => setView({ kind: "main" })}
         />
       </div>
