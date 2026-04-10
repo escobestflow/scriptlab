@@ -393,6 +393,7 @@ function DesignTab({
   const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
   const [editValue, setEditValue] = useState("");
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartY = useRef(0);
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -433,6 +434,8 @@ function DesignTab({
 
         return (
           <div key={beat.id} ref={el => { beatRefs.current[i] = el; }}>
+            {/* Drop indicator before this beat */}
+            <div className={`beat-drop-indicator ${draggingIdx != null && dropTargetIdx === i && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1 ? "active" : ""}`} />
             <div
               className={`beat-card ${isExpanded ? "expanded" : ""} ${isDragging ? "dragging" : ""}`}
             >
@@ -445,6 +448,7 @@ function DesignTab({
                     touchStartY.current = e.touches[0].clientY;
                     longPressTimer.current = setTimeout(() => {
                       setDraggingIdx(i);
+                      setDropTargetIdx(i);
                       setExpanded(null);
                     }, 300);
                   }}
@@ -456,29 +460,42 @@ function DesignTab({
                     if (draggingIdx == null) return;
                     e.preventDefault();
                     const y = e.touches[0].clientY;
-                    const delta = y - touchStartY.current;
-                    // Check if we've moved enough to swap
-                    if (Math.abs(delta) > 50) {
-                      if (delta > 0 && draggingIdx < beats.length - 1) {
-                        moveBeat(draggingIdx, "down");
-                        setDraggingIdx(draggingIdx + 1);
-                        touchStartY.current = y;
-                      } else if (delta < 0 && draggingIdx > 0) {
-                        moveBeat(draggingIdx, "up");
-                        setDraggingIdx(draggingIdx - 1);
-                        touchStartY.current = y;
-                      }
+                    // Find which gap the finger is over
+                    let target = draggingIdx;
+                    for (let j = 0; j < beats.length; j++) {
+                      const el = beatRefs.current[j];
+                      if (!el) continue;
+                      const rect = el.getBoundingClientRect();
+                      const mid = rect.top + rect.height / 2;
+                      if (y < mid) { target = j; break; }
+                      target = j + 1;
                     }
+                    // Clamp and skip self (no-op positions)
+                    target = Math.max(0, Math.min(beats.length, target));
+                    setDropTargetIdx(target);
                   }}
                   onTouchEnd={() => {
                     if (longPressTimer.current) {
                       clearTimeout(longPressTimer.current);
                       longPressTimer.current = null;
                     }
+                    if (draggingIdx != null && dropTargetIdx != null && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1) {
+                      // Perform the move
+                      const fromIdx = draggingIdx;
+                      const toIdx = dropTargetIdx > fromIdx ? dropTargetIdx - 1 : dropTargetIdx;
+                      if (fromIdx !== toIdx) {
+                        // Use direct setBeats via a sequence of moves
+                        let diff = toIdx - fromIdx;
+                        let cur = fromIdx;
+                        while (diff > 0) { moveBeat(cur, "down"); cur++; diff--; }
+                        while (diff < 0) { moveBeat(cur, "up"); cur--; diff++; }
+                      }
+                    }
                     setDraggingIdx(null);
+                    setDropTargetIdx(null);
                   }}
-                  onMouseDown={() => setDraggingIdx(i)}
-                  onMouseUp={() => setDraggingIdx(null)}
+                  onMouseDown={() => { setDraggingIdx(i); setDropTargetIdx(i); }}
+                  onMouseUp={() => { setDraggingIdx(null); setDropTargetIdx(null); }}
                 >
                   ⠿
                 </button>
@@ -580,14 +597,19 @@ function DesignTab({
               )}
             </div>
 
-            {/* Inline + button between beats */}
+            {/* Drop indicator after this beat (for dropping at end) */}
+            {i === beats.length - 1 && (
+              <div className={`beat-drop-indicator ${draggingIdx != null && dropTargetIdx === beats.length && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1 ? "active" : ""}`} />
+            )}
+
+            {/* Insert button between beats */}
             <div className="beat-insert-row">
               <button
                 className="beat-insert-btn"
                 onClick={() => openBeatTray(i + 1)}
                 aria-label="Insert beat here"
               >
-                +
+                + Add beat
               </button>
             </div>
           </div>

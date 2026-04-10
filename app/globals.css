@@ -900,22 +900,25 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 /* Beat insert button between beats */
 .beat-insert-row {
   display: flex;
-  justify-content: flex-end;
-  padding: 4px 8px;
+  justify-content: center;
+  padding: 5px 0;
 }
 .beat-insert-btn {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px;
-  font-weight: 300;
-  color: var(--ink-mute);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-ghost);
   background: var(--bg);
   transition: all 220ms var(--ease);
-  opacity: 0.5;
 }
-.beat-insert-btn:active { opacity: 1; background: var(--bg-secondary); }
+.beat-insert-btn:active { color: var(--ink-mute); background: var(--bg-secondary); border-color: var(--border-strong); }
 
 /* Drag grip handle */
 .beat-grip {
@@ -935,11 +938,27 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .beat-grip:active { color: var(--ink-mute); }
 
-/* Drag state */
+/* Drag state — lifted card */
 .beat-card.dragging {
-  opacity: 0.5;
-  border-style: dashed;
-  background: var(--bg-secondary);
+  opacity: 0.92;
+  transform: scale(1.02);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 10;
+  position: relative;
+  border-color: var(--ink-mute);
+}
+
+/* Drop indicator — thin line between beats */
+.beat-drop-indicator {
+  height: 3px;
+  margin: 0 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  opacity: 0;
+  transition: opacity 150ms var(--ease);
+}
+.beat-drop-indicator.active {
+  opacity: 1;
 }
 
 /* Scene content in Execute tab */
