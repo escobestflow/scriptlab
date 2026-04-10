@@ -413,7 +413,7 @@ function DesignTab({
   }
 
   return (
-    <>
+    <div className={draggingIdx != null ? "beats-dragging" : ""}>
       {beats.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>◆</div>
@@ -631,7 +631,7 @@ function DesignTab({
         );
       })}
 
-    </>
+    </div>
   );
 }
 

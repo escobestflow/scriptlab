@@ -21,7 +21,8 @@
 html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior-y: none; }
 
 body {
-  background: var(--bg);
+  background: linear-gradient(180deg, #FDFEFE 0%, #EDF1F4 100%);
+  background-attachment: fixed;
   color: var(--ink);
   font-family: 'Lato', -apple-system, system-ui, sans-serif;
   font-weight: 400;
@@ -945,6 +946,18 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   border-style: dashed;
   border-color: var(--ink-ghost);
   background: var(--bg-secondary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Prevent text selection on all beats while any drag is active */
+.beats-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.beats-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 /* The lifted clone that follows the finger */
