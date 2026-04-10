@@ -397,6 +397,7 @@ function DesignTab({
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartY = useRef(0);
   const touchOffsetY = useRef(0);
+  const isDragActive = useRef(false);
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cloneRef = useRef<HTMLDivElement | null>(null);
 
@@ -440,89 +441,82 @@ function DesignTab({
             <div className={`beat-drop-indicator ${draggingIdx != null && dropTargetIdx === i && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1 ? "active" : ""}`} />
             <div
               className={`beat-card ${isExpanded ? "expanded" : ""} ${isDragging ? "dragging" : ""}`}
+              onTouchStart={(e) => {
+                const y = e.touches[0].clientY;
+                touchStartY.current = y;
+                isDragActive.current = false;
+                const cardEl = beatRefs.current[i]?.querySelector(".beat-card") as HTMLElement | null;
+                longPressTimer.current = setTimeout(() => {
+                  isDragActive.current = true;
+                  setDraggingIdx(i);
+                  setDropTargetIdx(i);
+                  setExpanded(null);
+                  if (cardEl) {
+                    const rect = cardEl.getBoundingClientRect();
+                    touchOffsetY.current = y - rect.top;
+                    const clone = cardEl.cloneNode(true) as HTMLDivElement;
+                    clone.className = "beat-drag-clone";
+                    clone.style.top = `${rect.top}px`;
+                    clone.style.width = `${rect.width}px`;
+                    document.body.appendChild(clone);
+                    cloneRef.current = clone;
+                  }
+                }, 400);
+              }}
+              onTouchMove={(e) => {
+                const y = e.touches[0].clientY;
+                // If we moved before long-press fired, cancel it (it's a scroll)
+                if (longPressTimer.current && Math.abs(y - touchStartY.current) > 8) {
+                  clearTimeout(longPressTimer.current);
+                  longPressTimer.current = null;
+                }
+                if (!isDragActive.current) return;
+                e.preventDefault();
+                if (cloneRef.current) {
+                  cloneRef.current.style.top = `${y - touchOffsetY.current}px`;
+                }
+                let target = draggingIdx ?? i;
+                for (let j = 0; j < beats.length; j++) {
+                  const el = beatRefs.current[j];
+                  if (!el) continue;
+                  const rect = el.getBoundingClientRect();
+                  const mid = rect.top + rect.height / 2;
+                  if (y < mid) { target = j; break; }
+                  target = j + 1;
+                }
+                target = Math.max(0, Math.min(beats.length, target));
+                setDropTargetIdx(target);
+              }}
+              onTouchEnd={() => {
+                if (longPressTimer.current) {
+                  clearTimeout(longPressTimer.current);
+                  longPressTimer.current = null;
+                }
+                if (cloneRef.current) {
+                  cloneRef.current.remove();
+                  cloneRef.current = null;
+                }
+                if (isDragActive.current && draggingIdx != null && dropTargetIdx != null && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1) {
+                  const fromIdx = draggingIdx;
+                  const toIdx = dropTargetIdx > fromIdx ? dropTargetIdx - 1 : dropTargetIdx;
+                  if (fromIdx !== toIdx) {
+                    let diff = toIdx - fromIdx;
+                    let cur = fromIdx;
+                    while (diff > 0) { moveBeat(cur, "down"); cur++; diff--; }
+                    while (diff < 0) { moveBeat(cur, "up"); cur--; diff++; }
+                  }
+                }
+                isDragActive.current = false;
+                setDraggingIdx(null);
+                setDropTargetIdx(null);
+              }}
             >
               <div className="beat-header" style={{ display: "flex", alignItems: "center", gap: 0 }}>
-                {/* Drag grip */}
-                <button
-                  className="beat-grip"
-                  aria-label="Drag to reorder"
-                  onTouchStart={(e) => {
-                    const y = e.touches[0].clientY;
-                    touchStartY.current = y;
-                    const cardEl = beatRefs.current[i]?.querySelector(".beat-card") as HTMLElement | null;
-                    longPressTimer.current = setTimeout(() => {
-                      setDraggingIdx(i);
-                      setDropTargetIdx(i);
-                      setExpanded(null);
-                      // Clone the actual card DOM and attach as fixed overlay
-                      if (cardEl) {
-                        const rect = cardEl.getBoundingClientRect();
-                        touchOffsetY.current = y - rect.top;
-                        const clone = cardEl.cloneNode(true) as HTMLDivElement;
-                        clone.className = "beat-drag-clone";
-                        clone.style.top = `${rect.top}px`;
-                        clone.style.width = `${rect.width}px`;
-                        document.body.appendChild(clone);
-                        cloneRef.current = clone;
-                      }
-                    }, 300);
-                  }}
-                  onTouchMove={(e) => {
-                    if (longPressTimer.current) {
-                      clearTimeout(longPressTimer.current);
-                      longPressTimer.current = null;
-                    }
-                    if (draggingIdx == null) return;
-                    e.preventDefault();
-                    const y = e.touches[0].clientY;
-                    // Move the clone
-                    if (cloneRef.current) {
-                      cloneRef.current.style.top = `${y - touchOffsetY.current}px`;
-                    }
-                    // Find which gap the finger is over
-                    let target = draggingIdx;
-                    for (let j = 0; j < beats.length; j++) {
-                      const el = beatRefs.current[j];
-                      if (!el) continue;
-                      const rect = el.getBoundingClientRect();
-                      const mid = rect.top + rect.height / 2;
-                      if (y < mid) { target = j; break; }
-                      target = j + 1;
-                    }
-                    target = Math.max(0, Math.min(beats.length, target));
-                    setDropTargetIdx(target);
-                  }}
-                  onTouchEnd={() => {
-                    if (longPressTimer.current) {
-                      clearTimeout(longPressTimer.current);
-                      longPressTimer.current = null;
-                    }
-                    // Remove clone
-                    if (cloneRef.current) {
-                      cloneRef.current.remove();
-                      cloneRef.current = null;
-                    }
-                    if (draggingIdx != null && dropTargetIdx != null && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1) {
-                      const fromIdx = draggingIdx;
-                      const toIdx = dropTargetIdx > fromIdx ? dropTargetIdx - 1 : dropTargetIdx;
-                      if (fromIdx !== toIdx) {
-                        let diff = toIdx - fromIdx;
-                        let cur = fromIdx;
-                        while (diff > 0) { moveBeat(cur, "down"); cur++; diff--; }
-                        while (diff < 0) { moveBeat(cur, "up"); cur--; diff++; }
-                      }
-                    }
-                    setDraggingIdx(null);
-                    setDropTargetIdx(null);
-                  }}
-                  onMouseDown={() => { setDraggingIdx(i); setDropTargetIdx(i); }}
-                  onMouseUp={() => { setDraggingIdx(null); setDropTargetIdx(null); }}
-                >
-                  ⠿
-                </button>
+                {/* Drag grip — visual indicator */}
+                <div className="beat-grip" aria-hidden="true">⠿</div>
                 <button
                   style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
-                  onClick={() => setExpanded(isExpanded ? null : beat.id)}
+                  onClick={() => { if (!isDragActive.current) setExpanded(isExpanded ? null : beat.id); }}
                 >
                 <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
                   {i + 1}
