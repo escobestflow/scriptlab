@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#000000"/>
+
+  <!-- TOP: Large D — spine on left, bowl opens right -->
+  <path d="M15,12 L15,46 L37,46 A28,17,0,0,1,37,12 Z" fill="white"/>
+  <!-- D counter (inner cutout) -->
+  <path d="M23,19 L23,39 L37,39 A17,10,0,0,1,37,19 Z" fill="black"/>
+
+  <!-- BOTTOM LEFT: Reversed D — spine on right, bowl opens left -->
+  <path d="M32,54 L46,54 L46,88 L32,88 A18,17,0,0,0,32,54 Z" fill="white"/>
+  <!-- Reversed D counter -->
+  <path d="M33,61 L39,61 L39,81 L33,81 A8,10,0,0,0,33,61 Z" fill="black"/>
+
+  <!-- BOTTOM RIGHT: B — spine on left, two bumps open right -->
+  <path d="M50,54 L50,88 L64,88 A17,8,0,0,1,64,71 A15,8,0,0,1,64,54 Z" fill="white"/>
+  <!-- Top bump counter -->
+  <ellipse cx="71.5" cy="62.5" rx="6" ry="4" fill="black"/>
+  <!-- Bottom bump counter -->
+  <ellipse cx="72.5" cy="79.5" rx="7" ry="4.5" fill="black"/>
+</svg>

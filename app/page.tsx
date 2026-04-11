@@ -191,7 +191,9 @@ export default function Page() {
           <button className="topbar-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
             <IconMenu />
           </button>
-          <div className="topbar-center">ScriptLab</div>
+          <div className="topbar-center">
+            <img src="/logo.svg" alt="ScriptLab" style={{ height: 32, width: 32 }} />
+          </div>
           <div style={{ width: 44 }} />
         </div>
         <div className="screen-scroll" key={mainTab}>
@@ -255,7 +257,9 @@ export default function Page() {
         onClick={() => setMenuOpen(false)}
       />
       <div className={`menu-drawer ${menuOpen ? "open" : ""}`}>
-        <div className="menu-header">ScriptLab</div>
+        <div className="menu-header">
+          <img src="/logo.svg" alt="ScriptLab" style={{ height: 40, width: 40 }} />
+        </div>
         {[
           { icon: <IconSettings />, label: "Settings" },
           { icon: <IconUser />, label: "Account" },
