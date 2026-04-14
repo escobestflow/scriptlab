@@ -67,6 +67,33 @@ export default function Page() {
   useEffect(() => { if (hydrated) saveProjects(projects); }, [projects, hydrated]);
   useEffect(() => { if (hydrated) saveMoments(moments); }, [moments, hydrated]);
 
+  // Auto-generate thumbnails for projects that don't have one
+  const thumbnailGenRef = useRef(false);
+  useEffect(() => {
+    if (!hydrated || thumbnailGenRef.current) return;
+    const missing = projects.filter(p => !p.thumbnail && p.title);
+    if (missing.length === 0) return;
+    thumbnailGenRef.current = true;
+    (async () => {
+      for (const p of missing) {
+        try {
+          const res = await fetch("/api/generate-thumbnail", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: p.title, logline: p.logline, genres: p.settings.genres }),
+          });
+          if (!res.ok) continue;
+          const data = await res.json();
+          if (data.thumbnail) {
+            setProjects(ps => ps.map(pr =>
+              pr.id === p.id ? { ...pr, thumbnail: data.thumbnail } : pr
+            ));
+          }
+        } catch {}
+      }
+    })();
+  }, [hydrated, projects]);
+
   const updateProject = (id: string, u: (s: Story) => Story) =>
     setProjects(ps => ps.map(p => p.id === id ? { ...u(p), updatedAt: new Date().toISOString() } : p));
 
