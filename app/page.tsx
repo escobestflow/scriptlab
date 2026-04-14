@@ -124,6 +124,24 @@ export default function Page() {
     setTimeout(() => setToastVisible(false), 2000);
   }
 
+  // ── Thumbnail generation ──
+  async function generateThumbnail(projectId: string, title: string, logline: string, genres: string[]) {
+    try {
+      const res = await fetch("/api/generate-thumbnail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, logline, genres }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.thumbnail) {
+        setProjects(ps => ps.map(p =>
+          p.id === projectId ? { ...p, thumbnail: data.thumbnail } : p
+        ));
+      }
+    } catch {}
+  }
+
   function updateMoment(id: string, patch: Partial<Moment>) {
     setMoments(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m));
   }
@@ -168,6 +186,8 @@ export default function Page() {
             const saved = (view as any).draft;
             setProjects(ps => [saved, ...ps]);
             setView({ kind: "studio", projectId: saved.id });
+            // Generate thumbnail in background
+            generateThumbnail(saved.id, saved.title, saved.logline, saved.settings.genres);
           }}
         />
       );
@@ -568,9 +588,17 @@ function ProjectsTab({
         const pct = progress(p);
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
-            <div className="project-thumb">
-              {p.title ? p.title.charAt(0).toUpperCase() : "?"}
-            </div>
+            {p.thumbnail ? (
+              <img
+                src={p.thumbnail}
+                alt=""
+                className="project-thumb-img"
+              />
+            ) : (
+              <div className="project-thumb">
+                {p.title ? p.title.charAt(0).toUpperCase() : "?"}
+              </div>
+            )}
             <div className="project-info">
               <div className="project-title">{p.title || "Untitled"}</div>
               <div className="project-genre">

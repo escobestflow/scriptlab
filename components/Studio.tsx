@@ -932,8 +932,31 @@ function ConfigureTab({
   setStory: (u: (s: Story) => Story) => void;
 }) {
   const s = story.settings;
+  const [generatingCover, setGeneratingCover] = useState(false);
   const set = <K extends keyof Story["settings"]>(k: K, v: Story["settings"][K]) =>
     setStory(st => ({ ...st, settings: { ...st.settings, [k]: v } }));
+
+  async function generateCover() {
+    setGeneratingCover(true);
+    try {
+      const res = await fetch("/api/generate-thumbnail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: story.title,
+          logline: story.logline,
+          genres: story.settings.genres,
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.thumbnail) {
+        setStory(st => ({ ...st, thumbnail: data.thumbnail }));
+      }
+    } catch {} finally {
+      setGeneratingCover(false);
+    }
+  }
 
   return (
     <>
@@ -949,6 +972,18 @@ function ConfigureTab({
             onChange={e => setStory(st => ({ ...st, logline: e.target.value }))}
             placeholder="Logline" rows={3} />
         </div>
+      </div>
+
+      <div className="card">
+        <span className="eyebrow">Cover</span>
+        {story.thumbnail && (
+          <img src={story.thumbnail} alt="" style={{ width: "100%", borderRadius: 12, marginBottom: 10 }} />
+        )}
+        <button className="btn-secondary" onClick={generateCover}
+          disabled={generatingCover}
+          style={{ width: "100%", fontSize: 13 }}>
+          {generatingCover ? "Generating…" : story.thumbnail ? "Regenerate cover" : "Generate cover"}
+        </button>
       </div>
 
       <div className="card">

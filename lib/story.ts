@@ -77,5 +77,6 @@ export interface Story {
   snippets: Snippet[];
   beats: Beat[];              // for feature/short
   episodes?: Episode[];       // for tv-show
+  thumbnail?: string;         // base64 data URL for AI-generated cover
   updatedAt: string;
 }

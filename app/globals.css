@@ -160,6 +160,13 @@ button { cursor: pointer; }
   flex-shrink: 0;
 }
 
+.project-thumb-img {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
 .project-info { flex: 1; min-width: 0; }
 .project-title {
   font-size: 17px;
