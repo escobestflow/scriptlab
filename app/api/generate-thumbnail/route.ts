@@ -1,5 +1,7 @@
 // Generates a project thumbnail via DALL-E 3.
-// Returns the image as a base64 data URL so it can be stored in the Story object.
+// Compresses to 256x256 JPEG (~15-25KB) so it fits in localStorage.
+
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +26,6 @@ export async function POST(req: Request) {
 
     const prompt = `flat minimal design illustration, representing a ${genreStr} movie about ${description}, simple geometric shapes, basic muted earthy colors with orange and teal accents, geometric human figures, textured grain effect, dark moody background, no text, no words, no letters`;
 
-    // Call DALL-E 3
     const res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
@@ -59,7 +60,14 @@ export async function POST(req: Request) {
       });
     }
 
-    const dataUrl = `data:image/png;base64,${b64}`;
+    // Compress: 1024x1024 PNG → 256x256 JPEG (~15-25KB instead of ~1.5MB)
+    const pngBuffer = Buffer.from(b64, "base64");
+    const jpegBuffer = await sharp(pngBuffer)
+      .resize(256, 256)
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    const dataUrl = `data:image/jpeg;base64,${jpegBuffer.toString("base64")}`;
 
     return new Response(JSON.stringify({ thumbnail: dataUrl }), {
       headers: { "Content-Type": "application/json" },

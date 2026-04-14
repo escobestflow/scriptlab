@@ -41,7 +41,14 @@ export function loadProjects(): Story[] {
 
 export function saveProjects(projects: Story[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(P_KEY, JSON.stringify(projects));
+  try {
+    localStorage.setItem(P_KEY, JSON.stringify(projects));
+  } catch (e) {
+    // localStorage quota exceeded — strip thumbnails and retry
+    console.warn("Storage quota exceeded, stripping thumbnails");
+    const stripped = projects.map(p => ({ ...p, thumbnail: undefined }));
+    try { localStorage.setItem(P_KEY, JSON.stringify(stripped)); } catch {}
+  }
 }
 
 export function loadMoments(): Moment[] {
