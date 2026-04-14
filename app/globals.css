@@ -21,7 +21,8 @@
 html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior-y: none; }
 
 body {
-  background: linear-gradient(180deg, #FDFEFE 0%, #EDF1F4 100%);
+  background: url('/bg.svg') no-repeat center center;
+  background-size: cover;
   background-attachment: fixed;
   color: var(--ink);
   font-family: 'Lato', -apple-system, system-ui, sans-serif;
