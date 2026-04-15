@@ -46,10 +46,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signInWithGoogle() {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        redirectTo: origin,
       },
     });
   }
