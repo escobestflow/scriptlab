@@ -736,20 +736,31 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   -webkit-overflow-scrolling: touch;
 }
 
-.studio-sticky-header {
+/* Collapsed sticky bar — hidden by default, slides in when scrolled */
+.studio-collapsed-bar {
   position: fixed;
   top: 0;
   left: 0; right: 0;
   max-width: 520px;
   margin: 0 auto;
   z-index: 30;
+  background: var(--bg);
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: transform 280ms var(--ease), opacity 200ms var(--ease);
+  pointer-events: none;
+}
+.studio-collapsed-bar.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.studio-collapsed-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 44px;
   padding: 0 16px;
-  background: var(--bg);
-  transition: opacity 200ms var(--ease), transform 200ms var(--ease);
 }
 .studio-sticky-title {
   font-size: 15px;
@@ -758,24 +769,22 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   text-align: center;
   flex: 1;
 }
-
-.studio-sticky-tabs {
-  position: fixed;
-  left: 0; right: 0;
-  max-width: 520px;
-  margin: 0 auto;
-  z-index: 29;
+.studio-collapsed-tabs {
   display: flex;
   justify-content: center;
-  padding: 6px 0 8px;
-  background: var(--bg);
-  transition: top 260ms var(--ease);
+  padding: 0 0 8px;
 }
 
-/* Expanded header (scrolls with content) */
+/* Expanded header (in scroll flow, scrolls naturally) */
 .project-header-expanded {
   padding: 12px 20px 0;
-  transition: opacity 160ms var(--ease);
+}
+
+/* In-flow tabs (scroll with content, replaced by sticky bar when scrolled) */
+.studio-inflow-tabs {
+  display: flex;
+  justify-content: center;
+  padding: 0 0 8px;
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */
