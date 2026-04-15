@@ -1,8 +1,8 @@
 import { Story, Beat } from "./story";
-import { Moment, SAMPLE_PROJECTS, SAMPLE_MOMENTS } from "./sampleData";
+import { Moment } from "./sampleData";
+import { supabase } from "./supabase";
 
-const P_KEY = "scriptwriter.projects.v4";
-const M_KEY = "scriptwriter.moments.v1";
+// ── Beat normalization (backward compat) ──
 
 function normalizeBeat(b: any, index: number): Beat {
   return {
@@ -27,46 +27,72 @@ function normalizeStory(s: any): Story {
   };
 }
 
-export function loadProjects(): Story[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(P_KEY);
-    if (!raw) {
-      saveProjects(SAMPLE_PROJECTS);
-      return SAMPLE_PROJECTS;
-    }
-    return JSON.parse(raw).map(normalizeStory);
-  } catch { return []; }
+// ── Supabase CRUD for Projects ──
+
+export async function loadProjectsFromDB(userId: string): Promise<Story[]> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, data, thumbnail")
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map(row => {
+    const story = normalizeStory({ ...row.data, id: row.id });
+    if (row.thumbnail) story.thumbnail = row.thumbnail;
+    return story;
+  });
 }
 
-export function saveProjects(projects: Story[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(P_KEY, JSON.stringify(projects));
-  } catch (e) {
-    // localStorage quota exceeded — strip thumbnails and retry
-    console.warn("Storage quota exceeded, stripping thumbnails");
-    const stripped = projects.map(p => ({ ...p, thumbnail: undefined }));
-    try { localStorage.setItem(P_KEY, JSON.stringify(stripped)); } catch {}
-  }
+export async function saveProjectToDB(userId: string, project: Story) {
+  const { thumbnail, ...rest } = project;
+  const { error } = await supabase
+    .from("projects")
+    .upsert({
+      id: project.id,
+      user_id: userId,
+      data: rest,
+      thumbnail: thumbnail ?? null,
+      updated_at: new Date().toISOString(),
+    });
+  if (error) console.error("Save project error:", error);
 }
 
-export function loadMoments(): Moment[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(M_KEY);
-    if (!raw) {
-      saveMoments(SAMPLE_MOMENTS);
-      return SAMPLE_MOMENTS;
-    }
-    return JSON.parse(raw);
-  } catch { return []; }
+export async function deleteProjectFromDB(projectId: string) {
+  await supabase.from("projects").delete().eq("id", projectId);
 }
 
-export function saveMoments(moments: Moment[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(M_KEY, JSON.stringify(moments));
+// ── Supabase CRUD for Moments ──
+
+export async function loadMomentsFromDB(userId: string): Promise<Moment[]> {
+  const { data, error } = await supabase
+    .from("moments")
+    .select("id, data")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+  return data.map(row => ({ ...row.data, id: row.id } as Moment));
 }
+
+export async function saveMomentToDB(userId: string, moment: Moment) {
+  const { error } = await supabase
+    .from("moments")
+    .upsert({
+      id: moment.id,
+      user_id: userId,
+      data: moment,
+      created_at: moment.createdAt,
+    });
+  if (error) console.error("Save moment error:", error);
+}
+
+export async function deleteMomentFromDB(momentId: string) {
+  await supabase.from("moments").delete().eq("id", momentId);
+}
+
+// ── New blank project ──
 
 export function newBlankProject(): Story {
   return {

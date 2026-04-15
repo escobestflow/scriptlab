@@ -1,7 +1,8 @@
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
 
 export const metadata = {
-  title: "ScriptWriter",
+  title: "ScriptLab",
   description: "Iterative screenwriting, structured by AI.",
   manifest: "/manifest.webmanifest",
 };
@@ -12,7 +13,7 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover" as const,
-  themeColor: "#f6f7fb",
+  themeColor: "#FDFEFE",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -25,9 +26,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="ScriptWriter" />
+        <meta name="apple-mobile-web-app-title" content="ScriptLab" />
       </head>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
