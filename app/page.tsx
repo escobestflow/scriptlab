@@ -18,16 +18,7 @@ type View =
 
 type MainTab = "projects" | "moments";
 
-/* ======= SVG Icons (inline, no deps) ======= */
-const IconMenu = () => (
-  <svg viewBox="0 0 24 24"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
-);
-const IconClap = () => (
-  <svg viewBox="0 0 24 24"><path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/><path d="M3 9h18V7H3v2z"/><path d="M7 7l3-4"/><path d="M13 7l3-4"/></svg>
-);
-const IconBulb = () => (
-  <svg viewBox="0 0 24 24"><path d="M9 21h6"/><path d="M9 18h6"/><path d="M12 2a7 7 0 00-4 12.7V17h8v-2.3A7 7 0 0012 2z"/></svg>
-);
+/* ======= SVG Icons (from design assets) ======= */
 const IconSearch = () => (
   <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
 );
@@ -226,15 +217,7 @@ export default function Page() {
     return (
       <div className="app" style={{ alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
         <div style={{ marginBottom: 8 }}>
-          <span className="brand-logo" style={{ fontSize: 20 }}>
-            <svg className="brand-clap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22 }}>
-              <path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/>
-              <path d="M3 9h18V7H3v2z"/>
-              <path d="M7 7l3-4"/>
-              <path d="M13 7l3-4"/>
-            </svg>
-            <span>lot</span><span className="brand-twist">Twist</span>
-          </span>
+          <img src="/logo.svg" alt="PlotTwist" style={{ width: 120, height: 18 }} />
         </div>
         <div className="display" style={{ marginBottom: 8 }}>
           Your stories,{"\n"}structured.
@@ -309,18 +292,10 @@ export default function Page() {
       <>
         <div className="topbar">
           <button className="topbar-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
-            <IconMenu />
+            <img src="/menu-icon.svg" alt="" style={{ width: 22, height: 15 }} />
           </button>
           <div className="topbar-center">
-            <span className="brand-logo">
-              <svg className="brand-clap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/>
-                <path d="M3 9h18V7H3v2z"/>
-                <path d="M7 7l3-4"/>
-                <path d="M13 7l3-4"/>
-              </svg>
-              <span>lot</span><span className="brand-twist">Twist</span>
-            </span>
+            <img src="/logo.svg" alt="PlotTwist" className="brand-logo-img" />
           </div>
           <div style={{ width: 44 }} />
         </div>
@@ -354,7 +329,9 @@ export default function Page() {
             className={`tab ${view.kind === "main" && mainTab === "projects" ? "active" : ""}`}
             onClick={() => { setView({ kind: "main" }); setMainTab("projects"); }}
           >
-            <span className="icon"><IconClap /></span>
+            <span className="icon">
+              <img src={view.kind === "main" && mainTab === "projects" ? "/project-icon-active.svg" : "/project-icon-inactive.svg"} alt="" />
+            </span>
             PROJECTS
           </button>
 
@@ -373,7 +350,9 @@ export default function Page() {
             className={`tab ${view.kind === "main" && mainTab === "moments" ? "active" : ""}`}
             onClick={() => { setView({ kind: "main" }); setMainTab("moments"); }}
           >
-            <span className="icon"><IconBulb /></span>
+            <span className="icon">
+              <img src={view.kind === "main" && mainTab === "moments" ? "/ideas-icon-active.svg" : "/ideas-icon-inactive.svg"} alt="" />
+            </span>
             IDEAS
           </button>
         </div>
@@ -386,15 +365,7 @@ export default function Page() {
       />
       <div className={`menu-drawer ${menuOpen ? "open" : ""}`}>
         <div className="menu-header">
-          <span className="brand-logo" style={{ fontSize: 18 }}>
-            <svg className="brand-clap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/>
-              <path d="M3 9h18V7H3v2z"/>
-              <path d="M7 7l3-4"/>
-              <path d="M13 7l3-4"/>
-            </svg>
-            <span>lot</span><span className="brand-twist">Twist</span>
-          </span>
+          <img src="/logo.svg" alt="PlotTwist" style={{ width: 100, height: 15 }} />
         </div>
         {user && (
           <div style={{ fontSize: 13, color: "var(--ink-mute)", marginBottom: 16 }}>
@@ -709,7 +680,7 @@ function ProjectsTab({
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
         <div className="display">Projects</div>
         <button className="btn-new-project" onClick={onNew}>
-          + NEW PROJECT
+          <img src="/add-icon.svg" alt="" /> NEW PROJECT
         </button>
       </div>
 
