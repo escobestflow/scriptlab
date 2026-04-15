@@ -265,9 +265,8 @@ export function Studio({
   const t = Math.min(1, scrollY / collapseThreshold);
   // Title: 18px → 15px
   const titleSize = 18 - t * 3;
-  // Thumbnail: fades and shrinks
+  // Thumbnail: fade only, no scale
   const thumbOpacity = Math.max(0, 1 - t * 2.2);
-  const thumbScale = 1 - t * 0.3;
   // Thumbnail height collapses to 0 so title/tabs slide up naturally
   const thumbMaxHeight = Math.max(0, 100 * (1 - t));
 
@@ -304,7 +303,6 @@ export function Studio({
           style={{
             opacity: thumbOpacity,
             maxHeight: thumbMaxHeight,
-            transform: `scale(${thumbScale})`,
           }}
         >
           {story.thumbnail ? (

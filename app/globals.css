@@ -746,25 +746,23 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   justify-content: space-between;
   height: 44px;
   padding: 0 16px;
-  background: var(--bg);
 }
 
-/* Thumbnail area — in flow, collapses on scroll */
+/* Thumbnail area — in flow, fades on scroll */
 .studio-thumb-area {
   display: flex;
   justify-content: center;
   overflow: hidden;
-  transform-origin: center top;
   transition: max-height 60ms linear;
 }
 
-/* Layer 2: Title — sticks below top row (top: 44px) */
+/* Layer 2: Title — sticks at top:0 (aligns with nav row) */
 .studio-title-sticky {
   position: sticky;
-  top: 44px;
+  top: 0;
   z-index: 21;
-  background: var(--bg);
   padding: 4px 20px 6px;
+  pointer-events: none;
 }
 .studio-title-text {
   font-weight: 900;
@@ -773,15 +771,14 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   transition: font-size 60ms linear;
 }
 
-/* Layer 3: Tab bar — sticks below title (top: 74px) */
+/* Layer 3: Tab bar — sticks below nav row */
 .studio-tabs-sticky {
   position: sticky;
-  top: 74px;
+  top: 44px;
   z-index: 20;
   display: flex;
   justify-content: center;
   padding: 0 0 8px;
-  background: var(--bg);
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */
