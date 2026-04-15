@@ -12,13 +12,16 @@ export function Studio({
   setStory,
   moments,
   onBack,
+  isNew = false,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   moments: Moment[];
   onBack: () => void;
+  isNew?: boolean;
 }) {
   const [section, setSection] = useState<Section>("concept");
+  const [showSuccess, setShowSuccess] = useState(isNew);
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -272,6 +275,8 @@ export function Studio({
                 markStoryOutOfSync("Concept was updated");
                 markScriptOutOfSync("Concept was updated");
               }}
+              showSuccess={showSuccess}
+              onDismissSuccess={() => setShowSuccess(false)}
             />
           )}
           {section === "characters" && (
@@ -420,28 +425,45 @@ function ProjectHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="topbar">
-      <button className="topbar-btn" onClick={onBack} aria-label="Back">
-        <svg viewBox="0 0 24 24" style={{width:22,height:22,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-      </button>
-      <div style={{ textAlign: "center", flex: 1 }}>
-        <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.01em" }}>
-          {story.title || "Untitled"}
-        </div>
+    <div className="project-header">
+      {/* Top row: back + settings */}
+      <div className="project-header-toprow">
+        <button className="project-header-btn" onClick={onBack} aria-label="Back">
+          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>BACK</span>
+        </button>
+        {onSetup ? (
+          <button className="project-header-btn" onClick={onSetup} aria-label="Settings">
+            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
+              <line x1="4" y1="6" x2="4" y2="6" strokeLinecap="round"/>
+              <line x1="4" y1="12" x2="4" y2="12" strokeLinecap="round"/>
+              <line x1="4" y1="18" x2="4" y2="18" strokeLinecap="round"/>
+              <line x1="4" y1="6" x2="20" y2="6"/>
+              <line x1="4" y1="12" x2="20" y2="12"/>
+              <line x1="4" y1="18" x2="20" y2="18"/>
+              <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+              <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+              <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+            </svg>
+          </button>
+        ) : (
+          <div style={{ width: 44 }} />
+        )}
+      </div>
+      {/* Centered thumbnail + title */}
+      <div className="project-header-center">
+        {story.thumbnail ? (
+          <img src={story.thumbnail} alt="" className="project-header-thumb" />
+        ) : (
+          <div className="project-header-thumb project-header-thumb-placeholder">
+            {story.title ? story.title.charAt(0).toUpperCase() : "?"}
+          </div>
+        )}
+        <div className="project-header-title">{story.title || "Untitled"}</div>
         {subtitle && <div className="caption">{subtitle}</div>}
       </div>
-      {onSetup ? (
-        <button className="topbar-btn" onClick={onSetup} aria-label="Settings">
-          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-          </svg>
-        </button>
-      ) : (
-        <div style={{ width: 44 }} />
-      )}
     </div>
   );
 }
@@ -450,14 +472,81 @@ function ProjectHeader({
 /* ============ CONCEPT TAB =================== */
 /* ============================================ */
 
+/* ── Collapsible attribute row ── */
+function AttrRow({
+  label,
+  values,
+  placeholder,
+  expanded,
+  onToggle,
+  children,
+}: {
+  label: string;
+  values?: string[];
+  placeholder?: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  const hasValues = values && values.length > 0;
+  return (
+    <div className="attr-row">
+      <button className="attr-row-header" onClick={onToggle}>
+        <span className="attr-label">{label}</span>
+        <div className="attr-values">
+          {hasValues
+            ? values.map(v => <span key={v} className="attr-pill">{v}</span>)
+            : <span className="attr-placeholder">{placeholder || "Not set"}</span>
+          }
+        </div>
+        <svg className={`attr-caret ${expanded ? "open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {expanded && (
+        <div className="attr-row-body">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Success banner (shown after project creation) ── */
+function SuccessBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="success-banner">
+      <div className="success-icon">&#10003;</div>
+      <div className="success-content">
+        <div className="success-title">Project created!</div>
+        <div className="success-text">
+          Add more details below to help AI generate better story structure, characters, and scenes.
+        </div>
+      </div>
+      <button className="success-dismiss" onClick={onDismiss} aria-label="Dismiss">
+        <svg viewBox="0 0 24 24" style={{width:16,height:16,stroke:"currentColor",strokeWidth:2,fill:"none"}}>
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function ConceptTab({
   story,
   setStory,
+  showSuccess,
+  onDismissSuccess,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
+  showSuccess: boolean;
+  onDismissSuccess: () => void;
 }) {
+  const [openAttr, setOpenAttr] = useState<string | null>(null);
   const [themeInput, setThemeInput] = useState("");
+
+  const toggle = (key: string) => setOpenAttr(prev => prev === key ? null : key);
 
   function addTheme() {
     const t = themeInput.trim();
@@ -476,49 +565,46 @@ function ConceptTab({
     }));
   }
 
+  const formatLabel = story.projectType === "tv-show" ? "TV Show" : story.projectType === "short" ? "Short Film" : "Feature Film";
+
   return (
     <>
-      {/* Title & logline */}
-      <div className="card">
-        <span className="eyebrow">Title</span>
-        <input
-          className="field"
-          value={story.title}
-          onChange={e => setStory(s => ({ ...s, title: e.target.value }))}
-          placeholder="Project title"
-        />
-      </div>
+      {showSuccess && <SuccessBanner onDismiss={onDismissSuccess} />}
 
-      <div className="card">
-        <span className="eyebrow">Logline</span>
-        <textarea
-          className="field"
-          value={story.logline}
-          onChange={e => setStory(s => ({ ...s, logline: e.target.value }))}
-          placeholder="A one-sentence summary of your story"
-          rows={2}
-        />
-      </div>
+      {/* Format */}
+      <AttrRow
+        label="Format"
+        values={[formatLabel.toUpperCase()]}
+        expanded={openAttr === "format"}
+        onToggle={() => toggle("format")}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {([
+            { value: "feature" as const, label: "Feature Film" },
+            { value: "short" as const, label: "Short Film" },
+            { value: "tv-show" as const, label: "TV Show" },
+          ]).map(pt => (
+            <button
+              key={pt.value}
+              className={`choice ${story.projectType === pt.value ? "selected" : ""}`}
+              onClick={() => setStory(s => ({ ...s, projectType: pt.value }))}
+              style={{ textAlign: "left", padding: "12px 14px" }}
+            >
+              <div className="choice-title">{pt.label}</div>
+            </button>
+          ))}
+        </div>
+      </AttrRow>
 
-      {/* Summary / Premise */}
-      <div className="card">
-        <span className="eyebrow">Summary</span>
-        <textarea
-          className="field"
-          value={story.concept.summary}
-          onChange={e => setStory(s => ({
-            ...s,
-            concept: { ...s.concept, summary: e.target.value },
-          }))}
-          placeholder="A 2-3 sentence premise describing your story"
-          rows={4}
-        />
-      </div>
-
-      {/* Genre chips */}
-      <div className="card">
-        <span className="eyebrow">Genre</span>
-        <div className="chip-row" style={{ marginTop: 8 }}>
+      {/* Genre */}
+      <AttrRow
+        label="Genre"
+        values={story.settings.genres.length > 0 ? story.settings.genres.map(g => g.toUpperCase()) : undefined}
+        placeholder="Select genres"
+        expanded={openAttr === "genre"}
+        onToggle={() => toggle("genre")}
+      >
+        <div className="chip-row">
           {(["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"] as const).map(g => (
             <button key={g}
               className={`chip ${story.settings.genres.includes(g) ? "selected" : ""}`}
@@ -535,11 +621,70 @@ function ConceptTab({
             </button>
           ))}
         </div>
-      </div>
+      </AttrRow>
+
+      {/* Title */}
+      <AttrRow
+        label="Title"
+        values={story.title ? [story.title] : undefined}
+        placeholder="Add a title"
+        expanded={openAttr === "title"}
+        onToggle={() => toggle("title")}
+      >
+        <input
+          className="field"
+          value={story.title}
+          onChange={e => setStory(s => ({ ...s, title: e.target.value }))}
+          placeholder="Working title"
+          autoFocus
+        />
+      </AttrRow>
+
+      {/* Logline */}
+      <AttrRow
+        label="Logline"
+        values={story.logline ? [story.logline] : undefined}
+        placeholder="Add a logline"
+        expanded={openAttr === "logline"}
+        onToggle={() => toggle("logline")}
+      >
+        <textarea
+          className="field"
+          value={story.logline}
+          onChange={e => setStory(s => ({ ...s, logline: e.target.value }))}
+          placeholder="A one-sentence summary of your story"
+          rows={2}
+        />
+      </AttrRow>
+
+      {/* Summary */}
+      <AttrRow
+        label="Summary"
+        values={story.concept.summary ? [story.concept.summary] : undefined}
+        placeholder="Add a premise"
+        expanded={openAttr === "summary"}
+        onToggle={() => toggle("summary")}
+      >
+        <textarea
+          className="field"
+          value={story.concept.summary}
+          onChange={e => setStory(s => ({
+            ...s,
+            concept: { ...s.concept, summary: e.target.value },
+          }))}
+          placeholder="A 2-3 sentence premise describing your story"
+          rows={4}
+        />
+      </AttrRow>
 
       {/* Tone */}
-      <div className="card">
-        <span className="eyebrow">Tone</span>
+      <AttrRow
+        label="Tone"
+        values={story.concept.tone ? [story.concept.tone] : undefined}
+        placeholder="Set the tone"
+        expanded={openAttr === "tone"}
+        onToggle={() => toggle("tone")}
+      >
         <input
           className="field"
           value={story.concept.tone}
@@ -549,24 +694,22 @@ function ConceptTab({
           }))}
           placeholder='e.g. "dark comedy", "tense and atmospheric"'
         />
-      </div>
+      </AttrRow>
 
       {/* Themes */}
-      <div className="card">
-        <span className="eyebrow">Themes</span>
-        <div className="chip-row" style={{ marginTop: 8, marginBottom: 8 }}>
+      <AttrRow
+        label="Themes"
+        values={story.concept.themes.length > 0 ? story.concept.themes : undefined}
+        placeholder="Add themes"
+        expanded={openAttr === "themes"}
+        onToggle={() => toggle("themes")}
+      >
+        <div className="chip-row" style={{ marginBottom: 10 }}>
           {story.concept.themes.map(t => (
-            <button
-              key={t}
-              className="chip selected"
-              onClick={() => removeTheme(t)}
-            >
-              {t} ✕
+            <button key={t} className="chip selected" onClick={() => removeTheme(t)}>
+              {t} &#10005;
             </button>
           ))}
-          {story.concept.themes.length === 0 && (
-            <span className="caption">No themes yet</span>
-          )}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <input
@@ -577,21 +720,22 @@ function ConceptTab({
             placeholder="Add a theme"
             style={{ flex: 1, marginBottom: 0 }}
           />
-          <button
-            className="btn-secondary"
-            onClick={addTheme}
-            disabled={!themeInput.trim()}
-            style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}
-          >
+          <button className="btn-secondary" onClick={addTheme} disabled={!themeInput.trim()}
+            style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
             Add
           </button>
         </div>
-      </div>
+      </AttrRow>
 
-      {/* Ending types */}
-      <div className="card">
-        <span className="eyebrow">Ending</span>
-        <div className="chip-row" style={{ marginTop: 8 }}>
+      {/* Ending */}
+      <AttrRow
+        label="Ending"
+        values={story.settings.endingTypes.length > 0 ? story.settings.endingTypes.map(e => e.toUpperCase()) : undefined}
+        placeholder="Select ending type"
+        expanded={openAttr === "ending"}
+        onToggle={() => toggle("ending")}
+      >
+        <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
             <button key={e}
               className={`chip ${story.settings.endingTypes.includes(e) ? "selected" : ""}`}
@@ -608,13 +752,7 @@ function ConceptTab({
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Info banner */}
-      <div className="info-banner">
-        <span className="info-icon">i</span>
-        <span>Concept feeds AI generation across Characters, Story, and Script.</span>
-      </div>
+      </AttrRow>
     </>
   );
 }

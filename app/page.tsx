@@ -13,7 +13,7 @@ import { Genre, ProjectType } from "@/lib/story";
 
 type View =
   | { kind: "main" }
-  | { kind: "studio"; projectId: string };
+  | { kind: "studio"; projectId: string; isNew?: boolean };
 
 type MainTab = "projects" | "moments";
 
@@ -279,7 +279,7 @@ export default function Page() {
     setProjects(ps => [saved, ...ps]);
     if (user) saveProjectToDB(user.id, saved);
     closeCreateModal();
-    setView({ kind: "studio", projectId: saved.id });
+    setView({ kind: "studio", projectId: saved.id, isNew: true });
     generateThumbnail(saved.id, saved.title, saved.logline, saved.settings.genres);
   }
 
@@ -296,6 +296,7 @@ export default function Page() {
           setStory={(u: any) => updateProject(studioProject.id, u)}
           moments={moments}
           onBack={() => setView({ kind: "main" })}
+          isNew={(view as any).isNew ?? false}
         />
       );
     }
