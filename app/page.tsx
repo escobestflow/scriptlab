@@ -8,12 +8,11 @@ import {
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
 } from "@/lib/storage";
 import { useAuth } from "@/lib/auth";
-import { Wizard } from "@/components/Wizard";
 import { Studio } from "@/components/Studio";
+import { Genre, ProjectType } from "@/lib/story";
 
 type View =
   | { kind: "main" }
-  | { kind: "wizard"; draft: Story }
   | { kind: "studio"; projectId: string };
 
 type MainTab = "projects" | "moments";
@@ -48,6 +47,10 @@ export default function Page() {
   const [liveTranscript, setLiveTranscript] = useState("");
   const [editingMoment, setEditingMoment] = useState<Moment | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
+  // New project creation modal
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createStep, setCreateStep] = useState(0);
+  const [createDraft, setCreateDraft] = useState<Story | null>(null);
   const recognitionRef = useRef<any>(null);
   const capturedRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -257,25 +260,35 @@ export default function Page() {
     return <div className="app" />;
   }
 
+  // ── New project creation helpers ──
+  function openCreateModal() {
+    setCreateDraft(newBlankProject());
+    setCreateStep(0);
+    setCreateOpen(true);
+  }
+
+  function closeCreateModal() {
+    setCreateOpen(false);
+    setCreateDraft(null);
+    setCreateStep(0);
+  }
+
+  function finishCreate() {
+    if (!createDraft) return;
+    const saved = createDraft;
+    setProjects(ps => [saved, ...ps]);
+    if (user) saveProjectToDB(user.id, saved);
+    closeCreateModal();
+    setView({ kind: "studio", projectId: saved.id });
+    generateThumbnail(saved.id, saved.title, saved.logline, saved.settings.genres);
+  }
+
+  function updateDraft(u: (s: Story) => Story) {
+    setCreateDraft(prev => prev ? u(prev) : prev);
+  }
+
   /* ── Content area (changes with view, tab bar stays) ── */
   function renderContent() {
-    if (view.kind === "wizard") {
-      return (
-        <Wizard
-          draft={(view as any).draft}
-          setDraft={(u: any) => setView(v => v.kind === "wizard" ? { ...v, draft: u(v.draft) } : v)}
-          onCancel={() => setView({ kind: "main" })}
-          onFinish={() => {
-            const saved = (view as any).draft as Story;
-            setProjects(ps => [saved, ...ps]);
-            if (user) saveProjectToDB(user.id, saved);
-            setView({ kind: "studio", projectId: saved.id });
-            generateThumbnail(saved.id, saved.title, saved.logline, saved.settings.genres);
-          }}
-        />
-      );
-    }
-
     if (view.kind === "studio" && studioProject) {
       return (
         <Studio
@@ -305,7 +318,7 @@ export default function Page() {
               <ProjectsTab
                 projects={projects}
                 onOpen={(id) => setView({ kind: "studio", projectId: id })}
-                onNew={() => setView({ kind: "wizard", draft: newBlankProject() })}
+                onNew={openCreateModal}
                 progress={projectProgress}
               />
             )}
@@ -428,6 +441,55 @@ export default function Page() {
               onClose={() => setEditingMoment(null)}
             />
           )}
+        </div>
+      </div>
+
+      {/* ── Project creation modal ── */}
+      <div className={`create-modal-backdrop ${createOpen ? "open" : ""}`} onClick={closeCreateModal} />
+      <div className={`create-modal ${createOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">New Project</div>
+          <button className="chip" onClick={closeCreateModal}>Cancel</button>
+        </div>
+        <div className="create-modal-body">
+          {createDraft && createStep === 0 && (
+            <CreateStepFormat draft={createDraft} setDraft={updateDraft} />
+          )}
+          {createDraft && createStep === 1 && (
+            <CreateStepTitle draft={createDraft} setDraft={updateDraft} />
+          )}
+          {createDraft && createStep === 2 && (
+            <CreateStepGenre draft={createDraft} setDraft={updateDraft} />
+          )}
+        </div>
+        <div className="create-modal-footer">
+          {/* Progress dots */}
+          <div className="create-dots">
+            {[0, 1, 2].map(i => (
+              <div key={i} className={`create-dot ${i === createStep ? "active" : i < createStep ? "done" : ""}`} />
+            ))}
+          </div>
+          <div className="create-modal-actions">
+            {createStep > 0 && (
+              <button className="btn-secondary" onClick={() => setCreateStep(s => s - 1)}
+                style={{ fontSize: 14, minWidth: 70 }}>
+                Back
+              </button>
+            )}
+            {createStep < 2 ? (
+              <button className="btn-primary" onClick={() => setCreateStep(s => s + 1)}
+                style={{ flex: 1 }}>
+                Continue
+              </button>
+            ) : (
+              <button className="btn-primary" onClick={finishCreate}
+                disabled={!createDraft?.title?.trim()}
+                style={{ flex: 1 }}>
+                Create Project
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -794,6 +856,130 @@ function MomentsTab({ moments, onEdit }: { moments: Moment[]; onEdit: (m: Moment
           <div className="moment-time">{formatTime(m.createdAt)}</div>
         </div>
       ))}
+    </>
+  );
+}
+
+/* ============================================ */
+/* ========= PROJECT CREATION STEPS ========== */
+/* ============================================ */
+
+const PROJECT_TYPES: { value: ProjectType; title: string; sub: string }[] = [
+  { value: "feature",  title: "Feature Film", sub: "90-120 min. Full story arc." },
+  { value: "short",    title: "Short Film",   sub: "Under 40 min. Tight & focused." },
+  { value: "tv-show",  title: "TV Show",      sub: "Episodes. Serialized story." },
+];
+const ALL_GENRES: Genre[] = ["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"];
+
+function CreateStepFormat({
+  draft, setDraft,
+}: {
+  draft: Story;
+  setDraft: (u: (s: Story) => Story) => void;
+}) {
+  return (
+    <>
+      <div className="display heading">What are you making?</div>
+      <div className="body-text">Pick the format. This shapes how the project is organized.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
+        {PROJECT_TYPES.map(pt => (
+          <button
+            key={pt.value}
+            className={`choice ${draft.projectType === pt.value ? "selected" : ""}`}
+            onClick={() => setDraft(s => ({ ...s, projectType: pt.value }))}
+            style={{ textAlign: "left" }}
+          >
+            <div className="choice-title">{pt.title}</div>
+            <div className="choice-sub">{pt.sub}</div>
+          </button>
+        ))}
+      </div>
+      {draft.projectType === "tv-show" && (
+        <div style={{ marginTop: 16 }}>
+          <div className="caption" style={{ marginBottom: 8 }}>How many episodes to start with?</div>
+          <input
+            className="field"
+            type="number"
+            min={1}
+            max={24}
+            placeholder="e.g. 8"
+            value={draft.episodes?.length ?? ""}
+            onChange={e => {
+              const count = Math.max(1, Math.min(24, parseInt(e.target.value) || 1));
+              setDraft(s => ({
+                ...s,
+                episodes: Array.from({ length: count }, (_, i) => ({
+                  id: `ep_${i + 1}`,
+                  title: `Episode ${i + 1}`,
+                  number: i + 1,
+                  beats: [],
+                })),
+              }));
+            }}
+          />
+        </div>
+      )}
+    </>
+  );
+}
+
+function CreateStepTitle({
+  draft, setDraft,
+}: {
+  draft: Story;
+  setDraft: (u: (s: Story) => Story) => void;
+}) {
+  return (
+    <>
+      <div className="display heading">Let{"'"}s name it.</div>
+      <div className="body-text">Give your story a working title. You can always change it later.</div>
+      <input
+        className="field"
+        placeholder="The Quiet Room"
+        value={draft.title}
+        onChange={e => setDraft(s => ({ ...s, title: e.target.value }))}
+        autoFocus
+      />
+    </>
+  );
+}
+
+function CreateStepGenre({
+  draft, setDraft,
+}: {
+  draft: Story;
+  setDraft: (u: (s: Story) => Story) => void;
+}) {
+  const toggleGenre = (g: Genre) => {
+    setDraft(s => {
+      const current = s.settings.genres;
+      const next = current.includes(g)
+        ? current.filter(x => x !== g)
+        : [...current, g];
+      return { ...s, settings: { ...s.settings, genres: next } };
+    });
+  };
+
+  return (
+    <>
+      <div className="display heading">Set the genre.</div>
+      <div className="body-text">Select one or more genres to define the world of your story.</div>
+      <div className="chip-row" style={{ marginTop: 8 }}>
+        {ALL_GENRES.map(g => (
+          <button
+            key={g}
+            className={`chip ${draft.settings.genres.includes(g) ? "selected" : ""}`}
+            onClick={() => toggleGenre(g)}
+          >
+            {g}
+          </button>
+        ))}
+      </div>
+      {draft.settings.genres.length > 1 && (
+        <div className="caption" style={{ marginTop: 12 }}>
+          Blend: {draft.settings.genres.join(" + ")}
+        </div>
+      )}
     </>
   );
 }
