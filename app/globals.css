@@ -728,7 +728,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .sheet-body.placeholder { color: var(--ink-mute); }
 
-/* ======= STUDIO LAYOUT (single scroll, sticky header + tabs) ======= */
+/* ======= STUDIO LAYOUT (layered sticky: toprow → title → tabs) ======= */
 
 .studio-scroll {
   flex: 1;
@@ -736,37 +736,52 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   -webkit-overflow-scrolling: touch;
 }
 
-/* Sticky zone: pins the top row + tabs when scrolled */
-.studio-sticky-zone {
+/* Layer 1: Top row — always pinned at very top */
+.studio-toprow-sticky {
   position: sticky;
   top: 0;
-  z-index: 20;
-  background: var(--bg);
-}
-
-/* Top row: back / inline-title / settings */
-.studio-toprow {
+  z-index: 22;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 44px;
   padding: 0 16px;
-}
-.studio-inline-title {
-  flex: 1;
-  text-align: center;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 8px;
+  background: var(--bg);
 }
 
-/* Tabs row (inside sticky zone) */
-.studio-tabs-row {
+/* Thumbnail area — in flow, collapses on scroll */
+.studio-thumb-area {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  transform-origin: center top;
+  transition: max-height 60ms linear;
+}
+
+/* Layer 2: Title — sticks below top row (top: 44px) */
+.studio-title-sticky {
+  position: sticky;
+  top: 44px;
+  z-index: 21;
+  background: var(--bg);
+  padding: 4px 20px 6px;
+}
+.studio-title-text {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-align: center;
+  transition: font-size 60ms linear;
+}
+
+/* Layer 3: Tab bar — sticks below title (top: 74px) */
+.studio-tabs-sticky {
+  position: sticky;
+  top: 74px;
+  z-index: 20;
   display: flex;
   justify-content: center;
   padding: 0 0 8px;
+  background: var(--bg);
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */

@@ -260,66 +260,51 @@ export function Studio({
 
   const sorted = [...beats].sort((a, b) => a.position - b.position);
 
-  // Scroll progress for thumbnail fade and title shrink
-  const collapseThreshold = 80;
-  const collapseProgress = Math.min(1, scrollY / collapseThreshold);
-
-  // Title interpolation: 18px → 15px
-  const titleSize = 18 - collapseProgress * 3;
-  // Thumbnail scale: 1 → 0, fades away
-  const thumbOpacity = Math.max(0, 1 - collapseProgress * 2);
-  const thumbScale = 1 - collapseProgress * 0.3;
+  // Scroll-driven interpolation
+  const collapseThreshold = 90;
+  const t = Math.min(1, scrollY / collapseThreshold);
+  // Title: 18px → 15px
+  const titleSize = 18 - t * 3;
+  // Thumbnail: fades and shrinks
+  const thumbOpacity = Math.max(0, 1 - t * 2.2);
+  const thumbScale = 1 - t * 0.3;
+  // Thumbnail height collapses to 0 so title/tabs slide up naturally
+  const thumbMaxHeight = Math.max(0, 100 * (1 - t));
 
   return (
     <>
-      {/* Single scrollable area — everything is in-flow */}
+      {/* Single scrollable area */}
       <div
         className="studio-scroll"
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {/* Sticky zone: header row + tabs. Uses position:sticky to pin at top. */}
-        <div className="studio-sticky-zone">
-          {/* Top row: back / title / settings — always visible */}
-          <div className="studio-toprow">
-            <button className="project-header-btn" onClick={handleBack} aria-label="Back">
-              <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
-              <span>BACK</span>
-            </button>
-            {/* Inline title — fades in as scroll progresses */}
-            <div
-              className="studio-inline-title"
-              style={{ opacity: collapseProgress, fontSize: 15, fontWeight: 900 }}
-            >
-              {story.title || "Untitled"}
-            </div>
-            <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-              <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
-                <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-                <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-                <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-                <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-              </svg>
-            </button>
-          </div>
-
-          {/* Tabs — one instance, sticks with the top row */}
-          <div className="studio-tabs-row">
-            <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
-          </div>
+        {/* Layer 1: Top row — sticky at top:0, always pinned */}
+        <div className="studio-toprow-sticky">
+          <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span>BACK</span>
+          </button>
+          <div style={{ flex: 1 }} />
+          <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
+              <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+              <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+              <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+              <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+            </svg>
+          </button>
         </div>
 
-        {/* Thumbnail + large title — scrolls away, fades out */}
+        {/* Thumbnail — in flow, fades + collapses height on scroll */}
         <div
-          className="project-header-center"
+          className="studio-thumb-area"
           style={{
             opacity: thumbOpacity,
+            maxHeight: thumbMaxHeight,
             transform: `scale(${thumbScale})`,
-            transformOrigin: "center top",
-            marginTop: -4,
-            pointerEvents: thumbOpacity < 0.2 ? "none" : "auto",
           }}
         >
           {story.thumbnail ? (
@@ -329,10 +314,24 @@ export function Studio({
               {story.title ? story.title.charAt(0).toUpperCase() : "?"}
             </div>
           )}
-          <div className="project-header-title" style={{ fontSize: titleSize }}>
+        </div>
+
+        {/* Layer 2: Title — sticky at top:44px, shrinks via JS */}
+        <div className="studio-title-sticky">
+          <div
+            className="studio-title-text"
+            style={{ fontSize: titleSize }}
+          >
             {story.title || "Untitled"}
           </div>
-          {isTV && activeEpisode && <div className="caption">{activeEpisode.title}</div>}
+          {isTV && activeEpisode && thumbOpacity > 0.3 && (
+            <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
+          )}
+        </div>
+
+        {/* Layer 3: Tab bar — sticky at top:74px, sticks below title */}
+        <div className="studio-tabs-sticky">
+          <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
         </div>
 
         {/* Tab content */}
