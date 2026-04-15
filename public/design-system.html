@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlotTwist Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Core palette */
+    --bg: #ffffff;
+    --bg-secondary: #f7f7f8;
+    --surface: #ffffff;
+
+    /* Borders */
+    --border: rgba(0, 0, 0, 0.07);
+    --border-strong: rgba(0, 0, 0, 0.14);
+    --border-ddd: #DDDDDD;
+
+    /* Text (ink scale) */
+    --ink: #000000;
+    --ink-soft: #3c3c43;
+    --ink-mute: #8e8e93;
+    --ink-ghost: #c7c7cc;
+
+    /* Accent */
+    --record: #FF3B30;
+    --progress: #000000;
+
+    /* Sync status */
+    --sync: #e67e22;
+    --sync-bg: #fef9f0;
+    --sync-border: #f5e6cc;
+
+    /* Motion */
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* Shadows */
+    --card-shadow:
+      0 0 23px 0 rgba(0, 0, 0, 0.08),
+      -0.5px -0.5px 0 0 rgba(0, 0, 0, 0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Lato', -apple-system, system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    padding: 40px 24px 80px;
+    max-width: 800px;
+    margin: 0 auto;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 { font-size: 32px; font-weight: 900; margin-bottom: 4px; letter-spacing: -0.035em; }
+  .subtitle { font-size: 14px; color: var(--ink-mute); margin-bottom: 48px; }
+  h2 { font-size: 20px; font-weight: 700; margin: 48px 0 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 15px; font-weight: 700; margin: 28px 0 12px; color: var(--ink-soft); }
+
+  /* Color swatch grid */
+  .color-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .color-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .color-swatch {
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+  }
+  .color-info { padding: 10px 12px; }
+  .color-name { font-size: 13px; font-weight: 700; }
+  .color-value { font-size: 11px; color: var(--ink-mute); margin-top: 2px; font-family: 'Courier New', monospace; }
+  .color-tw { font-size: 10px; color: var(--ink-ghost); margin-top: 2px; }
+
+  /* Type scale */
+  .type-row {
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .type-meta {
+    flex-shrink: 0;
+    width: 160px;
+    font-size: 11px;
+    color: var(--ink-mute);
+    font-family: 'Courier New', monospace;
+    line-height: 1.5;
+  }
+  .type-sample { flex: 1; }
+  .type-tw { font-size: 10px; color: var(--ink-ghost); margin-top: 4px; }
+
+  /* Token table */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-mute); padding: 8px 0; border-bottom: 2px solid var(--border-strong); }
+  td { padding: 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  td:first-child { font-family: 'Courier New', monospace; font-size: 12px; font-weight: 600; }
+  .mono { font-family: 'Courier New', monospace; font-size: 12px; }
+
+  /* Shadow demo */
+  .shadow-demo {
+    display: inline-flex;
+    gap: 24px;
+    margin-top: 8px;
+  }
+  .shadow-box {
+    width: 120px;
+    height: 80px;
+    border-radius: 16px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--ink-mute);
+  }
+
+  /* Radius demo */
+  .radius-row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+  .radius-box {
+    width: 60px;
+    height: 60px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--ink-mute);
+    font-family: 'Courier New', monospace;
+  }
+
+  @media print {
+    body { padding: 20px; }
+    h2 { break-before: page; }
+    .color-swatch { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<h1>PlotTwist Design System</h1>
+<div class="subtitle">Token reference for colors, typography, spacing, and effects. All values are live from CSS custom properties.</div>
+
+<!-- ============================================ -->
+<!-- ============ COLORS ======================= -->
+<!-- ============================================ -->
+
+<h2>Colors</h2>
+
+<h3>Core Palette</h3>
+<div class="color-grid">
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--bg);"></div>
+    <div class="color-info">
+      <div class="color-name">Background</div>
+      <div class="color-value">--bg &middot; #ffffff</div>
+      <div class="color-tw">tw: bg-bg</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--bg-secondary);"></div>
+    <div class="color-info">
+      <div class="color-name">Background Secondary</div>
+      <div class="color-value">--bg-secondary &middot; #f7f7f8</div>
+      <div class="color-tw">tw: bg-bg-secondary</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--surface);"></div>
+    <div class="color-info">
+      <div class="color-name">Surface</div>
+      <div class="color-value">--surface &middot; #ffffff</div>
+      <div class="color-tw">tw: bg-surface</div>
+    </div>
+  </div>
+</div>
+
+<h3>Ink (Text) Scale</h3>
+<div class="color-grid">
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--ink);"></div>
+    <div class="color-info">
+      <div class="color-name">Ink</div>
+      <div class="color-value">--ink &middot; #000000</div>
+      <div class="color-tw">tw: text-ink</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--ink-soft);"></div>
+    <div class="color-info">
+      <div class="color-name">Ink Soft</div>
+      <div class="color-value">--ink-soft &middot; #3c3c43</div>
+      <div class="color-tw">tw: text-ink-soft</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--ink-mute);"></div>
+    <div class="color-info">
+      <div class="color-name">Ink Mute</div>
+      <div class="color-value">--ink-mute &middot; #8e8e93</div>
+      <div class="color-tw">tw: text-ink-mute</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--ink-ghost);"></div>
+    <div class="color-info">
+      <div class="color-name">Ink Ghost</div>
+      <div class="color-value">--ink-ghost &middot; #c7c7cc</div>
+      <div class="color-tw">tw: text-ink-ghost</div>
+    </div>
+  </div>
+</div>
+
+<h3>Borders</h3>
+<div class="color-grid">
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--border);"></div>
+    <div class="color-info">
+      <div class="color-name">Border</div>
+      <div class="color-value">--border &middot; rgba(0,0,0,0.07)</div>
+      <div class="color-tw">tw: border-border</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--border-strong);"></div>
+    <div class="color-info">
+      <div class="color-name">Border Strong</div>
+      <div class="color-value">--border-strong &middot; rgba(0,0,0,0.14)</div>
+      <div class="color-tw">tw: border-border-strong</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--border-ddd);"></div>
+    <div class="color-info">
+      <div class="color-name">Border Light</div>
+      <div class="color-value">--border-ddd &middot; #DDDDDD</div>
+      <div class="color-tw">tw: border-border-ddd</div>
+    </div>
+  </div>
+</div>
+
+<h3>Accent &amp; Status</h3>
+<div class="color-grid">
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--record);"></div>
+    <div class="color-info">
+      <div class="color-name">Record Red</div>
+      <div class="color-value">--record &middot; #FF3B30</div>
+      <div class="color-tw">tw: bg-record, text-record</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--sync);"></div>
+    <div class="color-info">
+      <div class="color-name">Sync Orange</div>
+      <div class="color-value">--sync &middot; #e67e22</div>
+      <div class="color-tw">tw: bg-sync, text-sync</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--sync-bg);"></div>
+    <div class="color-info">
+      <div class="color-name">Sync Background</div>
+      <div class="color-value">--sync-bg &middot; #fef9f0</div>
+      <div class="color-tw">tw: bg-sync-bg</div>
+    </div>
+  </div>
+  <div class="color-card">
+    <div class="color-swatch" style="background: var(--sync-border);"></div>
+    <div class="color-info">
+      <div class="color-name">Sync Border</div>
+      <div class="color-value">--sync-border &middot; #f5e6cc</div>
+      <div class="color-tw">tw: border-sync-border</div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ============ TYPOGRAPHY =================== -->
+<!-- ============================================ -->
+
+<h2>Typography</h2>
+
+<p style="font-size: 13px; color: var(--ink-mute); margin-bottom: 20px;">
+  Font family: <strong>Lato</strong> &middot; Weights loaded: 300, 400, 500, 600, 700, 900
+</p>
+
+<div class="type-row">
+  <div class="type-meta">
+    35px / 600<br>
+    -0.035em<br>
+    LH 1.08
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 35px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.08;">Display</div>
+    <div class="type-tw">tw: text-display font-semibold</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    22px / 900<br>
+    -0.025em
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 22px; font-weight: 900; letter-spacing: -0.025em;">Display Small</div>
+    <div class="type-tw">tw: text-3xl font-black</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    18px / 900
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 18px; font-weight: 900;">Title</div>
+    <div class="type-tw">tw: text-xl font-black</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    15px / 400<br>
+    LH 1.45
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 15px; font-weight: 400; line-height: 1.45;">Body text for paragraphs and descriptions. This is the default reading size used throughout the app for loglines, summaries, and general content.</div>
+    <div class="type-tw">tw: text-body</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    14px / 400<br>
+    LH 1.45
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 14px; font-weight: 400; line-height: 1.45;">UI text for form fields, beat descriptions, and secondary content.</div>
+    <div class="type-tw">tw: text-md</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    13px / 400-700<br>
+    LH 1.55
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 13px; font-weight: 400; line-height: 1.55;">Small UI text for buttons, labels, and compact elements.</div>
+    <div class="type-tw">tw: text-base</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    12px / 400<br>
+    LH 1.35
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 12px; font-weight: 400; line-height: 1.35; color: var(--ink-mute);">Caption text for metadata, timestamps, and secondary info.</div>
+    <div class="type-tw">tw: text-sm</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    11px / 700<br>
+    0.1em &middot; CAPS
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute);">EYEBROW LABEL</div>
+    <div class="type-tw">tw: text-caption font-bold tracking-widest uppercase</div>
+  </div>
+</div>
+
+<div class="type-row">
+  <div class="type-meta">
+    10px / 500-700<br>
+    0.06-0.07em &middot; CAPS
+  </div>
+  <div class="type-sample">
+    <div style="font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;">TAB LABEL / BUTTON LABEL</div>
+    <div class="type-tw">tw: text-xs font-bold tracking-wider uppercase</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ============ SHADOWS ====================== -->
+<!-- ============================================ -->
+
+<h2>Shadows</h2>
+
+<div class="shadow-demo">
+  <div>
+    <div class="shadow-box" style="box-shadow: var(--card-shadow);">card</div>
+    <div style="font-size: 11px; color: var(--ink-mute); margin-top: 8px; text-align: center;" class="mono">--card-shadow</div>
+    <div style="font-size: 10px; color: var(--ink-ghost); text-align: center;">tw: shadow-card</div>
+  </div>
+  <div>
+    <div class="shadow-box" style="box-shadow: 0 2px 12px rgba(0,0,0,0.08);">fab</div>
+    <div style="font-size: 11px; color: var(--ink-mute); margin-top: 8px; text-align: center;" class="mono">fab</div>
+    <div style="font-size: 10px; color: var(--ink-ghost); text-align: center;">tw: shadow-fab</div>
+  </div>
+  <div>
+    <div class="shadow-box" style="box-shadow: 0 16px 50px rgba(0,0,0,0.22), 0 4px 14px rgba(0,0,0,0.12);">drag</div>
+    <div style="font-size: 11px; color: var(--ink-mute); margin-top: 8px; text-align: center;" class="mono">drag</div>
+    <div style="font-size: 10px; color: var(--ink-ghost); text-align: center;">tw: shadow-drag</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ============ BORDER RADIUS ================ -->
+<!-- ============================================ -->
+
+<h2>Border Radius</h2>
+
+<div class="radius-row">
+  <div>
+    <div class="radius-box" style="border-radius: 10px;">10</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">sm</div>
+  </div>
+  <div>
+    <div class="radius-box" style="border-radius: 12px;">12</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">DEFAULT</div>
+  </div>
+  <div>
+    <div class="radius-box" style="border-radius: 14px;">14</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">md</div>
+  </div>
+  <div>
+    <div class="radius-box" style="border-radius: 16px;">16</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">lg</div>
+  </div>
+  <div>
+    <div class="radius-box" style="border-radius: 18px;">18</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">xl</div>
+  </div>
+  <div>
+    <div class="radius-box" style="border-radius: 20px;">20</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">2xl</div>
+  </div>
+  <div>
+    <div class="radius-box" style="border-radius: 24px;">24</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">3xl</div>
+  </div>
+  <div>
+    <div class="radius-box" style="border-radius: 999px;">pill</div>
+    <div style="font-size: 10px; color: var(--ink-mute); text-align: center; margin-top: 4px;">full</div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ============ SPACING ====================== -->
+<!-- ============================================ -->
+
+<h2>Spacing Scale</h2>
+
+<p style="font-size: 13px; color: var(--ink-mute); margin-bottom: 16px;">
+  Uses Tailwind's default 4px base scale. Common values in the app:
+</p>
+
+<table>
+  <thead>
+    <tr><th>Tailwind</th><th>Value</th><th>Usage</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>4px</td><td>Tight gaps, icon margins</td></tr>
+    <tr><td>1.5</td><td>6px</td><td>Chip padding, tab gaps</td></tr>
+    <tr><td>2</td><td>8px</td><td>Button gaps, small padding</td></tr>
+    <tr><td>2.5</td><td>10px</td><td>Card internal padding, field padding</td></tr>
+    <tr><td>3</td><td>12px</td><td>Card padding, section gaps</td></tr>
+    <tr><td>3.5</td><td>14px</td><td>Card margins, content gaps</td></tr>
+    <tr><td>4</td><td>16px</td><td>Standard padding, beat card padding</td></tr>
+    <tr><td>5</td><td>20px</td><td>Screen horizontal padding, card padding</td></tr>
+    <tr><td>5.5</td><td>22px</td><td>Sheet padding, content margins</td></tr>
+    <tr><td>7</td><td>28px</td><td>Large element sizing</td></tr>
+    <tr><td>8</td><td>32px</td><td>Section spacing</td></tr>
+    <tr><td>11</td><td>44px</td><td>Touch target (buttons, icons)</td></tr>
+    <tr><td>13</td><td>52px</td><td>Record button inner</td></tr>
+    <tr><td>15</td><td>60px</td><td>Project thumbnail</td></tr>
+    <tr><td>16</td><td>64px</td><td>Record FAB</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================ -->
+<!-- ============ MOTION ======================= -->
+<!-- ============================================ -->
+
+<h2>Motion</h2>
+
+<table>
+  <thead>
+    <tr><th>Token</th><th>Value</th><th>Usage</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>--ease</td><td>cubic-bezier(0.22, 1, 0.36, 1)</td><td>All transitions (spring curve)</td></tr>
+    <tr><td>duration-fast</td><td>200ms</td><td>Button states, hover effects</td></tr>
+    <tr><td>duration-normal</td><td>260ms</td><td>Card transitions, tab switches</td></tr>
+    <tr><td>duration-sheet</td><td>320-480ms</td><td>Sheet open/close, page transitions</td></tr>
+  </tbody>
+</table>
+
+<div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 11px; color: var(--ink-ghost);">
+  PlotTwist Design System &middot; Generated from tailwind.config.js + globals.css &middot; All swatches render live from CSS custom properties
+</div>
+
+</body>
+</html>

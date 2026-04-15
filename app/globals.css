@@ -1,21 +1,42 @@
-/* ScriptWriter · Black & White, clean, tactile.
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* PlotTwist Design System · Black & White, clean, tactile.
    Reference: iOS-native clarity. Paper-white ground.
-   Generous spacing. Thin borders. No color except the record red. */
+   Generous spacing. Thin borders. No color except the record red.
+   Tailwind config mirrors these tokens — see tailwind.config.js */
 
 :root {
+  /* ── Core palette ── */
   --bg: #ffffff;
   --bg-secondary: #f7f7f8;
   --surface: #ffffff;
+
+  /* ── Borders ── */
   --border: rgba(0, 0, 0, 0.07);
   --border-strong: rgba(0, 0, 0, 0.14);
+  --border-ddd: #DDDDDD;
+
+  /* ── Text (ink scale) ── */
   --ink: #000000;
   --ink-soft: #3c3c43;
   --ink-mute: #8e8e93;
   --ink-ghost: #c7c7cc;
+
+  /* ── Accent ── */
   --record: #FF3B30;
   --progress: #000000;
+
+  /* ── Sync status ── */
+  --sync: #e67e22;
+  --sync-bg: #fef9f0;
+  --sync-border: #f5e6cc;
+
+  /* ── Motion ── */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  /* Design token: card double drop shadow */
+
+  /* ── Shadows ── */
   --card-shadow:
     0 0 23px 0 rgba(0, 0, 0, 0.08),
     -0.5px -0.5px 0 0 rgba(0, 0, 0, 0.25);
@@ -90,7 +111,7 @@ button { cursor: pointer; }
   width: 117px;
   height: 38px;
   padding: 0;
-  border: 1px solid #DDDDDD;
+  border: 1px solid var(--border-ddd);
   border-radius: 11px;
   background: transparent;
   color: var(--ink);
@@ -744,7 +765,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: inline-block;
   width: 6px;
   height: 6px;
-  background: #e67e22;
+  background: var(--sync);
   border-radius: 50%;
   margin-left: 4px;
   vertical-align: top;
@@ -760,8 +781,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* Sync banner */
 .sync-banner {
-  background: #fef9f0;
-  border: 1px solid #f5e6cc;
+  background: var(--sync-bg);
+  border: 1px solid var(--sync-border);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 12px;
