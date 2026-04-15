@@ -1,4 +1,4 @@
-import { Story } from "./story";
+import { Story, Character } from "./story";
 
 export interface Moment {
   id: string;
@@ -8,6 +8,14 @@ export interface Moment {
   createdAt: string;
   linkedProjectId?: string;
 }
+
+function ch(id: string, name: string, role: string, want: string, need: string, notes: string): Character {
+  return { id, name, role, archetype: "", backstory: "", motivations: "", flaws: "", want, need, relationships: [], voice: "", arc: "", notes };
+}
+
+const defaultConcept = { summary: "", tone: "", themes: [] as string[] };
+const defaultScript = { scenes: [] as any[], syncStatus: "synced" as const };
+const defaultSyncState = {};
 
 export const SAMPLE_PROJECTS: Story[] = [
   {
@@ -24,9 +32,10 @@ export const SAMPLE_PROJECTS: Story[] = [
       pace: 4,
       endingTypes: ["bittersweet"],
     },
+    concept: defaultConcept,
     characters: [
-      { id: "c1", name: "Mae", role: "protagonist", want: "To be left alone", need: "To forgive herself for her sister's death", notes: "Late 30s. Works from home. Hasn't left her apartment in 6 months." },
-      { id: "c2", name: "Jonah", role: "catalyst", want: "A fresh start", need: "To stop running from his own grief", notes: "Moves in next door. Musician. Disarmingly kind." },
+      ch("c1", "Mae", "protagonist", "To be left alone", "To forgive herself for her sister's death", "Late 30s. Works from home. Hasn't left her apartment in 6 months."),
+      ch("c2", "Jonah", "catalyst", "A fresh start", "To stop running from his own grief", "Moves in next door. Musician. Disarmingly kind."),
     ],
     ingredients: [
       { id: "i1", label: "setting", description: "A rent-controlled apartment building with paper-thin walls", locked: true },
@@ -43,6 +52,8 @@ export const SAMPLE_PROJECTS: Story[] = [
       { id: "b5", name: "Debate", summary: "Mae tries to ignore it. Puts on white noise. Earplugs. But the melody finds her everywhere — in the pipes, the elevator music, her dreams.", purpose: "Can she maintain the walls she's built?", position: 4, momentIds: [], status: "design" },
       { id: "b6", name: "Break Into Two", summary: "Mae slides a note under Jonah's door: 'Where did you learn that song?' He slides one back: 'My mother. Where did you hear it?'", purpose: "She chooses connection over isolation.", position: 5, momentIds: [], status: "design" },
     ],
+    script: defaultScript,
+    syncState: defaultSyncState,
     updatedAt: "2026-04-08T18:22:00.000Z",
   },
   {
@@ -59,10 +70,11 @@ export const SAMPLE_PROJECTS: Story[] = [
       pace: 6,
       endingTypes: ["ambiguous", "twist"],
     },
+    concept: defaultConcept,
     characters: [
-      { id: "c1", name: "Delia", role: "protagonist", want: "To find her missing son", need: "To accept what really happened that night", notes: "Driving cross-country for 3 days straight. Running on fumes." },
-      { id: "c2", name: "Roy", role: "ally", want: "A place to sleep", need: "To stop lying to himself", notes: "Trucker. Seems normal. Is not." },
-      { id: "c3", name: "The Clerk", role: "threshold guardian", want: "Unknown", need: "Unknown", notes: "Knows too much. Never leaves the front desk." },
+      ch("c1", "Delia", "protagonist", "To find her missing son", "To accept what really happened that night", "Driving cross-country for 3 days straight. Running on fumes."),
+      ch("c2", "Roy", "ally", "A place to sleep", "To stop lying to himself", "Trucker. Seems normal. Is not."),
+      ch("c3", "The Clerk", "threshold guardian", "Unknown", "Unknown", "Knows too much. Never leaves the front desk."),
     ],
     ingredients: [
       { id: "i1", label: "setting", description: "A motel at mile marker 0 on a road that doesn't exist", locked: true },
@@ -75,6 +87,8 @@ export const SAMPLE_PROJECTS: Story[] = [
       { id: "b2", name: "Call to Adventure", summary: "GPS dies. A neon sign flickers to life where there was nothing: SUNDOWN MOTEL. VACANCY.", purpose: "The threshold appears.", position: 1, momentIds: ["m7"], status: "design" },
       { id: "b3", name: "Refusal", summary: "Delia almost drives past. But the car stalls. Engine dead. The motel is the only light for miles.", purpose: "Choice is removed.", position: 2, momentIds: [], status: "design" },
     ],
+    script: defaultScript,
+    syncState: defaultSyncState,
     updatedAt: "2026-04-07T10:15:00.000Z",
   },
   {
@@ -91,9 +105,10 @@ export const SAMPLE_PROJECTS: Story[] = [
       pace: 7,
       endingTypes: ["bittersweet"],
     },
+    concept: defaultConcept,
     characters: [
-      { id: "c1", name: "Nora", role: "protagonist", want: "To make a perfect film about their friendship", need: "To let go of the past", notes: "Type-A. Carries a shot list everywhere. Afraid of change." },
-      { id: "c2", name: "Benny", role: "co-lead", want: "To have one last wild summer", need: "To tell Nora he's not going to college", notes: "Class clown. Hides real feelings behind humor." },
+      ch("c1", "Nora", "protagonist", "To make a perfect film about their friendship", "To let go of the past", "Type-A. Carries a shot list everywhere. Afraid of change."),
+      ch("c2", "Benny", "co-lead", "To have one last wild summer", "To tell Nora he's not going to college", "Class clown. Hides real feelings behind humor."),
     ],
     ingredients: [
       { id: "i1", label: "setting", description: "A small beach town that's being gentrified — their favorite spots keep closing", locked: true },
@@ -106,6 +121,8 @@ export const SAMPLE_PROJECTS: Story[] = [
       { id: "b2", name: "The Project Begins", summary: "They start filming. First interview: 'Tell the camera how we met.' They immediately disagree about whether it was first or second grade.", purpose: "Introduce the core conflict — they remember everything differently.", position: 1, momentIds: [], status: "design" },
       { id: "b3", name: "Escalation", summary: "Each location they visit is changing — the arcade is now a CrossFit, the video store is a smoothie bar. The town is moving on even if they aren't.", purpose: "External world mirrors the internal loss they can't articulate.", position: 2, momentIds: [], status: "design" },
     ],
+    script: defaultScript,
+    syncState: defaultSyncState,
     updatedAt: "2026-04-09T02:30:00.000Z",
   },
 ];

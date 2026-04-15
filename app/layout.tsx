@@ -2,7 +2,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 
 export const metadata = {
-  title: "ScriptLab",
+  title: "PlotTwist",
   description: "Iterative screenwriting, structured by AI.",
   manifest: "/manifest.webmanifest",
 };
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="ScriptLab" />
+        <meta name="apple-mobile-web-app-title" content="PlotTwist" />
       </head>
       <body>
         <AuthProvider>{children}</AuthProvider>

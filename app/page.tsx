@@ -22,11 +22,11 @@ type MainTab = "projects" | "moments";
 const IconMenu = () => (
   <svg viewBox="0 0 24 24"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></svg>
 );
-const IconFolder = () => (
-  <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h4l2 2h8a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+const IconClap = () => (
+  <svg viewBox="0 0 24 24"><path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/><path d="M3 9h18V7H3v2z"/><path d="M7 7l3-4"/><path d="M13 7l3-4"/></svg>
 );
-const IconStar = () => (
-  <svg viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7-6-4.6h7.6z"/></svg>
+const IconBulb = () => (
+  <svg viewBox="0 0 24 24"><path d="M9 21h6"/><path d="M9 18h6"/><path d="M12 2a7 7 0 00-4 12.7V17h8v-2.3A7 7 0 0012 2z"/></svg>
 );
 const IconSearch = () => (
   <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
@@ -225,8 +225,16 @@ export default function Page() {
   if (!user) {
     return (
       <div className="app" style={{ alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
-        <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 8 }}>
-          ScriptLab
+        <div style={{ marginBottom: 8 }}>
+          <span className="brand-logo" style={{ fontSize: 20 }}>
+            <svg className="brand-clap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22 }}>
+              <path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/>
+              <path d="M3 9h18V7H3v2z"/>
+              <path d="M7 7l3-4"/>
+              <path d="M13 7l3-4"/>
+            </svg>
+            <span>lot</span><span className="brand-twist">Twist</span>
+          </span>
         </div>
         <div className="display" style={{ marginBottom: 8 }}>
           Your stories,{"\n"}structured.
@@ -303,7 +311,17 @@ export default function Page() {
           <button className="topbar-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
             <IconMenu />
           </button>
-          <div className="topbar-center">ScriptLab</div>
+          <div className="topbar-center">
+            <span className="brand-logo">
+              <svg className="brand-clap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/>
+                <path d="M3 9h18V7H3v2z"/>
+                <path d="M7 7l3-4"/>
+                <path d="M13 7l3-4"/>
+              </svg>
+              <span>lot</span><span className="brand-twist">Twist</span>
+            </span>
+          </div>
           <div style={{ width: 44 }} />
         </div>
         <div className="screen-scroll" key={mainTab}>
@@ -336,8 +354,8 @@ export default function Page() {
             className={`tab ${view.kind === "main" && mainTab === "projects" ? "active" : ""}`}
             onClick={() => { setView({ kind: "main" }); setMainTab("projects"); }}
           >
-            <span className="icon"><IconFolder /></span>
-            Projects
+            <span className="icon"><IconClap /></span>
+            PROJECTS
           </button>
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -348,15 +366,15 @@ export default function Page() {
             >
               <div className="red-dot" />
             </button>
-            <div className="record-label">Record</div>
+            <div className="record-label">REC</div>
           </div>
 
           <button
             className={`tab ${view.kind === "main" && mainTab === "moments" ? "active" : ""}`}
             onClick={() => { setView({ kind: "main" }); setMainTab("moments"); }}
           >
-            <span className="icon"><IconStar /></span>
-            Moments
+            <span className="icon"><IconBulb /></span>
+            IDEAS
           </button>
         </div>
       </nav>
@@ -367,7 +385,17 @@ export default function Page() {
         onClick={() => setMenuOpen(false)}
       />
       <div className={`menu-drawer ${menuOpen ? "open" : ""}`}>
-        <div className="menu-header">ScriptLab</div>
+        <div className="menu-header">
+          <span className="brand-logo" style={{ fontSize: 18 }}>
+            <svg className="brand-clap" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 20h16a1 1 0 001-1v-10H3v10a1 1 0 001 1z"/>
+              <path d="M3 9h18V7H3v2z"/>
+              <path d="M7 7l3-4"/>
+              <path d="M13 7l3-4"/>
+            </svg>
+            <span>lot</span><span className="brand-twist">Twist</span>
+          </span>
+        </div>
         {user && (
           <div style={{ fontSize: 13, color: "var(--ink-mute)", marginBottom: 16 }}>
             {user.email}
@@ -464,7 +492,7 @@ function RecordingForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          story: { id: "", title: "", logline: "", projectType: "feature", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], updatedAt: "" },
+          story: { id: "", title: "", logline: "", projectType: "feature", concept: { summary: "", tone: "", themes: [] }, settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], script: { scenes: [], syncStatus: "synced" }, syncState: {}, updatedAt: "" },
           action: { type: "clean_moment", payload: { rawText: liveTranscript } },
         }),
       });
@@ -583,7 +611,7 @@ function MomentEditForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          story: { id: "", title: "", logline: "", projectType: "feature", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], updatedAt: "" },
+          story: { id: "", title: "", logline: "", projectType: "feature", concept: { summary: "", tone: "", themes: [] }, settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], script: { scenes: [], syncStatus: "synced" }, syncState: {}, updatedAt: "" },
           action: { type: "clean_moment", payload: { rawText: text } },
         }),
       });
@@ -680,8 +708,8 @@ function ProjectsTab({
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
         <div className="display">Projects</div>
-        <button className="btn-secondary" onClick={onNew} style={{ fontSize: 13 }}>
-          + New
+        <button className="btn-new-project" onClick={onNew}>
+          + NEW PROJECT
         </button>
       </div>
 

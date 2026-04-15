@@ -1,9 +1,9 @@
 {
-  "name": "ScriptWriter",
-  "short_name": "ScriptWriter",
+  "name": "PlotTwist",
+  "short_name": "PlotTwist",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f6f7fb",
-  "theme_color": "#f6f7fb",
+  "background_color": "#FDFEFE",
+  "theme_color": "#FDFEFE",
   "orientation": "portrait"
 }

@@ -67,9 +67,52 @@ button { cursor: pointer; }
   left: 50%; transform: translateX(-50%);
   font-weight: 900;
   font-size: 15px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: var(--ink);
+}
+
+/* Brand logo — clapperboard + lotTwist */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-family: 'Lato', sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.brand-clap {
+  width: 18px;
+  height: 18px;
+  margin-right: 1px;
+  position: relative;
+  top: 0px;
+}
+.brand-twist {
+  font-weight: 900;
+}
+
+/* New project button (pill with border) */
+.btn-new-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 200ms var(--ease);
+}
+.btn-new-project:active {
+  background: rgba(0,0,0,0.04);
 }
 .topbar-btn {
   width: 44px; height: 44px;
@@ -674,6 +717,16 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
+.section-tabs.four-tabs {
+  padding: 0 12px;
+}
+.section-tabs.four-tabs .section-tab {
+  flex: 1;
+  text-align: center;
+  padding: 10px 6px 12px;
+  font-size: 12px;
+  position: relative;
+}
 .section-tab {
   padding: 10px 20px 12px;
   font-size: 13px;
@@ -686,6 +739,107 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .section-tab.active {
   color: var(--ink);
   border-bottom-color: var(--ink);
+}
+
+/* Sync dot indicator on tabs */
+.sync-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #e67e22;
+  border-radius: 50%;
+  margin-left: 4px;
+  vertical-align: top;
+  position: relative;
+  top: -1px;
+}
+.sync-dot.inline {
+  margin-right: 6px;
+  margin-left: 0;
+  vertical-align: middle;
+  top: 0;
+}
+
+/* Sync banner */
+.sync-banner {
+  background: #fef9f0;
+  border: 1px solid #f5e6cc;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.sync-banner-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.sync-banner-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Character card styles */
+.character-card {
+  overflow: hidden;
+}
+.character-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+.character-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+.character-body {
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+}
+
+/* Info banner */
+.info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--ink-mute);
+  line-height: 1.5;
+  margin-top: 12px;
+}
+.info-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-mute);
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 /* ======= BEAT EDITOR (Design Tab) ======= */

@@ -45,7 +45,7 @@ export function buildPrompt(story: Story, action: ActionRequest): BuiltPrompt {
 }
 
 function storyBible(story: Story): string {
-  const { settings, characters, ingredients, snippets, beats } = story;
+  const { settings, characters, ingredients, snippets, beats, concept } = story;
   return `# CURRENT PROJECT BIBLE
 
 ## Title
@@ -53,6 +53,11 @@ ${story.title || "(untitled)"}
 
 ## Logline
 ${story.logline || "(none yet)"}
+
+## Concept
+- Summary: ${concept?.summary || "(none)"}
+- Tone: ${concept?.tone || "(none)"}
+- Themes: ${concept?.themes?.join(", ") || "(none)"}
 
 ## Settings
 - Framework: ${settings.framework}
@@ -64,7 +69,17 @@ ${story.logline || "(none yet)"}
 - Ending types: ${(settings as any).endingTypes?.join(", ") || (settings as any).endingType || "none"}
 
 ## Characters
-${characters.map(c => `- ${c.name} (${c.role}) — wants: ${c.want}; needs: ${c.need}${c.notes ? `; ${c.notes}` : ""}`).join("\n") || "(none)"}
+${characters.map(c => {
+  let line = `- ${c.name} (${c.role})`;
+  if (c.archetype) line += ` [${c.archetype}]`;
+  line += ` — wants: ${c.want}; needs: ${c.need}`;
+  if (c.motivations) line += `; motivations: ${c.motivations}`;
+  if (c.flaws) line += `; flaws: ${c.flaws}`;
+  if (c.voice) line += `; voice: ${c.voice}`;
+  if (c.arc) line += `; arc: ${c.arc}`;
+  if (c.notes) line += `; ${c.notes}`;
+  return line;
+}).join("\n") || "(none)"}
 
 ## Ingredients
 ${ingredients.map(i => `- [${i.locked ? "LOCKED" : "free"}] ${i.label}: ${i.description}`).join("\n") || "(none)"}

@@ -250,7 +250,9 @@ function StepVibe({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story) 
 
 function StepCharacter({ draft, setDraft }: { draft: Story; setDraft: (u: (s: Story) => Story) => void }) {
   const ch = draft.characters[0] ?? {
-    id: "c1", name: "", role: "protagonist", want: "", need: "", notes: "",
+    id: "c1", name: "", role: "protagonist", archetype: "", backstory: "",
+    motivations: "", flaws: "", want: "", need: "", relationships: [],
+    voice: "", arc: "", notes: "",
   };
   const update = (patch: Partial<typeof ch>) => {
     setDraft(s => {

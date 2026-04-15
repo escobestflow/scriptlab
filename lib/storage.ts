@@ -1,4 +1,4 @@
-import { Story, Beat } from "./story";
+import { Story, Beat, Character, Concept, Script, SyncState } from "./story";
 import { Moment } from "./sampleData";
 import { supabase } from "./supabase";
 
@@ -13,17 +13,67 @@ function normalizeBeat(b: any, index: number): Beat {
   };
 }
 
+function normalizeCharacter(c: any): Character {
+  return {
+    id: c.id || "ch_" + Math.random().toString(36).slice(2),
+    name: c.name || "",
+    role: c.role || "",
+    archetype: c.archetype || "",
+    backstory: c.backstory || "",
+    motivations: c.motivations || "",
+    flaws: c.flaws || "",
+    want: c.want || "",
+    need: c.need || "",
+    relationships: c.relationships || [],
+    voice: c.voice || "",
+    arc: c.arc || "",
+    notes: c.notes || "",
+  };
+}
+
+function normalizeConcept(c: any): Concept {
+  return {
+    summary: c?.summary || "",
+    tone: c?.tone || "",
+    themes: c?.themes || [],
+  };
+}
+
+function normalizeScript(s: any): Script {
+  return {
+    scenes: s?.scenes || [],
+    syncStatus: s?.syncStatus || "synced",
+    lastSyncedAt: s?.lastSyncedAt,
+    outOfSyncReason: s?.outOfSyncReason,
+  };
+}
+
+function normalizeSyncState(s: any): SyncState {
+  return {
+    conceptHash: s?.conceptHash,
+    charactersHash: s?.charactersHash,
+    storyHash: s?.storyHash,
+    charactersOutOfSync: s?.charactersOutOfSync || false,
+    storyOutOfSync: s?.storyOutOfSync || false,
+    scriptOutOfSync: s?.scriptOutOfSync || false,
+  };
+}
+
 function normalizeStory(s: any): Story {
   return {
     ...s,
     projectType: s.projectType ?? "feature",
+    concept: normalizeConcept(s.concept),
     settings: {
       ...s.settings,
       genres: s.settings?.genres ?? (s.settings?.genre ? [s.settings.genre] : ["thriller"]),
       endingTypes: s.settings?.endingTypes ?? (s.settings?.endingType ? [s.settings.endingType] : ["bittersweet"]),
     },
+    characters: (s.characters ?? []).map((c: any) => normalizeCharacter(c)),
     beats: (s.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
     episodes: s.episodes ?? undefined,
+    script: normalizeScript(s.script),
+    syncState: normalizeSyncState(s.syncState),
   };
 }
 
@@ -103,6 +153,11 @@ export function newBlankProject(): Story {
     title: "",
     logline: "",
     projectType: "feature",
+    concept: {
+      summary: "",
+      tone: "",
+      themes: [],
+    },
     settings: {
       framework: "save-the-cat",
       genres: [],
@@ -116,6 +171,11 @@ export function newBlankProject(): Story {
     ingredients: [],
     snippets: [],
     beats: [],
+    script: {
+      scenes: [],
+      syncStatus: "synced",
+    },
+    syncState: {},
     updatedAt: new Date().toISOString(),
   };
 }

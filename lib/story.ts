@@ -22,14 +22,38 @@ export interface StorySettings {
   endingTypes: EndingType[]; // multi-select
 }
 
+// ── Concept layer ──
+
+export interface Concept {
+  summary: string;          // 2-3 sentence premise
+  tone: string;             // "dark comedy", "tense", etc.
+  themes: string[];         // e.g. ["redemption", "identity", "loss"]
+}
+
+// ── Character layer (expanded) ──
+
+export interface CharacterRelationship {
+  characterId: string;
+  description: string;      // e.g. "rival", "estranged daughter"
+}
+
 export interface Character {
   id: string;
   name: string;
-  role: string;
+  role: string;             // protagonist, antagonist, supporting, etc.
+  archetype: string;        // e.g. "the mentor", "the trickster"
+  backstory: string;
+  motivations: string;
+  flaws: string;
   want: string;
   need: string;
+  relationships: CharacterRelationship[];
+  voice: string;            // speaking style description
+  arc: string;              // character arc summary
   notes: string;
 }
+
+// ── Ingredients & Snippets ──
 
 export interface Ingredient {
   id: string;
@@ -45,6 +69,8 @@ export interface Snippet {
   tags: string[];
   usedInBeats: string[];
 }
+
+// ── Story / Beat layer ──
 
 export type BeatStatus = "design" | "written";
 
@@ -66,17 +92,51 @@ export interface Episode {
   beats: Beat[];
 }
 
+// ── Script layer ──
+
+export interface Scene {
+  id: string;
+  beatId: string;           // linked to a beat
+  heading: string;          // INT. COFFEE SHOP - DAY
+  content: string;          // formatted screenplay text
+  notes: string;            // writer notes
+  lastGeneratedFrom?: string; // hash/timestamp of upstream state when generated
+}
+
+export interface Script {
+  scenes: Scene[];
+  syncStatus: "synced" | "out-of-sync";
+  lastSyncedAt?: string;    // ISO timestamp
+  outOfSyncReason?: string; // what changed upstream
+}
+
+// ── Sync tracking ──
+
+export interface SyncState {
+  conceptHash?: string;     // snapshot of concept when downstream was last synced
+  charactersHash?: string;
+  storyHash?: string;
+  charactersOutOfSync?: boolean;
+  storyOutOfSync?: boolean;
+  scriptOutOfSync?: boolean;
+}
+
+// ── Main Story type ──
+
 export interface Story {
   id: string;
   title: string;
   logline: string;
   projectType: ProjectType;
   settings: StorySettings;
+  concept: Concept;
   characters: Character[];
   ingredients: Ingredient[];
   snippets: Snippet[];
   beats: Beat[];              // for feature/short
   episodes?: Episode[];       // for tv-show
+  script: Script;
+  syncState: SyncState;
   thumbnail?: string;         // base64 data URL for AI-generated cover
   updatedAt: string;
 }
