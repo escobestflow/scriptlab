@@ -260,77 +260,79 @@ export function Studio({
 
   const sorted = [...beats].sort((a, b) => a.position - b.position);
 
-  // Scroll-driven header collapse
-  // The expanded header (back row + thumbnail + title) is ~140px tall.
-  // Once that scrolls away, the collapsed header + tabs stick to the top.
-  const collapseThreshold = 100;
+  // Scroll progress for thumbnail fade and title shrink
+  const collapseThreshold = 80;
   const collapseProgress = Math.min(1, scrollY / collapseThreshold);
-  const isCollapsed = scrollY > 60;
 
-  const SettingsIcon = () => (
-    <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
-      <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-      <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-      <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-      <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-    </svg>
-  );
+  // Title interpolation: 18px → 15px
+  const titleSize = 18 - collapseProgress * 3;
+  // Thumbnail scale: 1 → 0, fades away
+  const thumbOpacity = Math.max(0, 1 - collapseProgress * 2);
+  const thumbScale = 1 - collapseProgress * 0.3;
 
   return (
     <>
-      {/* Collapsed sticky bar — only visible after scrolling past the expanded header */}
-      <div className={`studio-collapsed-bar ${isCollapsed ? "visible" : ""}`}>
-        <div className="studio-collapsed-row">
-          <button className="project-header-btn" onClick={handleBack} aria-label="Back">
-            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-          <div className="studio-sticky-title">{story.title || "Untitled"}</div>
-          <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-            <SettingsIcon />
-          </button>
-        </div>
-        <div className="studio-collapsed-tabs">
-          <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
-        </div>
-      </div>
-
-      {/* Main scrollable area — everything scrolls together */}
+      {/* Single scrollable area — everything is in-flow */}
       <div
         className="studio-scroll"
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {/* Expanded header — scrolls with content, fades as it leaves */}
-        <div className="project-header-expanded">
-          <div className="project-header-toprow">
+        {/* Sticky zone: header row + tabs. Uses position:sticky to pin at top. */}
+        <div className="studio-sticky-zone">
+          {/* Top row: back / title / settings — always visible */}
+          <div className="studio-toprow">
             <button className="project-header-btn" onClick={handleBack} aria-label="Back">
               <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
               <span>BACK</span>
             </button>
+            {/* Inline title — fades in as scroll progresses */}
+            <div
+              className="studio-inline-title"
+              style={{ opacity: collapseProgress, fontSize: 15, fontWeight: 900 }}
+            >
+              {story.title || "Untitled"}
+            </div>
             <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-              <SettingsIcon />
+              <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
+                <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+                <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+                <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+                <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+              </svg>
             </button>
           </div>
-          <div className="project-header-center" style={{ opacity: 1 - collapseProgress * 1.5 }}>
-            {story.thumbnail ? (
-              <img src={story.thumbnail} alt="" className="project-header-thumb" />
-            ) : (
-              <div className="project-header-thumb project-header-thumb-placeholder">
-                {story.title ? story.title.charAt(0).toUpperCase() : "?"}
-              </div>
-            )}
-            <div className="project-header-title">{story.title || "Untitled"}</div>
-            {isTV && activeEpisode && <div className="caption">{activeEpisode.title}</div>}
+
+          {/* Tabs — one instance, sticks with the top row */}
+          <div className="studio-tabs-row">
+            <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
           </div>
         </div>
 
-        {/* In-flow tabs — these scroll up and get replaced by the sticky collapsed bar */}
-        <div className="studio-inflow-tabs">
-          <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+        {/* Thumbnail + large title — scrolls away, fades out */}
+        <div
+          className="project-header-center"
+          style={{
+            opacity: thumbOpacity,
+            transform: `scale(${thumbScale})`,
+            transformOrigin: "center top",
+            marginTop: -4,
+            pointerEvents: thumbOpacity < 0.2 ? "none" : "auto",
+          }}
+        >
+          {story.thumbnail ? (
+            <img src={story.thumbnail} alt="" className="project-header-thumb" />
+          ) : (
+            <div className="project-header-thumb project-header-thumb-placeholder">
+              {story.title ? story.title.charAt(0).toUpperCase() : "?"}
+            </div>
+          )}
+          <div className="project-header-title" style={{ fontSize: titleSize }}>
+            {story.title || "Untitled"}
+          </div>
+          {isTV && activeEpisode && <div className="caption">{activeEpisode.title}</div>}
         </div>
 
         {/* Tab content */}

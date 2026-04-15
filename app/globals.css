@@ -728,7 +728,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .sheet-body.placeholder { color: var(--ink-mute); }
 
-/* ======= STUDIO LAYOUT (scroll-driven header collapse) ======= */
+/* ======= STUDIO LAYOUT (single scroll, sticky header + tabs) ======= */
 
 .studio-scroll {
   flex: 1;
@@ -736,52 +736,34 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   -webkit-overflow-scrolling: touch;
 }
 
-/* Collapsed sticky bar — hidden by default, slides in when scrolled */
-.studio-collapsed-bar {
-  position: fixed;
+/* Sticky zone: pins the top row + tabs when scrolled */
+.studio-sticky-zone {
+  position: sticky;
   top: 0;
-  left: 0; right: 0;
-  max-width: 520px;
-  margin: 0 auto;
-  z-index: 30;
+  z-index: 20;
   background: var(--bg);
-  transform: translateY(-100%);
-  opacity: 0;
-  transition: transform 280ms var(--ease), opacity 200ms var(--ease);
-  pointer-events: none;
 }
-.studio-collapsed-bar.visible {
-  transform: translateY(0);
-  opacity: 1;
-  pointer-events: auto;
-}
-.studio-collapsed-row {
+
+/* Top row: back / inline-title / settings */
+.studio-toprow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 44px;
   padding: 0 16px;
 }
-.studio-sticky-title {
-  font-size: 15px;
-  font-weight: 900;
-  letter-spacing: -0.01em;
-  text-align: center;
+.studio-inline-title {
   flex: 1;
-}
-.studio-collapsed-tabs {
-  display: flex;
-  justify-content: center;
-  padding: 0 0 8px;
-}
-
-/* Expanded header (in scroll flow, scrolls naturally) */
-.project-header-expanded {
-  padding: 12px 20px 0;
+  text-align: center;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
 }
 
-/* In-flow tabs (scroll with content, replaced by sticky bar when scrolled) */
-.studio-inflow-tabs {
+/* Tabs row (inside sticky zone) */
+.studio-tabs-row {
   display: flex;
   justify-content: center;
   padding: 0 0 8px;
