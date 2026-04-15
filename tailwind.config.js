@@ -19,6 +19,7 @@ module.exports = {
         "border-ddd":   "var(--border-ddd)",       // #DDDDDD
         ink:            "var(--ink)",              // #000000
         "ink-soft":     "var(--ink-soft)",         // #3c3c43
+        "ink-tab-inactive": "var(--ink-tab-inactive)", // #3C3C42
         "ink-mute":     "var(--ink-mute)",         // #8e8e93
         "ink-ghost":    "var(--ink-ghost)",         // #c7c7cc
         record:         "var(--record)",           // #FF3B30

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { Story, Beat, Episode, Character, CharacterRelationship, Scene } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
@@ -22,6 +22,14 @@ export function Studio({
 }) {
   const [section, setSection] = useState<Section>("concept");
   const [showSuccess, setShowSuccess] = useState(isNew);
+  const [scrollY, setScrollY] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current) {
+      setScrollY(scrollRef.current.scrollTop);
+    }
+  }, []);
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -252,26 +260,95 @@ export function Studio({
 
   const sorted = [...beats].sort((a, b) => a.position - b.position);
 
+  // Scroll-driven collapse: threshold at 80px scroll
+  const collapseThreshold = 80;
+  const collapseProgress = Math.min(1, scrollY / collapseThreshold);
+  const isCollapsed = collapseProgress > 0.5;
+
   return (
     <>
-      <ProjectHeader
-        story={story}
-        onBack={handleBack}
-        onSetup={() => setShowSetup(true)}
-        subtitle={isTV && activeEpisode ? activeEpisode.title : undefined}
-      />
+      {/* Collapsed sticky header — appears as user scrolls */}
+      <div
+        className="studio-sticky-header"
+        style={{
+          opacity: collapseProgress,
+          pointerEvents: isCollapsed ? "auto" : "none",
+          transform: `translateY(${isCollapsed ? 0 : -8}px)`,
+        }}
+      >
+        <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </button>
+        <div className="studio-sticky-title">{story.title || "Untitled"}</div>
+        <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
+            <line x1="4" y1="6" x2="20" y2="6"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="18" x2="20" y2="18"/>
+            <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+            <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+            <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+          </svg>
+        </button>
+      </div>
 
-      {/* 4-section tabs at top */}
-      <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+      {/* Sticky tabs — always visible, sticks below collapsed header */}
+      <div className="studio-sticky-tabs" style={{ top: isCollapsed ? 44 : 0 }}>
+        <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+      </div>
 
-      <div className="screen-scroll" key={section}>
-        <div className="page-enter">
+      {/* Scrollable content area */}
+      <div
+        className="studio-scroll"
+        ref={scrollRef}
+        onScroll={handleScroll}
+        key={section}
+      >
+        {/* Expandable header — scrolls away */}
+        <div
+          className="project-header-expanded"
+          style={{ opacity: 1 - collapseProgress }}
+        >
+          <div className="project-header-toprow">
+            <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+              <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              <span>BACK</span>
+            </button>
+            <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+              <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
+                <line x1="4" y1="6" x2="20" y2="6"/>
+                <line x1="4" y1="12" x2="20" y2="12"/>
+                <line x1="4" y1="18" x2="20" y2="18"/>
+                <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+                <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+                <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+              </svg>
+            </button>
+          </div>
+          <div className="project-header-center">
+            {story.thumbnail ? (
+              <img src={story.thumbnail} alt="" className="project-header-thumb" />
+            ) : (
+              <div className="project-header-thumb project-header-thumb-placeholder">
+                {story.title ? story.title.charAt(0).toUpperCase() : "?"}
+              </div>
+            )}
+            <div className="project-header-title">{story.title || "Untitled"}</div>
+            {isTV && activeEpisode && <div className="caption">{activeEpisode.title}</div>}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <div className="page-enter" style={{ padding: "8px 22px 22px" }}>
           {section === "concept" && (
             <ConceptTab
               story={story}
               setStory={(u) => {
                 setStory(u);
-                // When concept changes, mark downstream as out-of-sync
                 markStoryOutOfSync("Concept was updated");
                 markScriptOutOfSync("Concept was updated");
               }}
@@ -284,7 +361,6 @@ export function Studio({
               story={story}
               setStory={(u) => {
                 setStory(u);
-                // When characters change, mark downstream as out-of-sync
                 markStoryOutOfSync("Characters were updated");
                 markScriptOutOfSync("Characters were updated");
               }}
@@ -390,18 +466,18 @@ function SectionTabs({
   syncState: Story["syncState"];
 }) {
   const tabs: { key: Section; label: string; dot?: boolean }[] = [
-    { key: "concept", label: "Concept" },
-    { key: "characters", label: "Characters" },
-    { key: "story", label: "Story", dot: syncState.storyOutOfSync },
-    { key: "script", label: "Script", dot: syncState.scriptOutOfSync },
+    { key: "concept", label: "CONCEPT" },
+    { key: "characters", label: "CHARACTERS" },
+    { key: "story", label: "STORY", dot: syncState.storyOutOfSync },
+    { key: "script", label: "SCRIPT", dot: syncState.scriptOutOfSync },
   ];
 
   return (
-    <div className="section-tabs four-tabs">
+    <div className="studio-tab-bar">
       {tabs.map(t => (
         <button
           key={t.key}
-          className={`section-tab ${section === t.key ? "active" : ""}`}
+          className={`studio-tab ${section === t.key ? "active" : ""}`}
           onClick={() => setSection(t.key)}
         >
           {t.label}
@@ -416,6 +492,7 @@ function SectionTabs({
 /* ============ PROJECT HEADER ================ */
 /* ============================================ */
 
+/* Simple topbar header for sub-views (settings, episodes) */
 function ProjectHeader({
   story, onBack, onSetup, subtitle,
 }: {
@@ -425,45 +502,30 @@ function ProjectHeader({
   subtitle?: string;
 }) {
   return (
-    <div className="project-header">
-      {/* Top row: back + settings */}
-      <div className="project-header-toprow">
-        <button className="project-header-btn" onClick={onBack} aria-label="Back">
-          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          <span>BACK</span>
-        </button>
-        {onSetup ? (
-          <button className="project-header-btn" onClick={onSetup} aria-label="Settings">
-            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
-              <line x1="4" y1="6" x2="4" y2="6" strokeLinecap="round"/>
-              <line x1="4" y1="12" x2="4" y2="12" strokeLinecap="round"/>
-              <line x1="4" y1="18" x2="4" y2="18" strokeLinecap="round"/>
-              <line x1="4" y1="6" x2="20" y2="6"/>
-              <line x1="4" y1="12" x2="20" y2="12"/>
-              <line x1="4" y1="18" x2="20" y2="18"/>
-              <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-              <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-              <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-            </svg>
-          </button>
-        ) : (
-          <div style={{ width: 44 }} />
-        )}
-      </div>
-      {/* Centered thumbnail + title */}
-      <div className="project-header-center">
-        {story.thumbnail ? (
-          <img src={story.thumbnail} alt="" className="project-header-thumb" />
-        ) : (
-          <div className="project-header-thumb project-header-thumb-placeholder">
-            {story.title ? story.title.charAt(0).toUpperCase() : "?"}
-          </div>
-        )}
-        <div className="project-header-title">{story.title || "Untitled"}</div>
+    <div className="topbar">
+      <button className="topbar-btn" onClick={onBack} aria-label="Back">
+        <svg viewBox="0 0 24 24" style={{width:22,height:22,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <div style={{ textAlign: "center", flex: 1 }}>
+        <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.01em" }}>
+          {story.title || "Untitled"}
+        </div>
         {subtitle && <div className="caption">{subtitle}</div>}
       </div>
+      {onSetup ? (
+        <button className="topbar-btn" onClick={onSetup} aria-label="Settings">
+          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
+            <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+            <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+            <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+            <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
+          </svg>
+        </button>
+      ) : (
+        <div style={{ width: 44 }} />
+      )}
     </div>
   );
 }
