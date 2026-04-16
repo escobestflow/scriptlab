@@ -76,6 +76,7 @@ button { cursor: pointer; }
   margin: 0 auto;
   padding-top: env(safe-area-inset-top);
   background: transparent;
+  overflow: hidden;
 }
 
 /* ======= TOP BAR ======= */
@@ -301,8 +302,12 @@ button { cursor: pointer; }
   transition: transform 320ms var(--ease);
 }
 .tabbar-hidden {
-  transform: translateY(100%);
+  transform: translateY(calc(100% + 20px));
   pointer-events: none;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
 }
 .tabbar-inner {
   display: flex;
@@ -746,20 +751,27 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   position: sticky;
   top: 0;
   z-index: 22;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   height: 44px;
   padding: 0 16px;
   background: transparent;
 }
-/* White backdrop that fades in on scroll — set opacity via JS */
+.studio-nav-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+/* White backdrop that fades in on scroll — sits behind nav content */
 .studio-nav-bg {
   position: absolute;
-  inset: 0;
-  bottom: -40px; /* extend down to cover tab bar area */
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 84px; /* nav height + extend below to cover tab bar */
   background: var(--bg);
-  z-index: -1;
+  z-index: 1;
   pointer-events: none;
   transition: opacity 150ms linear;
 }

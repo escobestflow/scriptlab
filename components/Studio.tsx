@@ -274,16 +274,18 @@ export function Studio({
         {/* Nav row: back + inline title (fades in on scroll) + settings — sticky at top */}
         <div className="studio-nav-sticky">
           <div className="studio-nav-bg" style={{ opacity: Math.min(1, scrollY / 60) }} />
-          <button className="project-header-btn" onClick={handleBack} aria-label="Back">
-            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-            <span>BACK</span>
-          </button>
-          <div style={{ flex: 1 }} />
-          <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-            <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
-          </button>
+          <div className="studio-nav-content">
+            <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+              <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              <span>BACK</span>
+            </button>
+            <div style={{ flex: 1 }} />
+            <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+              <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
+            </button>
+          </div>
         </div>
 
         {/* Header block: thumbnail + title — scrolls naturally as one unit */}
