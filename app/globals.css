@@ -777,6 +777,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 /* Header block: thumbnail + title — normal flow, scrolls as one unit */
 .studio-header-block {
+  position: relative;
+  z-index: 23;
   display: flex;
   flex-direction: column;
   align-items: center;
