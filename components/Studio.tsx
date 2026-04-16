@@ -267,30 +267,28 @@ export function Studio({
 
   return (
     <>
-      {/* Fixed header zone: nav + thumbnail + title + tabs — moves via JS */}
+      {/* Nav row — fixed, never moves */}
+      <div className="studio-nav-fixed">
+        <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>BACK</span>
+        </button>
+        <div style={{ flex: 1 }} />
+        <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+          <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
+        </button>
+      </div>
+
+      {/* Scrollable area — thumbnail, title, tabs, and content all scroll together */}
       <div
-        className="studio-header-fixed"
-        style={{ transform: `translateY(${Math.max(-100, -scrollY)}px)` }}
+        className="studio-scroll"
+        ref={scrollRef}
+        onScroll={handleScroll}
       >
-        {/* Fade below header — prevents content peeking through */}
-        <div className="studio-header-bg" />
-
-        {/* Nav row */}
-        <div className="studio-nav-row">
-          <button className="project-header-btn" onClick={handleBack} aria-label="Back">
-            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-            <span>BACK</span>
-          </button>
-          <div style={{ flex: 1 }} />
-          <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-            <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
-          </button>
-        </div>
-
-        {/* Thumbnail + title */}
-        <div className="studio-header-center">
+        {/* Thumbnail + title + tabs — in scroll flow, sticks via CSS sticky */}
+        <div className="studio-header-sticky">
           <div style={{ opacity: thumbOpacity }}>
             {story.thumbnail ? (
               <img src={story.thumbnail} alt="" className="project-header-thumb" />
@@ -306,20 +304,11 @@ export function Studio({
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
+          <div className="studio-tabs-row">
+            <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+          </div>
         </div>
 
-        {/* Tab bar */}
-        <div className="studio-tabs-row">
-          <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
-        </div>
-      </div>
-
-      {/* Scrollable content area */}
-      <div
-        className="studio-scroll"
-        ref={scrollRef}
-        onScroll={handleScroll}
-      >
         {/* Tab content */}
         <div style={{ padding: "8px 22px 40px" }}>
           {section === "concept" && (
