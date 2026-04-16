@@ -757,7 +757,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .studio-nav-bg {
   position: absolute;
   inset: 0;
-  bottom: -60px; /* extend down to cover tab bar area too */
+  bottom: -40px; /* extend down to cover tab bar area */
   background: var(--bg);
   z-index: -1;
   pointer-events: none;
