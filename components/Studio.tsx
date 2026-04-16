@@ -279,9 +279,7 @@ export function Studio({
             </svg>
             <span>BACK</span>
           </button>
-          <div className="studio-nav-title" style={{ opacity: Math.min(1, scrollY / 80) }}>
-            {story.title || "Untitled"}
-          </div>
+          <div style={{ flex: 1 }} />
           <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
             <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
           </button>
@@ -538,6 +536,78 @@ function AttrRow({
   );
 }
 
+/* ── Text attribute row — stays open once filled, input loses chrome when unfocused ── */
+function TextAttrRow({
+  label,
+  value,
+  placeholder,
+  onChange,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+  multiline?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  const hasValue = value.trim().length > 0;
+  // Once text exists, always show the input (never collapse back)
+  const isOpen = hasValue || focused;
+
+  if (!isOpen) {
+    // Collapsed: looks like a normal attr row, tappable to open
+    return (
+      <div className="attr-row">
+        <button className="attr-row-header" onClick={() => setFocused(true)}>
+          <span className="attr-label">{label}</span>
+          <div className="attr-values">
+            <span className="attr-placeholder">{placeholder}</span>
+          </div>
+          <svg className="attr-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+      </div>
+    );
+  }
+
+  // Open: show input. When unfocused + has value: no border, white bg, no caret hint.
+  const inputClass = `attr-text-input ${!focused && hasValue ? "unfocused-filled" : ""}`;
+
+  return (
+    <div className="attr-row attr-row-text-open">
+      <div className="attr-row-header attr-row-header-static">
+        <span className="attr-label">{label}</span>
+      </div>
+      <div className="attr-row-body">
+        {multiline ? (
+          <textarea
+            className={inputClass}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={focused ? placeholder : ""}
+            rows={3}
+            autoFocus={!hasValue}
+          />
+        ) : (
+          <input
+            className={inputClass}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={focused ? placeholder : ""}
+            autoFocus={!hasValue}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── Success banner (shown after project creation) ── */
 function SuccessBanner({ onDismiss }: { onDismiss: () => void }) {
   return (
@@ -650,77 +720,38 @@ function ConceptTab({
       </AttrRow>
 
       {/* Title */}
-      <AttrRow
+      <TextAttrRow
         label="Title"
-        values={story.title ? [story.title] : undefined}
+        value={story.title}
         placeholder="Add a title"
-        expanded={openAttr === "title"}
-        onToggle={() => toggle("title")}
-      >
-        <input
-          className="field"
-          value={story.title}
-          onChange={e => setStory(s => ({ ...s, title: e.target.value }))}
-          placeholder="Working title"
-          autoFocus
-        />
-      </AttrRow>
+        onChange={v => setStory(s => ({ ...s, title: v }))}
+      />
 
       {/* Logline */}
-      <AttrRow
+      <TextAttrRow
         label="Logline"
-        values={story.logline ? [story.logline] : undefined}
+        value={story.logline}
         placeholder="Add a logline"
-        expanded={openAttr === "logline"}
-        onToggle={() => toggle("logline")}
-      >
-        <textarea
-          className="field"
-          value={story.logline}
-          onChange={e => setStory(s => ({ ...s, logline: e.target.value }))}
-          placeholder="A one-sentence summary of your story"
-          rows={2}
-        />
-      </AttrRow>
+        onChange={v => setStory(s => ({ ...s, logline: v }))}
+        multiline
+      />
 
       {/* Summary */}
-      <AttrRow
+      <TextAttrRow
         label="Summary"
-        values={story.concept.summary ? [story.concept.summary] : undefined}
+        value={story.concept.summary}
         placeholder="Add a premise"
-        expanded={openAttr === "summary"}
-        onToggle={() => toggle("summary")}
-      >
-        <textarea
-          className="field"
-          value={story.concept.summary}
-          onChange={e => setStory(s => ({
-            ...s,
-            concept: { ...s.concept, summary: e.target.value },
-          }))}
-          placeholder="A 2-3 sentence premise describing your story"
-          rows={4}
-        />
-      </AttrRow>
+        onChange={v => setStory(s => ({ ...s, concept: { ...s.concept, summary: v } }))}
+        multiline
+      />
 
       {/* Tone */}
-      <AttrRow
+      <TextAttrRow
         label="Tone"
-        values={story.concept.tone ? [story.concept.tone] : undefined}
+        value={story.concept.tone}
         placeholder="Set the tone"
-        expanded={openAttr === "tone"}
-        onToggle={() => toggle("tone")}
-      >
-        <input
-          className="field"
-          value={story.concept.tone}
-          onChange={e => setStory(s => ({
-            ...s,
-            concept: { ...s.concept, tone: e.target.value },
-          }))}
-          placeholder='e.g. "dark comedy", "tense and atmospheric"'
-        />
-      </AttrRow>
+        onChange={v => setStory(s => ({ ...s, concept: { ...s.concept, tone: v } }))}
+      />
 
       {/* Themes */}
       <AttrRow
