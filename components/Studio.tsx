@@ -288,8 +288,8 @@ export function Studio({
           </div>
         </div>
 
-        {/* Spacer — gives ~50px of scroll before header sticks */}
-        <div style={{ height: 50, flexShrink: 0 }} />
+        {/* Spacer — gives ~100px of scroll before header sticks */}
+        <div style={{ height: 100, flexShrink: 0 }} />
 
         {/* Thumbnail + title + tab bar — single sticky container */}
         <div className="studio-header-sticky">
