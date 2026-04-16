@@ -24,11 +24,17 @@ export function Studio({
   const [showSuccess, setShowSuccess] = useState(isNew);
   const scrollRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
+  const scrollCounterRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current || !thumbRef.current) return;
+    if (!scrollRef.current) return;
     const y = scrollRef.current.scrollTop;
-    thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
+    if (thumbRef.current) {
+      thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
+    }
+    if (scrollCounterRef.current) {
+      scrollCounterRef.current.textContent = `scrollY: ${Math.round(y)}px`;
+    }
   }, []);
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -264,6 +270,9 @@ export function Studio({
 
   return (
     <>
+      {/* DEBUG: scroll position counter */}
+      <div ref={scrollCounterRef} className="scroll-counter">scrollY: 0px</div>
+
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
         <button className="project-header-btn" onClick={handleBack} aria-label="Back">
