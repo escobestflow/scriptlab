@@ -740,36 +740,38 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ======= STUDIO LAYOUT ======= */
 
-/* Nav row — fixed at top, never moves */
-.studio-nav-fixed {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 44px;
-  padding: 0 16px;
-  z-index: 20;
-  background: transparent;
-}
-
-/* Scrollable area — everything below nav scrolls */
+/* Scrollable area — everything inside */
 .studio-scroll {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Thumbnail + title + tabs — scrolls with content, pinned via JS translateY */
+/* Nav row — sticky at top:0, pins immediately */
+.studio-nav-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 16px;
+  background: transparent;
+}
+
+/* Thumbnail + title + tabs — sticky at top:44px, pins below nav */
 .studio-header-sticky {
-  position: relative;
-  z-index: 10;
+  position: sticky;
+  top: 44px;
+  z-index: 11;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   padding: 8px 20px 0;
+  margin-top: 30px;
   background: var(--bg);
-  will-change: transform;
 }
 .studio-tabs-row {
   width: 100%;

@@ -23,24 +23,12 @@ export function Studio({
   const [section, setSection] = useState<Section>("concept");
   const [showSuccess, setShowSuccess] = useState(isNew);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
-  const scrollYRef = useRef(0);
 
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return;
+    if (!scrollRef.current || !thumbRef.current) return;
     const y = scrollRef.current.scrollTop;
-    scrollYRef.current = y;
-
-    // Pin header after 80px — direct DOM, no React re-render
-    if (headerRef.current) {
-      const pin = y > 80 ? y - 80 : 0;
-      headerRef.current.style.transform = `translateY(${pin}px)`;
-    }
-    // Fade thumbnail
-    if (thumbRef.current) {
-      thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
-    }
+    thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
   }, []);
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -276,28 +264,28 @@ export function Studio({
 
   return (
     <>
-      {/* Nav row — fixed, never moves */}
-      <div className="studio-nav-fixed">
-        <button className="project-header-btn" onClick={handleBack} aria-label="Back">
-          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          <span>BACK</span>
-        </button>
-        <div style={{ flex: 1 }} />
-        <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-          <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
-        </button>
-      </div>
-
-      {/* Scrollable area — thumbnail, title, tabs, and content all scroll together */}
+      {/* Single scroll container — everything inside */}
       <div
         className="studio-scroll"
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {/* Thumbnail + title + tabs — in scroll flow, pins via JS after 80px */}
-        <div className="studio-header-sticky" ref={headerRef}>
+        {/* Nav row — sticky at top:0, pins immediately (acts like fixed) */}
+        <div className="studio-nav-sticky">
+          <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span>BACK</span>
+          </button>
+          <div style={{ flex: 1 }} />
+          <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+            <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
+          </button>
+        </div>
+
+        {/* Thumbnail + title + tabs — sticky at top:44px, sticks below nav */}
+        <div className="studio-header-sticky">
           <div ref={thumbRef}>
             {story.thumbnail ? (
               <img src={story.thumbnail} alt="" className="project-header-thumb" />
