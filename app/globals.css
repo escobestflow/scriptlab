@@ -775,30 +775,25 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   pointer-events: none;
   transition: opacity 150ms linear;
 }
-/* Header block: thumbnail + title — normal flow, scrolls as one unit */
-.studio-header-block {
+/* Thumbnail + title + tabs — single sticky container, sticks at 100px */
+.studio-header-sticky {
   position: sticky;
-  top: 44px;
+  top: 100px;
   z-index: 21;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 0 20px 8px;
-  background: var(--bg);
+  padding: 0 20px 0;
 }
 .studio-header-thumb {
-  /* thumbnail fades via inline opacity — no layout shift */
+  /* thumbnail fades via inline opacity */
 }
-
-/* Tab bar — sticky, pins below nav (top: 44px). */
-.studio-tabs-sticky {
-  position: sticky;
-  top: 130px;
-  z-index: 20;
+.studio-tabs-row {
+  width: 100%;
   display: flex;
   justify-content: center;
-  padding: 4px 0 12px;
+  padding: 4px 0 8px;
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */

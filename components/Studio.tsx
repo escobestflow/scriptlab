@@ -288,8 +288,8 @@ export function Studio({
           </div>
         </div>
 
-        {/* Header block: thumbnail + title — scrolls naturally as one unit */}
-        <div className="studio-header-block">
+        {/* Thumbnail + title + tab bar — single sticky container */}
+        <div className="studio-header-sticky">
           <div className="studio-header-thumb" style={{ opacity: thumbOpacity }}>
             {story.thumbnail ? (
               <img src={story.thumbnail} alt="" className="project-header-thumb" />
@@ -305,11 +305,9 @@ export function Studio({
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
-        </div>
-
-        {/* Tab bar — sticky, pins below nav row on scroll */}
-        <div className="studio-tabs-sticky">
-          <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+          <div className="studio-tabs-row">
+            <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+          </div>
         </div>
 
         {/* Tab content */}
