@@ -272,8 +272,8 @@ export function Studio({
         className="studio-header-fixed"
         style={{ transform: `translateY(${Math.max(-100, -scrollY)}px)` }}
       >
-        {/* White backdrop — fades in on scroll */}
-        <div className="studio-header-bg" style={{ opacity: Math.min(1, scrollY / 60) }} />
+        {/* Fade below header — prevents content peeking through */}
+        <div className="studio-header-bg" />
 
         {/* Nav row */}
         <div className="studio-nav-row">
