@@ -769,7 +769,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   top: 0;
   left: 0;
   right: 0;
-  height: 54px; /* nav row height + small buffer */
+  height: 64px; /* nav row height + buffer */
   background: var(--bg);
   z-index: 1;
   pointer-events: none;
@@ -777,13 +777,15 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 /* Header block: thumbnail + title — normal flow, scrolls as one unit */
 .studio-header-block {
-  position: relative;
-  z-index: 23;
+  position: sticky;
+  top: 44px;
+  z-index: 21;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 0 20px 16px;
+  padding: 0 20px 8px;
+  background: var(--bg);
 }
 .studio-header-thumb {
   /* thumbnail fades via inline opacity — no layout shift */
@@ -792,7 +794,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 /* Tab bar — sticky, pins below nav (top: 44px). */
 .studio-tabs-sticky {
   position: sticky;
-  top: 54px;
+  top: 130px;
   z-index: 20;
   display: flex;
   justify-content: center;
