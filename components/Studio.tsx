@@ -267,34 +267,31 @@ export function Studio({
 
   return (
     <>
-      {/* Single scrollable area */}
+      {/* Fixed header zone: nav + thumbnail + title + tabs — moves via JS */}
       <div
-        className="studio-scroll"
-        ref={scrollRef}
-        onScroll={handleScroll}
+        className="studio-header-fixed"
+        style={{ transform: `translateY(${Math.max(-100, -scrollY)}px)` }}
       >
-        {/* White backdrop — sticky behind all top elements, fades in on scroll */}
-        <div className="studio-bg-sticky" style={{ opacity: Math.min(1, scrollY / 60) }} />
+        {/* White backdrop — fades in on scroll */}
+        <div className="studio-header-bg" style={{ opacity: Math.min(1, scrollY / 60) }} />
 
-        {/* Nav row: back + settings — sticky at top */}
-        <div className="studio-nav-sticky">
-          <div className="studio-nav-content">
-            <button className="project-header-btn" onClick={handleBack} aria-label="Back">
-              <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
-              <span>BACK</span>
-            </button>
-            <div style={{ flex: 1 }} />
-            <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-              <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
-            </button>
-          </div>
+        {/* Nav row */}
+        <div className="studio-nav-row">
+          <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span>BACK</span>
+          </button>
+          <div style={{ flex: 1 }} />
+          <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+            <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
+          </button>
         </div>
 
-        {/* Thumbnail + title + tab bar — scrolls 100px then pins via transform */}
-        <div className="studio-header-sticky" style={{ transform: `translateY(${headerOffset}px)` }}>
-          <div className="studio-header-thumb" style={{ opacity: thumbOpacity }}>
+        {/* Thumbnail + title */}
+        <div className="studio-header-center">
+          <div style={{ opacity: thumbOpacity }}>
             {story.thumbnail ? (
               <img src={story.thumbnail} alt="" className="project-header-thumb" />
             ) : (
@@ -309,11 +306,20 @@ export function Studio({
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
-          <div className="studio-tabs-row">
-            <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
-          </div>
         </div>
 
+        {/* Tab bar */}
+        <div className="studio-tabs-row">
+          <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+        </div>
+      </div>
+
+      {/* Scrollable content area */}
+      <div
+        className="studio-scroll"
+        ref={scrollRef}
+        onScroll={handleScroll}
+      >
         {/* Tab content */}
         <div style={{ padding: "8px 22px 40px" }}>
           {section === "concept" && (

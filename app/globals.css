@@ -740,57 +740,49 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ======= STUDIO LAYOUT ======= */
 
-.studio-scroll {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+/* Fixed header block — nav + thumb + title + tabs. Slides up via JS translateY. */
+.studio-header-fixed {
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
 }
-
-/* White backdrop — sticky behind all top elements, fades in on scroll */
-.studio-bg-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 19;
-  height: 164px;
-  margin-bottom: -164px; /* collapse so it doesn't take flow space */
+/* White backdrop behind header — fades in on scroll */
+.studio-header-bg {
+  position: absolute;
+  inset: 0;
   background: var(--bg);
+  z-index: -1;
   pointer-events: none;
-  transition: opacity 150ms linear;
 }
-
-/* Nav row: back + settings — sticky at top */
-.studio-nav-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 22;
-  height: 44px;
-  padding: 0 16px;
-  background: transparent;
-}
-.studio-nav-content {
+.studio-nav-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 100%;
+  height: 44px;
+  padding: 0 16px;
 }
-/* Thumbnail + title + tabs — pinned via JS transform after 100px scroll */
-.studio-header-sticky {
-  z-index: 21;
+.studio-header-center {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 0;
-  will-change: transform;
-}
-.studio-header-thumb {
-  /* thumbnail fades via inline opacity */
+  padding: 0 20px 8px;
 }
 .studio-tabs-row {
   width: 100%;
   display: flex;
   justify-content: center;
   padding: 4px 0 8px;
+}
+
+/* Scrollable content below the header */
+.studio-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */
