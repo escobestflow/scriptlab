@@ -745,8 +745,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  margin-top: -44px;
-  padding-top: 44px;
+  margin-top: -80px;
+  padding-top: 80px;
 }
 
 /* Nav row — sticky at top:0, pins immediately */
