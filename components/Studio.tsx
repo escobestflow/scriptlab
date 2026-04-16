@@ -261,9 +261,9 @@ export function Studio({
   const sorted = [...beats].sort((a, b) => a.position - b.position);
 
   // Scroll-driven interpolation
-  const thumbOpacity = Math.max(0, 1 - scrollY / 50);
-  // Header pins after 100px of scroll: scrolls naturally, then locks via translateY
-  const headerOffset = scrollY > 100 ? scrollY - 100 : 0;
+  const thumbOpacity = Math.max(0, 1 - scrollY / 60);
+  // Header scrolls naturally for 80px, then translateY counteracts scroll to pin it
+  const headerPin = scrollY > 80 ? scrollY - 80 : 0;
 
   return (
     <>
@@ -287,8 +287,8 @@ export function Studio({
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {/* Thumbnail + title + tabs — in scroll flow, sticks via CSS sticky */}
-        <div className="studio-header-sticky">
+        {/* Thumbnail + title + tabs — in scroll flow, pins via JS after 80px */}
+        <div className="studio-header-sticky" style={{ transform: `translateY(${headerPin}px)` }}>
           <div style={{ opacity: thumbOpacity }}>
             {story.thumbnail ? (
               <img src={story.thumbnail} alt="" className="project-header-thumb" />
