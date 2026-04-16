@@ -313,7 +313,7 @@ export function Studio({
         </div>
 
         {/* Tab content */}
-        <div style={{ padding: "8px 22px 22px" }}>
+        <div style={{ padding: "8px 22px 40px" }}>
           {section === "concept" && (
             <ConceptTab
               story={story}

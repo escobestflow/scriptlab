@@ -148,7 +148,7 @@ button { cursor: pointer; }
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 4px 20px 20px;
+  padding: 4px 20px 90px; /* extra bottom padding to clear the absolute tabbar */
 }
 
 /* ======= TYPOGRAPHY ======= */
@@ -294,20 +294,20 @@ button { cursor: pointer; }
 /* ======= TAB BAR (2 tabs + centered record FAB) ======= */
 
 .tabbar {
-  flex-shrink: 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 20;
   background: var(--bg);
   border-top: 1px solid var(--border);
   padding: 0 0 env(safe-area-inset-bottom);
+  transform: translateY(0);
   transition: transform 320ms var(--ease);
 }
 .tabbar-hidden {
   transform: translateY(calc(100% + 20px));
   pointer-events: none;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
 }
 .tabbar-inner {
   display: flex;
