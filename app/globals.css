@@ -746,7 +746,19 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   -webkit-overflow-scrolling: touch;
 }
 
-/* Nav row: back + inline title + settings — sticky at top */
+/* White backdrop — sticky behind all top elements, fades in on scroll */
+.studio-bg-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 19;
+  height: 164px;
+  margin-bottom: -164px; /* collapse so it doesn't take flow space */
+  background: var(--bg);
+  pointer-events: none;
+  transition: opacity 150ms linear;
+}
+
+/* Nav row: back + settings — sticky at top */
 .studio-nav-sticky {
   position: sticky;
   top: 0;
@@ -756,24 +768,10 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background: transparent;
 }
 .studio-nav-content {
-  position: relative;
-  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 100%;
-}
-/* White backdrop that fades in on scroll — sits behind nav content */
-.studio-nav-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 164px;
-  background: var(--bg);
-  z-index: 1;
-  pointer-events: none;
-  transition: opacity 150ms linear;
 }
 /* Thumbnail + title + tabs — single sticky container, sticks at 100px */
 .studio-header-sticky {

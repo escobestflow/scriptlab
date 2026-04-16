@@ -271,9 +271,11 @@ export function Studio({
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {/* Nav row: back + inline title (fades in on scroll) + settings — sticky at top */}
+        {/* White backdrop — sticky behind all top elements, fades in on scroll */}
+        <div className="studio-bg-sticky" style={{ opacity: Math.min(1, scrollY / 60) }} />
+
+        {/* Nav row: back + settings — sticky at top */}
         <div className="studio-nav-sticky">
-          <div className="studio-nav-bg" style={{ opacity: Math.min(1, scrollY / 60) }} />
           <div className="studio-nav-content">
             <button className="project-header-btn" onClick={handleBack} aria-label="Back">
               <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
