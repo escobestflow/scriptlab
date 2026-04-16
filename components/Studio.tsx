@@ -264,26 +264,26 @@ export function Studio({
 
   return (
     <>
-      {/* Single scroll container — everything inside */}
+      {/* Nav row — fixed above scroll, never moves */}
+      <div className="studio-nav-fixed">
+        <button className="project-header-btn" onClick={handleBack} aria-label="Back">
+          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>BACK</span>
+        </button>
+        <div style={{ flex: 1 }} />
+        <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
+          <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
+        </button>
+      </div>
+
+      {/* Scroll container — extends behind nav */}
       <div
         className="studio-scroll"
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {/* Nav row — sticky at top:0, pins immediately (acts like fixed) */}
-        <div className="studio-nav-sticky">
-          <button className="project-header-btn" onClick={handleBack} aria-label="Back">
-            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.8,fill:"none"}}>
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-            <span>BACK</span>
-          </button>
-          <div style={{ flex: 1 }} />
-          <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-            <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
-          </button>
-        </div>
-
         {/* Thumbnail — scrolls with content, not sticky */}
         <div className="studio-thumb-scroll" ref={thumbRef}>
           {story.thumbnail ? (

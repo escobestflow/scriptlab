@@ -740,26 +740,25 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ======= STUDIO LAYOUT ======= */
 
-/* Scrollable area — extends behind nav for extra scroll distance */
-.studio-scroll {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  margin-top: -80px;
-  padding-top: 80px;
-}
-
-/* Nav row — sticky at top:0, pins immediately */
-.studio-nav-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 12;
+/* Nav — fixed flex child, never moves */
+.studio-nav-fixed {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 44px;
   padding: 0 16px;
+  z-index: 20;
   background: transparent;
+}
+
+/* Scroll — extends 44px behind nav so header can scroll to nav top */
+.studio-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: -44px;
+  padding-top: 44px;
 }
 
 /* Thumbnail — normal flow, scrolls with content */
