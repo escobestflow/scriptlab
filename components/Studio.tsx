@@ -449,7 +449,7 @@ function SectionTabs({
           className={`studio-tab ${section === t.key ? "active" : ""}`}
           onClick={() => setSection(t.key)}
         >
-          {t.label}
+          <span className="studio-tab-label">{t.label}</span>
           {t.dot && <span className="sync-dot" />}
         </button>
       ))}

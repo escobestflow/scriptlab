@@ -809,15 +809,32 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   color: #3C3C42;
   background: none;
   border: none;
-  border-bottom: 2.5px solid transparent;
   cursor: pointer;
-  transition: color 200ms var(--ease), border-color 200ms var(--ease), font-weight 200ms var(--ease);
+  transition: color 200ms var(--ease), font-weight 200ms var(--ease);
   position: relative;
+}
+.studio-tab-label {
+  position: relative;
+  display: inline-block;
+}
+.studio-tab-label::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: var(--ink);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transition: transform 200ms var(--ease);
 }
 .studio-tab.active {
   color: var(--ink);
   font-weight: 700;
-  border-bottom-color: var(--ink);
+}
+.studio-tab.active .studio-tab-label::after {
+  transform: scaleX(1);
 }
 
 /* Sync dot indicator on tabs */
@@ -1039,8 +1056,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   transform: rotate(180deg);
 }
 .attr-row-body {
-  padding: 0 16px 16px;
-  border-top: 1px solid var(--border);
+  padding: 4px 16px 16px;
 }
 /* Chips inside attribute rows match the pill spec */
 .attr-row-body .chip-row { gap: 6px; }
