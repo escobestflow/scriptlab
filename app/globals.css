@@ -752,13 +752,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background: transparent;
 }
 
-/* Scroll — extends 44px behind nav so header can scroll to nav top */
+/* Scroll container — starts right below nav, no margin tricks */
 .studio-scroll {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  margin-top: -44px;
-  padding-top: 44px;
 }
 
 /* Thumbnail — normal flow, scrolls with content */
@@ -768,10 +766,10 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 8px 0;
 }
 
-/* Title + tabs — sticky, pins below nav after thumbnail scrolls away */
+/* Title + tabs — sticky, scrolls up behind nav before pinning */
 .studio-header-sticky {
   position: sticky;
-  top: 0;
+  top: -44px;
   z-index: 11;
   display: flex;
   flex-direction: column;
