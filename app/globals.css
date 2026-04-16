@@ -740,7 +740,21 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ======= STUDIO LAYOUT ======= */
 
-/* Scrollable area — extends behind nav for extra scroll distance */
+/* Nav — fixed flex child above scroll, never moves */
+.studio-nav-fixed {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 16px;
+  z-index: 20;
+  background: transparent;
+}
+
+/* Scroll container — extends 80px behind nav via negative margin.
+   Content starts at nav bottom (same visual position).
+   This gives the header 80px of scroll travel before it sticks. */
 .studio-scroll {
   flex: 1;
   overflow-y: auto;
@@ -749,20 +763,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding-top: 80px;
 }
 
-/* Nav row — sticky at top:0, pins immediately */
-.studio-nav-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 44px;
-  padding: 0 16px;
-  background: transparent;
-}
-
-/* Thumbnail + title + tabs — sticky at top:44px, pins below nav */
+/* Thumbnail + title + tabs — sticks at top of scroll viewport (behind nav) */
 .studio-header-sticky {
   position: sticky;
   top: 0;
