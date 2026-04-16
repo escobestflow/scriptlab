@@ -749,6 +749,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   height: 44px;
   padding: 0 16px;
   z-index: 20;
+  background: transparent;
 }
 
 /* Scrollable area — everything below nav scrolls */

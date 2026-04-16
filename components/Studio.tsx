@@ -22,12 +22,24 @@ export function Studio({
 }) {
   const [section, setSection] = useState<Section>("concept");
   const [showSuccess, setShowSuccess] = useState(isNew);
-  const [scrollY, setScrollY] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const thumbRef = useRef<HTMLDivElement>(null);
+  const scrollYRef = useRef(0);
 
   const handleScroll = useCallback(() => {
-    if (scrollRef.current) {
-      setScrollY(scrollRef.current.scrollTop);
+    if (!scrollRef.current) return;
+    const y = scrollRef.current.scrollTop;
+    scrollYRef.current = y;
+
+    // Pin header after 80px — direct DOM, no React re-render
+    if (headerRef.current) {
+      const pin = y > 80 ? y - 80 : 0;
+      headerRef.current.style.transform = `translateY(${pin}px)`;
+    }
+    // Fade thumbnail
+    if (thumbRef.current) {
+      thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
     }
   }, []);
   const [output, setOutput] = useState("");
@@ -260,10 +272,7 @@ export function Studio({
 
   const sorted = [...beats].sort((a, b) => a.position - b.position);
 
-  // Scroll-driven interpolation
-  const thumbOpacity = Math.max(0, 1 - scrollY / 60);
-  // Header scrolls naturally for 80px, then translateY counteracts scroll to pin it
-  const headerPin = scrollY > 80 ? scrollY - 80 : 0;
+  // Scroll values are driven directly via refs in handleScroll — no state re-renders
 
   return (
     <>
@@ -288,8 +297,8 @@ export function Studio({
         onScroll={handleScroll}
       >
         {/* Thumbnail + title + tabs — in scroll flow, pins via JS after 80px */}
-        <div className="studio-header-sticky" style={{ transform: `translateY(${headerPin}px)` }}>
-          <div style={{ opacity: thumbOpacity }}>
+        <div className="studio-header-sticky" ref={headerRef}>
+          <div ref={thumbRef}>
             {story.thumbnail ? (
               <img src={story.thumbnail} alt="" className="project-header-thumb" />
             ) : (
