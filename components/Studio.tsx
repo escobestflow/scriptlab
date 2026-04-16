@@ -10,7 +10,7 @@ import {
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft,
   createNewLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, switchProjectDraft, deleteProjectDraft,
-  saveLayerDraft, saveProjectDraft, isLayerDraftDirty,
+  saveLayerDraft, isLayerDraftDirty,
   getLayerSyncState, markLayerSynced,
 } from "@/lib/story";
 import { createProjectFromDraft } from "@/lib/storage";
@@ -359,21 +359,6 @@ export function Studio({
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
-
-          {/* Project-level Save button — saves all dirty layers at once */}
-          {(() => {
-            const anyDirty =
-              isLayerDraftDirty(activeConcept) ||
-              isLayerDraftDirty(activeCharacters) ||
-              isLayerDraftDirty(activeStoryLayer) ||
-              isLayerDraftDirty(activeScriptDraft);
-            if (!anyDirty) return null;
-            return (
-              <button className="project-save-btn" onClick={() => setStory(s => saveProjectDraft(s))}>
-                Save draft
-              </button>
-            );
-          })()}
 
           <div className="studio-tabs-row">
             <SectionTabs section={section} setSection={setSection} syncState={syncState} />
