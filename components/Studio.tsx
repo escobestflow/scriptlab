@@ -11,6 +11,7 @@ import {
   createNewLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, switchProjectDraft, deleteProjectDraft,
   saveLayerDraft, isLayerDraftDirty,
+  saveProjectDraft, isProjectDraftDirty,
   getLayerSyncState, markLayerSynced,
 } from "@/lib/story";
 import { createProjectFromDraft } from "@/lib/storage";
@@ -358,6 +359,13 @@ export function Studio({
 
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
+          )}
+
+          {/* Project-level Save button — shown when layer combination changed */}
+          {isProjectDraftDirty(story) && (
+            <button className="project-save-btn" onClick={() => setStory(s => saveProjectDraft(s))}>
+              Save Draft
+            </button>
           )}
 
           <div className="studio-tabs-row">
@@ -2079,6 +2087,11 @@ function SettingsTab({
           {sortedProjectDrafts.map(draft => {
             const isActive = draft.id === story.activeProjectDraftId;
             const canDelete = story.projectDrafts.length > 1;
+            // Compose composition string (C1 + Ch4 + S2 + Sc1)
+            const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
+            const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
+            const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
+            const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
             return (
               <div key={draft.id} className="inset-card" style={{ padding: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -2086,6 +2099,9 @@ function SettingsTab({
                     <div style={{ fontSize: 14, fontWeight: 700 }}>
                       Draft {draft.number}
                       {isActive && <span className="caption" style={{ marginLeft: 8 }}>· Active</span>}
+                    </div>
+                    <div className="caption" style={{ marginTop: 2 }}>
+                      Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
                     </div>
                     <div className="caption" style={{ marginTop: 2 }}>
                       Edited {formatDate(draft.updatedAt)}

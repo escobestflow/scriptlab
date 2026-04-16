@@ -817,42 +817,42 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   font-weight: 600;
 }
 
-/* Elevated "Create new" button at top of dropdown menus */
+/* "Create new" button at top of dropdown menus — matches Save Changes style */
 .drafts-dropdown-create {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   width: calc(100% - 12px);
-  margin: 6px 6px 10px;
-  padding: 10px 14px;
+  margin: 6px 6px 8px;
+  padding: 6px 14px;
   background: var(--ink);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-family: 'Lato', sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
   transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
 }
 .drafts-dropdown-create:active {
   transform: scale(0.97);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
 .drafts-dropdown-create-icon {
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.15);
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
 }
 .drafts-dropdown-date {
   font-size: 11px;
@@ -921,6 +921,30 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   animation: saveBtnIn 220ms var(--ease);
 }
 .draft-save-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* Project-level Save Draft button — shown when combination changed */
+.project-save-btn {
+  align-self: center;
+  margin: 4px auto 8px;
+  padding: 6px 14px;
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Lato', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+  animation: saveBtnIn 220ms var(--ease);
+}
+.project-save-btn:active {
   transform: scale(0.97);
   box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }

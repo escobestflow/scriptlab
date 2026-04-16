@@ -155,7 +155,8 @@ export interface ProjectDraft {
   id: string;
   number: number;
   createdAt: string;
-  updatedAt: string;
+  updatedAt: string;    // bumps when the layer combination changes
+  savedAt: string;      // moves only when the user explicitly saves
   conceptDraftId: string;
   charactersDraftId: string;
   storyDraftId: string;
@@ -454,14 +455,20 @@ export function saveLayerDraft(story: Story, layer: LayerKey): Story {
   }
 }
 
-// Save ALL active layer drafts at once (project-level save).
+// Save the project draft's current layer combination — advances pd.savedAt.
+// The project draft is "dirty" when its layer combination has changed
+// (via createNewLayerDraft or switchLayerDraft) since the last save.
 export function saveProjectDraft(story: Story): Story {
-  let s = story;
-  s = saveLayerDraft(s, "concept");
-  s = saveLayerDraft(s, "characters");
-  s = saveLayerDraft(s, "story");
-  s = saveLayerDraft(s, "script");
-  return s;
+  const now = new Date().toISOString();
+  return {
+    ...story,
+    projectDrafts: story.projectDrafts.map(pd =>
+      pd.id === story.activeProjectDraftId
+        ? { ...pd, savedAt: pd.updatedAt }
+        : pd
+    ),
+    updatedAt: now,
+  };
 }
 
 // Check if a layer draft is dirty (has unsaved edits).
@@ -470,6 +477,13 @@ export function isLayerDraftDirty(
 ): boolean {
   if (!draft) return false;
   return new Date(draft.updatedAt).getTime() > new Date(draft.savedAt).getTime();
+}
+
+// Check if the active project draft's combination has been changed since saved.
+export function isProjectDraftDirty(story: Story): boolean {
+  const pd = getActiveProjectDraft(story);
+  if (!pd) return false;
+  return new Date(pd.updatedAt).getTime() > new Date(pd.savedAt).getTime();
 }
 
 // ── Helpers: switch layer draft on active project draft ──
@@ -540,6 +554,7 @@ export function createNewProjectDraft(story: Story): Story {
     number: nextNumber,
     createdAt: now,
     updatedAt: now,
+    savedAt: now,
     conceptDraftId: active.conceptDraftId,
     charactersDraftId: active.charactersDraftId,
     storyDraftId: active.storyDraftId,
