@@ -744,7 +744,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: -8px;
+  margin-top: -11px;
   background: none;
   border: none;
   padding: 4px 8px;
@@ -869,7 +869,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   position: relative;
   margin-bottom: 12px;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   gap: 8px;
 }
@@ -896,8 +896,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .layer-draft-menu {
   top: calc(100% + 4px);
-  left: auto;
-  right: 0;
+  left: 0;
+  right: auto;
   transform: none;
   min-width: 200px;
 }
@@ -927,7 +927,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 /* Project-level Save Draft button — above tab bar */
 .project-save-btn {
   align-self: center;
-  margin: 2px auto 10px;
+  margin: 7px auto 10px;
   padding: 8px 18px;
   background: var(--ink);
   color: #fff;

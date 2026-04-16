@@ -68,11 +68,13 @@ function normalizeSettings(s: any): StorySettings {
 
 function normalizeConceptDraft(d: any, number = 1, ts?: string): ConceptLayerDraft {
   const now = ts || d?.updatedAt || new Date().toISOString();
+  const updated = d?.updatedAt || now;
   return {
     id: d?.id || "cd_" + Math.random().toString(36).slice(2),
     number: d?.number ?? number,
     createdAt: d?.createdAt || now,
-    updatedAt: d?.updatedAt || now,
+    updatedAt: updated,
+    savedAt: d?.savedAt || updated,
     logline: d?.logline || "",
     settings: normalizeSettings(d?.settings),
     concept: normalizeConcept(d?.concept),
@@ -81,22 +83,26 @@ function normalizeConceptDraft(d: any, number = 1, ts?: string): ConceptLayerDra
 
 function normalizeCharactersDraft(d: any, number = 1, ts?: string): CharactersLayerDraft {
   const now = ts || d?.updatedAt || new Date().toISOString();
+  const updated = d?.updatedAt || now;
   return {
     id: d?.id || "chd_" + Math.random().toString(36).slice(2),
     number: d?.number ?? number,
     createdAt: d?.createdAt || now,
-    updatedAt: d?.updatedAt || now,
+    updatedAt: updated,
+    savedAt: d?.savedAt || updated,
     characters: (d?.characters ?? []).map((c: any) => normalizeCharacter(c)),
   };
 }
 
 function normalizeStoryLayerDraft(d: any, number = 1, ts?: string): StoryLayerDraft {
   const now = ts || d?.updatedAt || new Date().toISOString();
+  const updated = d?.updatedAt || now;
   return {
     id: d?.id || "sd_" + Math.random().toString(36).slice(2),
     number: d?.number ?? number,
     createdAt: d?.createdAt || now,
-    updatedAt: d?.updatedAt || now,
+    updatedAt: updated,
+    savedAt: d?.savedAt || updated,
     beats: (d?.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
     episodes: d?.episodes ?? undefined,
     ingredients: d?.ingredients ?? [],
@@ -106,11 +112,13 @@ function normalizeStoryLayerDraft(d: any, number = 1, ts?: string): StoryLayerDr
 
 function normalizeScriptDraft(d: any, number = 1, ts?: string): ScriptLayerDraft {
   const now = ts || d?.updatedAt || new Date().toISOString();
+  const updated = d?.updatedAt || now;
   return {
     id: d?.id || "scd_" + Math.random().toString(36).slice(2),
     number: d?.number ?? number,
     createdAt: d?.createdAt || now,
-    updatedAt: d?.updatedAt || now,
+    updatedAt: updated,
+    savedAt: d?.savedAt || updated,
     script: normalizeScript(d?.script),
   };
 }

@@ -10,6 +10,7 @@ import {
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft,
   createNewLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, switchProjectDraft, deleteProjectDraft,
+  saveLayerDraft, saveProjectDraft, isLayerDraftDirty,
   getLayerSyncState, markLayerSynced,
 } from "@/lib/story";
 import { createProjectFromDraft } from "@/lib/storage";
@@ -359,16 +360,16 @@ export function Studio({
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
 
-          {/* Project-level Save button — shown when any layer is dirty */}
+          {/* Project-level Save button — saves all dirty layers at once */}
           {(() => {
             const anyDirty =
-              new Date(activeConcept.updatedAt).getTime()    > new Date(activeConcept.createdAt).getTime() ||
-              new Date(activeCharacters.updatedAt).getTime() > new Date(activeCharacters.createdAt).getTime() ||
-              new Date(activeStoryLayer.updatedAt).getTime() > new Date(activeStoryLayer.createdAt).getTime() ||
-              new Date(activeScriptDraft.updatedAt).getTime() > new Date(activeScriptDraft.createdAt).getTime();
+              isLayerDraftDirty(activeConcept) ||
+              isLayerDraftDirty(activeCharacters) ||
+              isLayerDraftDirty(activeStoryLayer) ||
+              isLayerDraftDirty(activeScriptDraft);
             if (!anyDirty) return null;
             return (
-              <button className="project-save-btn" onClick={handleCreateNewProjectDraft}>
+              <button className="project-save-btn" onClick={() => setStory(s => saveProjectDraft(s))}>
                 Save draft
               </button>
             );
@@ -639,11 +640,11 @@ function LayerDraftPicker({
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 
-  // "Dirty" = edited since creation. Save button appears in this state.
-  const isDirty = active && new Date(active.updatedAt).getTime() > new Date(active.createdAt).getTime();
+  // Dirty = has edits since last save. Save button appears in this state.
+  const isDirty = isLayerDraftDirty(active);
 
   const handleSave = () => {
-    setStory(s => createNewLayerDraft(s, layer));
+    setStory(s => saveLayerDraft(s, layer));
   };
 
   return (

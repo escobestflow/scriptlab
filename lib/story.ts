@@ -111,6 +111,7 @@ export interface ConceptLayerDraft {
   number: number;
   createdAt: string;
   updatedAt: string;
+  savedAt: string;          // moves only when user explicitly saves
   logline: string;
   settings: StorySettings;
   concept: Concept;
@@ -121,6 +122,7 @@ export interface CharactersLayerDraft {
   number: number;
   createdAt: string;
   updatedAt: string;
+  savedAt: string;
   characters: Character[];
 }
 
@@ -129,6 +131,7 @@ export interface StoryLayerDraft {
   number: number;
   createdAt: string;
   updatedAt: string;
+  savedAt: string;
   beats: Beat[];
   episodes?: Episode[];
   ingredients: Ingredient[];
@@ -140,6 +143,7 @@ export interface ScriptLayerDraft {
   number: number;
   createdAt: string;
   updatedAt: string;
+  savedAt: string;
   script: Script;
 }
 
@@ -193,7 +197,7 @@ export type LayerKey = "concept" | "characters" | "story" | "script";
 
 export function emptyConceptDraft(id: string, number: number, ts: string): ConceptLayerDraft {
   return {
-    id, number, createdAt: ts, updatedAt: ts,
+    id, number, createdAt: ts, updatedAt: ts, savedAt: ts,
     logline: "",
     settings: {
       framework: "save-the-cat",
@@ -209,12 +213,12 @@ export function emptyConceptDraft(id: string, number: number, ts: string): Conce
 }
 
 export function emptyCharactersDraft(id: string, number: number, ts: string): CharactersLayerDraft {
-  return { id, number, createdAt: ts, updatedAt: ts, characters: [] };
+  return { id, number, createdAt: ts, updatedAt: ts, savedAt: ts, characters: [] };
 }
 
 export function emptyStoryLayerDraft(id: string, number: number, ts: string): StoryLayerDraft {
   return {
-    id, number, createdAt: ts, updatedAt: ts,
+    id, number, createdAt: ts, updatedAt: ts, savedAt: ts,
     beats: [],
     ingredients: [],
     snippets: [],
@@ -223,7 +227,7 @@ export function emptyStoryLayerDraft(id: string, number: number, ts: string): St
 
 export function emptyScriptDraft(id: string, number: number, ts: string): ScriptLayerDraft {
   return {
-    id, number, createdAt: ts, updatedAt: ts,
+    id, number, createdAt: ts, updatedAt: ts, savedAt: ts,
     script: { scenes: [], syncStatus: "synced" },
   };
 }
@@ -415,6 +419,53 @@ export function createNewLayerDraft(story: Story, layer: LayerKey): Story {
     case "story":      return createNewStoryLayerDraft(story);
     case "script":     return createNewScriptDraft(story);
   }
+}
+
+// ── Save layer draft ──
+// Mark the active layer draft as "saved" — advances savedAt to updatedAt.
+// No new draft is created; this just clears the dirty state.
+
+export function saveLayerDraft(story: Story, layer: LayerKey): Story {
+  const pd = getActiveProjectDraft(story);
+  const now = new Date().toISOString();
+  const refKey: "conceptDraftId" | "charactersDraftId" | "storyDraftId" | "scriptDraftId" =
+    layer === "concept"    ? "conceptDraftId" :
+    layer === "characters" ? "charactersDraftId" :
+    layer === "story"      ? "storyDraftId" :
+                             "scriptDraftId";
+  const activeId = pd[refKey];
+
+  const mapDraft = <T extends { id: string; updatedAt: string; savedAt: string }>(arr: T[]): T[] =>
+    arr.map(d => d.id === activeId ? { ...d, savedAt: d.updatedAt } : d);
+
+  switch (layer) {
+    case "concept":
+      return { ...story, conceptDrafts: mapDraft(story.conceptDrafts), updatedAt: now };
+    case "characters":
+      return { ...story, charactersDrafts: mapDraft(story.charactersDrafts), updatedAt: now };
+    case "story":
+      return { ...story, storyDrafts: mapDraft(story.storyDrafts), updatedAt: now };
+    case "script":
+      return { ...story, scriptDrafts: mapDraft(story.scriptDrafts), updatedAt: now };
+  }
+}
+
+// Save ALL active layer drafts at once (project-level save).
+export function saveProjectDraft(story: Story): Story {
+  let s = story;
+  s = saveLayerDraft(s, "concept");
+  s = saveLayerDraft(s, "characters");
+  s = saveLayerDraft(s, "story");
+  s = saveLayerDraft(s, "script");
+  return s;
+}
+
+// Check if a layer draft is dirty (has unsaved edits).
+export function isLayerDraftDirty(
+  draft: { updatedAt: string; savedAt: string } | undefined
+): boolean {
+  if (!draft) return false;
+  return new Date(draft.updatedAt).getTime() > new Date(draft.savedAt).getTime();
 }
 
 // ── Helpers: switch layer draft on active project draft ──
