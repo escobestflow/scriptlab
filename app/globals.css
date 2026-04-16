@@ -770,7 +770,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: center;
   gap: 8px;
   padding: 8px 20px 0;
-  margin-top: 30px;
+  margin-top: 15px;
   background: var(--bg);
 }
 .studio-tabs-row {
