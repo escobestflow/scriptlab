@@ -283,12 +283,7 @@ export function Studio({
             {story.title || "Untitled"}
           </div>
           <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
-            <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
-              <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-              <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-              <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-              <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-            </svg>
+            <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
           </button>
         </div>
 
@@ -490,12 +485,7 @@ function ProjectHeader({
       </div>
       {onSetup ? (
         <button className="topbar-btn" onClick={onSetup} aria-label="Settings">
-          <svg viewBox="0 0 24 24" style={{width:20,height:20,stroke:"currentColor",strokeWidth:1.6,fill:"none"}}>
-            <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
-            <circle cx="8" cy="6" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-            <circle cx="16" cy="12" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-            <circle cx="10" cy="18" r="2" fill="var(--bg)" strokeWidth="1.6"/>
-          </svg>
+          <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
         </button>
       ) : (
         <div style={{ width: 44 }} />
