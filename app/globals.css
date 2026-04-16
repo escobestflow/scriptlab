@@ -778,7 +778,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 /* Thumbnail + title + tabs — single sticky container, sticks at 100px */
 .studio-header-sticky {
   position: sticky;
-  top: 100px;
+  top: 44px;
   z-index: 21;
   display: flex;
   flex-direction: column;
