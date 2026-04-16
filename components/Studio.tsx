@@ -284,17 +284,19 @@ export function Studio({
           </button>
         </div>
 
-        {/* Thumbnail + title + tabs — sticky at top:44px, sticks below nav */}
+        {/* Thumbnail — scrolls with content, not sticky */}
+        <div className="studio-thumb-scroll" ref={thumbRef}>
+          {story.thumbnail ? (
+            <img src={story.thumbnail} alt="" className="project-header-thumb" />
+          ) : (
+            <div className="project-header-thumb project-header-thumb-placeholder">
+              {story.title ? story.title.charAt(0).toUpperCase() : "?"}
+            </div>
+          )}
+        </div>
+
+        {/* Title + tabs — sticky, sticks below nav */}
         <div className="studio-header-sticky">
-          <div ref={thumbRef}>
-            {story.thumbnail ? (
-              <img src={story.thumbnail} alt="" className="project-header-thumb" />
-            ) : (
-              <div className="project-header-thumb project-header-thumb-placeholder">
-                {story.title ? story.title.charAt(0).toUpperCase() : "?"}
-              </div>
-            )}
-          </div>
           <div className="project-header-title">
             {story.title || "Untitled"}
           </div>

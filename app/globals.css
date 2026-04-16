@@ -762,7 +762,14 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background: transparent;
 }
 
-/* Thumbnail + title + tabs — sticky at top:44px, pins below nav */
+/* Thumbnail — normal flow, scrolls with content */
+.studio-thumb-scroll {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+/* Title + tabs — sticky, pins below nav after thumbnail scrolls away */
 .studio-header-sticky {
   position: sticky;
   top: 0;
@@ -771,7 +778,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 8px 20px 0;
+  padding: 4px 20px 0;
   background: var(--bg);
 }
 .studio-tabs-row {
