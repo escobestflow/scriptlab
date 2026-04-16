@@ -773,21 +773,15 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   justify-content: space-between;
   height: 100%;
 }
-/* Thumbnail + title + tabs — single sticky container, sticks at 100px */
+/* Thumbnail + title + tabs — pinned via JS transform after 100px scroll */
 .studio-header-sticky {
-  position: sticky;
-  top: 44px;
   z-index: 21;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   padding: 0;
-}
-.studio-header-sticky .studio-header-thumb,
-.studio-header-sticky .project-header-title {
-  padding-left: 20px;
-  padding-right: 20px;
+  will-change: transform;
 }
 .studio-header-thumb {
   /* thumbnail fades via inline opacity */
