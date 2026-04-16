@@ -1,8 +1,12 @@
-import { Story, Draft, Beat, Character, Concept, Script, SyncState, StorySettings } from "./story";
+import {
+  Story, ProjectDraft, Beat, Character, Concept, Script, StorySettings,
+  ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft,
+  emptyConceptDraft, emptyCharactersDraft, emptyStoryLayerDraft, emptyScriptDraft,
+} from "./story";
 import { Moment } from "./sampleData";
 import { supabase } from "./supabase";
 
-// ── Field-level normalization ──
+// ── Field normalization helpers ──
 
 function normalizeBeat(b: any, index: number): Beat {
   return {
@@ -48,17 +52,6 @@ function normalizeScript(s: any): Script {
   };
 }
 
-function normalizeSyncState(s: any): SyncState {
-  return {
-    conceptHash: s?.conceptHash,
-    charactersHash: s?.charactersHash,
-    storyHash: s?.storyHash,
-    charactersOutOfSync: s?.charactersOutOfSync || false,
-    storyOutOfSync: s?.storyOutOfSync || false,
-    scriptOutOfSync: s?.scriptOutOfSync || false,
-  };
-}
-
 function normalizeSettings(s: any): StorySettings {
   return {
     framework: s?.framework || "save-the-cat",
@@ -71,67 +64,207 @@ function normalizeSettings(s: any): StorySettings {
   };
 }
 
-// ── Draft normalization ──
-// Builds a draft from either a draft-shaped object or from legacy top-level fields.
+// ── Layer draft normalization ──
 
-function normalizeDraft(d: any, number: number = 1, fallbackTime?: string): Draft {
-  const now = fallbackTime || new Date().toISOString();
+function normalizeConceptDraft(d: any, number = 1, ts?: string): ConceptLayerDraft {
+  const now = ts || d?.updatedAt || new Date().toISOString();
   return {
-    id: d?.id || "d_" + Math.random().toString(36).slice(2),
+    id: d?.id || "cd_" + Math.random().toString(36).slice(2),
     number: d?.number ?? number,
     createdAt: d?.createdAt || now,
     updatedAt: d?.updatedAt || now,
     logline: d?.logline || "",
     settings: normalizeSettings(d?.settings),
     concept: normalizeConcept(d?.concept),
-    characters: (d?.characters ?? []).map((c: any) => normalizeCharacter(c)),
-    ingredients: d?.ingredients ?? [],
-    snippets: d?.snippets ?? [],
-    beats: (d?.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
-    episodes: d?.episodes ?? undefined,
-    script: normalizeScript(d?.script),
-    syncState: normalizeSyncState(d?.syncState),
   };
 }
 
-// ── Story normalization ──
-// Migrates legacy projects (content at top level) into the drafts[] model.
+function normalizeCharactersDraft(d: any, number = 1, ts?: string): CharactersLayerDraft {
+  const now = ts || d?.updatedAt || new Date().toISOString();
+  return {
+    id: d?.id || "chd_" + Math.random().toString(36).slice(2),
+    number: d?.number ?? number,
+    createdAt: d?.createdAt || now,
+    updatedAt: d?.updatedAt || now,
+    characters: (d?.characters ?? []).map((c: any) => normalizeCharacter(c)),
+  };
+}
+
+function normalizeStoryLayerDraft(d: any, number = 1, ts?: string): StoryLayerDraft {
+  const now = ts || d?.updatedAt || new Date().toISOString();
+  return {
+    id: d?.id || "sd_" + Math.random().toString(36).slice(2),
+    number: d?.number ?? number,
+    createdAt: d?.createdAt || now,
+    updatedAt: d?.updatedAt || now,
+    beats: (d?.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
+    episodes: d?.episodes ?? undefined,
+    ingredients: d?.ingredients ?? [],
+    snippets: d?.snippets ?? [],
+  };
+}
+
+function normalizeScriptDraft(d: any, number = 1, ts?: string): ScriptLayerDraft {
+  const now = ts || d?.updatedAt || new Date().toISOString();
+  return {
+    id: d?.id || "scd_" + Math.random().toString(36).slice(2),
+    number: d?.number ?? number,
+    createdAt: d?.createdAt || now,
+    updatedAt: d?.updatedAt || now,
+    script: normalizeScript(d?.script),
+  };
+}
+
+// ── Story normalization / migration ──
+// Handles three shapes:
+//  1. New: layered drafts (conceptDrafts[], etc. + projectDrafts[])
+//  2. Mid: monolithic drafts[] with complete content (previous iteration)
+//  3. Old: top-level content (pre-drafts)
+
+function genId(prefix: string) {
+  return prefix + "_" + Math.random().toString(36).slice(2);
+}
 
 function normalizeStory(s: any): Story {
   const now = s.updatedAt || new Date().toISOString();
 
-  // Legacy migration: if no drafts array, wrap top-level content as Draft 1.
-  let drafts: Draft[];
-  let activeDraftId: string;
-  let draftCounter: number;
-
-  if (Array.isArray(s.drafts) && s.drafts.length > 0) {
-    drafts = s.drafts.map((d: any, i: number) => normalizeDraft(d, i + 1, now));
-    activeDraftId = s.activeDraftId && drafts.some(d => d.id === s.activeDraftId)
-      ? s.activeDraftId
-      : drafts[0].id;
-    draftCounter = s.draftCounter ?? Math.max(...drafts.map(d => d.number));
-  } else {
-    // Legacy: build Draft 1 from top-level content
-    const initial = normalizeDraft(s, 1, now);
-    drafts = [initial];
-    activeDraftId = initial.id;
-    draftCounter = 1;
+  // Shape 1: new layered structure
+  if (Array.isArray(s.conceptDrafts) && Array.isArray(s.projectDrafts)) {
+    const conceptDrafts    = s.conceptDrafts.map((d: any, i: number) => normalizeConceptDraft(d, i + 1));
+    const charactersDrafts = (s.charactersDrafts ?? []).map((d: any, i: number) => normalizeCharactersDraft(d, i + 1));
+    const storyDrafts      = (s.storyDrafts ?? []).map((d: any, i: number) => normalizeStoryLayerDraft(d, i + 1));
+    const scriptDrafts     = (s.scriptDrafts ?? []).map((d: any, i: number) => normalizeScriptDraft(d, i + 1));
+    const projectDrafts: ProjectDraft[] = (s.projectDrafts ?? []).map((pd: any, i: number) => ({
+      id: pd.id || genId("pd"),
+      number: pd.number ?? i + 1,
+      createdAt: pd.createdAt || now,
+      updatedAt: pd.updatedAt || now,
+      conceptDraftId:    pd.conceptDraftId    || conceptDrafts[0]?.id,
+      charactersDraftId: pd.charactersDraftId || charactersDrafts[0]?.id,
+      storyDraftId:      pd.storyDraftId      || storyDrafts[0]?.id,
+      scriptDraftId:     pd.scriptDraftId     || scriptDrafts[0]?.id,
+      conceptSyncedAt:    pd.conceptSyncedAt,
+      charactersSyncedAt: pd.charactersSyncedAt,
+      storySyncedAt:      pd.storySyncedAt,
+    }));
+    return {
+      id: s.id,
+      title: s.title || "",
+      projectType: s.projectType ?? "feature",
+      thumbnail: s.thumbnail,
+      conceptDrafts,
+      charactersDrafts,
+      storyDrafts,
+      scriptDrafts,
+      projectDrafts,
+      activeProjectDraftId: projectDrafts.some((pd: ProjectDraft) => pd.id === s.activeProjectDraftId)
+        ? s.activeProjectDraftId
+        : projectDrafts[0]?.id,
+      counters: {
+        concept: s.counters?.concept ?? conceptDrafts.length,
+        characters: s.counters?.characters ?? charactersDrafts.length,
+        story: s.counters?.story ?? storyDrafts.length,
+        script: s.counters?.script ?? scriptDrafts.length,
+        project: s.counters?.project ?? projectDrafts.length,
+      },
+      updatedAt: now,
+    };
   }
 
+  // Shape 2: monolithic drafts[] (previous iteration). Split each old draft into 4 layer drafts.
+  if (Array.isArray(s.drafts) && s.drafts.length > 0) {
+    const oldDrafts: any[] = s.drafts;
+    const conceptDrafts: ConceptLayerDraft[] = [];
+    const charactersDrafts: CharactersLayerDraft[] = [];
+    const storyDrafts: StoryLayerDraft[] = [];
+    const scriptDrafts: ScriptLayerDraft[] = [];
+    const projectDrafts: ProjectDraft[] = [];
+
+    oldDrafts.forEach((od, i) => {
+      const ts = od.updatedAt || now;
+      const cd: ConceptLayerDraft    = normalizeConceptDraft({ ...od, id: genId("cd") }, i + 1, ts);
+      const chd: CharactersLayerDraft = normalizeCharactersDraft({ characters: od.characters, id: genId("chd") }, i + 1, ts);
+      const sd: StoryLayerDraft      = normalizeStoryLayerDraft({
+        beats: od.beats, episodes: od.episodes, ingredients: od.ingredients, snippets: od.snippets,
+        id: genId("sd"),
+      }, i + 1, ts);
+      const scd: ScriptLayerDraft    = normalizeScriptDraft({ script: od.script, id: genId("scd") }, i + 1, ts);
+      conceptDrafts.push(cd);
+      charactersDrafts.push(chd);
+      storyDrafts.push(sd);
+      scriptDrafts.push(scd);
+      projectDrafts.push({
+        id: od.id || genId("pd"),
+        number: od.number ?? i + 1,
+        createdAt: od.createdAt || ts,
+        updatedAt: od.updatedAt || ts,
+        conceptDraftId: cd.id,
+        charactersDraftId: chd.id,
+        storyDraftId: sd.id,
+        scriptDraftId: scd.id,
+        conceptSyncedAt: ts,
+        charactersSyncedAt: ts,
+        storySyncedAt: ts,
+      });
+    });
+
+    return {
+      id: s.id,
+      title: s.title || "",
+      projectType: s.projectType ?? "feature",
+      thumbnail: s.thumbnail,
+      conceptDrafts,
+      charactersDrafts,
+      storyDrafts,
+      scriptDrafts,
+      projectDrafts,
+      activeProjectDraftId: projectDrafts.find(pd => pd.id === s.activeDraftId)?.id ?? projectDrafts[0].id,
+      counters: {
+        concept: conceptDrafts.length,
+        characters: charactersDrafts.length,
+        story: storyDrafts.length,
+        script: scriptDrafts.length,
+        project: projectDrafts.length,
+      },
+      updatedAt: now,
+    };
+  }
+
+  // Shape 3: top-level legacy content — wrap into single layer drafts + one project draft.
+  const cd = normalizeConceptDraft(s, 1, now);
+  const chd = normalizeCharactersDraft(s, 1, now);
+  const sd = normalizeStoryLayerDraft(s, 1, now);
+  const scd = normalizeScriptDraft(s, 1, now);
+  const pd: ProjectDraft = {
+    id: genId("pd"),
+    number: 1,
+    createdAt: now,
+    updatedAt: now,
+    conceptDraftId: cd.id,
+    charactersDraftId: chd.id,
+    storyDraftId: sd.id,
+    scriptDraftId: scd.id,
+    conceptSyncedAt: now,
+    charactersSyncedAt: now,
+    storySyncedAt: now,
+  };
   return {
     id: s.id,
     title: s.title || "",
     projectType: s.projectType ?? "feature",
     thumbnail: s.thumbnail,
-    drafts,
-    activeDraftId,
-    draftCounter,
+    conceptDrafts: [cd],
+    charactersDrafts: [chd],
+    storyDrafts: [sd],
+    scriptDrafts: [scd],
+    projectDrafts: [pd],
+    activeProjectDraftId: pd.id,
+    counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 },
     updatedAt: now,
   };
 }
 
-// ── Supabase CRUD for Projects ──
+// ── Supabase CRUD ──
 
 export async function loadProjectsFromDB(userId: string): Promise<Story[]> {
   const { data, error } = await supabase
@@ -167,8 +300,6 @@ export async function deleteProjectFromDB(projectId: string) {
   await supabase.from("projects").delete().eq("id", projectId);
 }
 
-// ── Supabase CRUD for Moments ──
-
 export async function loadMomentsFromDB(userId: string): Promise<Moment[]> {
   const { data, error } = await supabase
     .from("moments")
@@ -203,60 +334,55 @@ export function newBlankProject(): Story {
   const projectId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
     ? crypto.randomUUID()
     : "p_" + Math.random().toString(36).slice(2);
-  const draftId = "d_" + Math.random().toString(36).slice(2);
 
-  const initialDraft: Draft = {
-    id: draftId,
-    number: 1,
-    createdAt: now,
-    updatedAt: now,
-    logline: "",
-    settings: {
-      framework: "save-the-cat",
-      genres: [],
-      vibe: "",
-      unpredictability: 5,
-      darkness: 5,
-      pace: 5,
-      endingTypes: [],
-    },
-    concept: { summary: "", tone: "", themes: [] },
-    characters: [],
-    ingredients: [],
-    snippets: [],
-    beats: [],
-    script: { scenes: [], syncStatus: "synced" },
-    syncState: {},
+  const cd  = emptyConceptDraft(genId("cd"), 1, now);
+  const chd = emptyCharactersDraft(genId("chd"), 1, now);
+  const sd  = emptyStoryLayerDraft(genId("sd"), 1, now);
+  const scd = emptyScriptDraft(genId("scd"), 1, now);
+  const pd: ProjectDraft = {
+    id: genId("pd"), number: 1, createdAt: now, updatedAt: now,
+    conceptDraftId: cd.id, charactersDraftId: chd.id,
+    storyDraftId: sd.id, scriptDraftId: scd.id,
+    conceptSyncedAt: now, charactersSyncedAt: now, storySyncedAt: now,
   };
 
   return {
     id: projectId,
     title: "",
     projectType: "feature",
-    drafts: [initialDraft],
-    activeDraftId: draftId,
-    draftCounter: 1,
+    conceptDrafts: [cd],
+    charactersDrafts: [chd],
+    storyDrafts: [sd],
+    scriptDrafts: [scd],
+    projectDrafts: [pd],
+    activeProjectDraftId: pd.id,
+    counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 },
     updatedAt: now,
   };
 }
 
-// ── Create a new project from an existing draft ──
-// Clones the draft's content into a brand new project.
+// ── Create a new project from an existing project draft ──
 
-export function createProjectFromDraft(sourceStory: Story, draftId: string): Story {
-  const source = sourceStory.drafts.find(d => d.id === draftId) ?? sourceStory.drafts[0];
+export function createProjectFromDraft(sourceStory: Story, projectDraftId: string): Story {
+  const sourcePD = sourceStory.projectDrafts.find(pd => pd.id === projectDraftId) ?? sourceStory.projectDrafts[0];
+  const srcConcept    = sourceStory.conceptDrafts.find(d => d.id === sourcePD.conceptDraftId)!;
+  const srcCharacters = sourceStory.charactersDrafts.find(d => d.id === sourcePD.charactersDraftId)!;
+  const srcStory      = sourceStory.storyDrafts.find(d => d.id === sourcePD.storyDraftId)!;
+  const srcScript     = sourceStory.scriptDrafts.find(d => d.id === sourcePD.scriptDraftId)!;
   const now = new Date().toISOString();
   const projectId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
     ? crypto.randomUUID()
     : "p_" + Math.random().toString(36).slice(2);
-  const newDraftId = "d_" + Math.random().toString(36).slice(2);
 
-  const clonedDraft: Draft = {
-    ...source,
-    id: newDraftId,
-    number: 1,
-    createdAt: now,
-    updatedAt: now,
+  const cd: ConceptLayerDraft    = { ...srcConcept,    id: genId("cd"),  number: 1, createdAt: now, updatedAt: now };
+  const chd: CharactersLayerDraft = { ...srcCharacters, id: genId("chd"), number: 1, createdAt: now, updatedAt: now };
+  const sd: StoryLayerDraft      = { ...srcStory,      id: genId("sd"),  number: 1, createdAt: now, updatedAt: now };
+  const scd: ScriptLayerDraft    = { ...srcScript,     id: genId("scd"), number: 1, createdAt: now, updatedAt: now };
+  const pd: ProjectDraft = {
+    id: genId("pd"), number: 1, createdAt: now, updatedAt: now,
+    conceptDraftId: cd.id, charactersDraftId: chd.id,
+    storyDraftId: sd.id, scriptDraftId: scd.id,
+    conceptSyncedAt: now, charactersSyncedAt: now, storySyncedAt: now,
   };
 
   return {
@@ -264,9 +390,13 @@ export function createProjectFromDraft(sourceStory: Story, draftId: string): Sto
     title: sourceStory.title ? `${sourceStory.title} (copy)` : "",
     projectType: sourceStory.projectType,
     thumbnail: sourceStory.thumbnail,
-    drafts: [clonedDraft],
-    activeDraftId: newDraftId,
-    draftCounter: 1,
+    conceptDrafts: [cd],
+    charactersDrafts: [chd],
+    storyDrafts: [sd],
+    scriptDrafts: [scd],
+    projectDrafts: [pd],
+    activeProjectDraftId: pd.id,
+    counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 },
     updatedAt: now,
   };
 }

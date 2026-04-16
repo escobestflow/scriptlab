@@ -2,8 +2,15 @@
 
 import { useRef, useState, useCallback } from "react";
 import {
-  Story, Draft, Beat, Episode, Character, CharacterRelationship, Scene,
-  getActiveDraft, updateActiveDraft, createNewDraft, activateDraft, deleteDraft as deleteDraftFn,
+  Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings,
+  ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, ProjectDraft,
+  LayerKey, LayerSyncState,
+  getActiveProjectDraft,
+  getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft,
+  updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft,
+  createNewLayerDraft, switchLayerDraft, deleteLayerDraft,
+  createNewProjectDraft, switchProjectDraft, deleteProjectDraft,
+  getLayerSyncState, markLayerSynced,
 } from "@/lib/story";
 import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
@@ -49,65 +56,61 @@ export function Studio({
   // TV show episode drill-in
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
 
-  // Active draft — where all editing happens
-  const d = getActiveDraft(story);
-  const setDraft = useCallback((patch: Partial<Draft>) => {
-    setStory(s => updateActiveDraft(s, patch));
-  }, [setStory]);
+  // Active layer drafts — where all editing happens
+  const activeProjectDraft = getActiveProjectDraft(story);
+  const activeConcept      = getActiveConceptDraft(story);
+  const activeCharacters   = getActiveCharactersDraft(story);
+  const activeStoryLayer   = getActiveStoryLayerDraft(story);
+  const activeScriptDraft  = getActiveScriptDraft(story);
+  const syncState          = getLayerSyncState(story);
 
   // Determine which beats we're editing
   const isTV = story.projectType === "tv-show";
-  const activeEpisode = isTV ? d.episodes?.find(ep => ep.id === activeEpisodeId) : null;
+  const activeEpisode = isTV ? activeStoryLayer.episodes?.find(ep => ep.id === activeEpisodeId) : null;
   const beats = isTV
     ? (activeEpisode?.beats ?? [])
-    : d.beats;
+    : activeStoryLayer.beats;
   const setBeats = (updater: (bs: Beat[]) => Beat[]) => {
     if (isTV && activeEpisodeId) {
-      setStory(s => updateActiveDraft(s, {
-        episodes: getActiveDraft(s).episodes?.map(ep =>
+      setStory(s => updateStoryLayerDraft(s, {
+        episodes: getActiveStoryLayerDraft(s).episodes?.map(ep =>
           ep.id === activeEpisodeId ? { ...ep, beats: updater(ep.beats) } : ep
         ),
       }));
     } else {
-      setStory(s => updateActiveDraft(s, { beats: updater(getActiveDraft(s).beats) }));
+      setStory(s => updateStoryLayerDraft(s, { beats: updater(getActiveStoryLayerDraft(s).beats) }));
     }
-    markScriptOutOfSync("Story beats were modified");
   };
 
-  function markScriptOutOfSync(reason: string) {
-    setStory(s => {
-      const ad = getActiveDraft(s);
-      return updateActiveDraft(s, {
-        script: { ...ad.script, syncStatus: "out-of-sync", outOfSyncReason: reason },
-        syncState: { ...ad.syncState, scriptOutOfSync: true },
-      });
-    });
-  }
-
-  function markStoryOutOfSync(reason: string) {
-    setStory(s => {
-      const ad = getActiveDraft(s);
-      return updateActiveDraft(s, {
-        syncState: { ...ad.syncState, storyOutOfSync: true },
-      });
-    });
-  }
-
-  // ── Draft management actions ──
-  const handleCreateNewDraft = () => {
-    setStory(s => createNewDraft(s));
+  // ── Draft management actions (project-level) ──
+  const handleCreateNewProjectDraft = () => {
+    setStory(s => createNewProjectDraft(s));
     setDraftsDropdownOpen(false);
   };
-  const handleLoadDraft = (draftId: string) => {
-    setStory(s => activateDraft(s, draftId));
+  const handleLoadProjectDraft = (draftId: string) => {
+    setStory(s => switchProjectDraft(s, draftId));
     setDraftsDropdownOpen(false);
   };
-  const handleDeleteDraft = (draftId: string) => {
-    setStory(s => deleteDraftFn(s, draftId));
+  const handleDeleteProjectDraft = (draftId: string) => {
+    setStory(s => deleteProjectDraft(s, draftId));
   };
   const handleCreateProjectFromDraft = (draftId: string) => {
     const newStory = createProjectFromDraft(story, draftId);
     onCreateProjectFromDraft?.(newStory);
+  };
+
+  // ── Layer draft actions ──
+  const handleCreateNewLayerDraft = (layer: LayerKey) => {
+    setStory(s => createNewLayerDraft(s, layer));
+  };
+  const handleSwitchLayerDraft = (layer: LayerKey, draftId: string) => {
+    setStory(s => switchLayerDraft(s, layer, draftId));
+  };
+  const handleDeleteLayerDraft = (layer: LayerKey, draftId: string) => {
+    setStory(s => deleteLayerDraft(s, layer, draftId));
+  };
+  const handleMarkLayerSynced = (layer: "characters" | "story" | "script") => {
+    setStory(s => markLayerSynced(s, layer));
   };
 
   async function run(action: ActionRequest, title: string) {
@@ -227,12 +230,12 @@ export function Studio({
           story={story}
           onBack={onBack}
           onSetup={() => setShowSetup(true)}
-          subtitle={`${d.episodes?.length ?? 0} episodes`}
+          subtitle={`${activeStoryLayer.episodes?.length ?? 0} episodes`}
         />
-        <SectionTabs section={section} setSection={setSection} syncState={d.syncState} />
+        <SectionTabs section={section} setSection={setSection} syncState={syncState} />
         <div className="screen-scroll">
           <div className="page-enter">
-            {(d.episodes ?? []).map(ep => (
+            {(activeStoryLayer.episodes ?? []).map(ep => (
               <button
                 key={ep.id}
                 className="project-card"
@@ -252,8 +255,8 @@ export function Studio({
             <button className="btn-secondary" style={{ width: "100%", marginTop: 12 }}
               onClick={() => {
                 setStory(s => {
-                  const ad = getActiveDraft(s);
-                  return updateActiveDraft(s, {
+                  const ad = getActiveStoryLayerDraft(s);
+                  return updateStoryLayerDraft(s, {
                     episodes: [
                       ...(ad.episodes ?? []),
                       {
@@ -288,9 +291,11 @@ export function Studio({
             <SettingsTab
               story={story}
               setStory={setStory}
-              onLoadDraft={handleLoadDraft}
-              onDeleteDraft={handleDeleteDraft}
+              onLoadProjectDraft={handleLoadProjectDraft}
+              onDeleteProjectDraft={handleDeleteProjectDraft}
               onCreateProjectFromDraft={handleCreateProjectFromDraft}
+              onSwitchLayerDraft={handleSwitchLayerDraft}
+              onDeleteLayerDraft={handleDeleteLayerDraft}
             />
           </div>
         </div>
@@ -341,12 +346,12 @@ export function Studio({
             {story.title || "Untitled"}
           </div>
 
-          {/* Drafts dropdown trigger */}
+          {/* Project drafts dropdown trigger */}
           <button
             className="drafts-dropdown-trigger"
             onClick={() => setDraftsDropdownOpen(v => !v)}
           >
-            <span>Draft {d.number}</span>
+            <span>Draft {activeProjectDraft.number}</span>
             <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
           </button>
 
@@ -354,33 +359,42 @@ export function Studio({
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
           <div className="studio-tabs-row">
-            <SectionTabs section={section} setSection={setSection} syncState={d.syncState} />
+            <SectionTabs section={section} setSection={setSection} syncState={syncState} />
           </div>
 
-          {/* Drafts dropdown menu */}
+          {/* Project drafts dropdown menu */}
           {draftsDropdownOpen && (
             <>
               <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
               <div className="drafts-dropdown-menu">
-                <button className="drafts-dropdown-item drafts-dropdown-new" onClick={handleCreateNewDraft}>
+                <button className="drafts-dropdown-item drafts-dropdown-new" onClick={handleCreateNewProjectDraft}>
                   <span style={{ fontSize: 16, fontWeight: 400 }}>+</span>
                   <span>Create new draft</span>
                 </button>
                 <div className="drafts-dropdown-divider" />
-                {[...story.drafts]
+                {[...story.projectDrafts]
                   .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
                   .map(draft => {
-                    const isActive = draft.id === story.activeDraftId;
-                    const iso = draft.updatedAt;
-                    const date = new Date(iso);
+                    const isActive = draft.id === story.activeProjectDraftId;
+                    const date = new Date(draft.updatedAt);
                     const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    // Badge showing which layer drafts this project draft references
+                    const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
+                    const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
+                    const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
+                    const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
                     return (
                       <button
                         key={draft.id}
                         className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                        onClick={() => handleLoadDraft(draft.id)}
+                        onClick={() => handleLoadProjectDraft(draft.id)}
                       >
-                        <span>Draft {draft.number}</span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
+                          <span>Draft {draft.number}</span>
+                          <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
+                            C{cNum} · Ch{chNum} · S{sNum} · Sc{scNum}
+                          </span>
+                        </div>
                         <span className="drafts-dropdown-date">{dateStr}</span>
                       </button>
                     );
@@ -395,11 +409,7 @@ export function Studio({
           {section === "concept" && (
             <ConceptTab
               story={story}
-              setStory={(u) => {
-                setStory(u);
-                markStoryOutOfSync("Concept was updated");
-                markScriptOutOfSync("Concept was updated");
-              }}
+              setStory={setStory}
               showSuccess={showSuccess}
               onDismissSuccess={() => setShowSuccess(false)}
             />
@@ -407,17 +417,15 @@ export function Studio({
           {section === "characters" && (
             <CharactersTab
               story={story}
-              setStory={(u) => {
-                setStory(u);
-                markStoryOutOfSync("Characters were updated");
-                markScriptOutOfSync("Characters were updated");
-              }}
+              setStory={setStory}
               run={run}
               busy={busy}
             />
           )}
           {section === "story" && (
             <StoryTab
+              story={story}
+              setStory={setStory}
               beats={sorted}
               moments={moments}
               addBeat={addBeat}
@@ -429,7 +437,7 @@ export function Studio({
               openBeatTray={(insertAt) => { setBeatTrayInsertAt(insertAt); setBeatTrayOpen(true); }}
               run={run}
               busy={busy}
-              syncState={d.syncState}
+              syncState={syncState}
             />
           )}
           {section === "script" && (
@@ -511,7 +519,7 @@ function SectionTabs({
 }: {
   section: Section;
   setSection: (s: Section) => void;
-  syncState: Draft["syncState"];
+  syncState: LayerSyncState;
 }) {
   const tabs: { key: Section; label: string; dot?: boolean }[] = [
     { key: "concept", label: "CONCEPT" },
@@ -578,6 +586,84 @@ function ProjectHeader({
 /* ============================================ */
 
 /* ── Collapsible attribute row ── */
+/* ── Layer draft picker ── */
+function LayerDraftPicker({
+  layer, label, story, setStory,
+}: {
+  layer: LayerKey;
+  label: string;
+  story: Story;
+  setStory: (u: (s: Story) => Story) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const pool = (
+    layer === "concept"    ? story.conceptDrafts :
+    layer === "characters" ? story.charactersDrafts :
+    layer === "story"      ? story.storyDrafts :
+                             story.scriptDrafts
+  );
+  const pd = getActiveProjectDraft(story);
+  const activeId = (
+    layer === "concept"    ? pd.conceptDraftId :
+    layer === "characters" ? pd.charactersDraftId :
+    layer === "story"      ? pd.storyDraftId :
+                             pd.scriptDraftId
+  );
+  const active = pool.find((d: any) => d.id === activeId) ?? pool[0];
+
+  const handleCreate = () => {
+    setStory(s => createNewLayerDraft(s, layer));
+    setOpen(false);
+  };
+  const handleSwitch = (id: string) => {
+    setStory(s => switchLayerDraft(s, layer, id));
+    setOpen(false);
+  };
+
+  const sorted = [...pool].sort((a: any, b: any) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  return (
+    <div className="layer-draft-picker">
+      <button
+        className="layer-draft-trigger"
+        onClick={() => setOpen(v => !v)}
+      >
+        <span className="layer-draft-label">{label} Draft {active.number}</span>
+        <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
+      </button>
+      {open && (
+        <>
+          <div className="drafts-dropdown-backdrop" onClick={() => setOpen(false)} />
+          <div className="drafts-dropdown-menu layer-draft-menu">
+            <button className="drafts-dropdown-item drafts-dropdown-new" onClick={handleCreate}>
+              <span style={{ fontSize: 16, fontWeight: 400 }}>+</span>
+              <span>Create new {layer} draft</span>
+            </button>
+            <div className="drafts-dropdown-divider" />
+            {sorted.map((d: any) => {
+              const isActive = d.id === activeId;
+              const date = new Date(d.updatedAt);
+              const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              return (
+                <button
+                  key={d.id}
+                  className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                  onClick={() => handleSwitch(d.id)}
+                >
+                  <span>Draft {d.number}</span>
+                  <span className="drafts-dropdown-date">{dateStr}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function AttrRow({
   label,
   values,
@@ -720,12 +806,12 @@ function ConceptTab({
   showSuccess: boolean;
   onDismissSuccess: () => void;
 }) {
-  const d = getActiveDraft(story);
+  const d = getActiveConceptDraft(story);
   const [openAttr, setOpenAttr] = useState<string | null>(null);
   const [themeInput, setThemeInput] = useState("");
 
   const toggle = (key: string) => setOpenAttr(prev => prev === key ? null : key);
-  const updateDraft = (patch: Partial<Draft>) => setStory(s => updateActiveDraft(s, patch));
+  const updateDraft = (patch: Partial<ConceptLayerDraft>) => setStory(s => updateConceptDraft(s, patch));
 
   function addTheme() {
     const t = themeInput.trim();
@@ -743,6 +829,8 @@ function ConceptTab({
   return (
     <>
       {showSuccess && <SuccessBanner onDismiss={onDismissSuccess} />}
+
+      <LayerDraftPicker layer="concept" label="Concept" story={story} setStory={setStory} />
 
       {/* Format */}
       <AttrRow
@@ -904,7 +992,7 @@ function CharactersTab({
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
 }) {
-  const d = getActiveDraft(story);
+  const d = getActiveCharactersDraft(story);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
 
@@ -924,20 +1012,20 @@ function CharactersTab({
       arc: "",
       notes: "",
     };
-    setStory(s => updateActiveDraft(s, { characters: [...getActiveDraft(s).characters, newChar] }));
+    setStory(s => updateCharactersDraft(s, { characters: [...getActiveCharactersDraft(s).characters, newChar] }));
     setEditingCharId(newChar.id);
     setExpandedId(newChar.id);
   }
 
   function updateCharacter(id: string, patch: Partial<Character>) {
-    setStory(s => updateActiveDraft(s, {
-      characters: getActiveDraft(s).characters.map(c => c.id === id ? { ...c, ...patch } : c),
+    setStory(s => updateCharactersDraft(s, {
+      characters: getActiveCharactersDraft(s).characters.map(c => c.id === id ? { ...c, ...patch } : c),
     }));
   }
 
   function removeCharacter(id: string) {
-    setStory(s => updateActiveDraft(s, {
-      characters: getActiveDraft(s).characters.filter(c => c.id !== id),
+    setStory(s => updateCharactersDraft(s, {
+      characters: getActiveCharactersDraft(s).characters.filter(c => c.id !== id),
     }));
     if (expandedId === id) setExpandedId(null);
     if (editingCharId === id) setEditingCharId(null);
@@ -954,6 +1042,8 @@ function CharactersTab({
 
   return (
     <>
+      <LayerDraftPicker layer="characters" label="Characters" story={story} setStory={setStory} />
+
       {d.characters.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
@@ -1176,9 +1266,12 @@ function CharacterEditForm({
 /* ============================================ */
 
 function StoryTab({
+  story, setStory,
   beats, moments, addBeat, updateBeat, moveBeat, removeBeat,
   unlinkMoment, openMomentPicker, openBeatTray, run, busy, syncState,
 }: {
+  story: Story;
+  setStory: (u: (s: Story) => Story) => void;
   beats: Beat[];
   moments: Moment[];
   addBeat: (name: string, summary: string, insertAt?: number) => void;
@@ -1190,7 +1283,7 @@ function StoryTab({
   openBeatTray: (insertAt: number) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
-  syncState: Draft["syncState"];
+  syncState: LayerSyncState;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
@@ -1217,6 +1310,8 @@ function StoryTab({
 
   return (
     <>
+      <LayerDraftPicker layer="story" label="Story" story={story} setStory={setStory} />
+
       {/* Out-of-sync banner */}
       {syncState.storyOutOfSync && (
         <div className="sync-banner">
@@ -1460,28 +1555,25 @@ function ScriptTab({
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
 }) {
-  const d = getActiveDraft(story);
+  const d = getActiveScriptDraft(story);
+  const syncState = getLayerSyncState(story);
   const writtenCount = beats.filter(b => b.status === "written").length;
-  const isOutOfSync = d.script.syncStatus === "out-of-sync" || d.syncState.scriptOutOfSync;
+  const isOutOfSync = syncState.scriptOutOfSync;
 
   function dismissSync() {
-    setStory(s => {
-      const ad = getActiveDraft(s);
-      return updateActiveDraft(s, {
-        script: { ...ad.script, syncStatus: "synced", outOfSyncReason: undefined },
-        syncState: { ...ad.syncState, scriptOutOfSync: false },
-      });
-    });
+    setStory(s => markLayerSynced(s, "script"));
   }
 
   return (
     <>
+      <LayerDraftPicker layer="script" label="Script" story={story} setStory={setStory} />
+
       {/* Out-of-sync banner */}
       {isOutOfSync && (
         <div className="sync-banner">
           <div className="sync-banner-text">
             <span className="sync-dot inline" />
-            {d.script.outOfSyncReason || "Upstream content was updated."}
+            Upstream content was updated.
             <br />Your script may need to be refreshed.
           </div>
           <div className="sync-banner-actions">
@@ -1670,7 +1762,7 @@ function BeatCreationForm({
     setShowAISettings(false);
     try {
       await callAI("generate_beat", {
-        position: getActiveDraft(story).beats.length,
+        position: getActiveStoryLayerDraft(story).beats.length,
         weirdness: aiSettings.weirdness,
         darkness: aiSettings.darkness,
         humor: aiSettings.humor,
@@ -1771,23 +1863,25 @@ function BeatCreationForm({
 /* ============================================ */
 
 function SettingsTab({
-  story, setStory, onLoadDraft, onDeleteDraft, onCreateProjectFromDraft,
+  story, setStory,
+  onLoadProjectDraft, onDeleteProjectDraft, onCreateProjectFromDraft,
+  onSwitchLayerDraft, onDeleteLayerDraft,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
-  onLoadDraft: (draftId: string) => void;
-  onDeleteDraft: (draftId: string) => void;
-  onCreateProjectFromDraft: (draftId: string) => void;
+  onLoadProjectDraft: (id: string) => void;
+  onDeleteProjectDraft: (id: string) => void;
+  onCreateProjectFromDraft: (id: string) => void;
+  onSwitchLayerDraft: (layer: LayerKey, id: string) => void;
+  onDeleteLayerDraft: (layer: LayerKey, id: string) => void;
 }) {
-  const d = getActiveDraft(story);
-  const s = d.settings;
+  const concept = getActiveConceptDraft(story);
+  const storyLayer = getActiveStoryLayerDraft(story);
+  const s = concept.settings;
   const [generatingCover, setGeneratingCover] = useState(false);
 
-  const setSettingField = <K extends keyof Draft["settings"]>(k: K, v: Draft["settings"][K]) =>
-    setStory(st => {
-      const ad = getActiveDraft(st);
-      return updateActiveDraft(st, { settings: { ...ad.settings, [k]: v } });
-    });
+  const setSettingField = <K extends keyof StorySettings>(k: K, v: StorySettings[K]) =>
+    setStory(st => updateConceptDraft(st, { settings: { ...getActiveConceptDraft(st).settings, [k]: v } }));
 
   async function generateCover() {
     setGeneratingCover(true);
@@ -1797,8 +1891,8 @@ function SettingsTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: story.title,
-          logline: d.logline,
-          genres: d.settings.genres,
+          logline: concept.logline,
+          genres: concept.settings.genres,
         }),
       });
       if (!res.ok) return;
@@ -1811,11 +1905,7 @@ function SettingsTab({
     }
   }
 
-  const sortedDrafts = [...story.drafts].sort((a, b) =>
-    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-  );
-
-  function formatDraftDate(iso: string) {
+  function formatDate(iso: string) {
     const d = new Date(iso);
     const now = new Date();
     const diff = now.getTime() - d.getTime();
@@ -1828,6 +1918,83 @@ function SettingsTab({
     if (days < 7) return `${days}d ago`;
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
+
+  const renderLayerDrafts = (layer: LayerKey, label: string) => {
+    const pool: any[] = (
+      layer === "concept"    ? story.conceptDrafts :
+      layer === "characters" ? story.charactersDrafts :
+      layer === "story"      ? story.storyDrafts :
+                               story.scriptDrafts
+    );
+    const pd = getActiveProjectDraft(story);
+    const activeId =
+      layer === "concept"    ? pd.conceptDraftId :
+      layer === "characters" ? pd.charactersDraftId :
+      layer === "story"      ? pd.storyDraftId :
+                               pd.scriptDraftId;
+    const refKey =
+      layer === "concept"    ? "conceptDraftId" :
+      layer === "characters" ? "charactersDraftId" :
+      layer === "story"      ? "storyDraftId" :
+                               "scriptDraftId";
+    const sorted = [...pool].sort((a, b) =>
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+    return (
+      <div className="card">
+        <span className="eyebrow">{label} Drafts</span>
+        <div className="stack" style={{ marginTop: 10 }}>
+          {sorted.map(d => {
+            const isActive = d.id === activeId;
+            const referenced = story.projectDrafts.some((pd: any) => pd[refKey] === d.id);
+            const canDelete = pool.length > 1 && !referenced;
+            return (
+              <div key={d.id} className="inset-card" style={{ padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>
+                      Draft {d.number}
+                      {isActive && <span className="caption" style={{ marginLeft: 8 }}>· Active</span>}
+                    </div>
+                    <div className="caption" style={{ marginTop: 2 }}>
+                      Edited {formatDate(d.updatedAt)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {!isActive && (
+                    <button className="btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
+                      onClick={() => onSwitchLayerDraft(layer, d.id)}>
+                      Load
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button className="btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0, color: "var(--record)" }}
+                      onClick={() => {
+                        if (confirm(`Delete ${label} Draft ${d.number}?`)) onDeleteLayerDraft(layer, d.id);
+                      }}>
+                      Delete
+                    </button>
+                  )}
+                  {referenced && !isActive && (
+                    <span className="caption" style={{ alignSelf: "center", color: "var(--ink-mute)" }}>
+                      Referenced by project draft(s)
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const sortedProjectDrafts = [...story.projectDrafts].sort((a, b) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 
   return (
     <>
@@ -1875,10 +2042,10 @@ function SettingsTab({
 
       <div className="card">
         <span className="eyebrow">Ingredients</span>
-        {d.ingredients.length === 0 && (
+        {storyLayer.ingredients.length === 0 && (
           <div className="caption" style={{ marginTop: 4 }}>No ingredients yet.</div>
         )}
-        {d.ingredients.map(ing => (
+        {storyLayer.ingredients.map(ing => (
           <div key={ing.id} className="inset-card">
             <div className="eyebrow">{ing.label} {ing.locked && "· locked"}</div>
             <div style={{ fontSize: 14, marginTop: 4 }}>{ing.description}</div>
@@ -1886,13 +2053,13 @@ function SettingsTab({
         ))}
       </div>
 
-      {/* Drafts section */}
+      {/* Project drafts */}
       <div className="card">
-        <span className="eyebrow">Drafts</span>
+        <span className="eyebrow">Project Drafts</span>
         <div className="stack" style={{ marginTop: 10 }}>
-          {sortedDrafts.map(draft => {
-            const isActive = draft.id === story.activeDraftId;
-            const canDelete = story.drafts.length > 1;
+          {sortedProjectDrafts.map(draft => {
+            const isActive = draft.id === story.activeProjectDraftId;
+            const canDelete = story.projectDrafts.length > 1;
             return (
               <div key={draft.id} className="inset-card" style={{ padding: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -1902,7 +2069,7 @@ function SettingsTab({
                       {isActive && <span className="caption" style={{ marginLeft: 8 }}>· Active</span>}
                     </div>
                     <div className="caption" style={{ marginTop: 2 }}>
-                      Edited {formatDraftDate(draft.updatedAt)}
+                      Edited {formatDate(draft.updatedAt)}
                     </div>
                   </div>
                 </div>
@@ -1910,7 +2077,7 @@ function SettingsTab({
                   {!isActive && (
                     <button className="btn-secondary"
                       style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
-                      onClick={() => onLoadDraft(draft.id)}>
+                      onClick={() => onLoadProjectDraft(draft.id)}>
                       Load
                     </button>
                   )}
@@ -1923,7 +2090,7 @@ function SettingsTab({
                     <button className="btn-secondary"
                       style={{ fontSize: 12, padding: "6px 12px", minHeight: 0, color: "var(--record)" }}
                       onClick={() => {
-                        if (confirm(`Delete Draft ${draft.number}?`)) onDeleteDraft(draft.id);
+                        if (confirm(`Delete Project Draft ${draft.number}?`)) onDeleteProjectDraft(draft.id);
                       }}>
                       Delete
                     </button>
@@ -1934,6 +2101,11 @@ function SettingsTab({
           })}
         </div>
       </div>
+
+      {renderLayerDrafts("concept",    "Concept")}
+      {renderLayerDrafts("characters", "Characters")}
+      {renderLayerDrafts("story",      "Story")}
+      {renderLayerDrafts("script",     "Script")}
     </>
   );
 }

@@ -10,7 +10,7 @@
 // This means iterative edits inside a session reuse ~90% of input tokens
 // at 10% price. Without this pattern, heavy usage is uneconomical.
 
-import { Story, getActiveDraft } from "./story";
+import { Story, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft } from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
 
 export interface BuiltPrompt {
@@ -31,15 +31,19 @@ export function buildPrompt(story: Story, action: ActionRequest): BuiltPrompt {
 }
 
 function storyBible(story: Story): string {
-  const d = getActiveDraft(story);
-  const { settings, characters, ingredients, snippets, beats, concept } = d;
+  const c  = getActiveConceptDraft(story);
+  const ch = getActiveCharactersDraft(story);
+  const sl = getActiveStoryLayerDraft(story);
+  const { settings, concept, logline } = c;
+  const { characters } = ch;
+  const { ingredients, snippets, beats } = sl;
   return `# CURRENT PROJECT BIBLE
 
 ## Title
 ${story.title || "(untitled)"}
 
 ## Logline
-${d.logline || "(none yet)"}
+${logline || "(none yet)"}
 
 ## Concept
 - Summary: ${concept?.summary || "(none)"}
@@ -91,7 +95,10 @@ ${beats.length
 }
 
 function buildAsk(story: Story, action: ActionRequest): string {
-  const d = getActiveDraft(story);
+  const c  = getActiveConceptDraft(story);
+  const sl = getActiveStoryLayerDraft(story);
+  // Compatibility shim so existing switch cases compile with minimal change:
+  const d = { ...c, ...sl };
   switch (action.type) {
     case "generate_beats":
       return `Generate a complete beat sheet for this project using the ${d.settings.framework} framework.

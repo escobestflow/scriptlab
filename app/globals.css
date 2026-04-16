@@ -826,6 +826,42 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin: 4px 0;
 }
 
+/* Layer draft picker (inside each tab) */
+.layer-draft-picker {
+  position: relative;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+.layer-draft-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Lato', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+.layer-draft-trigger:active {
+  background: var(--border);
+}
+.layer-draft-label {
+  text-transform: uppercase;
+}
+.layer-draft-menu {
+  top: calc(100% + 4px);
+  left: auto;
+  right: 0;
+  transform: none;
+  min-width: 180px;
+}
+
 /* ======= STUDIO LAYOUT ======= */
 
 /* Nav — absolute-positioned overlay, always at top, never moves */
