@@ -728,7 +728,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .sheet-body.placeholder { color: var(--ink-mute); }
 
-/* ======= STUDIO LAYOUT (layered sticky: toprow → title → tabs) ======= */
+/* ======= STUDIO LAYOUT ======= */
 
 .studio-scroll {
   flex: 1;
@@ -736,8 +736,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   -webkit-overflow-scrolling: touch;
 }
 
-/* Layer 1: Top row — always pinned at very top */
-.studio-toprow-sticky {
+/* Nav row: back + inline title + settings — sticky at top */
+.studio-nav-sticky {
   position: sticky;
   top: 0;
   z-index: 22;
@@ -746,39 +746,41 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   justify-content: space-between;
   height: 44px;
   padding: 0 16px;
+  background: transparent;
 }
-
-/* Thumbnail area — in flow, fades on scroll */
-.studio-thumb-area {
-  display: flex;
-  justify-content: center;
-  overflow: hidden;
-  transition: max-height 60ms linear;
-}
-
-/* Layer 2: Title — sticks at top:0 (aligns with nav row) */
-.studio-title-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 21;
-  padding: 4px 20px 6px;
-  pointer-events: none;
-}
-.studio-title-text {
+.studio-nav-title {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
   font-weight: 900;
   letter-spacing: -0.01em;
-  text-align: center;
-  transition: font-size 60ms linear;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
 }
 
-/* Layer 3: Tab bar — sticks below nav row */
+/* Header block: thumbnail + title — normal flow, scrolls as one unit */
+.studio-header-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+.studio-header-thumb {
+  /* thumbnail fades via inline opacity — no layout shift */
+}
+
+/* Tab bar — only sticky element besides nav. Pins below nav (top: 44px). */
 .studio-tabs-sticky {
   position: sticky;
   top: 44px;
   z-index: 20;
   display: flex;
   justify-content: center;
-  padding: 0 0 8px;
+  padding: 4px 0 12px;
+  background: var(--bg);
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */
