@@ -740,11 +740,13 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ======= STUDIO LAYOUT ======= */
 
-/* Scrollable area — everything inside */
+/* Scrollable area — extends behind nav for extra scroll distance */
 .studio-scroll {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  margin-top: -44px;
+  padding-top: 44px;
 }
 
 /* Nav row — sticky at top:0, pins immediately */
@@ -763,14 +765,13 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 /* Thumbnail + title + tabs — sticky at top:44px, pins below nav */
 .studio-header-sticky {
   position: sticky;
-  top: 44px;
+  top: 0;
   z-index: 11;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   padding: 8px 20px 0;
-  margin-top: 15px;
   background: var(--bg);
 }
 .studio-tabs-row {
