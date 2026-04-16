@@ -744,7 +744,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 2px;
+  margin-top: -8px;
   background: none;
   border: none;
   padding: 4px 8px;
@@ -815,6 +815,44 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   color: var(--ink);
   font-weight: 600;
 }
+
+/* Elevated "Create new" button at top of dropdown menus */
+.drafts-dropdown-create {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 12px);
+  margin: 6px 6px 10px;
+  padding: 10px 14px;
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Lato', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+.drafts-dropdown-create:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.drafts-dropdown-create-icon {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+}
 .drafts-dropdown-date {
   font-size: 11px;
   color: var(--ink-mute);
@@ -832,6 +870,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin-bottom: 12px;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 .layer-draft-trigger {
   display: inline-flex;
@@ -859,7 +899,58 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   left: auto;
   right: 0;
   transform: none;
-  min-width: 180px;
+  min-width: 200px;
+}
+
+/* Layer-level Save button — shown when layer has unsaved edits */
+.draft-save-btn {
+  padding: 6px 14px;
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Lato', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+  animation: saveBtnIn 220ms var(--ease);
+}
+.draft-save-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* Project-level Save Draft button — above tab bar */
+.project-save-btn {
+  align-self: center;
+  margin: 2px auto 10px;
+  padding: 8px 18px;
+  background: var(--ink);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Lato', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.14);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+  animation: saveBtnIn 220ms var(--ease);
+}
+.project-save-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.12);
+}
+
+@keyframes saveBtnIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ======= STUDIO LAYOUT ======= */

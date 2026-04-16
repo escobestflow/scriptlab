@@ -358,6 +358,22 @@ export function Studio({
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
+
+          {/* Project-level Save button — shown when any layer is dirty */}
+          {(() => {
+            const anyDirty =
+              new Date(activeConcept.updatedAt).getTime()    > new Date(activeConcept.createdAt).getTime() ||
+              new Date(activeCharacters.updatedAt).getTime() > new Date(activeCharacters.createdAt).getTime() ||
+              new Date(activeStoryLayer.updatedAt).getTime() > new Date(activeStoryLayer.createdAt).getTime() ||
+              new Date(activeScriptDraft.updatedAt).getTime() > new Date(activeScriptDraft.createdAt).getTime();
+            if (!anyDirty) return null;
+            return (
+              <button className="project-save-btn" onClick={handleCreateNewProjectDraft}>
+                Save draft
+              </button>
+            );
+          })()}
+
           <div className="studio-tabs-row">
             <SectionTabs section={section} setSection={setSection} syncState={syncState} />
           </div>
@@ -367,11 +383,10 @@ export function Studio({
             <>
               <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
               <div className="drafts-dropdown-menu">
-                <button className="drafts-dropdown-item drafts-dropdown-new" onClick={handleCreateNewProjectDraft}>
-                  <span style={{ fontSize: 16, fontWeight: 400 }}>+</span>
-                  <span>Create new draft</span>
+                <button className="drafts-dropdown-create" onClick={handleCreateNewProjectDraft}>
+                  <span className="drafts-dropdown-create-icon">+</span>
+                  <span>Create new project draft</span>
                 </button>
-                <div className="drafts-dropdown-divider" />
                 {[...story.projectDrafts]
                   .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
                   .map(draft => {
@@ -624,6 +639,13 @@ function LayerDraftPicker({
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 
+  // "Dirty" = edited since creation. Save button appears in this state.
+  const isDirty = active && new Date(active.updatedAt).getTime() > new Date(active.createdAt).getTime();
+
+  const handleSave = () => {
+    setStory(s => createNewLayerDraft(s, layer));
+  };
+
   return (
     <div className="layer-draft-picker">
       <button
@@ -633,15 +655,19 @@ function LayerDraftPicker({
         <span className="layer-draft-label">{label} Draft {active.number}</span>
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
+      {isDirty && (
+        <button className="draft-save-btn" onClick={handleSave} aria-label="Save as new draft">
+          Save
+        </button>
+      )}
       {open && (
         <>
           <div className="drafts-dropdown-backdrop" onClick={() => setOpen(false)} />
           <div className="drafts-dropdown-menu layer-draft-menu">
-            <button className="drafts-dropdown-item drafts-dropdown-new" onClick={handleCreate}>
-              <span style={{ fontSize: 16, fontWeight: 400 }}>+</span>
-              <span>Create new {layer} draft</span>
+            <button className="drafts-dropdown-create" onClick={handleCreate}>
+              <span className="drafts-dropdown-create-icon">+</span>
+              <span>Create new draft</span>
             </button>
-            <div className="drafts-dropdown-divider" />
             {sorted.map((d: any) => {
               const isActive = d.id === activeId;
               const date = new Date(d.updatedAt);
