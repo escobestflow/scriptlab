@@ -10,7 +10,7 @@
 // This means iterative edits inside a session reuse ~90% of input tokens
 // at 10% price. Without this pattern, heavy usage is uneconomical.
 
-import { Story } from "./story";
+import { Story, getActiveDraft } from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
 
 export interface BuiltPrompt {
@@ -19,40 +19,27 @@ export interface BuiltPrompt {
 }
 
 export function buildPrompt(story: Story, action: ActionRequest): BuiltPrompt {
-  // Block 2: the story bible — stable within a session, worth caching.
   const bible = storyBible(story);
-
-  // Block 3: the ask — fresh every request.
   const ask = buildAsk(story, action);
-
   return {
     system: [
-      // Block 1 — cached forever across all users & sessions
-      {
-        type: "text",
-        text: SYSTEM_BRAIN,
-        cache_control: { type: "ephemeral" },
-      },
-      // Block 2 — cached per session. Second cache breakpoint.
-      {
-        type: "text",
-        text: bible,
-        cache_control: { type: "ephemeral" },
-      },
+      { type: "text", text: SYSTEM_BRAIN, cache_control: { type: "ephemeral" } },
+      { type: "text", text: bible, cache_control: { type: "ephemeral" } },
     ],
     userMessage: ask,
   };
 }
 
 function storyBible(story: Story): string {
-  const { settings, characters, ingredients, snippets, beats, concept } = story;
+  const d = getActiveDraft(story);
+  const { settings, characters, ingredients, snippets, beats, concept } = d;
   return `# CURRENT PROJECT BIBLE
 
 ## Title
 ${story.title || "(untitled)"}
 
 ## Logline
-${story.logline || "(none yet)"}
+${d.logline || "(none yet)"}
 
 ## Concept
 - Summary: ${concept?.summary || "(none)"}
@@ -61,12 +48,12 @@ ${story.logline || "(none yet)"}
 
 ## Settings
 - Framework: ${settings.framework}
-- Genres: ${(settings as any).genres?.join(", ") || (settings as any).genre || "none"}
+- Genres: ${settings.genres?.join(", ") || "none"}
 - Vibe: ${settings.vibe}
 - Unpredictability: ${settings.unpredictability}/10
 - Darkness: ${settings.darkness}/10
 - Pace: ${settings.pace}/10
-- Ending types: ${(settings as any).endingTypes?.join(", ") || (settings as any).endingType || "none"}
+- Ending types: ${settings.endingTypes?.join(", ") || "none"}
 
 ## Characters
 ${characters.map(c => {
@@ -92,9 +79,9 @@ ${beats.length
   ? beats
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
       .map((b, i) => {
-        let line = `${i + 1}. [${(b as any).status ?? "design"}] ${b.name}: ${b.summary}`;
-        if ((b as any).momentIds?.length) {
-          line += `\n   Linked moments: ${(b as any).momentIds.join(", ")}`;
+        let line = `${i + 1}. [${b.status ?? "design"}] ${b.name}: ${b.summary}`;
+        if (b.momentIds?.length) {
+          line += `\n   Linked moments: ${b.momentIds.join(", ")}`;
         }
         return line;
       })
@@ -104,9 +91,10 @@ ${beats.length
 }
 
 function buildAsk(story: Story, action: ActionRequest): string {
+  const d = getActiveDraft(story);
   switch (action.type) {
     case "generate_beats":
-      return `Generate a complete beat sheet for this project using the ${story.settings.framework} framework.
+      return `Generate a complete beat sheet for this project using the ${d.settings.framework} framework.
 
 Return STRICT JSON in this exact schema:
 { "beats": [ { "name": string, "summary": string, "purpose": string } ] }
@@ -115,18 +103,18 @@ Rules:
 - Use every locked ingredient meaningfully.
 - Weave in at least one snippet where it fits naturally (reference by title in the purpose field).
 - Match the darkness/pace/unpredictability levels.
-- Respect the ending types: "${(story.settings as any).endingTypes?.join(", ") || (story.settings as any).endingType || "any"}".`;
+- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".`;
 
     case "swap_ingredient": {
       const id = action.payload.ingredientId;
-      const ing = story.ingredients.find(i => i.id === id);
-      return `Suggest 3 replacement options for the ingredient labeled "${ing?.label}" (currently: "${ing?.description}"). Keep the same structural role but push the unpredictability level (${story.settings.unpredictability}/10).
+      const ing = d.ingredients.find(i => i.id === id);
+      return `Suggest 3 replacement options for the ingredient labeled "${ing?.label}" (currently: "${ing?.description}"). Keep the same structural role but push the unpredictability level (${d.settings.unpredictability}/10).
 
 Return STRICT JSON: { "options": [ { "label": string, "description": string, "why": string } ] }`;
     }
 
     case "add_twist":
-      return `Propose a twist to inject into the current beat sheet. Target unpredictability: ${story.settings.unpredictability}/10.
+      return `Propose a twist to inject into the current beat sheet. Target unpredictability: ${d.settings.unpredictability}/10.
 
 Return STRICT JSON: { "twist": { "insertAfterBeat": number, "description": string, "ripple": string } }
 - "ripple" explains which later beats need to shift and how.`;
@@ -134,7 +122,7 @@ Return STRICT JSON: { "twist": { "insertAfterBeat": number, "description": strin
     case "rewrite_beat": {
       const idx = action.payload.beatIndex;
       const instruction = action.payload.instruction ?? "make it sharper";
-      const beat = story.beats[idx];
+      const beat = d.beats[idx];
       return `Rewrite beat #${idx + 1} ("${beat?.name}"). Current summary: "${beat?.summary}"
 
 Instruction: ${instruction}
@@ -144,9 +132,9 @@ Return STRICT JSON: { "beat": { "name": string, "summary": string, "purpose": st
 
     case "generate_scene": {
       const idx = action.payload.beatIndex;
-      const beat = story.beats[idx];
+      const beat = d.beats[idx];
       return `Write the full scene for beat #${idx + 1} ("${beat?.name}" — ${beat?.summary}).
-Match the vibe "${story.settings.vibe}" and genres "${(story.settings as any).genres?.join(", ") || (story.settings as any).genre || "drama"}".
+Match the vibe "${d.settings.vibe}" and genres "${d.settings.genres?.join(", ") || "drama"}".
 Return prose in screenplay-adjacent format. No JSON, no preamble.`;
     }
 
@@ -174,7 +162,7 @@ Creative settings for this beat:
 - Length: ${p.length ?? 5}/10 (1 = ultra-brief, 10 = detailed)
 
 Existing beats for context:
-${story.beats.map((b, i) => `${i + 1}. ${b.name}: ${b.summary}`).join("\n") || "(none yet)"}
+${d.beats.map((b, i) => `${i + 1}. ${b.name}: ${b.summary}`).join("\n") || "(none yet)"}
 
 Return STRICT JSON: { "name": string, "summary": string }
 - "name" = a short beat label (2-4 words)

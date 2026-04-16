@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Story } from "@/lib/story";
+import { Story, getActiveDraft, updateActiveDraft } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import {
   loadProjectsFromDB, saveProjectToDB, newBlankProject,
@@ -95,7 +95,7 @@ export default function Page() {
           const res = await fetch("/api/generate-thumbnail", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: p.title, logline: p.logline, genres: p.settings.genres }),
+            body: JSON.stringify({ title: p.title, logline: getActiveDraft(p).logline, genres: getActiveDraft(p).settings.genres }),
           });
           if (!res.ok) continue;
           const data = await res.json();
@@ -196,13 +196,13 @@ export default function Page() {
   }
 
   function projectProgress(p: Story): number {
-    // Simple heuristic: title + logline + characters + ingredients + beats
+    const d = getActiveDraft(p);
     let score = 0;
     if (p.title) score += 10;
-    if (p.logline) score += 10;
-    score += Math.min(p.characters.length * 10, 20);
-    score += Math.min(p.ingredients.length * 5, 15);
-    score += Math.min(p.beats.length * 3, 45);
+    if (d.logline) score += 10;
+    score += Math.min(d.characters.length * 10, 20);
+    score += Math.min(d.ingredients.length * 5, 15);
+    score += Math.min(d.beats.length * 3, 45);
     return Math.min(score, 100);
   }
 
@@ -280,7 +280,7 @@ export default function Page() {
     if (user) saveProjectToDB(user.id, saved);
     closeCreateModal();
     setView({ kind: "studio", projectId: saved.id, isNew: true });
-    generateThumbnail(saved.id, saved.title, saved.logline, saved.settings.genres);
+    generateThumbnail(saved.id, saved.title, getActiveDraft(saved).logline, getActiveDraft(saved).settings.genres);
   }
 
   function updateDraft(u: (s: Story) => Story) {
@@ -297,6 +297,11 @@ export default function Page() {
           moments={moments}
           onBack={() => setView({ kind: "main" })}
           isNew={(view as any).isNew ?? false}
+          onCreateProjectFromDraft={(newStory) => {
+            setProjects(ps => [newStory, ...ps]);
+            if (user) saveProjectToDB(user.id, newStory);
+            setView({ kind: "studio", projectId: newStory.id, isNew: true });
+          }}
         />
       );
     }
@@ -526,7 +531,7 @@ function RecordingForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          story: { id: "", title: "", logline: "", projectType: "feature", concept: { summary: "", tone: "", themes: [] }, settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], script: { scenes: [], syncStatus: "synced" }, syncState: {}, updatedAt: "" },
+          story: { id: "", title: "", projectType: "feature", drafts: [{ id: "d", number: 1, createdAt: "", updatedAt: "", logline: "", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, concept: { summary: "", tone: "", themes: [] }, characters: [], ingredients: [], snippets: [], beats: [], script: { scenes: [], syncStatus: "synced" }, syncState: {} }], activeDraftId: "d", draftCounter: 1, updatedAt: "" },
           action: { type: "clean_moment", payload: { rawText: liveTranscript } },
         }),
       });
@@ -645,7 +650,7 @@ function MomentEditForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          story: { id: "", title: "", logline: "", projectType: "feature", concept: { summary: "", tone: "", themes: [] }, settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, characters: [], ingredients: [], snippets: [], beats: [], script: { scenes: [], syncStatus: "synced" }, syncState: {}, updatedAt: "" },
+          story: { id: "", title: "", projectType: "feature", drafts: [{ id: "d", number: 1, createdAt: "", updatedAt: "", logline: "", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, concept: { summary: "", tone: "", themes: [] }, characters: [], ingredients: [], snippets: [], beats: [], script: { scenes: [], syncStatus: "synced" }, syncState: {} }], activeDraftId: "d", draftCounter: 1, updatedAt: "" },
           action: { type: "clean_moment", payload: { rawText: text } },
         }),
       });
@@ -749,6 +754,7 @@ function ProjectsTab({
 
       {projects.map(p => {
         const pct = progress(p);
+        const d = getActiveDraft(p);
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
             {p.thumbnail ? (
@@ -765,13 +771,13 @@ function ProjectsTab({
             <div className="project-info">
               <div className="project-title">{p.title || "Untitled"}</div>
               <div className="project-genre">
-                {(p.settings as any).genres?.length > 0
-                  ? (p.settings as any).genres.map((g: string) => <span key={g} className="genre-pill">{g}</span>)
-                  : (p.settings as any).genre && <span className="genre-pill">{(p.settings as any).genre}</span>
+                {d.settings.genres?.length > 0
+                  ? d.settings.genres.map((g: string) => <span key={g} className="genre-pill">{g}</span>)
+                  : null
                 }
-                <span className="genre-pill">{p.settings.framework.replace(/-/g, " ")}</span>
+                <span className="genre-pill">{d.settings.framework.replace(/-/g, " ")}</span>
               </div>
-              <div className="project-summary">{p.logline || "No logline yet"}</div>
+              <div className="project-summary">{d.logline || "No logline yet"}</div>
               <div className="progress-bar">
                 <div className="fill" style={{ width: `${pct}%` }} />
               </div>
@@ -878,6 +884,7 @@ function CreateStepFormat({
   draft: Story;
   setDraft: (u: (s: Story) => Story) => void;
 }) {
+  const activeDraft = getActiveDraft(draft);
   return (
     <>
       <div className="display heading">What are you making?</div>
@@ -904,11 +911,10 @@ function CreateStepFormat({
             min={1}
             max={24}
             placeholder="e.g. 8"
-            value={draft.episodes?.length ?? ""}
+            value={activeDraft.episodes?.length ?? ""}
             onChange={e => {
               const count = Math.max(1, Math.min(24, parseInt(e.target.value) || 1));
-              setDraft(s => ({
-                ...s,
+              setDraft(s => updateActiveDraft(s, {
                 episodes: Array.from({ length: count }, (_, i) => ({
                   id: `ep_${i + 1}`,
                   title: `Episode ${i + 1}`,
@@ -951,13 +957,15 @@ function CreateStepGenre({
   draft: Story;
   setDraft: (u: (s: Story) => Story) => void;
 }) {
+  const activeDraft = getActiveDraft(draft);
   const toggleGenre = (g: Genre) => {
     setDraft(s => {
-      const current = s.settings.genres;
+      const ad = getActiveDraft(s);
+      const current = ad.settings.genres;
       const next = current.includes(g)
         ? current.filter(x => x !== g)
         : [...current, g];
-      return { ...s, settings: { ...s.settings, genres: next } };
+      return updateActiveDraft(s, { settings: { ...ad.settings, genres: next } });
     });
   };
 
@@ -969,16 +977,16 @@ function CreateStepGenre({
         {ALL_GENRES.map(g => (
           <button
             key={g}
-            className={`chip ${draft.settings.genres.includes(g) ? "selected" : ""}`}
+            className={`chip ${activeDraft.settings.genres.includes(g) ? "selected" : ""}`}
             onClick={() => toggleGenre(g)}
           >
             {g}
           </button>
         ))}
       </div>
-      {draft.settings.genres.length > 1 && (
+      {activeDraft.settings.genres.length > 1 && (
         <div className="caption" style={{ marginTop: 12 }}>
-          Blend: {draft.settings.genres.join(" + ")}
+          Blend: {activeDraft.settings.genres.join(" + ")}
         </div>
       )}
     </>

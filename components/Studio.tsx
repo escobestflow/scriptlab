@@ -1,7 +1,11 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { Story, Beat, Episode, Character, CharacterRelationship, Scene } from "@/lib/story";
+import {
+  Story, Draft, Beat, Episode, Character, CharacterRelationship, Scene,
+  getActiveDraft, updateActiveDraft, createNewDraft, activateDraft, deleteDraft as deleteDraftFn,
+} from "@/lib/story";
+import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
 
@@ -13,28 +17,25 @@ export function Studio({
   moments,
   onBack,
   isNew = false,
+  onCreateProjectFromDraft,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   moments: Moment[];
   onBack: () => void;
   isNew?: boolean;
+  onCreateProjectFromDraft?: (newStory: Story) => void;
 }) {
   const [section, setSection] = useState<Section>("concept");
   const [showSuccess, setShowSuccess] = useState(isNew);
+  const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
-  const scrollCounterRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
-    if (!scrollRef.current) return;
+    if (!scrollRef.current || !thumbRef.current) return;
     const y = scrollRef.current.scrollTop;
-    if (thumbRef.current) {
-      thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
-    }
-    if (scrollCounterRef.current) {
-      scrollCounterRef.current.textContent = `scrollY: ${Math.round(y)}px`;
-    }
+    thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
   }, []);
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,41 +49,66 @@ export function Studio({
   // TV show episode drill-in
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
 
+  // Active draft — where all editing happens
+  const d = getActiveDraft(story);
+  const setDraft = useCallback((patch: Partial<Draft>) => {
+    setStory(s => updateActiveDraft(s, patch));
+  }, [setStory]);
+
   // Determine which beats we're editing
   const isTV = story.projectType === "tv-show";
-  const activeEpisode = isTV ? story.episodes?.find(ep => ep.id === activeEpisodeId) : null;
+  const activeEpisode = isTV ? d.episodes?.find(ep => ep.id === activeEpisodeId) : null;
   const beats = isTV
     ? (activeEpisode?.beats ?? [])
-    : story.beats;
+    : d.beats;
   const setBeats = (updater: (bs: Beat[]) => Beat[]) => {
     if (isTV && activeEpisodeId) {
-      setStory(s => ({
-        ...s,
-        episodes: s.episodes?.map(ep =>
+      setStory(s => updateActiveDraft(s, {
+        episodes: getActiveDraft(s).episodes?.map(ep =>
           ep.id === activeEpisodeId ? { ...ep, beats: updater(ep.beats) } : ep
         ),
       }));
     } else {
-      setStory(s => ({ ...s, beats: updater(s.beats) }));
+      setStory(s => updateActiveDraft(s, { beats: updater(getActiveDraft(s).beats) }));
     }
-    // Mark script as out-of-sync when story beats change
     markScriptOutOfSync("Story beats were modified");
   };
 
   function markScriptOutOfSync(reason: string) {
-    setStory(s => ({
-      ...s,
-      script: { ...s.script, syncStatus: "out-of-sync", outOfSyncReason: reason },
-      syncState: { ...s.syncState, scriptOutOfSync: true },
-    }));
+    setStory(s => {
+      const ad = getActiveDraft(s);
+      return updateActiveDraft(s, {
+        script: { ...ad.script, syncStatus: "out-of-sync", outOfSyncReason: reason },
+        syncState: { ...ad.syncState, scriptOutOfSync: true },
+      });
+    });
   }
 
   function markStoryOutOfSync(reason: string) {
-    setStory(s => ({
-      ...s,
-      syncState: { ...s.syncState, storyOutOfSync: true },
-    }));
+    setStory(s => {
+      const ad = getActiveDraft(s);
+      return updateActiveDraft(s, {
+        syncState: { ...ad.syncState, storyOutOfSync: true },
+      });
+    });
   }
+
+  // ── Draft management actions ──
+  const handleCreateNewDraft = () => {
+    setStory(s => createNewDraft(s));
+    setDraftsDropdownOpen(false);
+  };
+  const handleLoadDraft = (draftId: string) => {
+    setStory(s => activateDraft(s, draftId));
+    setDraftsDropdownOpen(false);
+  };
+  const handleDeleteDraft = (draftId: string) => {
+    setStory(s => deleteDraftFn(s, draftId));
+  };
+  const handleCreateProjectFromDraft = (draftId: string) => {
+    const newStory = createProjectFromDraft(story, draftId);
+    onCreateProjectFromDraft?.(newStory);
+  };
 
   async function run(action: ActionRequest, title: string) {
     if (busy) return;
@@ -201,12 +227,12 @@ export function Studio({
           story={story}
           onBack={onBack}
           onSetup={() => setShowSetup(true)}
-          subtitle={`${story.episodes?.length ?? 0} episodes`}
+          subtitle={`${d.episodes?.length ?? 0} episodes`}
         />
-        <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+        <SectionTabs section={section} setSection={setSection} syncState={d.syncState} />
         <div className="screen-scroll">
           <div className="page-enter">
-            {(story.episodes ?? []).map(ep => (
+            {(d.episodes ?? []).map(ep => (
               <button
                 key={ep.id}
                 className="project-card"
@@ -225,18 +251,20 @@ export function Studio({
             ))}
             <button className="btn-secondary" style={{ width: "100%", marginTop: 12 }}
               onClick={() => {
-                setStory(s => ({
-                  ...s,
-                  episodes: [
-                    ...(s.episodes ?? []),
-                    {
-                      id: "ep_" + Math.random().toString(36).slice(2),
-                      title: `Episode ${(s.episodes?.length ?? 0) + 1}`,
-                      number: (s.episodes?.length ?? 0) + 1,
-                      beats: [],
-                    },
-                  ],
-                }));
+                setStory(s => {
+                  const ad = getActiveDraft(s);
+                  return updateActiveDraft(s, {
+                    episodes: [
+                      ...(ad.episodes ?? []),
+                      {
+                        id: "ep_" + Math.random().toString(36).slice(2),
+                        title: `Episode ${(ad.episodes?.length ?? 0) + 1}`,
+                        number: (ad.episodes?.length ?? 0) + 1,
+                        beats: [],
+                      },
+                    ],
+                  });
+                });
               }}>
               + Add episode
             </button>
@@ -257,7 +285,13 @@ export function Studio({
         />
         <div className="screen-scroll">
           <div className="page-enter">
-            <SettingsTab story={story} setStory={setStory} />
+            <SettingsTab
+              story={story}
+              setStory={setStory}
+              onLoadDraft={handleLoadDraft}
+              onDeleteDraft={handleDeleteDraft}
+              onCreateProjectFromDraft={handleCreateProjectFromDraft}
+            />
           </div>
         </div>
       </>
@@ -270,9 +304,6 @@ export function Studio({
 
   return (
     <>
-      {/* DEBUG: scroll position counter */}
-      <div ref={scrollCounterRef} className="scroll-counter">scrollY: 0px</div>
-
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
         <button className="project-header-btn" onClick={handleBack} aria-label="Back">
@@ -304,17 +335,59 @@ export function Studio({
           )}
         </div>
 
-        {/* Title + tabs — sticky, sticks below nav */}
+        {/* Title + drafts dropdown + tabs — sticky, sticks below nav */}
         <div className="studio-header-sticky">
           <div className="project-header-title">
             {story.title || "Untitled"}
           </div>
+
+          {/* Drafts dropdown trigger */}
+          <button
+            className="drafts-dropdown-trigger"
+            onClick={() => setDraftsDropdownOpen(v => !v)}
+          >
+            <span>Draft {d.number}</span>
+            <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+          </button>
+
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
           <div className="studio-tabs-row">
-            <SectionTabs section={section} setSection={setSection} syncState={story.syncState} />
+            <SectionTabs section={section} setSection={setSection} syncState={d.syncState} />
           </div>
+
+          {/* Drafts dropdown menu */}
+          {draftsDropdownOpen && (
+            <>
+              <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
+              <div className="drafts-dropdown-menu">
+                <button className="drafts-dropdown-item drafts-dropdown-new" onClick={handleCreateNewDraft}>
+                  <span style={{ fontSize: 16, fontWeight: 400 }}>+</span>
+                  <span>Create new draft</span>
+                </button>
+                <div className="drafts-dropdown-divider" />
+                {[...story.drafts]
+                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                  .map(draft => {
+                    const isActive = draft.id === story.activeDraftId;
+                    const iso = draft.updatedAt;
+                    const date = new Date(iso);
+                    const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    return (
+                      <button
+                        key={draft.id}
+                        className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                        onClick={() => handleLoadDraft(draft.id)}
+                      >
+                        <span>Draft {draft.number}</span>
+                        <span className="drafts-dropdown-date">{dateStr}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Tab content */}
@@ -356,7 +429,7 @@ export function Studio({
               openBeatTray={(insertAt) => { setBeatTrayInsertAt(insertAt); setBeatTrayOpen(true); }}
               run={run}
               busy={busy}
-              syncState={story.syncState}
+              syncState={d.syncState}
             />
           )}
           {section === "script" && (
@@ -438,7 +511,7 @@ function SectionTabs({
 }: {
   section: Section;
   setSection: (s: Section) => void;
-  syncState: Story["syncState"];
+  syncState: Draft["syncState"];
 }) {
   const tabs: { key: Section; label: string; dot?: boolean }[] = [
     { key: "concept", label: "CONCEPT" },
@@ -647,26 +720,22 @@ function ConceptTab({
   showSuccess: boolean;
   onDismissSuccess: () => void;
 }) {
+  const d = getActiveDraft(story);
   const [openAttr, setOpenAttr] = useState<string | null>(null);
   const [themeInput, setThemeInput] = useState("");
 
   const toggle = (key: string) => setOpenAttr(prev => prev === key ? null : key);
+  const updateDraft = (patch: Partial<Draft>) => setStory(s => updateActiveDraft(s, patch));
 
   function addTheme() {
     const t = themeInput.trim();
     if (!t) return;
-    setStory(s => ({
-      ...s,
-      concept: { ...s.concept, themes: [...s.concept.themes, t] },
-    }));
+    updateDraft({ concept: { ...d.concept, themes: [...d.concept.themes, t] } });
     setThemeInput("");
   }
 
   function removeTheme(theme: string) {
-    setStory(s => ({
-      ...s,
-      concept: { ...s.concept, themes: s.concept.themes.filter(t => t !== theme) },
-    }));
+    updateDraft({ concept: { ...d.concept, themes: d.concept.themes.filter(t => t !== theme) } });
   }
 
   const formatLabel = story.projectType === "tv-show" ? "TV Show" : story.projectType === "short" ? "Short Film" : "Feature Film";
@@ -703,7 +772,7 @@ function ConceptTab({
       {/* Genre */}
       <AttrRow
         label="Genre"
-        values={story.settings.genres.length > 0 ? story.settings.genres.map(g => g.toUpperCase()) : undefined}
+        values={d.settings.genres.length > 0 ? d.settings.genres.map(g => g.toUpperCase()) : undefined}
         placeholder="Select genres"
         expanded={openAttr === "genre"}
         onToggle={() => toggle("genre")}
@@ -711,16 +780,15 @@ function ConceptTab({
         <div className="chip-row">
           {(["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"] as const).map(g => (
             <button key={g}
-              className={`chip ${story.settings.genres.includes(g) ? "selected" : ""}`}
-              onClick={() => setStory(s => ({
-                ...s,
+              className={`chip ${d.settings.genres.includes(g) ? "selected" : ""}`}
+              onClick={() => updateDraft({
                 settings: {
-                  ...s.settings,
-                  genres: s.settings.genres.includes(g)
-                    ? s.settings.genres.filter(x => x !== g)
-                    : [...s.settings.genres, g],
+                  ...d.settings,
+                  genres: d.settings.genres.includes(g)
+                    ? d.settings.genres.filter(x => x !== g)
+                    : [...d.settings.genres, g],
                 },
-              }))}>
+              })}>
               {g}
             </button>
           ))}
@@ -738,39 +806,39 @@ function ConceptTab({
       {/* Logline */}
       <TextAttrRow
         label="Logline"
-        value={story.logline}
+        value={d.logline}
         placeholder="Add a logline"
-        onChange={v => setStory(s => ({ ...s, logline: v }))}
+        onChange={v => updateDraft({ logline: v })}
         multiline
       />
 
       {/* Summary */}
       <TextAttrRow
         label="Summary"
-        value={story.concept.summary}
+        value={d.concept.summary}
         placeholder="Add a premise"
-        onChange={v => setStory(s => ({ ...s, concept: { ...s.concept, summary: v } }))}
+        onChange={v => updateDraft({ concept: { ...d.concept, summary: v } })}
         multiline
       />
 
       {/* Tone */}
       <TextAttrRow
         label="Tone"
-        value={story.concept.tone}
+        value={d.concept.tone}
         placeholder="Set the tone"
-        onChange={v => setStory(s => ({ ...s, concept: { ...s.concept, tone: v } }))}
+        onChange={v => updateDraft({ concept: { ...d.concept, tone: v } })}
       />
 
       {/* Themes */}
       <AttrRow
         label="Themes"
-        values={story.concept.themes.length > 0 ? story.concept.themes : undefined}
+        values={d.concept.themes.length > 0 ? d.concept.themes : undefined}
         placeholder="Add themes"
         expanded={openAttr === "themes"}
         onToggle={() => toggle("themes")}
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
-          {story.concept.themes.map(t => (
+          {d.concept.themes.map(t => (
             <button key={t} className="chip selected" onClick={() => removeTheme(t)}>
               {t} &#10005;
             </button>
@@ -795,7 +863,7 @@ function ConceptTab({
       {/* Ending */}
       <AttrRow
         label="Ending"
-        values={story.settings.endingTypes.length > 0 ? story.settings.endingTypes.map(e => e.toUpperCase()) : undefined}
+        values={d.settings.endingTypes.length > 0 ? d.settings.endingTypes.map(e => e.toUpperCase()) : undefined}
         placeholder="Select ending type"
         expanded={openAttr === "ending"}
         onToggle={() => toggle("ending")}
@@ -803,16 +871,15 @@ function ConceptTab({
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
             <button key={e}
-              className={`chip ${story.settings.endingTypes.includes(e) ? "selected" : ""}`}
-              onClick={() => setStory(s => ({
-                ...s,
+              className={`chip ${d.settings.endingTypes.includes(e) ? "selected" : ""}`}
+              onClick={() => updateDraft({
                 settings: {
-                  ...s.settings,
-                  endingTypes: s.settings.endingTypes.includes(e)
-                    ? s.settings.endingTypes.filter(x => x !== e)
-                    : [...s.settings.endingTypes, e],
+                  ...d.settings,
+                  endingTypes: d.settings.endingTypes.includes(e)
+                    ? d.settings.endingTypes.filter(x => x !== e)
+                    : [...d.settings.endingTypes, e],
                 },
-              }))}>
+              })}>
               {e}
             </button>
           ))}
@@ -837,6 +904,7 @@ function CharactersTab({
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
 }) {
+  const d = getActiveDraft(story);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
 
@@ -856,22 +924,20 @@ function CharactersTab({
       arc: "",
       notes: "",
     };
-    setStory(s => ({ ...s, characters: [...s.characters, newChar] }));
+    setStory(s => updateActiveDraft(s, { characters: [...getActiveDraft(s).characters, newChar] }));
     setEditingCharId(newChar.id);
     setExpandedId(newChar.id);
   }
 
   function updateCharacter(id: string, patch: Partial<Character>) {
-    setStory(s => ({
-      ...s,
-      characters: s.characters.map(c => c.id === id ? { ...c, ...patch } : c),
+    setStory(s => updateActiveDraft(s, {
+      characters: getActiveDraft(s).characters.map(c => c.id === id ? { ...c, ...patch } : c),
     }));
   }
 
   function removeCharacter(id: string) {
-    setStory(s => ({
-      ...s,
-      characters: s.characters.filter(c => c.id !== id),
+    setStory(s => updateActiveDraft(s, {
+      characters: getActiveDraft(s).characters.filter(c => c.id !== id),
     }));
     if (expandedId === id) setExpandedId(null);
     if (editingCharId === id) setEditingCharId(null);
@@ -888,7 +954,7 @@ function CharactersTab({
 
   return (
     <>
-      {story.characters.length === 0 && (
+      {d.characters.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
           <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No characters yet</div>
@@ -902,7 +968,7 @@ function CharactersTab({
         </div>
       )}
 
-      {story.characters.map(ch => {
+      {d.characters.map(ch => {
         const isExpanded = expandedId === ch.id;
         const isEditing = editingCharId === ch.id;
 
@@ -933,7 +999,7 @@ function CharactersTab({
                 {isEditing ? (
                   <CharacterEditForm
                     character={ch}
-                    allCharacters={story.characters}
+                    allCharacters={d.characters}
                     onUpdate={(patch) => updateCharacter(ch.id, patch)}
                     onDone={() => setEditingCharId(null)}
                     onRemove={() => removeCharacter(ch.id)}
@@ -941,7 +1007,7 @@ function CharactersTab({
                 ) : (
                   <CharacterViewCard
                     character={ch}
-                    allCharacters={story.characters}
+                    allCharacters={d.characters}
                     onEdit={() => setEditingCharId(ch.id)}
                     onRemove={() => removeCharacter(ch.id)}
                   />
@@ -952,7 +1018,7 @@ function CharactersTab({
         );
       })}
 
-      {story.characters.length > 0 && (
+      {d.characters.length > 0 && (
         <button
           className="btn-secondary"
           style={{ width: "100%", marginTop: 12, fontSize: 13 }}
@@ -1124,7 +1190,7 @@ function StoryTab({
   openBeatTray: (insertAt: number) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
-  syncState: Story["syncState"];
+  syncState: Draft["syncState"];
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
@@ -1394,15 +1460,18 @@ function ScriptTab({
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
 }) {
+  const d = getActiveDraft(story);
   const writtenCount = beats.filter(b => b.status === "written").length;
-  const isOutOfSync = story.script.syncStatus === "out-of-sync" || story.syncState.scriptOutOfSync;
+  const isOutOfSync = d.script.syncStatus === "out-of-sync" || d.syncState.scriptOutOfSync;
 
   function dismissSync() {
-    setStory(s => ({
-      ...s,
-      script: { ...s.script, syncStatus: "synced", outOfSyncReason: undefined },
-      syncState: { ...s.syncState, scriptOutOfSync: false },
-    }));
+    setStory(s => {
+      const ad = getActiveDraft(s);
+      return updateActiveDraft(s, {
+        script: { ...ad.script, syncStatus: "synced", outOfSyncReason: undefined },
+        syncState: { ...ad.syncState, scriptOutOfSync: false },
+      });
+    });
   }
 
   return (
@@ -1412,7 +1481,7 @@ function ScriptTab({
         <div className="sync-banner">
           <div className="sync-banner-text">
             <span className="sync-dot inline" />
-            {story.script.outOfSyncReason || "Upstream content was updated."}
+            {d.script.outOfSyncReason || "Upstream content was updated."}
             <br />Your script may need to be refreshed.
           </div>
           <div className="sync-banner-actions">
@@ -1601,7 +1670,7 @@ function BeatCreationForm({
     setShowAISettings(false);
     try {
       await callAI("generate_beat", {
-        position: story.beats.length,
+        position: getActiveDraft(story).beats.length,
         weirdness: aiSettings.weirdness,
         darkness: aiSettings.darkness,
         humor: aiSettings.humor,
@@ -1702,15 +1771,23 @@ function BeatCreationForm({
 /* ============================================ */
 
 function SettingsTab({
-  story, setStory,
+  story, setStory, onLoadDraft, onDeleteDraft, onCreateProjectFromDraft,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
+  onLoadDraft: (draftId: string) => void;
+  onDeleteDraft: (draftId: string) => void;
+  onCreateProjectFromDraft: (draftId: string) => void;
 }) {
-  const s = story.settings;
+  const d = getActiveDraft(story);
+  const s = d.settings;
   const [generatingCover, setGeneratingCover] = useState(false);
-  const set = <K extends keyof Story["settings"]>(k: K, v: Story["settings"][K]) =>
-    setStory(st => ({ ...st, settings: { ...st.settings, [k]: v } }));
+
+  const setSettingField = <K extends keyof Draft["settings"]>(k: K, v: Draft["settings"][K]) =>
+    setStory(st => {
+      const ad = getActiveDraft(st);
+      return updateActiveDraft(st, { settings: { ...ad.settings, [k]: v } });
+    });
 
   async function generateCover() {
     setGeneratingCover(true);
@@ -1720,8 +1797,8 @@ function SettingsTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: story.title,
-          logline: story.logline,
-          genres: story.settings.genres,
+          logline: d.logline,
+          genres: d.settings.genres,
         }),
       });
       if (!res.ok) return;
@@ -1732,6 +1809,24 @@ function SettingsTab({
     } catch {} finally {
       setGeneratingCover(false);
     }
+  }
+
+  const sortedDrafts = [...story.drafts].sort((a, b) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  function formatDraftDate(iso: string) {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "Just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
 
   return (
@@ -1754,7 +1849,7 @@ function SettingsTab({
         <span className="eyebrow">Framework</span>
         <div className="select-wrap">
           <select className="field" value={s.framework}
-            onChange={e => set("framework", e.target.value as any)}>
+            onChange={e => setSettingField("framework", e.target.value as any)}>
             <option value="save-the-cat">Save the Cat</option>
             <option value="heros-journey">Hero&apos;s Journey</option>
             <option value="three-act">Three Act</option>
@@ -1766,29 +1861,78 @@ function SettingsTab({
       <div className="card">
         <span className="eyebrow">Vibe</span>
         <input className="field" value={s.vibe}
-          onChange={e => set("vibe", e.target.value)} placeholder="Describe the vibe" />
+          onChange={e => setSettingField("vibe", e.target.value)} placeholder="Describe the vibe" />
       </div>
 
       <div className="card">
         <span className="eyebrow">Dials</span>
         <div className="stack" style={{ marginTop: 8 }}>
-          <Slider label="Unpredictability" value={s.unpredictability} onChange={v => set("unpredictability", v)} />
-          <Slider label="Darkness"         value={s.darkness}         onChange={v => set("darkness", v)} />
-          <Slider label="Pace"             value={s.pace}             onChange={v => set("pace", v)} />
+          <Slider label="Unpredictability" value={s.unpredictability} onChange={v => setSettingField("unpredictability", v)} />
+          <Slider label="Darkness"         value={s.darkness}         onChange={v => setSettingField("darkness", v)} />
+          <Slider label="Pace"             value={s.pace}             onChange={v => setSettingField("pace", v)} />
         </div>
       </div>
 
       <div className="card">
         <span className="eyebrow">Ingredients</span>
-        {story.ingredients.length === 0 && (
+        {d.ingredients.length === 0 && (
           <div className="caption" style={{ marginTop: 4 }}>No ingredients yet.</div>
         )}
-        {story.ingredients.map(ing => (
+        {d.ingredients.map(ing => (
           <div key={ing.id} className="inset-card">
             <div className="eyebrow">{ing.label} {ing.locked && "· locked"}</div>
             <div style={{ fontSize: 14, marginTop: 4 }}>{ing.description}</div>
           </div>
         ))}
+      </div>
+
+      {/* Drafts section */}
+      <div className="card">
+        <span className="eyebrow">Drafts</span>
+        <div className="stack" style={{ marginTop: 10 }}>
+          {sortedDrafts.map(draft => {
+            const isActive = draft.id === story.activeDraftId;
+            const canDelete = story.drafts.length > 1;
+            return (
+              <div key={draft.id} className="inset-card" style={{ padding: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>
+                      Draft {draft.number}
+                      {isActive && <span className="caption" style={{ marginLeft: 8 }}>· Active</span>}
+                    </div>
+                    <div className="caption" style={{ marginTop: 2 }}>
+                      Edited {formatDraftDate(draft.updatedAt)}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {!isActive && (
+                    <button className="btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
+                      onClick={() => onLoadDraft(draft.id)}>
+                      Load
+                    </button>
+                  )}
+                  <button className="btn-secondary"
+                    style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
+                    onClick={() => onCreateProjectFromDraft(draft.id)}>
+                    New project from this
+                  </button>
+                  {canDelete && (
+                    <button className="btn-secondary"
+                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0, color: "var(--record)" }}
+                      onClick={() => {
+                        if (confirm(`Delete Draft ${draft.number}?`)) onDeleteDraft(draft.id);
+                      }}>
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </>
   );

@@ -100,20 +100,20 @@ export interface Scene {
   heading: string;          // INT. COFFEE SHOP - DAY
   content: string;          // formatted screenplay text
   notes: string;            // writer notes
-  lastGeneratedFrom?: string; // hash/timestamp of upstream state when generated
+  lastGeneratedFrom?: string;
 }
 
 export interface Script {
   scenes: Scene[];
   syncStatus: "synced" | "out-of-sync";
-  lastSyncedAt?: string;    // ISO timestamp
-  outOfSyncReason?: string; // what changed upstream
+  lastSyncedAt?: string;
+  outOfSyncReason?: string;
 }
 
 // ── Sync tracking ──
 
 export interface SyncState {
-  conceptHash?: string;     // snapshot of concept when downstream was last synced
+  conceptHash?: string;
   charactersHash?: string;
   storyHash?: string;
   charactersOutOfSync?: boolean;
@@ -121,22 +121,103 @@ export interface SyncState {
   scriptOutOfSync?: boolean;
 }
 
-// ── Main Story type ──
+// ── Draft ──
+// A Draft is a complete snapshot of the editable project content.
+// Every project has at least one draft. Users can create new drafts as
+// checkpoints/versions, load older drafts, or spin a draft into a new project.
 
-export interface Story {
+export interface Draft {
   id: string;
-  title: string;
+  number: number;           // user-facing sequential number ("Draft 1", "Draft 2")
+  createdAt: string;
+  updatedAt: string;
+  // All editable content:
   logline: string;
-  projectType: ProjectType;
   settings: StorySettings;
   concept: Concept;
   characters: Character[];
   ingredients: Ingredient[];
   snippets: Snippet[];
-  beats: Beat[];              // for feature/short
-  episodes?: Episode[];       // for tv-show
+  beats: Beat[];            // for feature/short
+  episodes?: Episode[];     // for tv-show
   script: Script;
   syncState: SyncState;
-  thumbnail?: string;         // base64 data URL for AI-generated cover
+}
+
+// ── Main Story type ──
+// A Story holds shared metadata (title, projectType, thumbnail) and a set
+// of drafts. All editable content lives inside drafts. The active draft
+// is what the user is currently editing.
+
+export interface Story {
+  id: string;
+  title: string;                 // shared across drafts
+  projectType: ProjectType;      // shared across drafts
+  thumbnail?: string;            // shared across drafts
+  drafts: Draft[];
+  activeDraftId: string;
+  draftCounter: number;          // for generating draft numbers
   updatedAt: string;
+}
+
+// ── Draft helpers ──
+
+export function getActiveDraft(story: Story): Draft {
+  return story.drafts.find(d => d.id === story.activeDraftId) ?? story.drafts[0];
+}
+
+export function updateActiveDraft(story: Story, patch: Partial<Draft>): Story {
+  const now = new Date().toISOString();
+  return {
+    ...story,
+    drafts: story.drafts.map(d =>
+      d.id === story.activeDraftId
+        ? { ...d, ...patch, updatedAt: now }
+        : d
+    ),
+    updatedAt: now,
+  };
+}
+
+export function createNewDraft(story: Story): Story {
+  const active = getActiveDraft(story);
+  const now = new Date().toISOString();
+  const nextNumber = story.draftCounter + 1;
+  const newDraft: Draft = {
+    ...active,
+    id: "d_" + Math.random().toString(36).slice(2),
+    number: nextNumber,
+    createdAt: now,
+    updatedAt: now,
+  };
+  return {
+    ...story,
+    drafts: [...story.drafts, newDraft],
+    activeDraftId: newDraft.id,
+    draftCounter: nextNumber,
+    updatedAt: now,
+  };
+}
+
+export function activateDraft(story: Story, draftId: string): Story {
+  if (!story.drafts.some(d => d.id === draftId)) return story;
+  return {
+    ...story,
+    activeDraftId: draftId,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+export function deleteDraft(story: Story, draftId: string): Story {
+  if (story.drafts.length <= 1) return story; // can't delete the only draft
+  const filtered = story.drafts.filter(d => d.id !== draftId);
+  const nextActive = story.activeDraftId === draftId
+    ? filtered[0].id
+    : story.activeDraftId;
+  return {
+    ...story,
+    drafts: filtered,
+    activeDraftId: nextActive,
+    updatedAt: new Date().toISOString(),
+  };
 }

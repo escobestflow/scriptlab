@@ -1,4 +1,4 @@
-import { Story, Character } from "./story";
+// Sample project data — uses legacy shape; normalizeStory() migrates to drafts[]
 
 export interface Moment {
   id: string;
@@ -9,7 +9,7 @@ export interface Moment {
   linkedProjectId?: string;
 }
 
-function ch(id: string, name: string, role: string, want: string, need: string, notes: string): Character {
+function ch(id: string, name: string, role: string, want: string, need: string, notes: string) {
   return { id, name, role, archetype: "", backstory: "", motivations: "", flaws: "", want, need, relationships: [], voice: "", arc: "", notes };
 }
 
@@ -17,7 +17,7 @@ const defaultConcept = { summary: "", tone: "", themes: [] as string[] };
 const defaultScript = { scenes: [] as any[], syncStatus: "synced" as const };
 const defaultSyncState = {};
 
-export const SAMPLE_PROJECTS: Story[] = [
+export const SAMPLE_PROJECTS: any[] = [
   {
     id: "p_quiet_room",
     title: "The Quiet Room",

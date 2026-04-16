@@ -1,8 +1,8 @@
-import { Story, Beat, Character, Concept, Script, SyncState } from "./story";
+import { Story, Draft, Beat, Character, Concept, Script, SyncState, StorySettings } from "./story";
 import { Moment } from "./sampleData";
 import { supabase } from "./supabase";
 
-// ── Beat normalization (backward compat) ──
+// ── Field-level normalization ──
 
 function normalizeBeat(b: any, index: number): Beat {
   return {
@@ -59,21 +59,75 @@ function normalizeSyncState(s: any): SyncState {
   };
 }
 
-function normalizeStory(s: any): Story {
+function normalizeSettings(s: any): StorySettings {
   return {
-    ...s,
+    framework: s?.framework || "save-the-cat",
+    genres: s?.genres ?? (s?.genre ? [s.genre] : []),
+    vibe: s?.vibe || "",
+    unpredictability: s?.unpredictability ?? 5,
+    darkness: s?.darkness ?? 5,
+    pace: s?.pace ?? 5,
+    endingTypes: s?.endingTypes ?? (s?.endingType ? [s.endingType] : []),
+  };
+}
+
+// ── Draft normalization ──
+// Builds a draft from either a draft-shaped object or from legacy top-level fields.
+
+function normalizeDraft(d: any, number: number = 1, fallbackTime?: string): Draft {
+  const now = fallbackTime || new Date().toISOString();
+  return {
+    id: d?.id || "d_" + Math.random().toString(36).slice(2),
+    number: d?.number ?? number,
+    createdAt: d?.createdAt || now,
+    updatedAt: d?.updatedAt || now,
+    logline: d?.logline || "",
+    settings: normalizeSettings(d?.settings),
+    concept: normalizeConcept(d?.concept),
+    characters: (d?.characters ?? []).map((c: any) => normalizeCharacter(c)),
+    ingredients: d?.ingredients ?? [],
+    snippets: d?.snippets ?? [],
+    beats: (d?.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
+    episodes: d?.episodes ?? undefined,
+    script: normalizeScript(d?.script),
+    syncState: normalizeSyncState(d?.syncState),
+  };
+}
+
+// ── Story normalization ──
+// Migrates legacy projects (content at top level) into the drafts[] model.
+
+function normalizeStory(s: any): Story {
+  const now = s.updatedAt || new Date().toISOString();
+
+  // Legacy migration: if no drafts array, wrap top-level content as Draft 1.
+  let drafts: Draft[];
+  let activeDraftId: string;
+  let draftCounter: number;
+
+  if (Array.isArray(s.drafts) && s.drafts.length > 0) {
+    drafts = s.drafts.map((d: any, i: number) => normalizeDraft(d, i + 1, now));
+    activeDraftId = s.activeDraftId && drafts.some(d => d.id === s.activeDraftId)
+      ? s.activeDraftId
+      : drafts[0].id;
+    draftCounter = s.draftCounter ?? Math.max(...drafts.map(d => d.number));
+  } else {
+    // Legacy: build Draft 1 from top-level content
+    const initial = normalizeDraft(s, 1, now);
+    drafts = [initial];
+    activeDraftId = initial.id;
+    draftCounter = 1;
+  }
+
+  return {
+    id: s.id,
+    title: s.title || "",
     projectType: s.projectType ?? "feature",
-    concept: normalizeConcept(s.concept),
-    settings: {
-      ...s.settings,
-      genres: s.settings?.genres ?? (s.settings?.genre ? [s.settings.genre] : ["thriller"]),
-      endingTypes: s.settings?.endingTypes ?? (s.settings?.endingType ? [s.settings.endingType] : ["bittersweet"]),
-    },
-    characters: (s.characters ?? []).map((c: any) => normalizeCharacter(c)),
-    beats: (s.beats ?? []).map((b: any, i: number) => normalizeBeat(b, i)),
-    episodes: s.episodes ?? undefined,
-    script: normalizeScript(s.script),
-    syncState: normalizeSyncState(s.syncState),
+    thumbnail: s.thumbnail,
+    drafts,
+    activeDraftId,
+    draftCounter,
+    updatedAt: now,
   };
 }
 
@@ -145,19 +199,18 @@ export async function deleteMomentFromDB(momentId: string) {
 // ── New blank project ──
 
 export function newBlankProject(): Story {
-  return {
-    id:
-      (typeof crypto !== "undefined" && "randomUUID" in crypto)
-        ? crypto.randomUUID()
-        : "p_" + Math.random().toString(36).slice(2),
-    title: "",
+  const now = new Date().toISOString();
+  const projectId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+    ? crypto.randomUUID()
+    : "p_" + Math.random().toString(36).slice(2);
+  const draftId = "d_" + Math.random().toString(36).slice(2);
+
+  const initialDraft: Draft = {
+    id: draftId,
+    number: 1,
+    createdAt: now,
+    updatedAt: now,
     logline: "",
-    projectType: "feature",
-    concept: {
-      summary: "",
-      tone: "",
-      themes: [],
-    },
     settings: {
       framework: "save-the-cat",
       genres: [],
@@ -167,15 +220,53 @@ export function newBlankProject(): Story {
       pace: 5,
       endingTypes: [],
     },
+    concept: { summary: "", tone: "", themes: [] },
     characters: [],
     ingredients: [],
     snippets: [],
     beats: [],
-    script: {
-      scenes: [],
-      syncStatus: "synced",
-    },
+    script: { scenes: [], syncStatus: "synced" },
     syncState: {},
-    updatedAt: new Date().toISOString(),
+  };
+
+  return {
+    id: projectId,
+    title: "",
+    projectType: "feature",
+    drafts: [initialDraft],
+    activeDraftId: draftId,
+    draftCounter: 1,
+    updatedAt: now,
+  };
+}
+
+// ── Create a new project from an existing draft ──
+// Clones the draft's content into a brand new project.
+
+export function createProjectFromDraft(sourceStory: Story, draftId: string): Story {
+  const source = sourceStory.drafts.find(d => d.id === draftId) ?? sourceStory.drafts[0];
+  const now = new Date().toISOString();
+  const projectId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
+    ? crypto.randomUUID()
+    : "p_" + Math.random().toString(36).slice(2);
+  const newDraftId = "d_" + Math.random().toString(36).slice(2);
+
+  const clonedDraft: Draft = {
+    ...source,
+    id: newDraftId,
+    number: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  return {
+    id: projectId,
+    title: sourceStory.title ? `${sourceStory.title} (copy)` : "",
+    projectType: sourceStory.projectType,
+    thumbnail: sourceStory.thumbnail,
+    drafts: [clonedDraft],
+    activeDraftId: newDraftId,
+    draftCounter: 1,
+    updatedAt: now,
   };
 }
