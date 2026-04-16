@@ -772,7 +772,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   /* thumbnail fades via inline opacity — no layout shift */
 }
 
-/* Tab bar — only sticky element besides nav. Pins below nav (top: 44px). */
+/* Tab bar — sticky, pins below nav (top: 44px). */
 .studio-tabs-sticky {
   position: sticky;
   top: 44px;
@@ -780,7 +780,6 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: flex;
   justify-content: center;
   padding: 4px 0 12px;
-  background: var(--bg);
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */

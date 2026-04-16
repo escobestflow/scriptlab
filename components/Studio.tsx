@@ -317,7 +317,7 @@ export function Studio({
         </div>
 
         {/* Tab content */}
-        <div className="page-enter" style={{ padding: "8px 22px 22px" }} key={section}>
+        <div style={{ padding: "8px 22px 22px" }}>
           {section === "concept" && (
             <ConceptTab
               story={story}
