@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import {
   Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, ProjectDraft,
@@ -642,8 +642,8 @@ function LayerDraftPicker({
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
       {isDirty && (
-        <button className="draft-save-btn" onClick={handleSave} aria-label="Save as new draft">
-          Save
+        <button className="draft-save-btn" onClick={handleSave} aria-label="Save changes">
+          Save Changes
         </button>
       )}
       {open && (
@@ -730,12 +730,19 @@ function TextAttrRow({
   multiline?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
+  const taRef = useRef<HTMLTextAreaElement>(null);
   const hasValue = value.trim().length > 0;
-  // Once text exists, always show the input (never collapse back)
   const isOpen = hasValue || focused;
 
+  // Auto-resize textarea to fit content (full text visible, no cutoff)
+  useEffect(() => {
+    if (multiline && taRef.current) {
+      taRef.current.style.height = "auto";
+      taRef.current.style.height = taRef.current.scrollHeight + "px";
+    }
+  }, [value, focused, multiline]);
+
   if (!isOpen) {
-    // Collapsed: looks like a normal attr row, tappable to open
     return (
       <div className="attr-row">
         <button className="attr-row-header" onClick={() => setFocused(true)}>
@@ -751,7 +758,6 @@ function TextAttrRow({
     );
   }
 
-  // Open: show input. When unfocused + has value: no border, white bg, no caret hint.
   const inputClass = `attr-text-input ${!focused && hasValue ? "unfocused-filled" : ""}`;
 
   return (
@@ -762,13 +768,14 @@ function TextAttrRow({
       <div className="attr-row-body">
         {multiline ? (
           <textarea
+            ref={taRef}
             className={inputClass}
             value={value}
             onChange={e => onChange(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             placeholder={focused ? placeholder : ""}
-            rows={3}
+            rows={1}
             autoFocus={!hasValue}
           />
         ) : (
@@ -860,7 +867,7 @@ function ConceptTab({
             <button
               key={pt.value}
               className={`choice ${story.projectType === pt.value ? "selected" : ""}`}
-              onClick={() => setStory(s => ({ ...s, projectType: pt.value }))}
+              onClick={() => setStory(s => updateConceptDraft({ ...s, projectType: pt.value }, {}))}
               style={{ textAlign: "left", padding: "12px 14px" }}
             >
               <div className="choice-title">{pt.label}</div>
@@ -900,7 +907,7 @@ function ConceptTab({
         label="Title"
         value={story.title}
         placeholder="Add a title"
-        onChange={v => setStory(s => ({ ...s, title: v }))}
+        onChange={v => setStory(s => updateConceptDraft({ ...s, title: v }, {}))}
       />
 
       {/* Logline */}

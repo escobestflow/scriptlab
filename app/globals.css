@@ -870,7 +870,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   position: relative;
   margin-bottom: 12px;
   display: flex;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
   gap: 20px;
 }
@@ -1167,9 +1167,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding-bottom: 14px;
 }
 .project-header-thumb {
-  width: 50px;
-  height: 50px;
-  border-radius: 10px;
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
   object-fit: cover;
 }
 .project-header-thumb-placeholder {
@@ -1279,18 +1279,22 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background: var(--surface);
   font-family: 'Lato', sans-serif;
   font-size: 14px;
+  line-height: 1.45;
   color: var(--ink);
   outline: none;
   resize: none;
-  transition: border-color 200ms var(--ease), background 200ms var(--ease);
+  overflow: hidden;
+  transition: border-color 220ms var(--ease), background 220ms var(--ease), padding 220ms var(--ease);
 }
 .attr-text-input:focus {
   border-color: var(--ink-mute);
 }
-/* Unfocused but has content: seamless, no chrome */
+/* Unfocused but has content: no chrome, left-aligned with the attr label */
 .attr-text-input.unfocused-filled {
   border-color: transparent;
   background: transparent;
+  padding-left: 0;
+  padding-right: 0;
 }
 /* Chips inside attribute rows match the pill spec */
 .attr-row-body .chip-row { gap: 6px; }

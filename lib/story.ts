@@ -326,6 +326,7 @@ export function createNewConceptDraft(story: Story): Story {
     number: nextNumber,
     createdAt: now,
     updatedAt: now,
+    savedAt: now,
   };
   return {
     ...story,
@@ -350,6 +351,7 @@ export function createNewCharactersDraft(story: Story): Story {
     number: nextNumber,
     createdAt: now,
     updatedAt: now,
+    savedAt: now,
   };
   return {
     ...story,
@@ -374,6 +376,7 @@ export function createNewStoryLayerDraft(story: Story): Story {
     number: nextNumber,
     createdAt: now,
     updatedAt: now,
+    savedAt: now,
   };
   return {
     ...story,
@@ -398,6 +401,7 @@ export function createNewScriptDraft(story: Story): Story {
     number: nextNumber,
     createdAt: now,
     updatedAt: now,
+    savedAt: now,
   };
   return {
     ...story,
