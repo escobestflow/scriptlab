@@ -298,6 +298,11 @@ button { cursor: pointer; }
   background: var(--bg);
   border-top: 1px solid var(--border);
   padding: 0 0 env(safe-area-inset-bottom);
+  transition: transform 320ms var(--ease);
+}
+.tabbar-hidden {
+  transform: translateY(100%);
+  pointer-events: none;
 }
 .tabbar-inner {
   display: flex;
@@ -747,6 +752,16 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   height: 44px;
   padding: 0 16px;
   background: transparent;
+}
+/* White backdrop that fades in on scroll — set opacity via JS */
+.studio-nav-bg {
+  position: absolute;
+  inset: 0;
+  bottom: -60px; /* extend down to cover tab bar area too */
+  background: var(--bg);
+  z-index: -1;
+  pointer-events: none;
+  transition: opacity 150ms linear;
 }
 /* Header block: thumbnail + title — normal flow, scrolls as one unit */
 .studio-header-block {

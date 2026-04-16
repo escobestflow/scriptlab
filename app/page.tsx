@@ -336,8 +336,8 @@ export default function Page() {
     <div className="app">
       {renderContent()}
 
-      {/* Tab bar — ALWAYS visible */}
-      <nav className="tabbar">
+      {/* Tab bar — hidden when inside a project */}
+      <nav className={`tabbar ${view.kind === "studio" ? "tabbar-hidden" : ""}`}>
         <div className="tabbar-inner">
           <button
             className={`tab ${view.kind === "main" && mainTab === "projects" ? "active" : ""}`}
