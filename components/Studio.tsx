@@ -1066,6 +1066,7 @@ function TextAttrRow({
         <span className="attr-label">
           {label}
           {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+          {pager}
           {dot && <span className="sync-dot attr-dot" />}
         </span>
       </div>
