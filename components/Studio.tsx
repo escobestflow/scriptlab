@@ -326,6 +326,7 @@ export function Studio({
               onLoadProjectDraft={handleLoadProjectDraft}
               onDeleteProjectDraft={handleDeleteProjectDraft}
               onCreateProjectFromDraft={handleCreateProjectFromDraft}
+              onDeleteLayerDraft={handleDeleteLayerDraft}
               onRequestDeleteProject={() => setConfirmDeleteProject(true)}
             />
           </div>
@@ -1948,6 +1949,7 @@ function BeatCreationForm({
 function SettingsTab({
   story, setStory,
   onLoadProjectDraft, onDeleteProjectDraft, onCreateProjectFromDraft,
+  onDeleteLayerDraft,
   onRequestDeleteProject,
 }: {
   story: Story;
@@ -1955,6 +1957,7 @@ function SettingsTab({
   onLoadProjectDraft: (id: string) => void;
   onDeleteProjectDraft: (id: string) => void;
   onCreateProjectFromDraft: (id: string) => void;
+  onDeleteLayerDraft: (layer: LayerKey, draftId: string) => void;
   onRequestDeleteProject: () => void;
 }) {
   const concept = getActiveConceptDraft(story);
@@ -2066,6 +2069,56 @@ function SettingsTab({
                       Delete
                     </button>
                   )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Layer drafts — consolidated compact view */}
+      <div className="card">
+        <span className="eyebrow">Layer Drafts</span>
+        <div className="caption" style={{ marginTop: 4, marginBottom: 10 }}>
+          Individual drafts per layer. Delete is disabled while a project draft references the draft.
+        </div>
+        <div className="layer-drafts-grid">
+          {([
+            { layer: "concept" as LayerKey,    label: "Concept",    pool: story.conceptDrafts,    refKey: "conceptDraftId"    as const },
+            { layer: "characters" as LayerKey, label: "Characters", pool: story.charactersDrafts, refKey: "charactersDraftId" as const },
+            { layer: "story" as LayerKey,      label: "Story",      pool: story.storyDrafts,      refKey: "storyDraftId"      as const },
+            { layer: "script" as LayerKey,     label: "Script",     pool: story.scriptDrafts,     refKey: "scriptDraftId"     as const },
+          ]).map(({ layer, label, pool, refKey }) => {
+            const activePD = getActiveProjectDraft(story);
+            const activeDraftId = activePD?.[refKey];
+            const sorted = [...pool].sort((a, b) => a.number - b.number);
+            return (
+              <div key={layer} className="layer-drafts-row">
+                <div className="layer-drafts-label">{label}</div>
+                <div className="layer-drafts-chips">
+                  {sorted.map(d => {
+                    const isActive = d.id === activeDraftId;
+                    const referenced = story.projectDrafts.some(pd => pd[refKey] === d.id);
+                    const canDelete = !referenced && pool.length > 1;
+                    return (
+                      <span key={d.id} className={`layer-draft-chip ${isActive ? "active" : ""}`}>
+                        <span className="layer-draft-chip-num">{d.number}</span>
+                        {canDelete && (
+                          <button
+                            className="layer-draft-chip-del"
+                            aria-label={`Delete ${label} Draft ${d.number}`}
+                            onClick={() => {
+                              if (confirm(`Delete ${label} Draft ${d.number}?`)) {
+                                onDeleteLayerDraft(layer, d.id);
+                              }
+                            }}
+                          >
+                            &#10005;
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             );

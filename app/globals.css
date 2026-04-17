@@ -602,6 +602,73 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin-top: 10px;
 }
 
+/* ======= LAYER DRAFTS GRID (settings) ======= */
+.layer-drafts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.layer-drafts-row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+.layer-drafts-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-mute);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.layer-drafts-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.layer-draft-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.layer-draft-chip.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.layer-draft-chip-num {
+  line-height: 1;
+}
+.layer-draft-chip-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--record);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.layer-draft-chip-del:hover {
+  background: rgba(0,0,0,0.06);
+}
+
 /* ======= CHOICE GRID (wizard) ======= */
 
 .choice-grid {
@@ -1046,7 +1113,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   height: 44px;
   padding: 0 16px;
   z-index: 20;
-  background: transparent;
+  background: url('/nav-bar-bg.svg') no-repeat center center;
+  background-size: cover;
 }
 
 /* Scroll container — fills the entire app area, starts at y=0 (behind nav) */
