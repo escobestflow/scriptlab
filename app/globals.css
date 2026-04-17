@@ -2325,3 +2325,59 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .menu-item svg { width: 20px; height: 20px; stroke: var(--ink-soft); stroke-width: 1.6; fill: none; }
 .menu-item .label { flex: 1; }
 .menu-item .arrow { color: var(--ink-ghost); font-size: 16px; font-weight: 300; }
+
+/* Toggle row in menu — icon + stacked (label, caption) + toggle switch */
+.menu-item-toggle {
+  cursor: pointer;
+  align-items: flex-start;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+.menu-item-toggle .menu-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menu-item-toggle .label {
+  flex: initial;
+  font-size: 16px;
+  font-weight: 600;
+}
+.menu-item-caption {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-mute);
+  line-height: 1.35;
+}
+
+/* iOS-style toggle switch */
+.toggle-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  margin-top: 2px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.24);
+  cursor: pointer;
+  transition: background 220ms var(--ease);
+}
+.toggle-switch.on { background: #34C759; }
+.toggle-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15), 0 2px 1px rgba(0,0,0,0.06);
+  transition: transform 220ms var(--ease);
+}
+.toggle-switch.on .toggle-switch-knob { transform: translateX(18px); }
+.toggle-switch:active .toggle-switch-knob { width: 26px; }
+.toggle-switch.on:active .toggle-switch-knob { transform: translateX(14px); }

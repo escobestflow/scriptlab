@@ -29,6 +29,7 @@ export function Studio({
   isNew = false,
   onCreateProjectFromDraft,
   onDeleteProject,
+  autosaveEnabled = true,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -37,6 +38,7 @@ export function Studio({
   isNew?: boolean;
   onCreateProjectFromDraft?: (newStory: Story) => void;
   onDeleteProject?: () => void;
+  autosaveEnabled?: boolean;
 }) {
   const [section, setSection] = useState<Section>("concept");
   const [showSuccess, setShowSuccess] = useState(isNew);
@@ -87,6 +89,26 @@ export function Studio({
   const activeStoryLayer   = getActiveStoryLayerDraft(story);
   const activeScriptDraft  = getActiveScriptDraft(story);
   const syncState          = getLayerSyncState(story);
+
+  // ── Autosave ──
+  // When enabled, every edit to `story` is immediately "saved" by bumping
+  // savedAt to match updatedAt on any dirty layer, and on the project draft
+  // itself. This removes the need for manual save buttons and dirty dots.
+  // The effect is idempotent: once everything is clean, isLayerDraftDirty
+  // returns false for all layers and the effect short-circuits without
+  // triggering another render.
+  useEffect(() => {
+    if (!autosaveEnabled || !story) return;
+
+    let next = story;
+    if (isLayerDraftDirty(getActiveConceptDraft(next)))        next = saveLayerDraft(next, "concept");
+    if (isLayerDraftDirty(getActiveCharactersDraft(next)))     next = saveLayerDraft(next, "characters");
+    if (isLayerDraftDirty(getActiveStoryLayerDraft(next)))     next = saveLayerDraft(next, "story");
+    if (isLayerDraftDirty(getActiveScriptDraft(next)))         next = saveLayerDraft(next, "script");
+    if (isProjectDraftDirty(next))                             next = saveProjectDraft(next);
+
+    if (next !== story) setStory(() => next);
+  }, [story, autosaveEnabled, setStory]);
 
   // Determine which beats we're editing
   const isTV = story.projectType === "tv-show";
@@ -410,15 +432,16 @@ export function Studio({
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
           )}
 
-          {/* Project-level Save button — shown when layer combination changed */}
-          {isProjectDraftDirty(story) && (
+          {/* Project-level Save button — shown when layer combination changed.
+              Hidden entirely in autosave mode (edits commit immediately). */}
+          {!autosaveEnabled && isProjectDraftDirty(story) && (
             <button className="project-save-btn" onClick={() => setStory(s => saveProjectDraft(s))}>
               Save Project Draft {activeProjectDraft.number}
             </button>
           )}
 
           <div className="studio-tabs-row">
-            <SectionTabs section={section} setSection={setSection} story={story} />
+            <SectionTabs section={section} setSection={setSection} story={story} autosaveEnabled={autosaveEnabled} />
           </div>
 
           {/* Project drafts dropdown menu */}
@@ -470,6 +493,7 @@ export function Studio({
               setStory={setStory}
               showSuccess={showSuccess}
               onDismissSuccess={() => setShowSuccess(false)}
+              autosaveEnabled={autosaveEnabled}
             />
           )}
           {section === "characters" && (
@@ -479,6 +503,7 @@ export function Studio({
               run={run}
               busy={busy}
               openCharTray={() => setCharTrayOpen(true)}
+              autosaveEnabled={autosaveEnabled}
             />
           )}
           {section === "story" && (
@@ -497,6 +522,7 @@ export function Studio({
               run={run}
               busy={busy}
               syncState={syncState}
+              autosaveEnabled={autosaveEnabled}
             />
           )}
           {section === "script" && (
@@ -506,6 +532,7 @@ export function Studio({
               beats={sorted}
               run={run}
               busy={busy}
+              autosaveEnabled={autosaveEnabled}
             />
           )}
         </div>
@@ -613,10 +640,12 @@ function SectionTabs({
   section,
   setSection,
   story,
+  autosaveEnabled = true,
 }: {
   section: Section;
   setSection: (s: Section) => void;
   story: Story;
+  autosaveEnabled?: boolean;
 }) {
   const tabs: { key: Section; label: string; layer: LayerKey }[] = [
     { key: "concept",    label: "CONCEPT",    layer: "concept" },
@@ -628,7 +657,7 @@ function SectionTabs({
   return (
     <div className="studio-tab-bar">
       {tabs.map(t => {
-        const dot = isLayerChangedForTabDot(story, t.layer);
+        const dot = !autosaveEnabled && isLayerChangedForTabDot(story, t.layer);
         return (
           <button
             key={t.key}
@@ -736,12 +765,13 @@ const THEME_PRESETS: string[] = [
 /* ── Collapsible attribute row ── */
 /* ── Layer draft picker ── */
 function LayerDraftPicker({
-  layer, label, story, setStory,
+  layer, label, story, setStory, autosaveEnabled = true,
 }: {
   layer: LayerKey;
   label: string;
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
+  autosaveEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -789,7 +819,7 @@ function LayerDraftPicker({
         <span className="layer-draft-label">{label} Draft {active.number}</span>
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
-      {isDirty && (
+      {!autosaveEnabled && isDirty && (
         <button className="draft-save-btn" onClick={handleSave} aria-label={`Save ${label} Draft ${active.number}`}>
           Save {label} Draft {active.number}
         </button>
@@ -1125,11 +1155,13 @@ function ConceptTab({
   setStory,
   showSuccess,
   onDismissSuccess,
+  autosaveEnabled = true,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   showSuccess: boolean;
   onDismissSuccess: () => void;
+  autosaveEnabled?: boolean;
 }) {
   const d = getActiveConceptDraft(story);
   const [openAttr, setOpenAttr] = useState<string | null>(null);
@@ -1258,7 +1290,7 @@ function ConceptTab({
     <>
       {showSuccess && <SuccessBanner onDismiss={onDismissSuccess} />}
 
-      <LayerDraftPicker layer="concept" label="Concept" story={story} setStory={setStory} />
+      <LayerDraftPicker layer="concept" label="Concept" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
 
       {/* Format */}
       <AttrRow
@@ -1266,7 +1298,7 @@ function ConceptTab({
         values={[formatLabel.toUpperCase()]}
         expanded={openAttr === "format"}
         onToggle={() => toggle("format")}
-        dot={isConceptFieldDirty(story, "projectType")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "projectType")}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -1293,7 +1325,7 @@ function ConceptTab({
         placeholder="Select genres"
         expanded={openAttr === "genre"}
         onToggle={() => toggle("genre")}
-        dot={isConceptFieldDirty(story, "genres")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "genres")}
       >
         <div className="chip-row">
           {(["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"] as const).map(g => (
@@ -1319,7 +1351,7 @@ function ConceptTab({
         value={story.title}
         placeholder="Add a title"
         onChange={v => setStory(s => updateConceptDraft({ ...s, title: v }, {}))}
-        dot={isConceptFieldDirty(story, "title")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "title")}
         ai={() => generateConcept("title")}
         aiLoading={aiBusy === "title"}
         pager={
@@ -1347,7 +1379,7 @@ function ConceptTab({
         placeholder="Add a logline"
         onChange={v => updateDraft({ logline: v })}
         multiline
-        dot={isConceptFieldDirty(story, "logline")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "logline")}
         ai={() => generateConcept("logline")}
         aiLoading={aiBusy === "logline"}
         pager={
@@ -1375,7 +1407,7 @@ function ConceptTab({
         placeholder="Add a premise"
         onChange={v => updateDraft({ concept: { ...d.concept, summary: v } })}
         multiline
-        dot={isConceptFieldDirty(story, "summary")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "summary")}
         ai={() => generateConcept("summary")}
         aiLoading={aiBusy === "summary"}
         pager={
@@ -1403,7 +1435,7 @@ function ConceptTab({
         placeholder="Set the tone"
         expanded={openAttr === "tone"}
         onToggle={() => toggle("tone")}
-        dot={isConceptFieldDirty(story, "tone")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "tone")}
         ai={() => generateConcept("tone")}
         aiLoading={aiBusy === "tone"}
       >
@@ -1460,7 +1492,7 @@ function ConceptTab({
         placeholder="Add themes"
         expanded={openAttr === "themes"}
         onToggle={() => toggle("themes")}
-        dot={isConceptFieldDirty(story, "themes")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "themes")}
         ai={() => generateConcept("themes")}
         aiLoading={aiBusy === "themes"}
       >
@@ -1519,7 +1551,7 @@ function ConceptTab({
         placeholder="Select ending type"
         expanded={openAttr === "ending"}
         onToggle={() => toggle("ending")}
-        dot={isConceptFieldDirty(story, "endingTypes")}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "endingTypes")}
         ai={() => generateConcept("ending")}
         aiLoading={aiBusy === "ending"}
       >
@@ -1638,12 +1670,14 @@ function CharactersTab({
   run,
   busy,
   openCharTray,
+  autosaveEnabled = true,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
   openCharTray: () => void;
+  autosaveEnabled?: boolean;
 }) {
   const d = getActiveCharactersDraft(story);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -1674,7 +1708,7 @@ function CharactersTab({
 
   return (
     <>
-      <LayerDraftPicker layer="characters" label="Characters" story={story} setStory={setStory} />
+      <LayerDraftPicker layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
 
       {d.characters.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
@@ -2114,6 +2148,7 @@ function StoryTab({
   story, setStory,
   beats, moments, addBeat, updateBeat, moveBeat, removeBeat,
   unlinkMoment, openMomentPicker, openBeatTray, run, busy, syncState,
+  autosaveEnabled = true,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -2129,6 +2164,7 @@ function StoryTab({
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
   syncState: LayerSyncState;
+  autosaveEnabled?: boolean;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
@@ -2155,7 +2191,7 @@ function StoryTab({
 
   return (
     <>
-      <LayerDraftPicker layer="story" label="Story" story={story} setStory={setStory} />
+      <LayerDraftPicker layer="story" label="Story" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
 
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {beats.length === 0 && (
@@ -2383,12 +2419,14 @@ function ScriptTab({
   beats,
   run,
   busy,
+  autosaveEnabled = true,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   beats: Beat[];
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
+  autosaveEnabled?: boolean;
 }) {
   const d = getActiveScriptDraft(story);
   const syncState = getLayerSyncState(story);
@@ -2404,7 +2442,7 @@ function ScriptTab({
 
   return (
     <>
-      <LayerDraftPicker layer="script" label="Script" story={story} setStory={setStory} />
+      <LayerDraftPicker layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
 
       {/* Out-of-sync banner — only after a script has been produced */}
       {isOutOfSync && (

@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Studio } from "@/components/Studio";
 import { Genre, ProjectType } from "@/lib/story";
+import { useAutosavePref } from "@/lib/prefs";
 
 type View =
   | { kind: "main" }
@@ -41,6 +42,7 @@ export default function Page() {
   const [view, setView] = useState<View>({ kind: "main" });
   const [mainTab, setMainTab] = useState<MainTab>("projects");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [autosaveEnabled, setAutosaveEnabled] = useAutosavePref();
   const [recording, setRecording] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
@@ -310,6 +312,7 @@ export default function Page() {
             deleteProjectFromDB(id);
             setView({ kind: "main" });
           }}
+          autosaveEnabled={autosaveEnabled}
         />
       );
     }
@@ -399,8 +402,41 @@ export default function Page() {
             {user.email}
           </div>
         )}
+        {/* Autosave toggle — replaces the old "Settings" stub row.
+            Inline iOS-style toggle keeps menu flat; no sub-sheet needed. */}
+        <div
+          className="menu-item menu-item-toggle"
+          onClick={() => setAutosaveEnabled(!autosaveEnabled)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setAutosaveEnabled(!autosaveEnabled);
+            }
+          }}
+        >
+          <IconSettings />
+          <div className="menu-item-text">
+            <div className="label">Autosave edits</div>
+            <div className="menu-item-caption">
+              Saves drafts as you type. Turn off to use manual save buttons.
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`toggle-switch ${autosaveEnabled ? "on" : ""}`}
+            aria-label="Toggle autosave"
+            aria-pressed={autosaveEnabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              setAutosaveEnabled(!autosaveEnabled);
+            }}
+          >
+            <span className="toggle-switch-knob" />
+          </button>
+        </div>
         {[
-          { icon: <IconSettings />, label: "Settings" },
           { icon: <IconZap />, label: "AI Connections" },
           { icon: <IconExport />, label: "Export Scripts" },
         ].map(item => (
