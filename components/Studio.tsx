@@ -780,6 +780,7 @@ function LayerDraftPicker({
 
   return (
     <div className="layer-draft-picker" ref={pickerRef}>
+      <div className="layer-draft-picker-bg" aria-hidden="true" />
       <button
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
