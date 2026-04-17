@@ -1082,7 +1082,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ======= STUDIO LAYOUT ======= */
 
-/* Nav — absolute-positioned overlay, always at top, never moves */
+/* Nav — absolute-positioned overlay, always at top, never moves.
+   Transparent so the scrolling title can be seen layered behind it. */
 .studio-nav-fixed {
   position: absolute;
   top: 0;
@@ -1094,8 +1095,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   height: 44px;
   padding: 0 16px;
   z-index: 20;
-  background: url('/nav-bar-bg.svg') no-repeat center center;
-  background-size: cover;
+  background: transparent;
 }
 
 /* Scroll container — fills the entire app area, starts at y=0 (behind nav) */
