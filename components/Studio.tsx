@@ -12,6 +12,7 @@ import {
   createNewProjectDraft, switchProjectDraft, deleteProjectDraft,
   saveLayerDraft, isLayerDraftDirty,
   saveProjectDraft, isProjectDraftDirty,
+  isLayerChangedForTabDot, isConceptFieldDirty, ConceptField,
   getLayerSyncState, markLayerSynced,
 } from "@/lib/story";
 import { createProjectFromDraft } from "@/lib/storage";
@@ -237,7 +238,7 @@ export function Studio({
           onSetup={() => setShowSetup(true)}
           subtitle={`${activeStoryLayer.episodes?.length ?? 0} episodes`}
         />
-        <SectionTabs section={section} setSection={setSection} syncState={syncState} />
+        <SectionTabs section={section} setSection={setSection} story={story} />
         <div className="screen-scroll">
           <div className="page-enter">
             {(activeStoryLayer.episodes ?? []).map(ep => (
@@ -398,7 +399,7 @@ export function Studio({
           )}
 
           <div className="studio-tabs-row">
-            <SectionTabs section={section} setSection={setSection} syncState={syncState} />
+            <SectionTabs section={section} setSection={setSection} story={story} />
           </div>
 
           {/* Project drafts dropdown menu */}
@@ -555,31 +556,34 @@ export function Studio({
 function SectionTabs({
   section,
   setSection,
-  syncState,
+  story,
 }: {
   section: Section;
   setSection: (s: Section) => void;
-  syncState: LayerSyncState;
+  story: Story;
 }) {
-  const tabs: { key: Section; label: string; dot?: boolean }[] = [
-    { key: "concept", label: "CONCEPT" },
-    { key: "characters", label: "CHARACTERS" },
-    { key: "story", label: "STORY", dot: syncState.storyOutOfSync },
-    { key: "script", label: "SCRIPT", dot: syncState.scriptOutOfSync },
+  const tabs: { key: Section; label: string; layer: LayerKey }[] = [
+    { key: "concept",    label: "CONCEPT",    layer: "concept" },
+    { key: "characters", label: "CHARACTERS", layer: "characters" },
+    { key: "story",      label: "STORY",      layer: "story" },
+    { key: "script",     label: "SCRIPT",     layer: "script" },
   ];
 
   return (
     <div className="studio-tab-bar">
-      {tabs.map(t => (
-        <button
-          key={t.key}
-          className={`studio-tab ${section === t.key ? "active" : ""}`}
-          onClick={() => setSection(t.key)}
-        >
-          <span className="studio-tab-label">{t.label}</span>
-          {t.dot && <span className="sync-dot" />}
-        </button>
-      ))}
+      {tabs.map(t => {
+        const dot = isLayerChangedForTabDot(story, t.layer);
+        return (
+          <button
+            key={t.key}
+            className={`studio-tab ${section === t.key ? "active" : ""}`}
+            onClick={() => setSection(t.key)}
+          >
+            <span className="studio-tab-label">{t.label}</span>
+            {dot && <span className="sync-dot" />}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -722,6 +726,7 @@ function AttrRow({
   expanded,
   onToggle,
   children,
+  dot,
 }: {
   label: string;
   values?: string[];
@@ -729,12 +734,16 @@ function AttrRow({
   expanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  dot?: boolean;
 }) {
   const hasValues = values && values.length > 0;
   return (
     <div className="attr-row">
       <button className="attr-row-header" onClick={onToggle}>
-        <span className="attr-label">{label}</span>
+        <span className="attr-label">
+          {label}
+          {dot && <span className="sync-dot attr-dot" />}
+        </span>
         <div className="attr-values">
           {hasValues
             ? values.map(v => <span key={v} className="attr-pill">{v}</span>)
@@ -761,12 +770,14 @@ function TextAttrRow({
   placeholder,
   onChange,
   multiline,
+  dot,
 }: {
   label: string;
   value: string;
   placeholder: string;
   onChange: (v: string) => void;
   multiline?: boolean;
+  dot?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -785,7 +796,10 @@ function TextAttrRow({
     return (
       <div className="attr-row">
         <button className="attr-row-header" onClick={() => setFocused(true)}>
-          <span className="attr-label">{label}</span>
+          <span className="attr-label">
+            {label}
+            {dot && <span className="sync-dot attr-dot" />}
+          </span>
           <div className="attr-values">
             <span className="attr-placeholder">{placeholder}</span>
           </div>
@@ -802,7 +816,10 @@ function TextAttrRow({
   return (
     <div className="attr-row attr-row-text-open">
       <div className="attr-row-header attr-row-header-static">
-        <span className="attr-label">{label}</span>
+        <span className="attr-label">
+          {label}
+          {dot && <span className="sync-dot attr-dot" />}
+        </span>
       </div>
       <div className="attr-row-body">
         {multiline ? (
@@ -896,6 +913,7 @@ function ConceptTab({
         values={[formatLabel.toUpperCase()]}
         expanded={openAttr === "format"}
         onToggle={() => toggle("format")}
+        dot={isConceptFieldDirty(story, "projectType")}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -922,6 +940,7 @@ function ConceptTab({
         placeholder="Select genres"
         expanded={openAttr === "genre"}
         onToggle={() => toggle("genre")}
+        dot={isConceptFieldDirty(story, "genres")}
       >
         <div className="chip-row">
           {(["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"] as const).map(g => (
@@ -947,6 +966,7 @@ function ConceptTab({
         value={story.title}
         placeholder="Add a title"
         onChange={v => setStory(s => updateConceptDraft({ ...s, title: v }, {}))}
+        dot={isConceptFieldDirty(story, "title")}
       />
 
       {/* Logline */}
@@ -956,6 +976,7 @@ function ConceptTab({
         placeholder="Add a logline"
         onChange={v => updateDraft({ logline: v })}
         multiline
+        dot={isConceptFieldDirty(story, "logline")}
       />
 
       {/* Summary */}
@@ -965,6 +986,7 @@ function ConceptTab({
         placeholder="Add a premise"
         onChange={v => updateDraft({ concept: { ...d.concept, summary: v } })}
         multiline
+        dot={isConceptFieldDirty(story, "summary")}
       />
 
       {/* Tone */}
@@ -973,6 +995,7 @@ function ConceptTab({
         value={d.concept.tone}
         placeholder="Set the tone"
         onChange={v => updateDraft({ concept: { ...d.concept, tone: v } })}
+        dot={isConceptFieldDirty(story, "tone")}
       />
 
       {/* Themes */}
@@ -982,6 +1005,7 @@ function ConceptTab({
         placeholder="Add themes"
         expanded={openAttr === "themes"}
         onToggle={() => toggle("themes")}
+        dot={isConceptFieldDirty(story, "themes")}
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {d.concept.themes.map(t => (
@@ -1013,6 +1037,7 @@ function ConceptTab({
         placeholder="Select ending type"
         expanded={openAttr === "ending"}
         onToggle={() => toggle("ending")}
+        dot={isConceptFieldDirty(story, "endingTypes")}
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (

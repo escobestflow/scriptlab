@@ -106,6 +106,17 @@ export interface Script {
 // ── Layer drafts ──
 // Each layer has its own drafts pool. A draft carries all content for that layer.
 
+// Snapshot of concept-tab fields at the moment of last save.
+// Also captures Story.title + Story.projectType which are shared
+// across drafts but editable from the Concept tab.
+export interface ConceptSavedSnapshot {
+  title: string;
+  projectType: ProjectType;
+  logline: string;
+  settings: StorySettings;
+  concept: Concept;
+}
+
 export interface ConceptLayerDraft {
   id: string;
   number: number;
@@ -115,6 +126,7 @@ export interface ConceptLayerDraft {
   logline: string;
   settings: StorySettings;
   concept: Concept;
+  savedSnapshot?: ConceptSavedSnapshot; // for per-field change dots
 }
 
 export interface CharactersLayerDraft {
@@ -161,6 +173,12 @@ export interface ProjectDraft {
   charactersDraftId: string;
   storyDraftId: string;
   scriptDraftId: string;
+  // Saved layer IDs at time of last save — used to detect per-tab
+  // "has this layer changed since save" indicators.
+  savedConceptDraftId?: string;
+  savedCharactersDraftId?: string;
+  savedStoryDraftId?: string;
+  savedScriptDraftId?: string;
   // Sync markers: ISO timestamps of when each upstream layer was "synced"
   // into this project draft. If upstream.updatedAt > this marker, the
   // downstream is considered out-of-sync.
@@ -328,6 +346,13 @@ export function createNewConceptDraft(story: Story): Story {
     createdAt: now,
     updatedAt: now,
     savedAt: now,
+    savedSnapshot: {
+      title: story.title,
+      projectType: story.projectType,
+      logline: active.logline,
+      settings: active.settings,
+      concept: active.concept,
+    },
   };
   return {
     ...story,
@@ -444,8 +469,25 @@ export function saveLayerDraft(story: Story, layer: LayerKey): Story {
     arr.map(d => d.id === activeId ? { ...d, savedAt: d.updatedAt } : d);
 
   switch (layer) {
-    case "concept":
-      return { ...story, conceptDrafts: mapDraft(story.conceptDrafts), updatedAt: now };
+    case "concept": {
+      // Snapshot current concept fields + shared Story fields (title/projectType)
+      const snapshot: ConceptSavedSnapshot = {
+        title: story.title,
+        projectType: story.projectType,
+        logline: getActiveConceptDraft(story).logline,
+        settings: getActiveConceptDraft(story).settings,
+        concept: getActiveConceptDraft(story).concept,
+      };
+      return {
+        ...story,
+        conceptDrafts: story.conceptDrafts.map(d =>
+          d.id === activeId
+            ? { ...d, savedAt: d.updatedAt, savedSnapshot: snapshot }
+            : d
+        ),
+        updatedAt: now,
+      };
+    }
     case "characters":
       return { ...story, charactersDrafts: mapDraft(story.charactersDrafts), updatedAt: now };
     case "story":
@@ -455,16 +497,22 @@ export function saveLayerDraft(story: Story, layer: LayerKey): Story {
   }
 }
 
-// Save the project draft's current layer combination — advances pd.savedAt.
-// The project draft is "dirty" when its layer combination has changed
-// (via createNewLayerDraft or switchLayerDraft) since the last save.
+// Save the project draft's current layer combination — advances pd.savedAt
+// and snapshots the current layer IDs into savedXDraftId fields.
 export function saveProjectDraft(story: Story): Story {
   const now = new Date().toISOString();
   return {
     ...story,
     projectDrafts: story.projectDrafts.map(pd =>
       pd.id === story.activeProjectDraftId
-        ? { ...pd, savedAt: pd.updatedAt }
+        ? {
+            ...pd,
+            savedAt: pd.updatedAt,
+            savedConceptDraftId: pd.conceptDraftId,
+            savedCharactersDraftId: pd.charactersDraftId,
+            savedStoryDraftId: pd.storyDraftId,
+            savedScriptDraftId: pd.scriptDraftId,
+          }
         : pd
     ),
     updatedAt: now,
@@ -484,6 +532,62 @@ export function isProjectDraftDirty(story: Story): boolean {
   const pd = getActiveProjectDraft(story);
   if (!pd) return false;
   return new Date(pd.updatedAt).getTime() > new Date(pd.savedAt).getTime();
+}
+
+// ── Per-tab change detection (for tab bar dots) ──
+// A tab shows a dot if its layer draft ID has changed since the project
+// was saved, OR if the active layer draft has unsaved edits.
+export function isLayerChangedForTabDot(story: Story, layer: LayerKey): boolean {
+  const pd = getActiveProjectDraft(story);
+  if (!pd) return false;
+
+  const currentId =
+    layer === "concept"    ? pd.conceptDraftId :
+    layer === "characters" ? pd.charactersDraftId :
+    layer === "story"      ? pd.storyDraftId :
+                             pd.scriptDraftId;
+  const savedId =
+    layer === "concept"    ? pd.savedConceptDraftId :
+    layer === "characters" ? pd.savedCharactersDraftId :
+    layer === "story"      ? pd.savedStoryDraftId :
+                             pd.savedScriptDraftId;
+  if (savedId && currentId !== savedId) return true;
+
+  const draft =
+    layer === "concept"    ? getActiveConceptDraft(story) :
+    layer === "characters" ? getActiveCharactersDraft(story) :
+    layer === "story"      ? getActiveStoryLayerDraft(story) :
+                             getActiveScriptDraft(story);
+  return isLayerDraftDirty(draft);
+}
+
+// ── Per-field change detection for Concept tab ──
+
+function arraysEqual<T>(a: T[], b: T[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+}
+
+export type ConceptField =
+  | "title" | "projectType" | "genres" | "logline"
+  | "summary" | "tone" | "themes" | "endingTypes";
+
+export function isConceptFieldDirty(story: Story, field: ConceptField): boolean {
+  const c = getActiveConceptDraft(story);
+  const snap = c.savedSnapshot;
+  if (!snap) return false;
+  switch (field) {
+    case "title":       return story.title !== snap.title;
+    case "projectType": return story.projectType !== snap.projectType;
+    case "genres":      return !arraysEqual(c.settings.genres, snap.settings.genres);
+    case "logline":     return c.logline !== snap.logline;
+    case "summary":     return c.concept.summary !== snap.concept.summary;
+    case "tone":        return c.concept.tone !== snap.concept.tone;
+    case "themes":      return !arraysEqual(c.concept.themes, snap.concept.themes);
+    case "endingTypes": return !arraysEqual(c.settings.endingTypes, snap.settings.endingTypes);
+  }
 }
 
 // ── Helpers: switch layer draft on active project draft ──
@@ -559,6 +663,10 @@ export function createNewProjectDraft(story: Story): Story {
     charactersDraftId: active.charactersDraftId,
     storyDraftId: active.storyDraftId,
     scriptDraftId: active.scriptDraftId,
+    savedConceptDraftId: active.conceptDraftId,
+    savedCharactersDraftId: active.charactersDraftId,
+    savedStoryDraftId: active.storyDraftId,
+    savedScriptDraftId: active.scriptDraftId,
     conceptSyncedAt: now,
     charactersSyncedAt: now,
     storySyncedAt: now,

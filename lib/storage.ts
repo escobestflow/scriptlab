@@ -144,16 +144,24 @@ function normalizeStory(s: any): Story {
     const scriptDrafts     = (s.scriptDrafts ?? []).map((d: any, i: number) => normalizeScriptDraft(d, i + 1));
     const projectDrafts: ProjectDraft[] = (s.projectDrafts ?? []).map((pd: any, i: number) => {
       const upd = pd.updatedAt || now;
+      const conceptId    = pd.conceptDraftId    || conceptDrafts[0]?.id;
+      const charactersId = pd.charactersDraftId || charactersDrafts[0]?.id;
+      const storyId      = pd.storyDraftId      || storyDrafts[0]?.id;
+      const scriptId     = pd.scriptDraftId     || scriptDrafts[0]?.id;
       return {
         id: pd.id || genId("pd"),
         number: pd.number ?? i + 1,
         createdAt: pd.createdAt || now,
         updatedAt: upd,
         savedAt: pd.savedAt || upd,
-        conceptDraftId:    pd.conceptDraftId    || conceptDrafts[0]?.id,
-        charactersDraftId: pd.charactersDraftId || charactersDrafts[0]?.id,
-        storyDraftId:      pd.storyDraftId      || storyDrafts[0]?.id,
-        scriptDraftId:     pd.scriptDraftId     || scriptDrafts[0]?.id,
+        conceptDraftId: conceptId,
+        charactersDraftId: charactersId,
+        storyDraftId: storyId,
+        scriptDraftId: scriptId,
+        savedConceptDraftId:    pd.savedConceptDraftId    || conceptId,
+        savedCharactersDraftId: pd.savedCharactersDraftId || charactersId,
+        savedStoryDraftId:      pd.savedStoryDraftId      || storyId,
+        savedScriptDraftId:     pd.savedScriptDraftId     || scriptId,
         conceptSyncedAt:    pd.conceptSyncedAt,
         charactersSyncedAt: pd.charactersSyncedAt,
         storySyncedAt:      pd.storySyncedAt,
@@ -215,6 +223,10 @@ function normalizeStory(s: any): Story {
         charactersDraftId: chd.id,
         storyDraftId: sd.id,
         scriptDraftId: scd.id,
+        savedConceptDraftId: cd.id,
+        savedCharactersDraftId: chd.id,
+        savedStoryDraftId: sd.id,
+        savedScriptDraftId: scd.id,
         conceptSyncedAt: ts,
         charactersSyncedAt: ts,
         storySyncedAt: ts,
@@ -258,6 +270,10 @@ function normalizeStory(s: any): Story {
     charactersDraftId: chd.id,
     storyDraftId: sd.id,
     scriptDraftId: scd.id,
+    savedConceptDraftId: cd.id,
+    savedCharactersDraftId: chd.id,
+    savedStoryDraftId: sd.id,
+    savedScriptDraftId: scd.id,
     conceptSyncedAt: now,
     charactersSyncedAt: now,
     storySyncedAt: now,
@@ -357,6 +373,8 @@ export function newBlankProject(): Story {
     id: genId("pd"), number: 1, createdAt: now, updatedAt: now, savedAt: now,
     conceptDraftId: cd.id, charactersDraftId: chd.id,
     storyDraftId: sd.id, scriptDraftId: scd.id,
+    savedConceptDraftId: cd.id, savedCharactersDraftId: chd.id,
+    savedStoryDraftId: sd.id, savedScriptDraftId: scd.id,
     conceptSyncedAt: now, charactersSyncedAt: now, storySyncedAt: now,
   };
 
@@ -396,6 +414,8 @@ export function createProjectFromDraft(sourceStory: Story, projectDraftId: strin
     id: genId("pd"), number: 1, createdAt: now, updatedAt: now, savedAt: now,
     conceptDraftId: cd.id, charactersDraftId: chd.id,
     storyDraftId: sd.id, scriptDraftId: scd.id,
+    savedConceptDraftId: cd.id, savedCharactersDraftId: chd.id,
+    savedStoryDraftId: sd.id, savedScriptDraftId: scd.id,
     conceptSyncedAt: now, charactersSyncedAt: now, storySyncedAt: now,
   };
 

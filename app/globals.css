@@ -1173,6 +1173,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   vertical-align: middle;
   top: 0;
 }
+.sync-dot.attr-dot {
+  margin-left: 6px;
+  vertical-align: middle;
+  top: -1px;
+}
 
 /* Sync banner */
 .sync-banner {
