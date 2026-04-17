@@ -1563,8 +1563,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding-bottom: 14px;
 }
 .project-header-thumb {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  aspect-ratio: 3 / 4;
   border-radius: 12px;
   object-fit: cover;
 }

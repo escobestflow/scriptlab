@@ -194,6 +194,7 @@ export interface Story {
   title: string;
   projectType: ProjectType;
   thumbnail?: string;
+  thumbnailPromptExtra?: string;
   conceptDrafts: ConceptLayerDraft[];
   charactersDrafts: CharactersLayerDraft[];
   storyDrafts: StoryLayerDraft[];

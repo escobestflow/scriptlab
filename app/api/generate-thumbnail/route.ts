@@ -26,11 +26,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { title, logline, genres } = await req.json();
+    const { title, logline, genres, extra } = await req.json();
 
     // Stage 1: Claude composes the locked-style image brief.
     const prompt = await buildImagePrompt(
-      { title, logline, genres },
+      { title, logline, genres, extra },
       anthropicKey,
     );
 

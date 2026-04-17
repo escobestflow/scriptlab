@@ -2692,6 +2692,7 @@ function SettingsTab({
           title: story.title,
           logline: concept.logline,
           genres: concept.settings.genres,
+          extra: story.thumbnailPromptExtra || "",
         }),
       });
       if (!res.ok) return;
@@ -2729,8 +2730,33 @@ function SettingsTab({
       <div className="card">
         <span className="eyebrow">Cover</span>
         {story.thumbnail && (
-          <img src={story.thumbnail} alt="" style={{ width: "100%", borderRadius: 12, marginBottom: 10 }} />
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <img
+              src={story.thumbnail}
+              alt=""
+              style={{
+                width: 160,
+                aspectRatio: "3 / 4",
+                borderRadius: 12,
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </div>
         )}
+        <span className="eyebrow" style={{ display: "block", marginTop: 4 }}>
+          Custom prompt additions (optional)
+        </span>
+        <input
+          type="text"
+          className="attr-text-input"
+          placeholder="e.g. include a vintage red car, set at dawn"
+          value={story.thumbnailPromptExtra || ""}
+          onChange={e =>
+            setStory(st => ({ ...st, thumbnailPromptExtra: e.target.value }))
+          }
+          style={{ marginBottom: 10 }}
+        />
         <Button variant="secondary" size="sm" onClick={generateCover}
           disabled={generatingCover}
           style={{ width: "100%" }}>

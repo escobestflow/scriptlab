@@ -109,6 +109,9 @@ export interface ImagePromptInputs {
   title: string;
   logline?: string;
   genres?: string[];
+  // Free-form user additions — folded into the brief as soft guidance.
+  // The locked style rules still take precedence.
+  extra?: string;
 }
 
 // Extracts the block after "Final Image Prompt:" up to the end of the reply.
@@ -123,13 +126,21 @@ export async function buildImagePrompt(
   inputs: ImagePromptInputs,
   apiKey: string,
 ): Promise<string> {
-  const { title, logline, genres } = inputs;
+  const { title, logline, genres, extra } = inputs;
   const genreStr = genres?.length ? genres.join(", ") : "drama";
+  const extraTrim = (extra || "").trim();
 
   const userMessage = [
     `Project title: ${title || "Untitled"}`,
     `Logline: ${logline || "(no logline provided — infer from title and genre)"}`,
     `Genre: ${genreStr}`,
+    ...(extraTrim
+      ? [
+          ``,
+          `User's custom additions (incorporate where they fit without breaking the locked style system — palette, flat vector rendering, no grain/text, 3:4 vertical framing are non-negotiable):`,
+          extraTrim,
+        ]
+      : []),
     ``,
     `Follow the brief. Return ONLY the six labeled sections.`,
   ].join("\n");
