@@ -1116,7 +1116,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 8px 0;
 }
 
-/* Title + tabs — sticky, scrolls up behind nav before pinning */
+/* Title + tabs — sticky, scrolls up behind nav before pinning.
+   Solid #FBFCFD container holds the project title, draft dropdown, and tabs. */
 .studio-header-sticky {
   position: sticky;
   top: -44px;
@@ -1126,19 +1127,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: center;
   gap: 8px;
   padding: 4px 0 0;
-  background: transparent;
-}
-/* Tab bar container background — gradient SVG matching the page bg */
-.studio-header-sticky::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 44px;
-  bottom: 0;
-  background: url('/tab-bar-container-bg.svg') no-repeat center center;
-  background-size: cover;
-  z-index: -1;
+  background: #FBFCFD;
 }
 .studio-header-sticky > :not(.studio-tabs-row) {
   padding-left: 20px;
