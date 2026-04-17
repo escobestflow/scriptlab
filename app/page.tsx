@@ -314,7 +314,7 @@ export default function Page() {
     // Main view
     return (
       <>
-        <div className="topbar">
+        <div className="topbar topbar-dark">
           <button className="topbar-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
             <img src="/menu-icon.svg" alt="" style={{ width: 22, height: 15 }} />
           </button>

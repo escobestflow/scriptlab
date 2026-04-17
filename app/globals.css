@@ -98,6 +98,19 @@ button { cursor: pointer; }
   color: var(--ink);
 }
 
+/* Dark modifier — used by the home-page header so the Unfold wordmark lives
+   on a near-black background. Scoped so Studio sub-view topbars stay light. */
+.topbar-dark {
+  background: #0b0b0f;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px);
+  padding-bottom: 14px;
+}
+.topbar-dark .topbar-center { color: #fff; }
+.topbar-dark .topbar-btn:active { background: rgba(255, 255, 255, 0.08); }
+.topbar-dark .topbar-btn svg { stroke: #fff; }
+.topbar-dark .topbar-btn img { filter: invert(1); }
+.topbar-dark .brand-logo-img { filter: invert(1); }
+
 /* Brand logo — SVG image from assets. Intrinsic aspect 86:18.5. */
 .brand-logo-img {
   width: 86px;
