@@ -1077,7 +1077,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 4px 0 0;
   background: transparent;
 }
-/* DEBUG: red bg so we can see the tab bar container clearly */
+/* Tab bar container background — gradient SVG matching the page bg */
 .studio-header-sticky::before {
   content: "";
   position: absolute;
@@ -1085,7 +1085,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   right: 0;
   top: 44px;
   bottom: 0;
-  background: red;
+  background: url('/tab-bar-container-bg.svg') no-repeat center center;
+  background-size: cover;
   z-index: -1;
 }
 .studio-header-sticky > :not(.studio-tabs-row) {
