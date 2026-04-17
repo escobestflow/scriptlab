@@ -283,6 +283,32 @@ export function Studio({
   }
 
   // Setup view
+  const confirmDeleteDialog = confirmDeleteProject ? (
+    <>
+      <div className="confirm-backdrop" onClick={() => setConfirmDeleteProject(false)} />
+      <div className="confirm-dialog">
+        <div className="confirm-title">Are you sure?</div>
+        <div className="confirm-body">
+          This will permanently delete &quot;{story.title || "this project"}&quot; and all of its drafts.
+          This action cannot be undone.
+        </div>
+        <div className="confirm-actions">
+          <button className="btn-secondary confirm-cancel"
+            onClick={() => setConfirmDeleteProject(false)}>
+            Cancel
+          </button>
+          <button className="btn-delete-project"
+            onClick={() => {
+              setConfirmDeleteProject(false);
+              onDeleteProject?.();
+            }}>
+            Delete Project
+          </button>
+        </div>
+      </div>
+    </>
+  ) : null;
+
   if (showSetup) {
     return (
       <>
@@ -303,6 +329,7 @@ export function Studio({
             />
           </div>
         </div>
+        {confirmDeleteDialog}
       </>
     );
   }
@@ -516,32 +543,7 @@ export function Studio({
         </div>
       </div>
 
-      {/* Delete project confirm dialog */}
-      {confirmDeleteProject && (
-        <>
-          <div className="confirm-backdrop" onClick={() => setConfirmDeleteProject(false)} />
-          <div className="confirm-dialog">
-            <div className="confirm-title">Are you sure?</div>
-            <div className="confirm-body">
-              This will permanently delete &quot;{story.title || "this project"}&quot; and all of its drafts.
-              This action cannot be undone.
-            </div>
-            <div className="confirm-actions">
-              <button className="btn-secondary confirm-cancel"
-                onClick={() => setConfirmDeleteProject(false)}>
-                Cancel
-              </button>
-              <button className="btn-delete-project"
-                onClick={() => {
-                  setConfirmDeleteProject(false);
-                  onDeleteProject?.();
-                }}>
-                Delete Project
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      {confirmDeleteDialog}
     </>
   );
 }
@@ -1931,12 +1933,7 @@ function SettingsTab({
   onRequestDeleteProject: () => void;
 }) {
   const concept = getActiveConceptDraft(story);
-  const storyLayer = getActiveStoryLayerDraft(story);
-  const s = concept.settings;
   const [generatingCover, setGeneratingCover] = useState(false);
-
-  const setSettingField = <K extends keyof StorySettings>(k: K, v: StorySettings[K]) =>
-    setStory(st => updateConceptDraft(st, { settings: { ...getActiveConceptDraft(st).settings, [k]: v } }));
 
   async function generateCover() {
     setGeneratingCover(true);
@@ -1992,47 +1989,6 @@ function SettingsTab({
           style={{ width: "100%", fontSize: 13 }}>
           {generatingCover ? "Generating..." : story.thumbnail ? "Regenerate cover" : "Generate cover"}
         </button>
-      </div>
-
-      <div className="card">
-        <span className="eyebrow">Framework</span>
-        <div className="select-wrap">
-          <select className="field" value={s.framework}
-            onChange={e => setSettingField("framework", e.target.value as any)}>
-            <option value="save-the-cat">Save the Cat</option>
-            <option value="heros-journey">Hero&apos;s Journey</option>
-            <option value="three-act">Three Act</option>
-            <option value="story-circle">Story Circle</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="card">
-        <span className="eyebrow">Vibe</span>
-        <input className="field" value={s.vibe}
-          onChange={e => setSettingField("vibe", e.target.value)} placeholder="Describe the vibe" />
-      </div>
-
-      <div className="card">
-        <span className="eyebrow">Dials</span>
-        <div className="stack" style={{ marginTop: 8 }}>
-          <Slider label="Unpredictability" value={s.unpredictability} onChange={v => setSettingField("unpredictability", v)} />
-          <Slider label="Darkness"         value={s.darkness}         onChange={v => setSettingField("darkness", v)} />
-          <Slider label="Pace"             value={s.pace}             onChange={v => setSettingField("pace", v)} />
-        </div>
-      </div>
-
-      <div className="card">
-        <span className="eyebrow">Ingredients</span>
-        {storyLayer.ingredients.length === 0 && (
-          <div className="caption" style={{ marginTop: 4 }}>No ingredients yet.</div>
-        )}
-        {storyLayer.ingredients.map(ing => (
-          <div key={ing.id} className="inset-card">
-            <div className="eyebrow">{ing.label} {ing.locked && "· locked"}</div>
-            <div style={{ fontSize: 14, marginTop: 4 }}>{ing.description}</div>
-          </div>
-        ))}
       </div>
 
       {/* Project drafts */}
