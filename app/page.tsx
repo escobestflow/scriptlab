@@ -817,13 +817,14 @@ function ProjectsTab({
             <div className="project-body">
               <div className="project-title">{p.title || "Untitled"}</div>
               <div className="project-genre">
-                {/* Non-interactive spans styled as .ds-selector — matches
-                    the Concept-tab genre chips exactly. The parent button
-                    owns the click target. */}
+                {/* .attr-pill matches the collapsed-state genre chips in
+                    the Concept tab on the Project Detail page. */}
                 {c.settings.genres?.length > 0 && c.settings.genres.map((g: string) => (
-                  <span key={g} className="ds-selector">{g}</span>
+                  <span key={g} className="attr-pill">{g.toUpperCase()}</span>
                 ))}
-                <span className="ds-selector">{c.settings.framework.replace(/-/g, " ")}</span>
+                <span className="attr-pill">
+                  {c.settings.framework.replace(/-/g, " ").toUpperCase()}
+                </span>
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
             </div>

@@ -207,48 +207,52 @@ button { cursor: pointer; }
 }
 
 /* ======= PROJECT CARDS ======= */
-/* Elevated hero card. Full-width cover on top, generous content block
-   below. Stacked shadows for real depth; subtle press scale for tactility.
-   Genre chips use the exact .ds-selector styling from the Concept tab. */
+/* Compact elevated list row — square cover on the left, content on the
+   right. Short enough that the next card always peeks below the viewport.
+   Genre chips reuse .attr-pill, matching the Concept-tab collapsed genre
+   summary exactly. 18px corners align with .card / sheet surfaces. */
 
 .project-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: 14px;
   width: 100%;
-  padding: 0;
-  margin-bottom: 20px;
-  border-radius: 24px;
+  padding: 14px;
+  margin-bottom: 14px;
+  border-radius: 18px;
   border: none;
   background: var(--surface);
-  /* Stacked elevation — a crisp 1px lift + a diffused ambient pool. */
+  /* Stacked elevation — crisp contact + diffused ambient. Scaled for the
+     smaller surface so the card lifts without looking puffy. */
   box-shadow:
-    0 1px 2px rgba(10, 10, 15, 0.06),
-    0 12px 32px rgba(10, 10, 15, 0.09);
-  overflow: hidden;
+    0 1px 2px rgba(10, 10, 15, 0.05),
+    0 8px 22px rgba(10, 10, 15, 0.07);
   text-align: left;
   cursor: pointer;
+  align-items: stretch;
   transition:
-    transform 260ms var(--ease),
-    box-shadow 260ms var(--ease);
+    transform 220ms var(--ease),
+    box-shadow 220ms var(--ease);
 }
 .project-card:active {
   transform: scale(0.985);
   box-shadow:
-    0 1px 2px rgba(10, 10, 15, 0.08),
-    0 4px 14px rgba(10, 10, 15, 0.07);
+    0 1px 2px rgba(10, 10, 15, 0.07),
+    0 3px 10px rgba(10, 10, 15, 0.05);
 }
 
-/* Hero cover — 3:2 landscape art. Fills to the card's rounded corners by
-   the parent's overflow:hidden. */
+/* Square cover — 112px matches the body's three-line rhythm. Thumbnails
+   are 1024×1024 so no cropping trickery is needed. */
 .project-cover {
-  width: 100%;
-  aspect-ratio: 3 / 2;
+  width: 112px;
+  height: 112px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
   background: linear-gradient(135deg, #1f1f24 0%, #0b0b0f 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  position: relative;
 }
 .project-cover-img {
   width: 100%;
@@ -256,41 +260,45 @@ button { cursor: pointer; }
   object-fit: cover;
   display: block;
 }
-/* Fallback when no thumbnail exists — large initial on gradient. */
 .project-cover-initial {
-  font-size: 72px;
+  font-size: 40px;
   font-weight: 900;
   color: rgba(255, 255, 255, 0.94);
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   line-height: 1;
 }
 
 .project-body {
-  padding: 22px 22px 24px;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  justify-content: center;
+  gap: 7px;
+  padding: 2px 0;
 }
 .project-title {
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 900;
-  letter-spacing: -0.018em;
+  letter-spacing: -0.015em;
   color: var(--ink);
-  line-height: 1.15;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 .project-genre {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
+  /* Cap to a single row — extra chips clip. Keeps height predictable. */
+  max-height: 21px;
+  overflow: hidden;
 }
 .project-summary {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ink-mute);
-  line-height: 1.45;
+  line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
