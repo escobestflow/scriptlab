@@ -227,6 +227,84 @@ Use the existing concept (format, genre, title, logline, summary, tone, themes) 
 Return STRICT JSON: { "ending": "happy" | "bittersweet" | "tragic" | "ambiguous" | "twist" }`;
     }
 
+    // ── Character-tab per-field generators ──
+    // The project bible above already includes all characters. The prompt
+    // targets ONE character by id and asks for a single field, using:
+    //   (a) the full concept (format, genre, logline, summary, tone, themes, ending)
+    //   (b) all other characters in this draft (to avoid duplication / stay coherent)
+    //   (c) the target character's other fields that are already filled
+    case "generate_character_name":
+    case "generate_character_archetype":
+    case "generate_character_backstory":
+    case "generate_character_motivations":
+    case "generate_character_flaws":
+    case "generate_character_want":
+    case "generate_character_need":
+    case "generate_character_voice":
+    case "generate_character_arc":
+    case "generate_character_notes": {
+      const ch = getActiveCharactersDraft(story);
+      const charId = action.payload?.characterId;
+      const target = ch.characters.find(c => c.id === charId);
+      if (!target) return `Unknown character.`;
+
+      // Map action → { fieldName, description, returnKey, format }
+      const fieldMap: Record<string, { field: string; guidance: string; returnKey: string; returnType: string }> = {
+        "generate_character_name":        { field: "name",        returnKey: "name",        returnType: "string", guidance: "A specific character name (given + optional last name). Fits the genre, tone, and period. Avoid generic placeholder names." },
+        "generate_character_archetype":   { field: "archetype",   returnKey: "archetype",   returnType: "string", guidance: "A single archetype label (1–4 words). E.g. 'reluctant mentor', 'unreliable narrator', 'tragic villain'. Match the character's role and the story's tone." },
+        "generate_character_backstory":   { field: "backstory",   returnKey: "backstory",   returnType: "string", guidance: "2–4 sentences of the character's history that inform who they are now. Concrete and sensory, not abstract." },
+        "generate_character_motivations": { field: "motivations", returnKey: "motivations", returnType: "string", guidance: "1–2 sentences on what drives them. Should tie to their want/need when already set." },
+        "generate_character_flaws":       { field: "flaws",       returnKey: "flaws",       returnType: "string", guidance: "1–2 sentences naming 1–2 genuine flaws that could derail them. Avoid humblebrags ('cares too much')." },
+        "generate_character_want":        { field: "want",        returnKey: "want",        returnType: "string", guidance: "The external, concrete objective (1 sentence). The thing they would say out loud. Should be contradictable by their 'need'." },
+        "generate_character_need":        { field: "need",        returnKey: "need",        returnType: "string", guidance: "The internal truth they must learn (1 sentence). Often in tension with their want." },
+        "generate_character_voice":       { field: "voice",       returnKey: "voice",       returnType: "string", guidance: "1–2 sentences on how they speak — cadence, diction, typical verbal tics. Evocative." },
+        "generate_character_arc":         { field: "arc",         returnKey: "arc",         returnType: "string", guidance: "1–3 sentences mapping who they are at start → end. Concrete beats, not abstractions." },
+        "generate_character_notes":       { field: "notes",       returnKey: "notes",       returnType: "string", guidance: "Any useful supplementary detail — physicality, iconic object, defining habit — in 1–2 sentences." },
+      };
+      const spec = fieldMap[action.type];
+
+      // Serialize target character's other filled fields so the model can build on them.
+      const existing: string[] = [];
+      if (target.name && spec.field !== "name")               existing.push(`- name: ${target.name}`);
+      if (target.role && spec.field !== "role")               existing.push(`- role: ${target.role}`);
+      if (target.archetype && spec.field !== "archetype")     existing.push(`- archetype: ${target.archetype}`);
+      if (target.backstory && spec.field !== "backstory")     existing.push(`- backstory: ${target.backstory}`);
+      if (target.motivations && spec.field !== "motivations") existing.push(`- motivations: ${target.motivations}`);
+      if (target.flaws && spec.field !== "flaws")             existing.push(`- flaws: ${target.flaws}`);
+      if (target.want && spec.field !== "want")               existing.push(`- want: ${target.want}`);
+      if (target.need && spec.field !== "need")               existing.push(`- need: ${target.need}`);
+      if (target.voice && spec.field !== "voice")             existing.push(`- voice: ${target.voice}`);
+      if (target.arc && spec.field !== "arc")                 existing.push(`- arc: ${target.arc}`);
+      if (target.notes && spec.field !== "notes")             existing.push(`- notes: ${target.notes}`);
+
+      const existingBlock = existing.length
+        ? existing.join("\n")
+        : "(only the role is set — generate from story context)";
+
+      // Other characters (to avoid duplicating archetypes/voices)
+      const others = ch.characters
+        .filter(c => c.id !== target.id)
+        .map(c => `- ${c.name || "(unnamed)"} [${c.role}]${c.archetype ? ` — ${c.archetype}` : ""}`)
+        .join("\n") || "(none)";
+
+      return `Generate the "${spec.field}" field for ONE character in this project.
+
+## Target character (existing fields)
+- id: ${target.id}
+- role: ${target.role}
+${existingBlock}
+
+## Other characters in this project
+${others}
+
+## Guidance
+${spec.guidance}
+
+Use the full project bible above (format, genre, logline, summary, tone, themes, ending) and the target character's existing fields to make the output cohere. Do not contradict anything already set.
+
+Return STRICT JSON: { "${spec.returnKey}": ${spec.returnType} }`;
+    }
+
     default:
       return `Unknown action.`;
   }

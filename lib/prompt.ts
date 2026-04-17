@@ -50,7 +50,18 @@ export type ActionType =
   | "generate_concept_summary"
   | "generate_concept_tone"
   | "generate_concept_themes"
-  | "generate_concept_ending";
+  | "generate_concept_ending"
+  // Character-tab per-field generators (Haiku, JSON-out)
+  | "generate_character_name"
+  | "generate_character_archetype"
+  | "generate_character_backstory"
+  | "generate_character_motivations"
+  | "generate_character_flaws"
+  | "generate_character_want"
+  | "generate_character_need"
+  | "generate_character_voice"
+  | "generate_character_arc"
+  | "generate_character_notes";
 
 export interface ActionRequest {
   type: ActionType;
@@ -76,6 +87,16 @@ export function modelForAction(type: ActionType): string {
     case "generate_concept_tone":
     case "generate_concept_themes":
     case "generate_concept_ending":
+    case "generate_character_name":
+    case "generate_character_archetype":
+    case "generate_character_backstory":
+    case "generate_character_motivations":
+    case "generate_character_flaws":
+    case "generate_character_want":
+    case "generate_character_need":
+    case "generate_character_voice":
+    case "generate_character_arc":
+    case "generate_character_notes":
     default:
       return "claude-haiku-4-5"; // fast + cheap for structure work
   }

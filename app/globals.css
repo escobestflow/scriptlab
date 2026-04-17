@@ -1263,6 +1263,64 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   color: #fff;
 }
 
+/* ======= CHARACTER FIELD — input/textarea with floating AI wand ======= */
+.char-field {
+  position: relative;
+}
+.char-field .field {
+  /* reserve space on the right so long content doesn't slide under the wand */
+  padding-right: 40px;
+}
+.char-field-ai {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+/* On single-line inputs the wand should be vertically centered */
+.char-field:not(.char-field-multiline) .char-field-ai {
+  top: 50%;
+  transform: translateY(-50%);
+}
+/* Drop the wand's own extra margin when it lives inside the float slot */
+.char-field-ai .ai-wand {
+  margin-left: 0;
+  vertical-align: top;
+}
+
+/* ======= CHARACTER ARCHETYPE BLOCK ======= */
+.char-archetype-block {
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--bg-secondary);
+}
+.char-archetype-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.char-archetype-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.char-archetype-current {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+/* Push the wand to the far right of the archetype header */
+.char-archetype-header .ai-wand {
+  margin-left: auto;
+}
+
 /* Sync banner */
 .sync-banner {
   background: var(--sync-bg);

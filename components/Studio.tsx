@@ -1318,6 +1318,85 @@ function ConceptTab({
 /* ============ CHARACTERS TAB ================ */
 /* ============================================ */
 
+// 20 curated character archetypes — cross-genre, instantly legible
+const ARCHETYPE_PRESETS: string[] = [
+  "reluctant hero",
+  "mentor",
+  "trickster",
+  "wise fool",
+  "tragic villain",
+  "anti-hero",
+  "femme fatale",
+  "everyman",
+  "rebel",
+  "caretaker",
+  "outlaw",
+  "innocent",
+  "magician",
+  "ruler",
+  "seeker",
+  "shadow",
+  "sidekick",
+  "unreliable narrator",
+  "fallen idol",
+  "chosen one",
+];
+
+// Which character fields support AI generation (all except role)
+type CharAIField =
+  | "name" | "archetype" | "backstory" | "motivations"
+  | "flaws" | "want" | "need" | "voice" | "arc" | "notes";
+
+const CHAR_AI_ACTION: Record<CharAIField, string> = {
+  name:        "generate_character_name",
+  archetype:   "generate_character_archetype",
+  backstory:   "generate_character_backstory",
+  motivations: "generate_character_motivations",
+  flaws:       "generate_character_flaws",
+  want:        "generate_character_want",
+  need:        "generate_character_need",
+  voice:       "generate_character_voice",
+  arc:         "generate_character_arc",
+  notes:       "generate_character_notes",
+};
+
+/* ── Character field wrapper: input/textarea with an inline AI wand ── */
+function CharField({
+  label, value, onChange, onAI, aiBusy, multiline, rows,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  onAI: () => void;
+  aiBusy: boolean;
+  multiline?: boolean;
+  rows?: number;
+}) {
+  return (
+    <div className={`char-field ${multiline ? "char-field-multiline" : ""}`}>
+      {multiline ? (
+        <textarea
+          className="field"
+          placeholder={label}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          rows={rows ?? 2}
+        />
+      ) : (
+        <input
+          className="field"
+          placeholder={label}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+        />
+      )}
+      <div className="char-field-ai">
+        <AIWandButton onClick={onAI} loading={aiBusy} />
+      </div>
+    </div>
+  );
+}
+
 function CharactersTab({
   story,
   setStory,
@@ -1426,7 +1505,7 @@ function CharactersTab({
                 {isEditing ? (
                   <CharacterEditForm
                     character={ch}
-                    allCharacters={d.characters}
+                    story={story}
                     onUpdate={(patch) => updateCharacter(ch.id, patch)}
                     onDone={() => setEditingCharId(null)}
                     onRemove={() => removeCharacter(ch.id)}
@@ -1533,23 +1612,80 @@ function CharacterViewCard({
 
 function CharacterEditForm({
   character: ch,
-  allCharacters,
+  story,
   onUpdate,
   onDone,
   onRemove,
 }: {
   character: Character;
-  allCharacters: Character[];
+  story: Story;
   onUpdate: (patch: Partial<Character>) => void;
   onDone: () => void;
   onRemove: () => void;
 }) {
   const roles = ["protagonist", "antagonist", "supporting", "mentor", "love_interest", "comic_relief"];
+  const [archetypeCustomOpen, setArchetypeCustomOpen] = useState(false);
+  const [archetypeInput, setArchetypeInput] = useState("");
+  const [aiBusy, setAiBusy] = useState<CharAIField | null>(null);
+
+  async function generateCharacterField(field: CharAIField) {
+    if (aiBusy) return;
+    setAiBusy(field);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story,
+          action: { type: CHAR_AI_ACTION[field], payload: { characterId: ch.id } },
+        }),
+      });
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.type === "text") fullText += evt.value;
+          } catch {}
+        }
+      }
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return;
+      const parsed = JSON.parse(jsonMatch[0]);
+      const val = parsed[field];
+      if (typeof val === "string" && val.trim()) {
+        onUpdate({ [field]: val } as Partial<Character>);
+      }
+    } catch (err) {
+      console.error("Character generation failed:", err);
+    } finally {
+      setAiBusy(null);
+    }
+  }
+
+  function selectArchetype(a: string) {
+    onUpdate({ archetype: ch.archetype === a ? "" : a });
+  }
 
   return (
     <div className="stack">
-      <input className="field" placeholder="Name" value={ch.name}
-        onChange={e => onUpdate({ name: e.target.value })} />
+      <CharField
+        label="Name"
+        value={ch.name}
+        onChange={v => onUpdate({ name: v })}
+        onAI={() => generateCharacterField("name")}
+        aiBusy={aiBusy === "name"}
+      />
 
       <div className="select-wrap">
         <select className="field" value={ch.role}
@@ -1560,32 +1696,128 @@ function CharacterEditForm({
         </select>
       </div>
 
-      <input className="field" placeholder="Archetype (e.g. the mentor, the trickster)"
-        value={ch.archetype} onChange={e => onUpdate({ archetype: e.target.value })} />
+      {/* Archetype — 20 presets + custom input + AI */}
+      <div className="char-archetype-block">
+        <div className="char-archetype-header">
+          <span className="char-archetype-label">Archetype</span>
+          {ch.archetype && <span className="char-archetype-current">{ch.archetype}</span>}
+          <AIWandButton onClick={() => generateCharacterField("archetype")} loading={aiBusy === "archetype"} />
+        </div>
+        <div className="chip-row">
+          {ARCHETYPE_PRESETS.map(a => (
+            <button key={a} type="button"
+              className={`chip ${ch.archetype === a ? "selected" : ""}`}
+              onClick={() => selectArchetype(a)}>
+              {a}
+            </button>
+          ))}
+          <button type="button"
+            className={`chip chip-custom ${archetypeCustomOpen ? "selected" : ""}`}
+            onClick={() => setArchetypeCustomOpen(o => !o)}>
+            + Custom
+          </button>
+        </div>
+        {archetypeCustomOpen && (
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <input
+              className="field"
+              value={archetypeInput}
+              onChange={e => setArchetypeInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && archetypeInput.trim()) {
+                  onUpdate({ archetype: archetypeInput.trim() });
+                  setArchetypeInput("");
+                  setArchetypeCustomOpen(false);
+                }
+              }}
+              placeholder="Describe the archetype"
+              style={{ flex: 1, marginBottom: 0 }}
+              autoFocus
+            />
+            <button className="btn-secondary"
+              onClick={() => {
+                if (!archetypeInput.trim()) return;
+                onUpdate({ archetype: archetypeInput.trim() });
+                setArchetypeInput("");
+                setArchetypeCustomOpen(false);
+              }}
+              disabled={!archetypeInput.trim()}
+              style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
+              Set
+            </button>
+          </div>
+        )}
+      </div>
 
-      <textarea className="field" placeholder="Backstory" value={ch.backstory}
-        onChange={e => onUpdate({ backstory: e.target.value })} rows={3} />
+      <CharField
+        label="Backstory"
+        value={ch.backstory}
+        onChange={v => onUpdate({ backstory: v })}
+        onAI={() => generateCharacterField("backstory")}
+        aiBusy={aiBusy === "backstory"}
+        multiline rows={3}
+      />
 
-      <textarea className="field" placeholder="Motivations" value={ch.motivations}
-        onChange={e => onUpdate({ motivations: e.target.value })} rows={2} />
+      <CharField
+        label="Motivations"
+        value={ch.motivations}
+        onChange={v => onUpdate({ motivations: v })}
+        onAI={() => generateCharacterField("motivations")}
+        aiBusy={aiBusy === "motivations"}
+        multiline rows={2}
+      />
 
-      <textarea className="field" placeholder="Flaws" value={ch.flaws}
-        onChange={e => onUpdate({ flaws: e.target.value })} rows={2} />
+      <CharField
+        label="Flaws"
+        value={ch.flaws}
+        onChange={v => onUpdate({ flaws: v })}
+        onAI={() => generateCharacterField("flaws")}
+        aiBusy={aiBusy === "flaws"}
+        multiline rows={2}
+      />
 
-      <input className="field" placeholder="What they want (external)" value={ch.want}
-        onChange={e => onUpdate({ want: e.target.value })} />
+      <CharField
+        label="What they want (external)"
+        value={ch.want}
+        onChange={v => onUpdate({ want: v })}
+        onAI={() => generateCharacterField("want")}
+        aiBusy={aiBusy === "want"}
+      />
 
-      <input className="field" placeholder="What they need (internal)" value={ch.need}
-        onChange={e => onUpdate({ need: e.target.value })} />
+      <CharField
+        label="What they need (internal)"
+        value={ch.need}
+        onChange={v => onUpdate({ need: v })}
+        onAI={() => generateCharacterField("need")}
+        aiBusy={aiBusy === "need"}
+      />
 
-      <textarea className="field" placeholder="Voice / speaking style" value={ch.voice}
-        onChange={e => onUpdate({ voice: e.target.value })} rows={2} />
+      <CharField
+        label="Voice / speaking style"
+        value={ch.voice}
+        onChange={v => onUpdate({ voice: v })}
+        onAI={() => generateCharacterField("voice")}
+        aiBusy={aiBusy === "voice"}
+        multiline rows={2}
+      />
 
-      <textarea className="field" placeholder="Character arc" value={ch.arc}
-        onChange={e => onUpdate({ arc: e.target.value })} rows={2} />
+      <CharField
+        label="Character arc"
+        value={ch.arc}
+        onChange={v => onUpdate({ arc: v })}
+        onAI={() => generateCharacterField("arc")}
+        aiBusy={aiBusy === "arc"}
+        multiline rows={2}
+      />
 
-      <textarea className="field" placeholder="Additional notes" value={ch.notes}
-        onChange={e => onUpdate({ notes: e.target.value })} rows={2} />
+      <CharField
+        label="Additional notes"
+        value={ch.notes}
+        onChange={v => onUpdate({ notes: v })}
+        onAI={() => generateCharacterField("notes")}
+        aiBusy={aiBusy === "notes"}
+        multiline rows={2}
+      />
 
       <div className="beat-actions" style={{ marginTop: 4 }}>
         <button className="btn-primary" style={{ fontSize: 13, padding: "10px 18px", minHeight: 0 }}
