@@ -789,7 +789,7 @@ function ProjectsTab({
 }) {
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 }}>
         <div className="display">Projects</div>
         <Button
           variant="secondary"
