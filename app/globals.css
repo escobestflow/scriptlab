@@ -1077,7 +1077,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 4px 0 0;
   background: transparent;
 }
-/* White bg only below the 44px nav zone so nav stays transparent */
+/* DEBUG: red bg so we can see the tab bar container clearly */
 .studio-header-sticky::before {
   content: "";
   position: absolute;
@@ -1085,7 +1085,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   right: 0;
   top: 44px;
   bottom: 0;
-  background: var(--bg);
+  background: red;
   z-index: -1;
 }
 .studio-header-sticky > :not(.studio-tabs-row) {
