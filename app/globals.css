@@ -2491,7 +2491,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .menu-toggle span {
   position: absolute;
-  right: 0; /* right-anchored so shorter bars flush-right against the full middle */
+  left: 0; /* left-anchored so shorter bars flush-left against the full middle */
   height: 2px;
   border-radius: 2px;
   background: currentColor;
