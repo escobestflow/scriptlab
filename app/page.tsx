@@ -1055,7 +1055,7 @@ function CreateStepFormat({
   const storyLayer = getActiveStoryLayerDraft(draft);
   return (
     <>
-      <div className="display heading">What are you making?</div>
+      <div className="display heading" style={{ marginTop: 25 }}>What are you making?</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 25 }}>
         {PROJECT_TYPES.map(pt => (
           <button
