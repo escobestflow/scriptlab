@@ -207,93 +207,90 @@ button { cursor: pointer; }
 }
 
 /* ======= PROJECT CARDS ======= */
-/* Modern, sleek list row. No shadow, no progress bar, no trailing chevron.
-   A single hairline border reads as quiet structure. Genre pills share the
-   silhouette of .ds-selector (pill, bordered, uppercase) at a smaller
-   display scale. */
+/* Elevated hero card. Full-width cover on top, generous content block
+   below. Stacked shadows for real depth; subtle press scale for tactility.
+   Genre chips use the exact .ds-selector styling from the Concept tab. */
 
 .project-card {
   display: flex;
-  gap: 16px;
-  padding: 18px;
-  margin-bottom: 10px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: none;
-  transition:
-    transform 200ms var(--ease),
-    border-color 200ms var(--ease),
-    background 200ms var(--ease);
+  flex-direction: column;
   width: 100%;
+  padding: 0;
+  margin-bottom: 20px;
+  border-radius: 24px;
+  border: none;
+  background: var(--surface);
+  /* Stacked elevation — a crisp 1px lift + a diffused ambient pool. */
+  box-shadow:
+    0 1px 2px rgba(10, 10, 15, 0.06),
+    0 12px 32px rgba(10, 10, 15, 0.09);
+  overflow: hidden;
   text-align: left;
-  align-items: center;
+  cursor: pointer;
+  transition:
+    transform 260ms var(--ease),
+    box-shadow 260ms var(--ease);
 }
 .project-card:active {
   transform: scale(0.985);
-  border-color: var(--border-strong);
-  background: var(--bg-secondary);
+  box-shadow:
+    0 1px 2px rgba(10, 10, 15, 0.08),
+    0 4px 14px rgba(10, 10, 15, 0.07);
 }
 
-.project-thumb {
-  width: 72px; height: 72px;
-  border-radius: 14px;
-  background: var(--ink);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 24px; font-weight: 900;
-  color: #fff;
-  flex-shrink: 0;
-  letter-spacing: -0.02em;
+/* Hero cover — 3:2 landscape art. Fills to the card's rounded corners by
+   the parent's overflow:hidden. */
+.project-cover {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  background: linear-gradient(135deg, #1f1f24 0%, #0b0b0f 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
 }
-
-.project-thumb-img {
-  width: 72px; height: 72px;
-  border-radius: 14px;
+.project-cover-img {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  flex-shrink: 0;
+  display: block;
+}
+/* Fallback when no thumbnail exists — large initial on gradient. */
+.project-cover-initial {
+  font-size: 72px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.94);
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
-.project-info {
-  flex: 1;
-  min-width: 0;
+.project-body {
+  padding: 22px 22px 24px;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 14px;
 }
 .project-title {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 900;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.018em;
   color: var(--ink);
-  white-space: nowrap;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .project-genre {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
 }
-/* Mirrors .ds-selector visual language (bordered pill, uppercase, bold)
-   at a meta-display scale. Non-interactive. */
-.genre-pill {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  color: var(--ink-soft);
-  background: transparent;
-  white-space: nowrap;
-}
 .project-summary {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--ink-mute);
-  line-height: 1.4;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;

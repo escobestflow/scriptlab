@@ -805,24 +805,25 @@ function ProjectsTab({
         const c = getActiveConceptDraft(p);
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
-            {p.thumbnail ? (
-              <img
-                src={p.thumbnail}
-                alt=""
-                className="project-thumb-img"
-              />
-            ) : (
-              <div className="project-thumb">
-                {p.title ? p.title.charAt(0).toUpperCase() : "?"}
-              </div>
-            )}
-            <div className="project-info">
+            <div className="project-cover">
+              {p.thumbnail ? (
+                <img src={p.thumbnail} alt="" className="project-cover-img" />
+              ) : (
+                <span className="project-cover-initial">
+                  {p.title ? p.title.charAt(0).toUpperCase() : "?"}
+                </span>
+              )}
+            </div>
+            <div className="project-body">
               <div className="project-title">{p.title || "Untitled"}</div>
               <div className="project-genre">
+                {/* Non-interactive spans styled as .ds-selector — matches
+                    the Concept-tab genre chips exactly. The parent button
+                    owns the click target. */}
                 {c.settings.genres?.length > 0 && c.settings.genres.map((g: string) => (
-                  <span key={g} className="genre-pill">{g}</span>
+                  <span key={g} className="ds-selector">{g}</span>
                 ))}
-                <span className="genre-pill">{c.settings.framework.replace(/-/g, " ")}</span>
+                <span className="ds-selector">{c.settings.framework.replace(/-/g, " ")}</span>
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
             </div>
