@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Story, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, updateConceptDraft } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import {
-  loadProjectsFromDB, saveProjectToDB, newBlankProject,
+  loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
 } from "@/lib/storage";
 import { useAuth } from "@/lib/auth";
@@ -303,6 +303,12 @@ export default function Page() {
             setProjects(ps => [newStory, ...ps]);
             if (user) saveProjectToDB(user.id, newStory);
             setView({ kind: "studio", projectId: newStory.id, isNew: true });
+          }}
+          onDeleteProject={() => {
+            const id = studioProject.id;
+            setProjects(ps => ps.filter(p => p.id !== id));
+            deleteProjectFromDB(id);
+            setView({ kind: "main" });
           }}
         />
       );

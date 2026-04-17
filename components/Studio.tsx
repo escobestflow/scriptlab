@@ -27,6 +27,7 @@ export function Studio({
   onBack,
   isNew = false,
   onCreateProjectFromDraft,
+  onDeleteProject,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -34,10 +35,12 @@ export function Studio({
   onBack: () => void;
   isNew?: boolean;
   onCreateProjectFromDraft?: (newStory: Story) => void;
+  onDeleteProject?: () => void;
 }) {
   const [section, setSection] = useState<Section>("concept");
   const [showSuccess, setShowSuccess] = useState(isNew);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
+  const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
 
@@ -296,8 +299,7 @@ export function Studio({
               onLoadProjectDraft={handleLoadProjectDraft}
               onDeleteProjectDraft={handleDeleteProjectDraft}
               onCreateProjectFromDraft={handleCreateProjectFromDraft}
-              onSwitchLayerDraft={handleSwitchLayerDraft}
-              onDeleteLayerDraft={handleDeleteLayerDraft}
+              onRequestDeleteProject={() => setConfirmDeleteProject(true)}
             />
           </div>
         </div>
@@ -513,6 +515,33 @@ export function Studio({
           />
         </div>
       </div>
+
+      {/* Delete project confirm dialog */}
+      {confirmDeleteProject && (
+        <>
+          <div className="confirm-backdrop" onClick={() => setConfirmDeleteProject(false)} />
+          <div className="confirm-dialog">
+            <div className="confirm-title">Are you sure?</div>
+            <div className="confirm-body">
+              This will permanently delete &quot;{story.title || "this project"}&quot; and all of its drafts.
+              This action cannot be undone.
+            </div>
+            <div className="confirm-actions">
+              <button className="btn-secondary confirm-cancel"
+                onClick={() => setConfirmDeleteProject(false)}>
+                Cancel
+              </button>
+              <button className="btn-delete-project"
+                onClick={() => {
+                  setConfirmDeleteProject(false);
+                  onDeleteProject?.();
+                }}>
+                Delete Project
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -1892,15 +1921,14 @@ function BeatCreationForm({
 function SettingsTab({
   story, setStory,
   onLoadProjectDraft, onDeleteProjectDraft, onCreateProjectFromDraft,
-  onSwitchLayerDraft, onDeleteLayerDraft,
+  onRequestDeleteProject,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   onLoadProjectDraft: (id: string) => void;
   onDeleteProjectDraft: (id: string) => void;
   onCreateProjectFromDraft: (id: string) => void;
-  onSwitchLayerDraft: (layer: LayerKey, id: string) => void;
-  onDeleteLayerDraft: (layer: LayerKey, id: string) => void;
+  onRequestDeleteProject: () => void;
 }) {
   const concept = getActiveConceptDraft(story);
   const storyLayer = getActiveStoryLayerDraft(story);
@@ -1945,79 +1973,6 @@ function SettingsTab({
     if (days < 7) return `${days}d ago`;
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
-
-  const renderLayerDrafts = (layer: LayerKey, label: string) => {
-    const pool: any[] = (
-      layer === "concept"    ? story.conceptDrafts :
-      layer === "characters" ? story.charactersDrafts :
-      layer === "story"      ? story.storyDrafts :
-                               story.scriptDrafts
-    );
-    const pd = getActiveProjectDraft(story);
-    const activeId =
-      layer === "concept"    ? pd.conceptDraftId :
-      layer === "characters" ? pd.charactersDraftId :
-      layer === "story"      ? pd.storyDraftId :
-                               pd.scriptDraftId;
-    const refKey =
-      layer === "concept"    ? "conceptDraftId" :
-      layer === "characters" ? "charactersDraftId" :
-      layer === "story"      ? "storyDraftId" :
-                               "scriptDraftId";
-    const sorted = [...pool].sort((a, b) =>
-      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    );
-    return (
-      <div className="card">
-        <span className="eyebrow">{label} Drafts</span>
-        <div className="stack" style={{ marginTop: 10 }}>
-          {sorted.map(d => {
-            const isActive = d.id === activeId;
-            const referenced = story.projectDrafts.some((pd: any) => pd[refKey] === d.id);
-            const canDelete = pool.length > 1 && !referenced;
-            return (
-              <div key={d.id} className="inset-card" style={{ padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>
-                      Draft {d.number}
-                      {isActive && <span className="caption" style={{ marginLeft: 8 }}>· Active</span>}
-                    </div>
-                    <div className="caption" style={{ marginTop: 2 }}>
-                      Edited {formatDate(d.updatedAt)}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {!isActive && (
-                    <button className="btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
-                      onClick={() => onSwitchLayerDraft(layer, d.id)}>
-                      Load
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button className="btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0, color: "var(--record)" }}
-                      onClick={() => {
-                        if (confirm(`Delete ${label} Draft ${d.number}?`)) onDeleteLayerDraft(layer, d.id);
-                      }}>
-                      Delete
-                    </button>
-                  )}
-                  {referenced && !isActive && (
-                    <span className="caption" style={{ alignSelf: "center", color: "var(--ink-mute)" }}>
-                      Referenced by project draft(s)
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
 
   const sortedProjectDrafts = [...story.projectDrafts].sort((a, b) =>
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
@@ -2137,10 +2092,19 @@ function SettingsTab({
         </div>
       </div>
 
-      {renderLayerDrafts("concept",    "Concept")}
-      {renderLayerDrafts("characters", "Characters")}
-      {renderLayerDrafts("story",      "Story")}
-      {renderLayerDrafts("script",     "Script")}
+      {/* Danger zone: delete project */}
+      <div className="card" style={{ marginTop: 20 }}>
+        <span className="eyebrow">Danger Zone</span>
+        <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
+          Permanently delete this project and all its drafts. This cannot be undone.
+        </div>
+        <button
+          className="btn-delete-project"
+          onClick={() => onRequestDeleteProject()}
+        >
+          Delete Project
+        </button>
+      </div>
     </>
   );
 }

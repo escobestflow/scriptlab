@@ -954,6 +954,84 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* ======= DELETE PROJECT BUTTON + CONFIRM DIALOG ======= */
+
+.btn-delete-project {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--record);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Lato', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(255, 59, 48, 0.18);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+}
+.btn-delete-project:active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 4px rgba(255, 59, 48, 0.14);
+}
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: confirmBackdropIn 180ms var(--ease);
+}
+.confirm-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 81;
+  width: calc(100% - 40px);
+  max-width: 340px;
+  padding: 22px;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
+  animation: confirmDialogIn 220ms var(--ease);
+}
+.confirm-title {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+.confirm-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin-bottom: 18px;
+}
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+.confirm-actions > * {
+  flex: 1;
+  min-height: 0 !important;
+}
+.confirm-cancel {
+  font-size: 13px;
+  padding: 10px 16px;
+}
+@keyframes confirmBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes confirmDialogIn {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
 /* ======= STUDIO LAYOUT ======= */
 
 /* Nav — absolute-positioned overlay, always at top, never moves */
@@ -996,8 +1074,23 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 4px 20px 0;
-  background: var(--bg);
+  padding: 4px 0 0;
+  background: transparent;
+}
+/* White background starts below the 44px nav zone so nav stays transparent */
+.studio-header-sticky::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 44px;
+  bottom: 0;
+  background: #F6F8FA;
+  z-index: -1;
+}
+.studio-header-sticky > :not(.studio-tabs-row) {
+  padding-left: 20px;
+  padding-right: 20px;
 }
 .studio-tabs-row {
   width: 100%;
@@ -1014,9 +1107,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: center;
   width: 100%;
   height: 41px;
-  background: var(--surface);
-  border-radius: 4px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
 }
 .studio-tab {
