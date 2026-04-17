@@ -893,12 +893,22 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* Layer draft picker (inside each tab) */
 .layer-draft-picker {
-  position: relative;
-  margin-bottom: 12px;
+  position: sticky;
+  /* Top offset matches the pinned header's bottom (set at runtime via JS) */
+  top: var(--draft-picker-top, 120px);
+  z-index: 9;
+  /* Extend horizontally to page edges (tab body has 22px horizontal padding) */
+  margin: 0 -22px 12px;
+  padding: 10px 22px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 20px;
+  /* Solid bg on top so content scrolling under is cleanly masked, then fade */
+  background:
+    linear-gradient(180deg, var(--bg) 0%, var(--bg) 72%, rgba(253,254,254,0) 100%);
+  /* Hairline separator at bottom for clear edge when pinned */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
 }
 .layer-draft-trigger {
   display: inline-flex;
@@ -1263,6 +1273,60 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   color: #fff;
 }
 
+/* ======= AI HISTORY PAGER (inline near the wand) ======= */
+.ai-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: rgba(106, 78, 226, 0.06);
+  color: #6a4ee2;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: -6px;
+  box-shadow: inset 0 0 0 1px rgba(106, 78, 226, 0.14);
+}
+.ai-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+.ai-pager-btn:hover:not(:disabled) {
+  background: rgba(106, 78, 226, 0.12);
+}
+.ai-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ai-pager-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  line-height: 1;
+}
+.ai-pager-sep {
+  opacity: 0.55;
+  margin: 0 1px;
+}
+
 /* ======= CHARACTER FIELD — input/textarea with floating AI wand ======= */
 .char-field {
   position: relative;
@@ -1271,11 +1335,17 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   /* reserve space on the right so long content doesn't slide under the wand */
   padding-right: 40px;
 }
+.char-field.char-field-has-pager .field {
+  padding-right: 128px; /* wand + pager cluster */
+}
 .char-field-ai {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 /* On single-line inputs the wand should be vertically centered */
 .char-field:not(.char-field-multiline) .char-field-ai {
@@ -1284,6 +1354,10 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 /* Drop the wand's own extra margin when it lives inside the float slot */
 .char-field-ai .ai-wand {
+  margin-left: 0;
+  vertical-align: top;
+}
+.char-field-ai .ai-pager {
   margin-left: 0;
   vertical-align: top;
 }

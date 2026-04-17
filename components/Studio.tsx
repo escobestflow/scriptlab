@@ -44,11 +44,28 @@ export function Studio({
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current || !thumbRef.current) return;
     const y = scrollRef.current.scrollTop;
     thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
+  }, []);
+
+  // Measure pinned header height so the LayerDraftPicker can stick right below it.
+  // The header pins at top: -44px, so its fully-pinned visible bottom is at (height - 44).
+  useEffect(() => {
+    const header = headerRef.current;
+    const scroll = scrollRef.current;
+    if (!header || !scroll) return;
+    const update = () => {
+      const pinnedBottom = Math.max(0, header.offsetHeight - 44);
+      scroll.style.setProperty("--draft-picker-top", `${pinnedBottom}px`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(header);
+    return () => ro.disconnect();
   }, []);
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -374,7 +391,7 @@ export function Studio({
         </div>
 
         {/* Title + drafts dropdown + tabs — sticky, sticks below nav */}
-        <div className="studio-header-sticky">
+        <div className="studio-header-sticky" ref={headerRef}>
           <div className="project-header-title">
             {story.title || "Untitled"}
           </div>
@@ -817,6 +834,112 @@ function AttrRow({
   );
 }
 
+/* ── AI history: ring-buffered per-field generation history (max 10) ── */
+// Persisted to localStorage so navigation survives reloads and tab switches.
+const AI_HISTORY_MAX = 10;
+
+function useAIHistory(key: string | null) {
+  // key === null means "no persistence for this field" — hook becomes a no-op
+  const [history, setHistory] = useState<string[]>([]);
+  const [cursor, setCursor] = useState<number>(-1);
+
+  // Load from storage when the key changes (switch character, switch draft, etc.)
+  useEffect(() => {
+    if (!key || typeof window === "undefined") {
+      setHistory([]); setCursor(-1);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && Array.isArray(parsed.history)) {
+        setHistory(parsed.history);
+        setCursor(typeof parsed.cursor === "number" ? parsed.cursor : parsed.history.length - 1);
+      } else {
+        setHistory([]); setCursor(-1);
+      }
+    } catch { setHistory([]); setCursor(-1); }
+  }, [key]);
+
+  // Persist on change
+  useEffect(() => {
+    if (!key || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(key, JSON.stringify({ history, cursor }));
+    } catch {}
+  }, [key, history, cursor]);
+
+  const push = useCallback((val: string) => {
+    setHistory(prev => {
+      const next = [...prev, val];
+      while (next.length > AI_HISTORY_MAX) next.shift();
+      setCursor(next.length - 1);
+      return next;
+    });
+  }, []);
+
+  const stepBack = useCallback(() => {
+    if (cursor <= 0) return null;
+    const nc = cursor - 1;
+    setCursor(nc);
+    return history[nc] ?? null;
+  }, [cursor, history]);
+
+  const stepForward = useCallback(() => {
+    if (cursor < 0 || cursor >= history.length - 1) return null;
+    const nc = cursor + 1;
+    setCursor(nc);
+    return history[nc] ?? null;
+  }, [cursor, history]);
+
+  return {
+    history, cursor, push, stepBack, stepForward,
+    canBack: cursor > 0,
+    canForward: cursor >= 0 && cursor < history.length - 1,
+  };
+}
+
+/* ── History pager: elegant pill with < 3/5 > ── */
+function HistoryPager({
+  history, cursor, onBack, onForward, canBack, canForward,
+}: {
+  history: string[];
+  cursor: number;
+  onBack: () => void;
+  onForward: () => void;
+  canBack: boolean;
+  canForward: boolean;
+}) {
+  if (history.length === 0) return null;
+  return (
+    <span className="ai-pager" onClick={e => e.stopPropagation()}>
+      <button
+        type="button"
+        className="ai-pager-btn"
+        disabled={!canBack}
+        onClick={e => { e.stopPropagation(); onBack(); }}
+        aria-label="Previous AI result"
+      >
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
+      </button>
+      <span className="ai-pager-count">{cursor + 1}<span className="ai-pager-sep">/</span>{history.length}</span>
+      <button
+        type="button"
+        className="ai-pager-btn"
+        disabled={!canForward}
+        onClick={e => { e.stopPropagation(); onForward(); }}
+        aria-label="Next AI result"
+      >
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </button>
+    </span>
+  );
+}
+
 /* ── AI wand button — elegant sparkle, sits next to field labels ── */
 function AIWandButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
   return (
@@ -851,6 +974,7 @@ function TextAttrRow({
   dot,
   ai,
   aiLoading,
+  pager,
 }: {
   label: string;
   value: string;
@@ -860,6 +984,7 @@ function TextAttrRow({
   dot?: boolean;
   ai?: () => void;
   aiLoading?: boolean;
+  pager?: React.ReactNode;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -881,6 +1006,7 @@ function TextAttrRow({
           <span className="attr-label">
             {label}
             {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+            {pager}
             {dot && <span className="sync-dot attr-dot" />}
           </span>
           <div className="attr-values">
@@ -975,6 +1101,12 @@ function ConceptTab({
   // Track which AI generator is currently running (one at a time)
   const [aiBusy, setAiBusy] = useState<null | "title" | "logline" | "summary" | "tone" | "themes" | "ending">(null);
 
+  // Per-field AI generation history (pagination) — only for text inputs.
+  // Tone/Themes/Ending are chip selectors and do not participate.
+  const titleHistory   = useAIHistory(`scriptlab.aihist.concept.${story.id}.${d.id}.title`);
+  const loglineHistory = useAIHistory(`scriptlab.aihist.concept.${story.id}.${d.id}.logline`);
+  const summaryHistory = useAIHistory(`scriptlab.aihist.concept.${story.id}.${d.id}.summary`);
+
   const toggle = (key: string) => setOpenAttr(prev => prev === key ? null : key);
   const updateDraft = (patch: Partial<ConceptLayerDraft>) => setStory(s => updateConceptDraft(s, patch));
 
@@ -1034,13 +1166,23 @@ function ConceptTab({
       const jsonMatch = fullText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return;
       const parsed = JSON.parse(jsonMatch[0]);
-      // Apply to draft based on field
+      // Apply to draft based on field (and push to history for text fields)
       setStory(s => {
-        if (field === "title")   return updateConceptDraft({ ...s, title: String(parsed.title ?? "") }, {});
-        if (field === "logline") return updateConceptDraft(s, { logline: String(parsed.logline ?? "") });
+        if (field === "title") {
+          const v = String(parsed.title ?? "");
+          if (v) titleHistory.push(v);
+          return updateConceptDraft({ ...s, title: v }, {});
+        }
+        if (field === "logline") {
+          const v = String(parsed.logline ?? "");
+          if (v) loglineHistory.push(v);
+          return updateConceptDraft(s, { logline: v });
+        }
         if (field === "summary") {
+          const v = String(parsed.summary ?? "");
+          if (v) summaryHistory.push(v);
           const c = getActiveConceptDraft(s);
-          return updateConceptDraft(s, { concept: { ...c.concept, summary: String(parsed.summary ?? "") } });
+          return updateConceptDraft(s, { concept: { ...c.concept, summary: v } });
         }
         if (field === "tone") {
           const c = getActiveConceptDraft(s);
@@ -1140,6 +1282,22 @@ function ConceptTab({
         dot={isConceptFieldDirty(story, "title")}
         ai={() => generateConcept("title")}
         aiLoading={aiBusy === "title"}
+        pager={
+          <HistoryPager
+            history={titleHistory.history}
+            cursor={titleHistory.cursor}
+            canBack={titleHistory.canBack}
+            canForward={titleHistory.canForward}
+            onBack={() => {
+              const v = titleHistory.stepBack();
+              if (v !== null) setStory(s => updateConceptDraft({ ...s, title: v }, {}));
+            }}
+            onForward={() => {
+              const v = titleHistory.stepForward();
+              if (v !== null) setStory(s => updateConceptDraft({ ...s, title: v }, {}));
+            }}
+          />
+        }
       />
 
       {/* Logline */}
@@ -1152,6 +1310,22 @@ function ConceptTab({
         dot={isConceptFieldDirty(story, "logline")}
         ai={() => generateConcept("logline")}
         aiLoading={aiBusy === "logline"}
+        pager={
+          <HistoryPager
+            history={loglineHistory.history}
+            cursor={loglineHistory.cursor}
+            canBack={loglineHistory.canBack}
+            canForward={loglineHistory.canForward}
+            onBack={() => {
+              const v = loglineHistory.stepBack();
+              if (v !== null) updateDraft({ logline: v });
+            }}
+            onForward={() => {
+              const v = loglineHistory.stepForward();
+              if (v !== null) updateDraft({ logline: v });
+            }}
+          />
+        }
       />
 
       {/* Summary */}
@@ -1164,6 +1338,22 @@ function ConceptTab({
         dot={isConceptFieldDirty(story, "summary")}
         ai={() => generateConcept("summary")}
         aiLoading={aiBusy === "summary"}
+        pager={
+          <HistoryPager
+            history={summaryHistory.history}
+            cursor={summaryHistory.cursor}
+            canBack={summaryHistory.canBack}
+            canForward={summaryHistory.canForward}
+            onBack={() => {
+              const v = summaryHistory.stepBack();
+              if (v !== null) updateDraft({ concept: { ...d.concept, summary: v } });
+            }}
+            onForward={() => {
+              const v = summaryHistory.stepForward();
+              if (v !== null) updateDraft({ concept: { ...d.concept, summary: v } });
+            }}
+          />
+        }
       />
 
       {/* Tone — 20 presets + custom input */}
@@ -1362,7 +1552,7 @@ const CHAR_AI_ACTION: Record<CharAIField, string> = {
 
 /* ── Character field wrapper: input/textarea with an inline AI wand ── */
 function CharField({
-  label, value, onChange, onAI, aiBusy, multiline, rows,
+  label, value, onChange, onAI, aiBusy, multiline, rows, pager,
 }: {
   label: string;
   value: string;
@@ -1371,9 +1561,13 @@ function CharField({
   aiBusy: boolean;
   multiline?: boolean;
   rows?: number;
+  pager?: React.ReactNode;
 }) {
+  // Reserve extra right-side padding when a pager is present so
+  // the cluster (pager + wand) doesn't cover input text.
+  const reservedClass = pager ? "char-field-has-pager" : "";
   return (
-    <div className={`char-field ${multiline ? "char-field-multiline" : ""}`}>
+    <div className={`char-field ${multiline ? "char-field-multiline" : ""} ${reservedClass}`}>
       {multiline ? (
         <textarea
           className="field"
@@ -1391,6 +1585,7 @@ function CharField({
         />
       )}
       <div className="char-field-ai">
+        {pager}
         <AIWandButton onClick={onAI} loading={aiBusy} />
       </div>
     </div>
@@ -1628,6 +1823,32 @@ function CharacterEditForm({
   const [archetypeInput, setArchetypeInput] = useState("");
   const [aiBusy, setAiBusy] = useState<CharAIField | null>(null);
 
+  // Per-field AI generation history. Scoped by story + character id so it
+  // follows the character across draft switches and persists across reloads.
+  // Archetype is a chip picker and is excluded.
+  const histKey = (f: string) => `scriptlab.aihist.char.${story.id}.${ch.id}.${f}`;
+  const nameHist        = useAIHistory(histKey("name"));
+  const backstoryHist   = useAIHistory(histKey("backstory"));
+  const motivationsHist = useAIHistory(histKey("motivations"));
+  const flawsHist       = useAIHistory(histKey("flaws"));
+  const wantHist        = useAIHistory(histKey("want"));
+  const needHist        = useAIHistory(histKey("need"));
+  const voiceHist       = useAIHistory(histKey("voice"));
+  const arcHist         = useAIHistory(histKey("arc"));
+  const notesHist       = useAIHistory(histKey("notes"));
+
+  const histFor: Partial<Record<CharAIField, ReturnType<typeof useAIHistory>>> = {
+    name: nameHist,
+    backstory: backstoryHist,
+    motivations: motivationsHist,
+    flaws: flawsHist,
+    want: wantHist,
+    need: needHist,
+    voice: voiceHist,
+    arc: arcHist,
+    notes: notesHist,
+  };
+
   async function generateCharacterField(field: CharAIField) {
     if (aiBusy) return;
     setAiBusy(field);
@@ -1665,12 +1886,37 @@ function CharacterEditForm({
       const val = parsed[field];
       if (typeof val === "string" && val.trim()) {
         onUpdate({ [field]: val } as Partial<Character>);
+        // Push to history if this field has a pager (excludes archetype)
+        const hist = histFor[field];
+        if (hist) hist.push(val);
       }
     } catch (err) {
       console.error("Character generation failed:", err);
     } finally {
       setAiBusy(null);
     }
+  }
+
+  // Small helper to build a pager node for a given character field
+  function pagerFor(field: CharAIField) {
+    const h = histFor[field];
+    if (!h) return undefined;
+    return (
+      <HistoryPager
+        history={h.history}
+        cursor={h.cursor}
+        canBack={h.canBack}
+        canForward={h.canForward}
+        onBack={() => {
+          const v = h.stepBack();
+          if (v !== null) onUpdate({ [field]: v } as Partial<Character>);
+        }}
+        onForward={() => {
+          const v = h.stepForward();
+          if (v !== null) onUpdate({ [field]: v } as Partial<Character>);
+        }}
+      />
+    );
   }
 
   function selectArchetype(a: string) {
@@ -1685,6 +1931,7 @@ function CharacterEditForm({
         onChange={v => onUpdate({ name: v })}
         onAI={() => generateCharacterField("name")}
         aiBusy={aiBusy === "name"}
+        pager={pagerFor("name")}
       />
 
       <div className="select-wrap">
@@ -1756,6 +2003,7 @@ function CharacterEditForm({
         onAI={() => generateCharacterField("backstory")}
         aiBusy={aiBusy === "backstory"}
         multiline rows={3}
+        pager={pagerFor("backstory")}
       />
 
       <CharField
@@ -1765,6 +2013,7 @@ function CharacterEditForm({
         onAI={() => generateCharacterField("motivations")}
         aiBusy={aiBusy === "motivations"}
         multiline rows={2}
+        pager={pagerFor("motivations")}
       />
 
       <CharField
@@ -1774,6 +2023,7 @@ function CharacterEditForm({
         onAI={() => generateCharacterField("flaws")}
         aiBusy={aiBusy === "flaws"}
         multiline rows={2}
+        pager={pagerFor("flaws")}
       />
 
       <CharField
@@ -1782,6 +2032,7 @@ function CharacterEditForm({
         onChange={v => onUpdate({ want: v })}
         onAI={() => generateCharacterField("want")}
         aiBusy={aiBusy === "want"}
+        pager={pagerFor("want")}
       />
 
       <CharField
@@ -1790,6 +2041,7 @@ function CharacterEditForm({
         onChange={v => onUpdate({ need: v })}
         onAI={() => generateCharacterField("need")}
         aiBusy={aiBusy === "need"}
+        pager={pagerFor("need")}
       />
 
       <CharField
@@ -1799,6 +2051,7 @@ function CharacterEditForm({
         onAI={() => generateCharacterField("voice")}
         aiBusy={aiBusy === "voice"}
         multiline rows={2}
+        pager={pagerFor("voice")}
       />
 
       <CharField
@@ -1808,6 +2061,7 @@ function CharacterEditForm({
         onAI={() => generateCharacterField("arc")}
         aiBusy={aiBusy === "arc"}
         multiline rows={2}
+        pager={pagerFor("arc")}
       />
 
       <CharField
@@ -1817,6 +2071,7 @@ function CharacterEditForm({
         onAI={() => generateCharacterField("notes")}
         aiBusy={aiBusy === "notes"}
         multiline rows={2}
+        pager={pagerFor("notes")}
       />
 
       <div className="beat-actions" style={{ marginTop: 4 }}>
