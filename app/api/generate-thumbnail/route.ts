@@ -1,15 +1,25 @@
-// Generates a project thumbnail via DALL-E 3.
-// Compresses to 256x256 JPEG (~15-25KB) so it fits in localStorage.
+// Generates a project thumbnail via a two-stage pipeline:
+//   1. Claude Haiku builds a locked-style cinematic-minimalist movie-poster prompt.
+//   2. DALL-E 3 renders it at 1024x1792 (closest native vertical ratio).
+//   3. Sharp center-crops/resizes to 192x256 (3:4) JPEG (~15-25KB) for localStorage.
 
 import sharp from "sharp";
+import { buildImagePrompt } from "@/lib/thumbnailPrompt";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "OPENAI_API_KEY not set" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (!anthropicKey) {
+    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY not set" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
@@ -18,14 +28,13 @@ export async function POST(req: Request) {
   try {
     const { title, logline, genres } = await req.json();
 
-    const description = logline
-      ? `${title}: ${logline}`
-      : title || "an untitled film project";
+    // Stage 1: Claude composes the locked-style image brief.
+    const prompt = await buildImagePrompt(
+      { title, logline, genres },
+      anthropicKey,
+    );
 
-    const genreStr = genres?.length ? genres.join(" and ") : "drama";
-
-    const prompt = `flat minimal design illustration, representing a ${genreStr} movie about ${description}, simple geometric shapes, basic muted earthy colors with orange and teal accents, geometric human figures, textured grain effect, dark moody background, no text, no words, no letters`;
-
+    // Stage 2: DALL-E 3 renders the prompt at vertical 1024x1792.
     const res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
@@ -36,7 +45,7 @@ export async function POST(req: Request) {
         model: "dall-e-3",
         prompt,
         n: 1,
-        size: "1024x1024",
+        size: "1024x1792",
         response_format: "b64_json",
         quality: "standard",
       }),
@@ -60,10 +69,10 @@ export async function POST(req: Request) {
       });
     }
 
-    // Compress: 1024x1024 PNG → 256x256 JPEG (~15-25KB instead of ~1.5MB)
+    // Compress: 1024x1792 PNG → 192x256 JPEG 3:4 (cover-cropped).
     const pngBuffer = Buffer.from(b64, "base64");
     const jpegBuffer = await sharp(pngBuffer)
-      .resize(256, 256)
+      .resize(192, 256, { fit: "cover", position: "attention" })
       .jpeg({ quality: 80 })
       .toBuffer();
 

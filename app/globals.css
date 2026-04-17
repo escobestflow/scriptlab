@@ -241,11 +241,11 @@ button { cursor: pointer; }
     0 3px 10px rgba(10, 10, 15, 0.05);
 }
 
-/* Square cover — 112px matches the body's three-line rhythm. Thumbnails
-   are 1024×1024 so no cropping trickery is needed. */
+/* Vertical movie-poster cover — 3:4 ratio to match DALL-E output
+   (1024×1792 center-cropped to 192×256). */
 .project-cover {
-  width: 112px;
-  height: 112px;
+  width: 100px;
+  aspect-ratio: 3 / 4;
   border-radius: 12px;
   overflow: hidden;
   flex-shrink: 0;
