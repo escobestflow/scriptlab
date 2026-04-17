@@ -951,29 +951,31 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   min-width: 200px;
 }
 
-/* Layer-level Save button — shown when layer has unsaved edits (Apple-style pill) */
+/* Layer-level Save button — shown when layer has unsaved edits.
+   Uses the standard app button styling: 4pt corners, uppercase label. */
 .draft-save-btn {
-  padding: 7px 16px;
+  padding: 6px 14px;
   background: var(--ink);
   color: #fff;
   border: none;
-  border-radius: 999px;
-  font-family: 'Lato', -apple-system, system-ui, sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  text-transform: none;
+  border-radius: 4px;
+  font-family: 'Lato', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
-  box-shadow: none;
-  transition: transform 140ms var(--ease), opacity 140ms var(--ease);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
   animation: saveBtnIn 220ms var(--ease);
 }
 .draft-save-btn:active {
-  transform: scale(0.96);
-  opacity: 0.85;
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
 
-/* Project-level Save Draft button — shown when combination changed */
+/* Project-level Save Draft button — shown when combination changed.
+   Standard app button styling: 4pt corners, uppercase label. */
 .project-save-btn {
   align-self: center;
   margin: 4px auto 8px;
@@ -981,7 +983,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background: var(--ink);
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   font-family: 'Lato', sans-serif;
   font-size: 11px;
   font-weight: 700;
