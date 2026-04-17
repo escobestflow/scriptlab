@@ -18,6 +18,7 @@ import {
 import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
+import { Button, Input, Textarea, Selector } from "@/components/ui";
 
 type Section = "concept" | "characters" | "story" | "script";
 
@@ -298,7 +299,7 @@ export function Studio({
                 <div className="project-arrow">›</div>
               </button>
             ))}
-            <button className="btn-secondary" style={{ width: "100%", marginTop: 12 }}
+            <Button variant="secondary" size="lg" style={{ width: "100%", marginTop: 12 }}
               onClick={() => {
                 setStory(s => {
                   const ad = getActiveStoryLayerDraft(s);
@@ -316,7 +317,7 @@ export function Studio({
                 });
               }}>
               + Add episode
-            </button>
+            </Button>
           </div>
         </div>
       </>
@@ -334,10 +335,10 @@ export function Studio({
           This action cannot be undone.
         </div>
         <div className="confirm-actions">
-          <button className="btn-secondary confirm-cancel"
+          <Button variant="secondary" size="sm"
             onClick={() => setConfirmDeleteProject(false)}>
             Cancel
-          </button>
+          </Button>
           <button className="btn-delete-project"
             onClick={() => {
               setConfirmDeleteProject(false);
@@ -544,7 +545,7 @@ export function Studio({
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">{sheetTitle}</div>
-          <button className="chip" onClick={() => setSheetOpen(false)}>Close</button>
+          <Button variant="secondary" size="sm" onClick={() => setSheetOpen(false)}>Close</Button>
         </div>
         <div className={`sheet-body ${!output ? "placeholder" : ""}`}>
           {output || (busy ? "Thinking..." : "Nothing here yet.")}
@@ -558,7 +559,7 @@ export function Studio({
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">Link a moment</div>
-          <button className="chip" onClick={() => { setPickerOpen(false); setPickerBeatId(null); }}>Close</button>
+          <Button variant="secondary" size="sm" onClick={() => { setPickerOpen(false); setPickerBeatId(null); }}>Close</Button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <MomentPicker
@@ -576,7 +577,7 @@ export function Studio({
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">New beat</div>
-          <button className="chip" onClick={() => setBeatTrayOpen(false)}>Cancel</button>
+          <Button variant="secondary" size="sm" onClick={() => setBeatTrayOpen(false)}>Cancel</Button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <BeatCreationForm
@@ -598,7 +599,7 @@ export function Studio({
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">New character</div>
-          <button className="chip" onClick={() => setCharTrayOpen(false)}>Cancel</button>
+          <Button variant="secondary" size="sm" onClick={() => setCharTrayOpen(false)}>Cancel</Button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <CharacterCreationForm
@@ -1329,8 +1330,8 @@ function ConceptTab({
       >
         <div className="chip-row">
           {(["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"] as const).map(g => (
-            <button key={g}
-              className={`chip ${d.settings.genres.includes(g) ? "selected" : ""}`}
+            <Selector key={g}
+              selected={d.settings.genres.includes(g)}
               onClick={() => updateDraft({
                 settings: {
                   ...d.settings,
@@ -1340,7 +1341,7 @@ function ConceptTab({
                 },
               })}>
               {g}
-            </button>
+            </Selector>
           ))}
         </div>
       </AttrRow>
@@ -1441,11 +1442,11 @@ function ConceptTab({
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {TONE_PRESETS.map(t => (
-            <button key={t}
-              className={`chip ${d.concept.tone === t ? "selected" : ""}`}
+            <Selector key={t}
+              selected={d.concept.tone === t}
               onClick={() => setTone(d.concept.tone === t ? "" : t)}>
               {t}
-            </button>
+            </Selector>
           ))}
           <button
             className={`chip chip-custom ${toneCustomOpen ? "selected" : ""}`}
@@ -1455,8 +1456,7 @@ function ConceptTab({
         </div>
         {toneCustomOpen && (
           <div style={{ display: "flex", gap: 8 }}>
-            <input
-              className="field"
+            <Input
               value={toneInput}
               onChange={e => setToneInput(e.target.value)}
               onKeyDown={e => {
@@ -1470,7 +1470,7 @@ function ConceptTab({
               style={{ flex: 1, marginBottom: 0 }}
               autoFocus
             />
-            <button className="btn-secondary"
+            <Button variant="secondary" size="sm"
               onClick={() => {
                 if (!toneInput.trim()) return;
                 setTone(toneInput.trim());
@@ -1478,9 +1478,9 @@ function ConceptTab({
                 setToneCustomOpen(false);
               }}
               disabled={!toneInput.trim()}
-              style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
+              style={{ flexShrink: 0 }}>
               Set
-            </button>
+            </Button>
           </div>
         )}
       </AttrRow>
@@ -1499,18 +1499,18 @@ function ConceptTab({
         {d.concept.themes.length > 0 && (
           <div className="chip-row" style={{ marginBottom: 10 }}>
             {d.concept.themes.map(t => (
-              <button key={t} className="chip selected" onClick={() => removeTheme(t)}>
+              <Selector key={t} selected onClick={() => removeTheme(t)}>
                 {t} &#10005;
-              </button>
+              </Selector>
             ))}
           </div>
         )}
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {THEME_PRESETS.filter(t => !d.concept.themes.includes(t)).map(t => (
-            <button key={t} className="chip"
+            <Selector key={t}
               onClick={() => addTheme(t)}>
               {t}
-            </button>
+            </Selector>
           ))}
           <button
             className={`chip chip-custom ${themeCustomOpen ? "selected" : ""}`}
@@ -1520,8 +1520,7 @@ function ConceptTab({
         </div>
         {themeCustomOpen && (
           <div style={{ display: "flex", gap: 8 }}>
-            <input
-              className="field"
+            <Input
               value={themeInput}
               onChange={e => setThemeInput(e.target.value)}
               onKeyDown={e => {
@@ -1534,12 +1533,12 @@ function ConceptTab({
               style={{ flex: 1, marginBottom: 0 }}
               autoFocus
             />
-            <button className="btn-secondary"
+            <Button variant="secondary" size="sm"
               onClick={() => { addTheme(); setThemeCustomOpen(false); }}
               disabled={!themeInput.trim()}
-              style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
+              style={{ flexShrink: 0 }}>
               Add
-            </button>
+            </Button>
           </div>
         )}
       </AttrRow>
@@ -1557,8 +1556,8 @@ function ConceptTab({
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
-            <button key={e}
-              className={`chip ${d.settings.endingTypes.includes(e) ? "selected" : ""}`}
+            <Selector key={e}
+              selected={d.settings.endingTypes.includes(e)}
               onClick={() => updateDraft({
                 settings: {
                   ...d.settings,
@@ -1568,7 +1567,7 @@ function ConceptTab({
                 },
               })}>
               {e}
-            </button>
+            </Selector>
           ))}
         </div>
       </AttrRow>
@@ -1641,16 +1640,14 @@ function CharField({
   return (
     <div className={`char-field ${multiline ? "char-field-multiline" : ""} ${reservedClass}`}>
       {multiline ? (
-        <textarea
-          className="field"
+        <Textarea
           placeholder={label}
           value={value}
           onChange={e => onChange(e.target.value)}
           rows={rows ?? 2}
         />
       ) : (
-        <input
-          className="field"
+        <Input
           placeholder={label}
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -1717,10 +1714,10 @@ function CharactersTab({
           <div className="caption" style={{ marginBottom: 16 }}>
             Create your first character to bring your story to life.
           </div>
-          <button className="btn-primary" style={{ fontSize: 14, padding: "14px 22px", minHeight: 0 }}
+          <Button variant="primary" size="lg"
             onClick={openCharTray}>
             + Add character
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1775,13 +1772,14 @@ function CharactersTab({
       })}
 
       {d.characters.length > 0 && (
-        <button
-          className="btn-secondary"
-          style={{ width: "100%", marginTop: 12, fontSize: 13 }}
+        <Button
+          variant="secondary"
+          size="sm"
+          style={{ width: "100%", marginTop: 12 }}
           onClick={openCharTray}
         >
           + Add character
-        </button>
+        </Button>
       )}
 
       {/* Info banner */}
@@ -1848,11 +1846,11 @@ function CharacterViewCard({
       )}
 
       <div className="beat-actions" style={{ marginTop: 12 }}>
-        <button className="btn-primary" style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}
-          onClick={onEdit}>Edit</button>
-        <button className="btn-secondary"
-          style={{ fontSize: 12, padding: "8px 14px", minHeight: 0, color: "var(--ink-mute)" }}
-          onClick={onRemove}>Remove</button>
+        <Button variant="primary" size="sm"
+          onClick={onEdit}>Edit</Button>
+        <Button variant="secondary" size="sm"
+          style={{ color: "var(--ink-mute)" }}
+          onClick={onRemove}>Remove</Button>
       </div>
     </>
   );
@@ -2007,11 +2005,11 @@ function CharacterEditForm({
         </div>
         <div className="chip-row">
           {ARCHETYPE_PRESETS.map(a => (
-            <button key={a} type="button"
-              className={`chip ${ch.archetype === a ? "selected" : ""}`}
+            <Selector key={a} type="button"
+              selected={ch.archetype === a}
               onClick={() => selectArchetype(a)}>
               {a}
-            </button>
+            </Selector>
           ))}
           <button type="button"
             className={`chip chip-custom ${archetypeCustomOpen ? "selected" : ""}`}
@@ -2021,8 +2019,7 @@ function CharacterEditForm({
         </div>
         {archetypeCustomOpen && (
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <input
-              className="field"
+            <Input
               value={archetypeInput}
               onChange={e => setArchetypeInput(e.target.value)}
               onKeyDown={e => {
@@ -2036,7 +2033,7 @@ function CharacterEditForm({
               style={{ flex: 1, marginBottom: 0 }}
               autoFocus
             />
-            <button className="btn-secondary"
+            <Button variant="secondary" size="sm"
               onClick={() => {
                 if (!archetypeInput.trim()) return;
                 onUpdate({ archetype: archetypeInput.trim() });
@@ -2044,9 +2041,9 @@ function CharacterEditForm({
                 setArchetypeCustomOpen(false);
               }}
               disabled={!archetypeInput.trim()}
-              style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
+              style={{ flexShrink: 0 }}>
               Set
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -2130,11 +2127,11 @@ function CharacterEditForm({
       />
 
       <div className="beat-actions" style={{ marginTop: 4 }}>
-        <button className="btn-primary" style={{ fontSize: 13, padding: "10px 18px", minHeight: 0 }}
-          onClick={onDone}>Done</button>
-        <button className="btn-secondary"
-          style={{ fontSize: 12, padding: "8px 14px", minHeight: 0, color: "var(--ink-mute)" }}
-          onClick={onRemove}>Remove</button>
+        <Button variant="primary" size="sm"
+          onClick={onDone}>Done</Button>
+        <Button variant="secondary" size="sm"
+          style={{ color: "var(--ink-mute)" }}
+          onClick={onRemove}>Remove</Button>
       </div>
     </div>
   );
@@ -2201,10 +2198,10 @@ function StoryTab({
             <div className="caption" style={{ marginBottom: 16 }}>
               Start building your story structure — add your first beat.
             </div>
-            <button className="btn-primary" style={{ fontSize: 14, padding: "14px 22px", minHeight: 0 }}
+            <Button variant="primary" size="lg"
               onClick={() => openBeatTray(0)}>
               + Add beat
-            </button>
+            </Button>
           </div>
         )}
 
@@ -2319,12 +2316,11 @@ function StoryTab({
                     <div className="beat-section-label">Name</div>
                     {editingField?.beatId === beat.id && editingField.field === "name" ? (
                       <div style={{ display: "flex", gap: 8 }}>
-                        <input className="field" value={editValue}
+                        <Input size="compact" value={editValue}
                           onChange={e => setEditValue(e.target.value)}
                           onBlur={saveEdit}
                           onKeyDown={e => e.key === "Enter" && saveEdit()}
-                          autoFocus
-                          style={{ fontSize: 14, padding: "10px 12px" }} />
+                          autoFocus />
                       </div>
                     ) : (
                       <div className="beat-text" onClick={() => startEdit(beat.id, "name", beat.name)}
@@ -2335,11 +2331,10 @@ function StoryTab({
 
                     <div className="beat-section-label">Summary</div>
                     {editingField?.beatId === beat.id && editingField.field === "summary" ? (
-                      <textarea className="field" value={editValue}
+                      <Textarea size="compact" value={editValue}
                         onChange={e => setEditValue(e.target.value)}
                         onBlur={saveEdit}
-                        autoFocus rows={4}
-                        style={{ fontSize: 14, padding: "10px 12px" }} />
+                        autoFocus rows={4} />
                     ) : (
                       <div className="beat-text" onClick={() => startEdit(beat.id, "summary", beat.summary)}
                         style={{ cursor: "text" }}>
@@ -2371,11 +2366,11 @@ function StoryTab({
                     )}
 
                     <div className="beat-actions">
-                      <button className="btn-secondary" style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}
-                        onClick={() => openMomentPicker(beat.id)}>+ Link moment</button>
-                      <button className="btn-secondary"
-                        style={{ fontSize: 12, padding: "8px 14px", minHeight: 0, color: "var(--ink-mute)" }}
-                        onClick={() => removeBeat(beat.id)}>Remove</button>
+                      <Button variant="secondary" size="sm"
+                        onClick={() => openMomentPicker(beat.id)}>+ Link moment</Button>
+                      <Button variant="secondary" size="sm"
+                        style={{ color: "var(--ink-mute)" }}
+                        onClick={() => removeBeat(beat.id)}>Remove</Button>
                     </div>
 
                     <div className="beat-reorder">
@@ -2491,14 +2486,14 @@ function ScriptTab({
           )}
           {beat.status === "design" && (
             <div style={{ padding: "0 16px 16px" }}>
-              <button className="btn-primary" disabled={busy}
-                style={{ width: "100%", fontSize: 13, padding: "12px 16px", minHeight: 0 }}
+              <Button variant="primary" size="sm" disabled={busy}
+                style={{ width: "100%" }}
                 onClick={() => run(
                   { type: "generate_scene", payload: { beatIndex: i } },
                   `Write · ${beat.name}`
                 )}>
                 Write this scene
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -2506,13 +2501,13 @@ function ScriptTab({
 
       {beats.length > 0 && (
         <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
-          <button className="btn-secondary" disabled={busy} style={{ flex: 1, fontSize: 13 }}
-            onClick={() => run({ type: "add_twist", payload: {} }, "Add twist")}>&#9889; Add twist</button>
-          <button className="btn-secondary" disabled={busy} style={{ flex: 1, fontSize: 13 }}
+          <Button variant="secondary" size="sm" disabled={busy} style={{ flex: 1 }}
+            onClick={() => run({ type: "add_twist", payload: {} }, "Add twist")}>&#9889; Add twist</Button>
+          <Button variant="secondary" size="sm" disabled={busy} style={{ flex: 1 }}
             onClick={() => run(
               { type: "brainstorm", payload: { prompt: "ways to deepen the conflict" } },
               "Brainstorm"
-            )}>&#9998; Brainstorm</button>
+            )}>&#9998; Brainstorm</Button>
         </div>
       )}
 
@@ -2655,11 +2650,11 @@ function BeatCreationForm({
 
   return (
     <div className="stack">
-      <input className="field" placeholder="Beat name" value={name}
+      <Input placeholder="Beat name" value={name}
         onChange={e => setName(e.target.value)} />
 
       <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <textarea className="field" placeholder="Describe this beat"
+        <Textarea placeholder="Describe this beat"
           value={summary} onChange={e => setSummary(e.target.value)} rows={4}
           style={{ flex: 1, marginBottom: 0 }} />
         <button
@@ -2676,16 +2671,15 @@ function BeatCreationForm({
 
       {summary.trim() && (
         <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn-secondary" onClick={cleanUp}
+          <Button variant="secondary" size="sm" onClick={cleanUp}
             disabled={cleaning || busy || generating}
-            style={{ fontSize: 13, flex: 1 }}>
+            style={{ flex: 1 }}>
             {cleaning ? "Cleaning..." : "Clean up"}
-          </button>
-          <button className="btn-secondary"
-            onClick={() => { setName(""); setSummary(""); }}
-            style={{ fontSize: 13 }}>
+          </Button>
+          <Button variant="secondary" size="sm"
+            onClick={() => { setName(""); setSummary(""); }}>
             Redo
-          </button>
+          </Button>
         </div>
       )}
 
@@ -2708,30 +2702,28 @@ function BeatCreationForm({
             </div>
           ))}
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn-primary" onClick={createWithAI}
-              disabled={generating} style={{ flex: 1, fontSize: 13, padding: "12px 16px", minHeight: 0 }}>
+            <Button variant="primary" size="sm" onClick={createWithAI}
+              disabled={generating} style={{ flex: 1 }}>
               {generating ? "Creating..." : "Create"}
-            </button>
-            <button className="btn-secondary" onClick={() => setShowAISettings(false)}
-              style={{ fontSize: 13, padding: "12px 16px", minHeight: 0 }}>
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setShowAISettings(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        <button className="btn-secondary"
+        <Button variant="secondary" size="sm"
           onClick={() => setShowAISettings(true)}
           disabled={busy || generating}
-          style={{ fontSize: 13, flex: 1 }}>
+          style={{ flex: 1 }}>
           {generating ? "Creating..." : "Create with AI"}
-        </button>
-        <button className="btn-primary" onClick={() => onSave(name || "Untitled beat", summary)}
-          disabled={!summary.trim()}
-          style={{ fontSize: 13, padding: "12px 20px", minHeight: 0 }}>
+        </Button>
+        <Button variant="primary" size="sm" onClick={() => onSave(name || "Untitled beat", summary)}
+          disabled={!summary.trim()}>
           Save
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -2758,8 +2750,7 @@ function CharacterCreationForm({
   ];
   return (
     <div className="stack">
-      <input
-        className="field"
+      <Input
         placeholder="Character name"
         value={name}
         onChange={e => setName(e.target.value)}
@@ -2769,26 +2760,26 @@ function CharacterCreationForm({
       <div className="eyebrow" style={{ marginTop: 8 }}>Role</div>
       <div className="chip-row">
         {roles.map(r => (
-          <button
+          <Selector
             key={r.key}
-            className={`chip ${role === r.key ? "selected" : ""}`}
+            selected={role === r.key}
             onClick={() => setRole(r.key)}
-            style={{ fontSize: 12, padding: "8px 14px" }}
           >
             {r.label}
-          </button>
+          </Selector>
         ))}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <button
-          className="btn-primary"
+        <Button
+          variant="primary"
+          size="sm"
           onClick={() => onSave(name.trim() || "Unnamed character", role)}
           disabled={!name.trim()}
-          style={{ flex: 1, fontSize: 13, padding: "12px 20px", minHeight: 0 }}
+          style={{ flex: 1 }}
         >
           Save
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -2864,11 +2855,11 @@ function SettingsTab({
         {story.thumbnail && (
           <img src={story.thumbnail} alt="" style={{ width: "100%", borderRadius: 12, marginBottom: 10 }} />
         )}
-        <button className="btn-secondary" onClick={generateCover}
+        <Button variant="secondary" size="sm" onClick={generateCover}
           disabled={generatingCover}
-          style={{ width: "100%", fontSize: 13 }}>
+          style={{ width: "100%" }}>
           {generatingCover ? "Generating..." : story.thumbnail ? "Regenerate cover" : "Generate cover"}
-        </button>
+        </Button>
       </div>
 
       {/* Project drafts */}
@@ -2901,25 +2892,23 @@ function SettingsTab({
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {!isActive && (
-                    <button className="btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
+                    <Button variant="secondary" size="sm"
                       onClick={() => onLoadProjectDraft(draft.id)}>
                       Load
-                    </button>
+                    </Button>
                   )}
-                  <button className="btn-secondary"
-                    style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
+                  <Button variant="secondary" size="sm"
                     onClick={() => onCreateProjectFromDraft(draft.id)}>
                     New project from this
-                  </button>
+                  </Button>
                   {canDelete && (
-                    <button className="btn-secondary"
-                      style={{ fontSize: 12, padding: "6px 12px", minHeight: 0, color: "var(--record)" }}
+                    <Button variant="secondary" size="sm"
+                      style={{ color: "var(--record)" }}
                       onClick={() => {
                         if (confirm(`Delete Project Draft ${draft.number}?`)) onDeleteProjectDraft(draft.id);
                       }}>
                       Delete
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -2964,12 +2953,10 @@ function SettingsTab({
                       <div className="caption" style={{ marginTop: 2 }}>{usageLabel}</div>
                       <div className="caption" style={{ marginTop: 2 }}>Edited {formatDate(d.updatedAt)}</div>
                     </div>
-                    <button
-                      className="btn-secondary"
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       style={{
-                        fontSize: 12,
-                        padding: "6px 12px",
-                        minHeight: 0,
                         color: "var(--record)",
                         opacity: canDelete ? 1 : 0.4,
                         cursor: canDelete ? "pointer" : "not-allowed",
@@ -2989,7 +2976,7 @@ function SettingsTab({
                       }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 );
               })}

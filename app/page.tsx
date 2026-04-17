@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { Studio } from "@/components/Studio";
 import { Genre, ProjectType } from "@/lib/story";
 import { useAutosavePref } from "@/lib/prefs";
+import { Button, Input, Textarea, Selector } from "@/components/ui";
 
 type View =
   | { kind: "main" }
@@ -232,16 +233,22 @@ export default function Page() {
         <div className="caption" style={{ marginBottom: 32, maxWidth: 260 }}>
           Design scripts for film, TV, and shorts — guided by AI and your raw creative moments.
         </div>
-        <button className="btn-primary" onClick={signInWithGoogle}
-          style={{ width: "100%", maxWidth: 280, gap: 10 }}>
-          <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: "#fff" }}>
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-          </svg>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={signInWithGoogle}
+          style={{ width: "100%", maxWidth: 280 }}
+          icon={
+            <svg viewBox="0 0 24 24" style={{ width: 14, height: 14, fill: "#fff" }}>
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+          }
+        >
           Sign in with Google
-        </button>
+        </Button>
       </div>
     );
   }
@@ -460,7 +467,7 @@ export default function Page() {
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">{recording ? "Recording…" : "New moment"}</div>
-          <button className="chip" onClick={() => { stopRecording(); setRecordSheetOpen(false); }}>Close</button>
+          <Button variant="secondary" size="sm" onClick={() => { stopRecording(); setRecordSheetOpen(false); }}>Close</Button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <RecordingForm
@@ -480,7 +487,7 @@ export default function Page() {
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">Edit moment</div>
-          <button className="chip" onClick={() => setEditingMoment(null)}>Close</button>
+          <Button variant="secondary" size="sm" onClick={() => setEditingMoment(null)}>Close</Button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           {editingMoment && (
@@ -520,7 +527,7 @@ export default function Page() {
               );
             })}
           </div>
-          <button className="chip" onClick={closeCreateModal}>Cancel</button>
+          <Button variant="secondary" size="sm" onClick={closeCreateModal}>Cancel</Button>
         </div>
         <div className="create-modal-body">
           {createDraft && createStep === 0 && (
@@ -536,22 +543,22 @@ export default function Page() {
         <div className="create-modal-footer">
           <div className="create-modal-actions">
             {createStep > 0 && (
-              <button className="btn-secondary" onClick={() => setCreateStep(s => s - 1)}
-                style={{ fontSize: 14, minWidth: 70 }}>
+              <Button variant="secondary" size="lg" onClick={() => setCreateStep(s => s - 1)}
+                style={{ minWidth: 96 }}>
                 Back
-              </button>
+              </Button>
             )}
             {createStep < 2 ? (
-              <button className="btn-primary" onClick={() => setCreateStep(s => s + 1)}
+              <Button variant="primary" size="lg" onClick={() => setCreateStep(s => s + 1)}
                 style={{ flex: 1 }}>
                 Continue
-              </button>
+              </Button>
             ) : (
-              <button className="btn-primary" onClick={finishCreate}
+              <Button variant="primary" size="lg" onClick={finishCreate}
                 disabled={!createDraft?.title?.trim()}
                 style={{ flex: 1 }}>
                 Create Project
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -635,32 +642,30 @@ function RecordingForm({
         {recording ? "Listening… tap to stop" : "Tap to record, or type below"}
       </div>
 
-      <textarea className="field" placeholder="Your moment…"
+      <Textarea placeholder="Your moment…"
         value={liveTranscript} onChange={e => setLiveTranscript(e.target.value)} rows={4} />
 
       {liveTranscript.trim() && (
         <>
           {/* Clean up — associated with the text above */}
-          <button className="btn-secondary" onClick={cleanUp} disabled={cleaning}
-            style={{ fontSize: 13, width: "100%" }}>
+          <Button variant="secondary" size="lg" block onClick={cleanUp} disabled={cleaning}>
             {cleaning ? "Cleaning…" : "✨ Clean up with AI"}
-          </button>
+          </Button>
 
           {/* Type picker */}
           <div className="eyebrow" style={{ marginTop: 8 }}>Type</div>
           <div className="chip-row">
             {MOMENT_TYPES.map(t => (
-              <button key={t} className={`chip ${type === t ? "selected" : ""}`}
-                onClick={() => setType(t)} style={{ fontSize: 12, padding: "8px 14px" }}>
+              <Selector key={t} selected={type === t} onClick={() => setType(t)}>
                 {t}
-              </button>
+              </Selector>
             ))}
           </div>
 
-          <button className="btn-primary" style={{ marginTop: 12, fontSize: 14 }}
+          <Button variant="primary" size="lg" block style={{ marginTop: 12 }}
             onClick={() => onSave(liveTranscript.trim(), type)}>
             Save moment
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -739,52 +744,49 @@ function MomentEditForm({
 
   return (
     <div className="stack">
-      <textarea className="field" value={text} rows={5}
+      <Textarea value={text} rows={5}
         onChange={e => { setText(e.target.value); onUpdate({ text: e.target.value }); }} />
 
       <div className="eyebrow">Type</div>
       <div className="chip-row">
         {MOMENT_TYPES.map(t => (
-          <button key={t} className={`chip ${type === t ? "selected" : ""}`}
-            onClick={() => { setType(t); onUpdate({ type: t }); }}
-            style={{ fontSize: 12, padding: "8px 14px" }}>
+          <Selector key={t} selected={type === t}
+            onClick={() => { setType(t); onUpdate({ type: t }); }}>
             {t}
-          </button>
+          </Selector>
         ))}
       </div>
 
       <div className="eyebrow" style={{ marginTop: 8 }}>Tags</div>
       <div style={{ display: "flex", gap: 8 }}>
-        <input className="field" placeholder="Add tag" value={tagInput}
+        <Input size="compact" placeholder="Add tag" value={tagInput}
           onChange={e => setTagInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && addTag()}
-          style={{ flex: 1, fontSize: 13, padding: "10px 12px" }} />
-        <button className="btn-secondary" onClick={addTag}
-          style={{ fontSize: 12, padding: "8px 14px", minHeight: 0 }}>+</button>
+          style={{ flex: 1 }} />
+        <Button variant="secondary" size="sm" onClick={addTag}>+</Button>
       </div>
       {tags.length > 0 && (
         <div className="chip-row" style={{ marginTop: 4 }}>
           {tags.map(t => (
-            <button key={t} className="chip selected" style={{ fontSize: 11, padding: "4px 10px" }}
-              onClick={() => removeTag(t)}>
+            <Selector key={t} selected onClick={() => removeTag(t)}
+              style={{ fontSize: 11, padding: "4px 10px" }}>
               {t} ✕
-            </button>
+            </Selector>
           ))}
         </div>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <button className="btn-secondary" onClick={cleanUp} disabled={cleaning}
-          style={{ flex: 1, fontSize: 13 }}>
+        <Button variant="secondary" size="lg" block onClick={cleanUp} disabled={cleaning}>
           {cleaning ? "Cleaning…" : "✨ Clean up"}
-        </button>
+        </Button>
       </div>
 
-      <button className="btn-secondary"
-        style={{ color: "var(--record)", borderColor: "var(--record)", fontSize: 13, marginTop: 4 }}
+      <Button variant="secondary" size="lg" block
+        style={{ color: "var(--record)", borderColor: "var(--record)", marginTop: 4 }}
         onClick={onDelete}>
         Delete moment
-      </button>
+      </Button>
     </div>
   );
 }
@@ -805,9 +807,14 @@ function ProjectsTab({
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20 }}>
         <div className="display">Projects</div>
-        <button className="btn-new-project" onClick={onNew}>
-          <img src="/add-icon.svg" alt="" /> NEW PROJECT
-        </button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onNew}
+          icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
+        >
+          New Project
+        </Button>
       </div>
 
       {projects.map(p => {
@@ -888,6 +895,9 @@ function MomentsTab({ moments, onEdit }: { moments: Moment[]; onEdit: (m: Moment
           onChange={e => setSearch(e.target.value)}
         />
       </div>
+      {/* Note: the `.search-bar` icon+input compound keeps its bespoke wrapper
+          because the layout is "icon inline with input". The styling intent
+          (minimalistic gray, fade-on-focus) matches <Input size="standard">. */}
 
       <div className="filter-row">
         {MOMENT_FILTERS.map(f => (
@@ -963,8 +973,7 @@ function CreateStepFormat({
       {draft.projectType === "tv-show" && (
         <div style={{ marginTop: 16 }}>
           <div className="caption" style={{ marginBottom: 8 }}>How many episodes to start with?</div>
-          <input
-            className="field"
+          <Input
             type="number"
             min={1}
             max={24}
@@ -1011,8 +1020,7 @@ function CreateStepTitle({
     <>
       <div className="display heading">Let{"'"}s name it.</div>
       <div className="body-text">Give your story a working title. You can always change it later.</div>
-      <input
-        className="field"
+      <Input
         placeholder="The Quiet Room"
         value={draft.title}
         onChange={e => setDraft(s => ({ ...s, title: e.target.value }))}
@@ -1046,13 +1054,13 @@ function CreateStepGenre({
       <div className="body-text">Select one or more genres to define the world of your story.</div>
       <div className="chip-row" style={{ marginTop: 8 }}>
         {ALL_GENRES.map(g => (
-          <button
+          <Selector
             key={g}
-            className={`chip ${conceptDraft.settings.genres.includes(g) ? "selected" : ""}`}
+            selected={conceptDraft.settings.genres.includes(g)}
             onClick={() => toggleGenre(g)}
           >
             {g}
-          </button>
+          </Selector>
         ))}
       </div>
       {conceptDraft.settings.genres.length > 1 && (

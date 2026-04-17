@@ -2381,3 +2381,169 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .toggle-switch.on .toggle-switch-knob { transform: translateX(18px); }
 .toggle-switch:active .toggle-switch-knob { width: 26px; }
 .toggle-switch.on:active .toggle-switch-knob { transform: translateX(14px); }
+
+/* =====================================================================
+   Design System primitives — Button / Input / Selector
+   ---------------------------------------------------------------------
+   Source of truth for the reusable primitives in components/ui/.
+   Change these rules and every usage of <Button>, <Input>, <Textarea>,
+   <Selector> picks up the new look.
+   ===================================================================== */
+
+/* ---------- Button ---------- */
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform 120ms var(--ease),
+    background-color 180ms var(--ease),
+    border-color 180ms var(--ease),
+    color 180ms var(--ease),
+    opacity 180ms var(--ease);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.ds-btn:active { transform: scale(0.97); }
+.ds-btn:disabled,
+.ds-btn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+.ds-btn-block { width: 100%; }
+
+.ds-btn-label { line-height: 1; }
+.ds-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Sizes */
+.ds-btn-sm {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 10px;
+  border-radius: 11px;
+}
+.ds-btn-sm .ds-btn-icon { width: 9px; height: 9px; }
+.ds-btn-sm .ds-btn-icon svg { width: 9px; height: 9px; }
+
+.ds-btn-lg {
+  height: 52px;
+  padding: 0 24px;
+  font-size: 12px;
+  border-radius: 14px;
+}
+.ds-btn-lg .ds-btn-icon { width: 12px; height: 12px; }
+.ds-btn-lg .ds-btn-icon svg { width: 12px; height: 12px; }
+
+/* Variants */
+.ds-btn-primary {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.ds-btn-primary:active { background: #1a1a1a; }
+
+.ds-btn-secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border-ddd);
+}
+.ds-btn-secondary:active { background: rgba(0, 0, 0, 0.04); }
+
+/* ---------- Input + Textarea ---------- */
+.ds-input {
+  width: 100%;
+  color: var(--ink);
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  outline: none;
+  font-family: inherit;
+  transition:
+    background-color 220ms var(--ease),
+    border-color 220ms var(--ease),
+    padding 220ms var(--ease);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ds-input::placeholder { color: var(--ink-ghost); }
+.ds-input:focus { border-color: var(--border-strong); }
+.ds-input:disabled { opacity: 0.5; cursor: default; }
+
+.ds-input-standard {
+  padding: 16px 18px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+.ds-input-compact {
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  border-radius: 10px;
+}
+/* Compact + filled + unfocused → chrome fades out, text reads inline */
+.ds-input-compact:not(:focus):not(:placeholder-shown) {
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ds-input-textarea {
+  min-height: 80px;
+  line-height: 1.45;
+  resize: none;
+  display: block;
+}
+
+/* ---------- Selector (chip) ---------- */
+.ds-selector {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    transform 120ms var(--ease),
+    background-color 220ms var(--ease),
+    border-color 220ms var(--ease),
+    color 220ms var(--ease);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.ds-selector:active { transform: scale(0.97); }
+.ds-selector.is-selected {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.ds-selector:disabled,
+.ds-selector[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
