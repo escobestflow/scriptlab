@@ -912,7 +912,6 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background-size: 100% 100%;
   background-repeat: no-repeat;
   background-position: center;
-  border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
 }
 .layer-draft-trigger {
   display: inline-flex;
