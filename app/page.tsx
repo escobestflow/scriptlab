@@ -400,15 +400,12 @@ export default function Page() {
         </div>
       </nav>
 
-      {/* Menu panel — drops down from the top nav. Topbar (z:10) stays
-          visible above the panel (z:5). Autosave is deprioritized to a
-          small row near the bottom; primary items are AI / Export. */}
+      {/* Menu panel — drops down from the top nav. Topbar (z:30) stays
+          visible above the panel (z:25), and the panel covers the bottom
+          tabbar (z:20). Primary items on top; account row + autosave
+          collapsed at the bottom. */}
       <div className={`menu-panel ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}>
         <div className="menu-panel-inner">
-          {user && (
-            <div className="menu-panel-account">{user.email}</div>
-          )}
-
           <div className="menu-panel-list">
             {[
               { icon: <IconZap />,    label: "AI Connections" },
@@ -429,10 +426,27 @@ export default function Page() {
 
           <div className="menu-panel-spacer" />
 
-          {/* Deprioritized — small utility row, no caption */}
+          {/* Account row — email left, Sign out right, above the autosave divider */}
+          {user && (
+            <div
+              className="menu-panel-account-row"
+              style={{ ["--d" as any]: "200ms" }}
+            >
+              <span className="menu-panel-account-email">{user.email}</span>
+              <button
+                className="menu-panel-account-signout"
+                onClick={() => { setMenuOpen(false); signOut(); }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+
+          {/* Deprioritized autosave — small utility row, no caption.
+              Its top border is the divider that sits below the email row. */}
           <div
             className="menu-panel-utility"
-            style={{ ["--d" as any]: "220ms" }}
+            style={{ ["--d" as any]: "250ms" }}
             onClick={() => setAutosaveEnabled(!autosaveEnabled)}
             role="button"
             tabIndex={0}
@@ -457,14 +471,6 @@ export default function Page() {
               <span className="toggle-switch-knob" />
             </button>
           </div>
-
-          <button
-            className="menu-panel-signout"
-            style={{ ["--d" as any]: "270ms" }}
-            onClick={() => { setMenuOpen(false); signOut(); }}
-          >
-            Sign out
-          </button>
         </div>
       </div>
 
