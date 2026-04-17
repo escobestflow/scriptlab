@@ -1707,17 +1707,25 @@ function CharactersTab({
     <>
       <LayerDraftPicker layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
 
+      {/* Primary "+ Add character" lives at the top of the list. */}
+      <Button
+        variant="primary"
+        size="lg"
+        block
+        onClick={openCharTray}
+        style={{ marginBottom: 12 }}
+        icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+      >
+        Add character
+      </Button>
+
       {d.characters.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
           <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
           <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No characters yet</div>
-          <div className="caption" style={{ marginBottom: 16 }}>
+          <div className="caption">
             Create your first character to bring your story to life.
           </div>
-          <Button variant="primary" size="lg"
-            onClick={openCharTray}>
-            + Add character
-          </Button>
         </div>
       )}
 
@@ -1770,17 +1778,6 @@ function CharactersTab({
           </div>
         );
       })}
-
-      {d.characters.length > 0 && (
-        <Button
-          variant="secondary"
-          size="sm"
-          style={{ width: "100%", marginTop: 12 }}
-          onClick={openCharTray}
-        >
-          + Add character
-        </Button>
-      )}
 
       {/* Info banner */}
       <div className="info-banner" style={{ marginTop: 16 }}>
@@ -2552,44 +2549,10 @@ function BeatCreationForm({
 }) {
   const [name, setName] = useState("");
   const [summary, setSummary] = useState("");
-  const [recording, setRecording] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiSettings, setAISettings] = useState<BeatAISettings>(loadBeatAISettings);
-  const recognitionRef = useRef<any>(null);
-  const capturedRef = useRef("");
-
-  function toggleRecord() {
-    const SR: any =
-      typeof window !== "undefined"
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-        : null;
-    if (!SR) return;
-    if (recording) {
-      recognitionRef.current?.stop();
-      setRecording(false);
-      return;
-    }
-    capturedRef.current = "";
-    const rec = new SR();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-US";
-    rec.onresult = (e: any) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) capturedRef.current += e.results[i][0].transcript + " ";
-        else interim += e.results[i][0].transcript;
-      }
-      setSummary((capturedRef.current + interim).trim());
-    };
-    rec.onend = () => setRecording(false);
-    rec.onerror = () => setRecording(false);
-    recognitionRef.current = rec;
-    rec.start();
-    setRecording(true);
-  }
 
   async function callAI(actionType: string, payload: Record<string, any>,
     onResult: (parsed: any) => void) {
@@ -2653,34 +2616,14 @@ function BeatCreationForm({
       <Input placeholder="Beat name" value={name}
         onChange={e => setName(e.target.value)} />
 
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
-        <Textarea placeholder="Describe this beat"
-          value={summary} onChange={e => setSummary(e.target.value)} rows={4}
-          style={{ flex: 1, marginBottom: 0 }} />
-        <button
-          className={`record-fab ${recording ? "recording" : ""}`}
-          onClick={toggleRecord}
-          style={{ position: "static", boxShadow: "0 2px 12px rgba(0,0,0,0.08)", width: 52, height: 52, flexShrink: 0 }}
-        >
-          <div className="red-dot" style={{ width: 22, height: 22 }} />
-        </button>
-      </div>
-      {recording && (
-        <div className="caption" style={{ textAlign: "right" }}>Listening... tap to stop</div>
-      )}
+      <Textarea placeholder="Describe this beat"
+        value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
 
       {summary.trim() && (
-        <div style={{ display: "flex", gap: 8 }}>
-          <Button variant="secondary" size="sm" onClick={cleanUp}
-            disabled={cleaning || busy || generating}
-            style={{ flex: 1 }}>
-            {cleaning ? "Cleaning..." : "Clean up"}
-          </Button>
-          <Button variant="secondary" size="sm"
-            onClick={() => { setName(""); setSummary(""); }}>
-            Redo
-          </Button>
-        </div>
+        <Button variant="secondary" size="sm" block onClick={cleanUp}
+          disabled={cleaning || busy || generating}>
+          {cleaning ? "Cleaning..." : "Clean Up With AI"}
+        </Button>
       )}
 
       {showAISettings && (

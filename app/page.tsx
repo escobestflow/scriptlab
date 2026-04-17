@@ -506,19 +506,19 @@ export default function Page() {
       <div className={`create-modal ${createOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-header create-modal-header">
-          {/* Elevated step indicator — replaces the "New Project" title */}
+          {/* Elevated step indicator — centered in the header, no cancel button.
+              Completed steps show a checkmark; upcoming/active render an empty
+              node (no numbers). */}
           <div className="create-stepper create-stepper-compact" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={createStep + 1}>
             {(["Format", "Title", "Genre"] as const).map((name, i) => {
               const state = i < createStep ? "done" : i === createStep ? "active" : "upcoming";
               return (
                 <div key={name} className={`create-step create-step-${state}`}>
                   <div className="create-step-node">
-                    {state === "done" ? (
+                    {state === "done" && (
                       <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
-                    ) : (
-                      <span className="create-step-num">{i + 1}</span>
                     )}
                   </div>
                   <div className="create-step-label">{name}</div>
@@ -527,7 +527,6 @@ export default function Page() {
               );
             })}
           </div>
-          <Button variant="secondary" size="sm" onClick={closeCreateModal}>Cancel</Button>
         </div>
         <div className="create-modal-body">
           {createDraft && createStep === 0 && (
@@ -956,7 +955,6 @@ function CreateStepFormat({
   return (
     <>
       <div className="display heading">What are you making?</div>
-      <div className="body-text">Pick the format. This shapes how the project is organized.</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
         {PROJECT_TYPES.map(pt => (
           <button
@@ -1019,7 +1017,6 @@ function CreateStepTitle({
   return (
     <>
       <div className="display heading">Let{"'"}s name it.</div>
-      <div className="body-text">Give your story a working title. You can always change it later.</div>
       <Input
         placeholder="The Quiet Room"
         value={draft.title}
@@ -1051,7 +1048,6 @@ function CreateStepGenre({
   return (
     <>
       <div className="display heading">Set the genre.</div>
-      <div className="body-text">Select one or more genres to define the world of your story.</div>
       <div className="chip-row" style={{ marginTop: 8 }}>
         {ALL_GENRES.map(g => (
           <Selector
