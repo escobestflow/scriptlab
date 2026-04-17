@@ -892,10 +892,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 
 /* Layer draft picker (inside each tab) — iOS-style sticky toolbar.
-   The container is transparent. A dedicated .layer-draft-picker-bg child
-   div carries the frosted-glass background, blur, and hairline border; its
-   opacity is driven by JS (--picker-bg-opacity) so the bar's backdrop
-   fades in only as it approaches its sticky pinning point. */
+   Uses draft-bar-bg.svg as a fully-opaque gradient background. */
 .layer-draft-picker {
   position: sticky;
   /* Top offset matches the pinned header's bottom (set at runtime via JS) */
@@ -911,32 +908,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: center;
   gap: 12px;
   min-height: 44px;
-  background: transparent;
-}
-.layer-draft-picker-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 0;
-  pointer-events: none;
-  /* Solid near-white with a touch of alpha — matches .studio-header-sticky (#FBFCFD)
-     so the bar visually extends the sticky header when both are pinned. No
-     backdrop-filter here because it has compositing quirks on mobile Safari
-     where opacity transitions don't always commit. */
-  background: rgba(251, 252, 253, 0.94);
+  background-image: url('/draft-bar-bg.svg');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
   border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
-  /* Starts hidden. JS writes inline style.opacity directly from scroll events. */
-  opacity: 0;
-  /* Smooth any gap between rAF frames so the fade is never choppy. */
-  transition: opacity 60ms linear;
-  will-change: opacity;
-}
-/* Make sure the trigger + save button paint above the backdrop layer */
-.layer-draft-picker > :not(.layer-draft-picker-bg) {
-  position: relative;
-  z-index: 1;
 }
 .layer-draft-trigger {
   display: inline-flex;
@@ -1305,31 +1281,31 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  height: 22px;
+  height: 26px;
   margin-left: 6px;
-  padding: 0 4px;
-  border-radius: 7px;
+  padding: 0 5px;
+  border-radius: 8px;
   background: rgba(106, 78, 226, 0.06);
   color: #6a4ee2;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  vertical-align: -6px;
+  vertical-align: -8px;
   box-shadow: inset 0 0 0 1px rgba(106, 78, 226, 0.14);
 }
 .ai-pager-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   margin: 0;
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 5px;
   transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
 }
 .ai-pager-btn:hover:not(:disabled) {
@@ -1341,17 +1317,25 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .ai-pager-count {
   display: inline-flex;
-  align-items: baseline;
-  gap: 1px;
-  padding: 0 2px;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  padding: 0 3px;
   font-variant-numeric: tabular-nums;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.03em;
   line-height: 1;
 }
-.ai-pager-sep {
-  opacity: 0.55;
-  margin: 0 1px;
+
+/* In the static (expanded) attr-row header, push pager to the far right */
+.attr-row-header-static {
+  justify-content: space-between;
+}
+.attr-row-header-static .ai-pager,
+.attr-row-header .ai-pager {
+  margin-left: auto;
+  align-self: center;
+  vertical-align: baseline;
 }
 
 /* ======= CHARACTER FIELD — input/textarea with floating AI wand ======= */

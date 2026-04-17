@@ -706,82 +706,6 @@ function LayerDraftPicker({
   setStory: (u: (s: Story) => Story) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
-  const bgRef = useRef<HTMLDivElement>(null);
-
-  // Fade the bar's background in as it approaches its sticky pinning point.
-  // Uses direct inline style mutation on the bg layer (no CSS var indirection)
-  // plus both scroll-event and IntersectionObserver paths for reliability.
-  useEffect(() => {
-    const picker = pickerRef.current;
-    const bg = bgRef.current;
-    if (!picker || !bg) return;
-
-    const scroll = picker.closest(".studio-scroll") as HTMLElement | null;
-    // If we can't find the scroll container, show the background permanently
-    // so the bar is still readable. Better than invisible.
-    if (!scroll) {
-      bg.style.opacity = "1";
-      return;
-    }
-
-    const FADE_RANGE = 36; // px before pinning where the fade ramps 0 → 1
-    let rafId = 0;
-
-    const computeOpacity = () => {
-      rafId = 0;
-      const header = scroll.querySelector(".studio-header-sticky") as HTMLElement | null;
-      const stickyTop = header ? Math.max(0, header.offsetHeight - 44) : 0;
-      const pickerTop =
-        picker.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
-      const distance = pickerTop - stickyTop; // 0 when pinned, positive before
-      const progress = Math.max(0, Math.min(1, 1 - distance / FADE_RANGE));
-      bg.style.opacity = String(progress);
-    };
-
-    const onScroll = () => {
-      if (rafId) return;
-      rafId = requestAnimationFrame(computeOpacity);
-    };
-
-    // Initial compute + wire up listeners.
-    computeOpacity();
-    scroll.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", computeOpacity);
-
-    // Safety net: if scroll listener doesn't fire for any reason, an
-    // IntersectionObserver will at least snap the bar fully opaque when
-    // pinned. We use rootMargin top = -(stickyTop + 1) so the observer
-    // fires right when the picker touches the sticky threshold.
-    let io: IntersectionObserver | null = null;
-    const header = scroll.querySelector(".studio-header-sticky") as HTMLElement | null;
-    if (header && "IntersectionObserver" in window) {
-      const stickyTop = Math.max(0, header.offsetHeight - 44);
-      io = new IntersectionObserver(
-        (entries) => {
-          for (const e of entries) {
-            // When picker is no longer intersecting (i.e. its top has crossed
-            // the sticky line), force bg to 1. Otherwise let scroll handler drive.
-            if (!e.isIntersecting) bg.style.opacity = "1";
-            else computeOpacity();
-          }
-        },
-        {
-          root: scroll,
-          rootMargin: `-${stickyTop + 1}px 0px 0px 0px`,
-          threshold: [0, 1],
-        }
-      );
-      io.observe(picker);
-    }
-
-    return () => {
-      scroll.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", computeOpacity);
-      if (rafId) cancelAnimationFrame(rafId);
-      if (io) io.disconnect();
-    };
-  }, []);
 
   const pool = (
     layer === "concept"    ? story.conceptDrafts :
@@ -819,8 +743,7 @@ function LayerDraftPicker({
   };
 
   return (
-    <div className="layer-draft-picker" ref={pickerRef}>
-      <div className="layer-draft-picker-bg" ref={bgRef} aria-hidden="true" />
+    <div className="layer-draft-picker">
       <button
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
@@ -998,11 +921,11 @@ function HistoryPager({
         onClick={e => { e.stopPropagation(); onBack(); }}
         aria-label="Previous AI result"
       >
-        <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="15 18 9 12 15 6" />
         </svg>
       </button>
-      <span className="ai-pager-count">{cursor + 1}<span className="ai-pager-sep">/</span>{history.length}</span>
+      <span className="ai-pager-count">{cursor + 1}</span>
       <button
         type="button"
         className="ai-pager-btn"
@@ -1010,7 +933,7 @@ function HistoryPager({
         onClick={e => { e.stopPropagation(); onForward(); }}
         aria-label="Next AI result"
       >
-        <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </button>
@@ -1084,12 +1007,12 @@ function TextAttrRow({
           <span className="attr-label">
             {label}
             {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
-            {pager}
             {dot && <span className="sync-dot attr-dot" />}
           </span>
           <div className="attr-values">
             <span className="attr-placeholder">{placeholder}</span>
           </div>
+          {pager}
           <svg className="attr-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -1106,9 +1029,9 @@ function TextAttrRow({
         <span className="attr-label">
           {label}
           {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
-          {pager}
           {dot && <span className="sync-dot attr-dot" />}
         </span>
+        {pager}
       </div>
       <div className="attr-row-body">
         {multiline ? (
@@ -1664,8 +1587,8 @@ function CharField({
         />
       )}
       <div className="char-field-ai">
-        {pager}
         <AIWandButton onClick={onAI} loading={aiBusy} />
+        {pager}
       </div>
     </div>
   );
