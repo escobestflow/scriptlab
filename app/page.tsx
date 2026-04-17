@@ -1056,7 +1056,7 @@ function CreateStepFormat({
   return (
     <>
       <div className="display heading">What are you making?</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 25 }}>
         {PROJECT_TYPES.map(pt => (
           <button
             key={pt.value}

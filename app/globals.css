@@ -1840,10 +1840,12 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   justify-content: center;
 }
 .create-stepper-compact .create-step-node {
-  width: 20px;
-  height: 20px;
+  width: 14px;
+  height: 14px;
   font-size: 10px;
   border-width: 1.25px;
+  /* 2px bottom breathing room between dot and label */
+  margin-bottom: 2px;
 }
 .create-stepper-compact .create-step-label {
   font-size: 9px;
@@ -1851,8 +1853,21 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   letter-spacing: 0.05em;
 }
 .create-stepper-compact .create-step-track {
-  top: 9px; /* re-center on the smaller 20px node */
+  top: 6px; /* re-center on the smaller 14px node */
   height: 1.5px;
+}
+
+/* Compact active state — just a solid black dot, no ring / scale / pulse.
+   Matches the "done" fill so the current step reads as a simple filled node. */
+.create-stepper-compact .create-step-active .create-step-node {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+  transform: none;
+  box-shadow: none;
+}
+.create-stepper-compact .create-step-active .create-step-node::before {
+  display: none;
 }
 
 /* Elegant elevated stepper — labeled nodes with connecting track */
