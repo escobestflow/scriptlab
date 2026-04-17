@@ -393,7 +393,7 @@ export function Studio({
           {/* Project-level Save button — shown when layer combination changed */}
           {isProjectDraftDirty(story) && (
             <button className="project-save-btn" onClick={() => setStory(s => saveProjectDraft(s))}>
-              Save Draft
+              Save Project
             </button>
           )}
 
@@ -681,8 +681,8 @@ function LayerDraftPicker({
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
       {isDirty && (
-        <button className="draft-save-btn" onClick={handleSave} aria-label="Save changes">
-          Save Changes
+        <button className="draft-save-btn" onClick={handleSave} aria-label={`Save ${label}`}>
+          Save {label}
         </button>
       )}
       {open && (
