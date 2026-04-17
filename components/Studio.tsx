@@ -55,6 +55,11 @@ export function Studio({
     thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
   }, []);
 
+  // Reset scroll position when entering a project (or switching to a different one).
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [story.id]);
+
   // Measure pinned header height so the LayerDraftPicker can stick right below it.
   // The header pins at top: -44px, so its fully-pinned visible bottom is at (height - 44).
   useEffect(() => {
@@ -79,7 +84,9 @@ export function Studio({
   const [showSetup, setShowSetup] = useState(false);
   const [beatTrayOpen, setBeatTrayOpen] = useState(false);
   const [beatTrayInsertAt, setBeatTrayInsertAt] = useState<number | null>(null);
-  const [charTrayOpen, setCharTrayOpen] = useState(false);
+  // Character sheet — a single sheet used for BOTH creation and editing.
+  // null = closed. "new-char-draft" marker or an existing character id = open.
+  const [charSheetCharId, setCharSheetCharId] = useState<string | null>(null);
   // TV show episode drill-in
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
 
@@ -158,6 +165,51 @@ export function Studio({
   };
   const handleMarkLayerSynced = (layer: "characters" | "story" | "script") => {
     setStory(s => markLayerSynced(s, layer));
+  };
+
+  // ── Character sheet open/close ──
+  // Creating a character = optimistically insert a blank record, open its sheet,
+  // and discard on close if nothing was filled in. Editing = open by id.
+  const openExistingCharacterSheet = (id: string) => setCharSheetCharId(id);
+  const openNewCharacterSheet = () => {
+    const newChar: Character = {
+      id: "ch_" + Math.random().toString(36).slice(2),
+      name: "",
+      role: "supporting",
+      archetype: "",
+      backstory: "",
+      motivations: "",
+      flaws: "",
+      want: "",
+      need: "",
+      relationships: [],
+      voice: "",
+      arc: "",
+      notes: "",
+    };
+    setStory(s => updateCharactersDraft(s, {
+      characters: [...getActiveCharactersDraft(s).characters, newChar],
+    }));
+    setCharSheetCharId(newChar.id);
+  };
+  const closeCharacterSheet = () => {
+    const id = charSheetCharId;
+    if (!id) return;
+    // Auto-discard a blank character (no name + no details filled in).
+    setStory(s => {
+      const chars = getActiveCharactersDraft(s).characters;
+      const ch = chars.find(c => c.id === id);
+      if (!ch) return s;
+      const isBlank =
+        !ch.name.trim() && !ch.archetype && !ch.backstory && !ch.motivations &&
+        !ch.flaws && !ch.want && !ch.need && !ch.voice && !ch.arc && !ch.notes &&
+        ch.relationships.length === 0;
+      if (!isBlank) return s;
+      return updateCharactersDraft(s, {
+        characters: chars.filter(c => c.id !== id),
+      });
+    });
+    setCharSheetCharId(null);
   };
 
   async function run(action: ActionRequest, title: string) {
@@ -503,7 +555,8 @@ export function Studio({
               setStory={setStory}
               run={run}
               busy={busy}
-              openCharTray={() => setCharTrayOpen(true)}
+              openNewCharacter={openNewCharacterSheet}
+              openCharacter={openExistingCharacterSheet}
               autosaveEnabled={autosaveEnabled}
             />
           )}
@@ -592,41 +645,60 @@ export function Studio({
         </div>
       </div>
 
-      {/* Character creation tray — mirrors the beat tray UX */}
-      <div className={`sheet-backdrop ${charTrayOpen ? "open" : ""}`}
-        onClick={() => setCharTrayOpen(false)} />
-      <div className={`sheet sheet-tall ${charTrayOpen ? "open" : ""}`}>
-        <div className="sheet-handle" />
-        <div className="sheet-header">
-          <div className="sheet-title">New character</div>
-          <Button variant="secondary" size="sm" onClick={() => setCharTrayOpen(false)}>Cancel</Button>
-        </div>
-        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
-          <CharacterCreationForm
-            onSave={(name, role) => {
-              const newChar: Character = {
-                id: "ch_" + Math.random().toString(36).slice(2),
-                name,
-                role: role as Character["role"],
-                archetype: "",
-                backstory: "",
-                motivations: "",
-                flaws: "",
-                want: "",
-                need: "",
-                relationships: [],
-                voice: "",
-                arc: "",
-                notes: "",
-              };
-              setStory(s => updateCharactersDraft(s, {
-                characters: [...getActiveCharactersDraft(s).characters, newChar],
-              }));
-              setCharTrayOpen(false);
-            }}
-          />
-        </div>
-      </div>
+      {/* Character sheet — single sheet for both creation and editing.
+          Sheet title reflects whether the character already has a name. */}
+      {(() => {
+        const open = charSheetCharId !== null;
+        const activeChar = open
+          ? getActiveCharactersDraft(story).characters.find(c => c.id === charSheetCharId)
+          : null;
+        return (
+          <>
+            <div className={`sheet-backdrop ${open ? "open" : ""}`}
+              onClick={closeCharacterSheet} />
+            <div className={`sheet sheet-tall ${open ? "open" : ""}`}>
+              <div className="sheet-handle" />
+              <div className="sheet-header">
+                <div className="sheet-title">
+                  {activeChar?.name?.trim() || "New character"}
+                </div>
+                <Button variant="secondary" size="sm" onClick={closeCharacterSheet}>Close</Button>
+              </div>
+              <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+                {activeChar && (
+                  <CharacterEditForm
+                    character={activeChar}
+                    story={story}
+                    onUpdate={(patch) => {
+                      setStory(s => updateCharactersDraft(s, {
+                        characters: getActiveCharactersDraft(s).characters.map(c =>
+                          c.id === activeChar.id ? { ...c, ...patch } : c
+                        ),
+                      }));
+                    }}
+                    onRemove={() => {
+                      setStory(s => updateCharactersDraft(s, {
+                        characters: getActiveCharactersDraft(s).characters.filter(c => c.id !== activeChar.id),
+                      }));
+                      setCharSheetCharId(null);
+                    }}
+                  />
+                )}
+              </div>
+              <div className="sheet-sticky-footer">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  block
+                  onClick={closeCharacterSheet}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {confirmDeleteDialog}
     </>
@@ -1666,33 +1738,19 @@ function CharactersTab({
   setStory,
   run,
   busy,
-  openCharTray,
+  openNewCharacter,
+  openCharacter,
   autosaveEnabled = true,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
-  openCharTray: () => void;
+  openNewCharacter: () => void;
+  openCharacter: (id: string) => void;
   autosaveEnabled?: boolean;
 }) {
   const d = getActiveCharactersDraft(story);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [editingCharId, setEditingCharId] = useState<string | null>(null);
-
-  function updateCharacter(id: string, patch: Partial<Character>) {
-    setStory(s => updateCharactersDraft(s, {
-      characters: getActiveCharactersDraft(s).characters.map(c => c.id === id ? { ...c, ...patch } : c),
-    }));
-  }
-
-  function removeCharacter(id: string) {
-    setStory(s => updateCharactersDraft(s, {
-      characters: getActiveCharactersDraft(s).characters.filter(c => c.id !== id),
-    }));
-    if (expandedId === id) setExpandedId(null);
-    if (editingCharId === id) setEditingCharId(null);
-  }
 
   const roleLabels: Record<string, string> = {
     protagonist: "Protagonist",
@@ -1712,7 +1770,7 @@ function CharactersTab({
         variant="primary"
         size="lg"
         block
-        onClick={openCharTray}
+        onClick={openNewCharacter}
         style={{ marginBottom: 12 }}
         icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
       >
@@ -1729,125 +1787,34 @@ function CharactersTab({
         </div>
       )}
 
-      {d.characters.map(ch => {
-        const isExpanded = expandedId === ch.id;
-        const isEditing = editingCharId === ch.id;
-
-        return (
-          <div key={ch.id} className="card character-card">
-            {/* Character header row */}
-            <button
-              className="character-header"
-              onClick={() => setExpandedId(isExpanded ? null : ch.id)}
-            >
-              <div className="character-avatar">
-                {ch.name ? ch.name[0].toUpperCase() : "?"}
+      {/* Character rows — tapping opens the unified character sheet. */}
+      {d.characters.map(ch => (
+        <div key={ch.id} className="card character-card">
+          <button
+            className="character-header"
+            onClick={() => openCharacter(ch.id)}
+          >
+            <div className="character-avatar">
+              {ch.name ? ch.name[0].toUpperCase() : "?"}
+            </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 900 }}>
+                {ch.name || "Unnamed character"}
               </div>
-              <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontSize: 15, fontWeight: 900 }}>
-                  {ch.name || "Unnamed character"}
-                </div>
-                <div className="caption">
-                  {roleLabels[ch.role] || ch.role || "No role"}
-                  {ch.archetype && ` · ${ch.archetype}`}
-                </div>
+              <div className="caption">
+                {roleLabels[ch.role] || ch.role || "No role"}
+                {ch.archetype && ` · ${ch.archetype}`}
               </div>
-              <span className="beat-expand" style={{ transform: isExpanded ? "rotate(90deg)" : "none" }}>›</span>
-            </button>
-
-            {isExpanded && (
-              <div className="character-body">
-                {isEditing ? (
-                  <CharacterEditForm
-                    character={ch}
-                    story={story}
-                    onUpdate={(patch) => updateCharacter(ch.id, patch)}
-                    onDone={() => setEditingCharId(null)}
-                    onRemove={() => removeCharacter(ch.id)}
-                  />
-                ) : (
-                  <CharacterViewCard
-                    character={ch}
-                    allCharacters={d.characters}
-                    onEdit={() => setEditingCharId(ch.id)}
-                    onRemove={() => removeCharacter(ch.id)}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+            </div>
+            <span className="beat-expand">›</span>
+          </button>
+        </div>
+      ))}
 
       {/* Info banner */}
       <div className="info-banner" style={{ marginTop: 16 }}>
         <span className="info-icon">i</span>
         <span>Characters inform AI-generated beats, scenes, and dialogue.</span>
-      </div>
-    </>
-  );
-}
-
-/* ── Character view (read-only) ── */
-
-function CharacterViewCard({
-  character: ch,
-  allCharacters,
-  onEdit,
-  onRemove,
-}: {
-  character: Character;
-  allCharacters: Character[];
-  onEdit: () => void;
-  onRemove: () => void;
-}) {
-  const fields: { label: string; value: string }[] = [
-    { label: "Archetype", value: ch.archetype },
-    { label: "Backstory", value: ch.backstory },
-    { label: "Motivations", value: ch.motivations },
-    { label: "Flaws", value: ch.flaws },
-    { label: "Want (external)", value: ch.want },
-    { label: "Need (internal)", value: ch.need },
-    { label: "Voice / Style", value: ch.voice },
-    { label: "Arc", value: ch.arc },
-    { label: "Notes", value: ch.notes },
-  ].filter(f => f.value);
-
-  return (
-    <>
-      {fields.length === 0 && (
-        <div className="caption" style={{ padding: "8px 0" }}>
-          No details yet. Tap Edit to add character info.
-        </div>
-      )}
-      {fields.map(f => (
-        <div key={f.label} style={{ marginBottom: 10 }}>
-          <div className="beat-section-label">{f.label}</div>
-          <div className="beat-text">{f.value}</div>
-        </div>
-      ))}
-
-      {ch.relationships.length > 0 && (
-        <>
-          <div className="beat-section-label">Relationships</div>
-          {ch.relationships.map((r, i) => {
-            const other = allCharacters.find(c => c.id === r.characterId);
-            return (
-              <div key={i} className="inset-card" style={{ marginBottom: 6 }}>
-                <span style={{ fontWeight: 700 }}>{other?.name || "Unknown"}</span>
-                <span className="caption" style={{ marginLeft: 8 }}>{r.description}</span>
-              </div>
-            );
-          })}
-        </>
-      )}
-
-      <div className="beat-actions" style={{ marginTop: 12 }}>
-        <Button variant="primary" size="sm"
-          onClick={onEdit}>Edit</Button>
-        <Button variant="secondary" size="sm"
-          style={{ color: "var(--ink-mute)" }}
-          onClick={onRemove}>Remove</Button>
       </div>
     </>
   );
@@ -1859,16 +1826,21 @@ function CharacterEditForm({
   character: ch,
   story,
   onUpdate,
-  onDone,
   onRemove,
 }: {
   character: Character;
   story: Story;
   onUpdate: (patch: Partial<Character>) => void;
-  onDone: () => void;
   onRemove: () => void;
 }) {
-  const roles = ["protagonist", "antagonist", "supporting", "mentor", "love_interest", "comic_relief"];
+  const roles: { key: string; label: string }[] = [
+    { key: "protagonist",   label: "Protagonist" },
+    { key: "antagonist",    label: "Antagonist" },
+    { key: "supporting",    label: "Supporting" },
+    { key: "mentor",        label: "Mentor" },
+    { key: "love_interest", label: "Love Interest" },
+    { key: "comic_relief",  label: "Comic Relief" },
+  ];
   const [archetypeCustomOpen, setArchetypeCustomOpen] = useState(false);
   const [archetypeInput, setArchetypeInput] = useState("");
   const [aiBusy, setAiBusy] = useState<CharAIField | null>(null);
@@ -1984,13 +1956,18 @@ function CharacterEditForm({
         pager={pagerFor("name")}
       />
 
-      <div className="select-wrap">
-        <select className="field" value={ch.role}
-          onChange={e => onUpdate({ role: e.target.value })}>
-          {roles.map(r => (
-            <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
-          ))}
-        </select>
+      {/* Role — chip selector matching Concept tab (Genre, etc). */}
+      <div className="eyebrow" style={{ marginTop: 4 }}>Role</div>
+      <div className="chip-row">
+        {roles.map(r => (
+          <Selector
+            key={r.key}
+            selected={ch.role === r.key}
+            onClick={() => onUpdate({ role: r.key })}
+          >
+            {r.label}
+          </Selector>
+        ))}
       </div>
 
       {/* Archetype — 20 presets + custom input + AI */}
@@ -2123,12 +2100,18 @@ function CharacterEditForm({
         pager={pagerFor("notes")}
       />
 
-      <div className="beat-actions" style={{ marginTop: 4 }}>
-        <Button variant="primary" size="sm"
-          onClick={onDone}>Done</Button>
-        <Button variant="secondary" size="sm"
+      {/* Delete sits at the very bottom of the scrollable form — user must
+          scroll past every field to reach it. No top action, no Done button
+          (sheet Save is sticky in the footer). */}
+      <div style={{ marginTop: 24, display: "flex", justifyContent: "center" }}>
+        <Button
+          variant="secondary"
+          size="sm"
           style={{ color: "var(--ink-mute)" }}
-          onClick={onRemove}>Remove</Button>
+          onClick={onRemove}
+        >
+          Delete character
+        </Button>
       </div>
     </div>
   );
@@ -2456,13 +2439,19 @@ function ScriptTab({
         </div>
       )}
 
-      <div className="caption" style={{ marginBottom: 14 }}>
-        {writtenCount}/{beats.length} scenes written.
-      </div>
+      {beats.length > 0 && (
+        <div className="caption" style={{ marginBottom: 14 }}>
+          {writtenCount}/{beats.length} scenes written.
+        </div>
+      )}
 
       {beats.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-          <div className="caption">No beats yet. Go to <b>Story</b> to structure first.</div>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>&#127916;</div>
+          <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No scenes yet</div>
+          <div className="caption">
+            Add beats in the <b>Story</b> tab first, then return here to write them into scenes.
+          </div>
         </div>
       )}
 
@@ -2665,62 +2654,6 @@ function BeatCreationForm({
         </Button>
         <Button variant="primary" size="sm" onClick={() => onSave(name || "Untitled beat", summary)}
           disabled={!summary.trim()}>
-          Save
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================ */
-/* ======== CHARACTER CREATION FORM =========== */
-/* ============================================ */
-
-function CharacterCreationForm({
-  onSave,
-}: {
-  onSave: (name: string, role: string) => void;
-}) {
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<string>("supporting");
-  const roles = [
-    { key: "protagonist",   label: "Protagonist" },
-    { key: "antagonist",    label: "Antagonist" },
-    { key: "supporting",    label: "Supporting" },
-    { key: "mentor",        label: "Mentor" },
-    { key: "love_interest", label: "Love Interest" },
-    { key: "comic_relief",  label: "Comic Relief" },
-  ];
-  return (
-    <div className="stack">
-      <Input
-        placeholder="Character name"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        autoFocus
-      />
-
-      <div className="eyebrow" style={{ marginTop: 8 }}>Role</div>
-      <div className="chip-row">
-        {roles.map(r => (
-          <Selector
-            key={r.key}
-            selected={role === r.key}
-            onClick={() => setRole(r.key)}
-          >
-            {r.label}
-          </Selector>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => onSave(name.trim() || "Unnamed character", role)}
-          disabled={!name.trim()}
-          style={{ flex: 1 }}
-        >
           Save
         </Button>
       </div>

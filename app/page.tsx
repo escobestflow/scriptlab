@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Story, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, updateConceptDraft } from "@/lib/story";
+import { Story, getActiveConceptDraft, getActiveStoryLayerDraft, updateConceptDraft } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
@@ -198,19 +198,6 @@ export default function Page() {
     setEditingMoment(null);
   }
 
-  function projectProgress(p: Story): number {
-    const concept = getActiveConceptDraft(p);
-    const chars = getActiveCharactersDraft(p);
-    const storyL = getActiveStoryLayerDraft(p);
-    let score = 0;
-    if (p.title) score += 10;
-    if (concept.logline) score += 10;
-    score += Math.min(chars.characters.length * 10, 20);
-    score += Math.min(storyL.ingredients.length * 5, 15);
-    score += Math.min(storyL.beats.length * 3, 45);
-    return Math.min(score, 100);
-  }
-
   // ── Auth loading ──
   if (authLoading) {
     return (
@@ -225,7 +212,7 @@ export default function Page() {
     return (
       <div className="app" style={{ alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
         <div style={{ marginBottom: 8 }}>
-          <img src="/logo.svg" alt="PlotTwist" style={{ width: 120, height: 18 }} />
+          <img src="/logo.svg" alt="Unfold" style={{ width: 86, height: 18.5 }} />
         </div>
         <div className="display" style={{ marginBottom: 8 }}>
           Your stories,{"\n"}structured.
@@ -332,7 +319,7 @@ export default function Page() {
             <img src="/menu-icon.svg" alt="" style={{ width: 22, height: 15 }} />
           </button>
           <div className="topbar-center">
-            <img src="/logo.svg" alt="PlotTwist" className="brand-logo-img" />
+            <img src="/logo.svg" alt="Unfold" className="brand-logo-img" />
           </div>
           <div style={{ width: 44 }} />
         </div>
@@ -343,7 +330,6 @@ export default function Page() {
                 projects={projects}
                 onOpen={(id) => setView({ kind: "studio", projectId: id })}
                 onNew={openCreateModal}
-                progress={projectProgress}
               />
             )}
             {mainTab === "moments" && (
@@ -402,7 +388,7 @@ export default function Page() {
       />
       <div className={`menu-drawer ${menuOpen ? "open" : ""}`}>
         <div className="menu-header">
-          <img src="/logo.svg" alt="PlotTwist" style={{ width: 100, height: 15 }} />
+          <img src="/logo.svg" alt="Unfold" style={{ width: 86, height: 18.5 }} />
         </div>
         {user && (
           <div style={{ fontSize: 13, color: "var(--ink-mute)", marginBottom: 16 }}>
@@ -795,12 +781,11 @@ function MomentEditForm({
 /* ============================================ */
 
 function ProjectsTab({
-  projects, onOpen, onNew, progress,
+  projects, onOpen, onNew,
 }: {
   projects: Story[];
   onOpen: (id: string) => void;
   onNew: () => void;
-  progress: (p: Story) => number;
 }) {
   return (
     <>
@@ -817,7 +802,6 @@ function ProjectsTab({
       </div>
 
       {projects.map(p => {
-        const pct = progress(p);
         const c = getActiveConceptDraft(p);
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
@@ -835,18 +819,13 @@ function ProjectsTab({
             <div className="project-info">
               <div className="project-title">{p.title || "Untitled"}</div>
               <div className="project-genre">
-                {c.settings.genres?.length > 0
-                  ? c.settings.genres.map((g: string) => <span key={g} className="genre-pill">{g}</span>)
-                  : null
-                }
+                {c.settings.genres?.length > 0 && c.settings.genres.map((g: string) => (
+                  <span key={g} className="genre-pill">{g}</span>
+                ))}
                 <span className="genre-pill">{c.settings.framework.replace(/-/g, " ")}</span>
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
-              <div className="progress-bar">
-                <div className="fill" style={{ width: `${pct}%` }} />
-              </div>
             </div>
-            <div className="project-arrow">›</div>
           </button>
         );
       })}
