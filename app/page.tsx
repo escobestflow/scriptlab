@@ -333,7 +333,11 @@ export default function Page() {
               />
             )}
             {mainTab === "moments" && (
-              <MomentsTab moments={moments} onEdit={(m) => setEditingMoment(m)} />
+              <MomentsTab
+                moments={moments}
+                onEdit={(m) => setEditingMoment(m)}
+                onAdd={saveDraftMoment}
+              />
             )}
           </div>
         </div>
@@ -841,9 +845,26 @@ function ProjectsTab({
 
 const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image"] as const;
 
-function MomentsTab({ moments, onEdit }: { moments: Moment[]; onEdit: (m: Moment) => void }) {
+function MomentsTab({
+  moments,
+  onEdit,
+  onAdd,
+}: {
+  moments: Moment[];
+  onEdit: (m: Moment) => void;
+  onAdd: (text: string, type: Moment["type"]) => void;
+}) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All");
+  const [newText, setNewText] = useState("");
+  const [newType, setNewType] = useState<Moment["type"]>("scene");
+
+  function submitNew() {
+    const text = newText.trim();
+    if (!text) return;
+    onAdd(text, newType);
+    setNewText("");
+  }
 
   const filtered = moments.filter(m => {
     if (filter !== "All" && m.type !== filter.toLowerCase()) return false;
@@ -865,7 +886,46 @@ function MomentsTab({ moments, onEdit }: { moments: Moment[]; onEdit: (m: Moment
 
   return (
     <>
-      <div className="display" style={{ marginBottom: 16 }}>Moments</div>
+      <div className="display" style={{ marginBottom: 20, marginTop: 40 }}>Moments</div>
+
+      {/* Manual add — type a moment without using voice capture. */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+          Add a moment
+        </span>
+        <textarea
+          className="attr-text-input"
+          placeholder="A line, a scene, a joke, a memory…"
+          value={newText}
+          onChange={e => setNewText(e.target.value)}
+          rows={2}
+          style={{ marginBottom: 10 }}
+        />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <select
+            value={newType}
+            onChange={e => setNewType(e.target.value as Moment["type"])}
+            className="attr-text-input"
+            style={{ width: "auto", flex: "0 0 auto", padding: "8px 10px" }}
+          >
+            <option value="scene">Scene</option>
+            <option value="dialogue">Dialogue</option>
+            <option value="joke">Joke</option>
+            <option value="memory">Memory</option>
+            <option value="character">Character</option>
+            <option value="image">Image</option>
+          </select>
+          <div style={{ flex: 1 }} />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={submitNew}
+            disabled={!newText.trim()}
+          >
+            Save moment
+          </Button>
+        </div>
+      </div>
 
       <div className="search-bar">
         <IconSearch />
@@ -895,12 +955,17 @@ function MomentsTab({ moments, onEdit }: { moments: Moment[]; onEdit: (m: Moment
         <div style={{ textAlign: "center", padding: "40px 0", color: "var(--ink-mute)", fontSize: 14 }}>
           {search || filter !== "All"
             ? "No moments match your filter."
-            : "Tap the red button to capture your first moment."}
+            : "Tap the red button below, or use the Add a moment card above."}
         </div>
       )}
 
       {filtered.map(m => (
-        <div key={m.id} className="moment-card" onClick={() => onEdit(m)} style={{ cursor: "pointer" }}>
+        <div
+          key={m.id}
+          className="card moment-item"
+          onClick={() => onEdit(m)}
+          style={{ cursor: "pointer", marginBottom: 12 }}
+        >
           <div className="moment-type">{m.type}</div>
           <div className="moment-text">{m.text}</div>
           {m.tags.length > 0 && (
