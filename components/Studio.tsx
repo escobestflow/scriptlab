@@ -2076,55 +2076,75 @@ function SettingsTab({
         </div>
       </div>
 
-      {/* Layer drafts — consolidated compact view */}
-      <div className="card">
-        <span className="eyebrow">Layer Drafts</span>
-        <div className="caption" style={{ marginTop: 4, marginBottom: 10 }}>
-          Individual drafts per layer. Delete is disabled while a project draft references the draft.
-        </div>
-        <div className="layer-drafts-grid">
-          {([
-            { layer: "concept" as LayerKey,    label: "Concept",    pool: story.conceptDrafts,    refKey: "conceptDraftId"    as const },
-            { layer: "characters" as LayerKey, label: "Characters", pool: story.charactersDrafts, refKey: "charactersDraftId" as const },
-            { layer: "story" as LayerKey,      label: "Story",      pool: story.storyDrafts,      refKey: "storyDraftId"      as const },
-            { layer: "script" as LayerKey,     label: "Script",     pool: story.scriptDrafts,     refKey: "scriptDraftId"     as const },
-          ]).map(({ layer, label, pool, refKey }) => {
-            const activePD = getActiveProjectDraft(story);
-            const activeDraftId = activePD?.[refKey];
-            const sorted = [...pool].sort((a, b) => a.number - b.number);
-            return (
-              <div key={layer} className="layer-drafts-row">
-                <div className="layer-drafts-label">{label}</div>
-                <div className="layer-drafts-chips">
-                  {sorted.map(d => {
-                    const isActive = d.id === activeDraftId;
-                    const referenced = story.projectDrafts.some(pd => pd[refKey] === d.id);
-                    const canDelete = !referenced && pool.length > 1;
-                    return (
-                      <span key={d.id} className={`layer-draft-chip ${isActive ? "active" : ""}`}>
-                        <span className="layer-draft-chip-num">{d.number}</span>
-                        {canDelete && (
-                          <button
-                            className="layer-draft-chip-del"
-                            aria-label={`Delete ${label} Draft ${d.number}`}
-                            onClick={() => {
-                              if (confirm(`Delete ${label} Draft ${d.number}?`)) {
-                                onDeleteLayerDraft(layer, d.id);
-                              }
-                            }}
-                          >
-                            &#10005;
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      {/* Layer drafts — per-section list, each line item shows usage + delete */}
+      {([
+        { layer: "concept" as LayerKey,    label: "Concept Drafts",    pool: story.conceptDrafts,    refKey: "conceptDraftId"    as const },
+        { layer: "characters" as LayerKey, label: "Characters Drafts", pool: story.charactersDrafts, refKey: "charactersDraftId" as const },
+        { layer: "story" as LayerKey,      label: "Story Drafts",      pool: story.storyDrafts,      refKey: "storyDraftId"      as const },
+        { layer: "script" as LayerKey,     label: "Script Drafts",     pool: story.scriptDrafts,     refKey: "scriptDraftId"     as const },
+      ]).map(({ layer, label, pool, refKey }) => {
+        const activePD = getActiveProjectDraft(story);
+        const activeDraftId = activePD?.[refKey];
+        const sorted = [...pool].sort((a, b) => a.number - b.number);
+        return (
+          <div key={layer} className="card">
+            <span className="eyebrow">{label}</span>
+            <div className="layer-draft-list">
+              {sorted.map(d => {
+                const isActive = d.id === activeDraftId;
+                const usedByPDs = story.projectDrafts
+                  .filter(pd => pd[refKey] === d.id)
+                  .sort((a, b) => a.number - b.number);
+                const referenced = usedByPDs.length > 0;
+                const canDelete = !referenced && pool.length > 1;
+                const usageLabel = referenced
+                  ? usedByPDs.length === 1
+                    ? `Used in Project Draft ${usedByPDs[0].number}`
+                    : `Used in Project Drafts ${usedByPDs.map(pd => pd.number).join(", ")}`
+                  : "Not used in any Project Draft";
+                return (
+                  <div key={d.id} className="layer-draft-item">
+                    <div className="layer-draft-item-info">
+                      <div className="layer-draft-item-title">
+                        Draft {d.number}
+                        {isActive && <span className="caption" style={{ marginLeft: 8 }}>· Active</span>}
+                      </div>
+                      <div className="caption" style={{ marginTop: 2 }}>{usageLabel}</div>
+                      <div className="caption" style={{ marginTop: 2 }}>Edited {formatDate(d.updatedAt)}</div>
+                    </div>
+                    <button
+                      className="btn-secondary"
+                      style={{
+                        fontSize: 12,
+                        padding: "6px 12px",
+                        minHeight: 0,
+                        color: "var(--record)",
+                        opacity: canDelete ? 1 : 0.4,
+                        cursor: canDelete ? "pointer" : "not-allowed",
+                      }}
+                      disabled={!canDelete}
+                      title={
+                        !canDelete && referenced
+                          ? "Cannot delete: used by a Project Draft"
+                          : !canDelete
+                            ? "Cannot delete the only draft"
+                            : undefined
+                      }
+                      onClick={() => {
+                        if (canDelete && confirm(`Delete Draft ${d.number}?`)) {
+                          onDeleteLayerDraft(layer, d.id);
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
 
       {/* Danger zone: delete project */}
       <div className="card" style={{ marginTop: 20 }}>

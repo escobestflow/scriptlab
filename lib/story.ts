@@ -535,24 +535,9 @@ export function isProjectDraftDirty(story: Story): boolean {
 }
 
 // ── Per-tab change detection (for tab bar dots) ──
-// A tab shows a dot if its layer draft ID has changed since the project
-// was saved, OR if the active layer draft has unsaved edits.
+// A tab shows a dot only when the active layer draft has unsaved option
+// edits. Creating or switching drafts alone does NOT trigger the dot.
 export function isLayerChangedForTabDot(story: Story, layer: LayerKey): boolean {
-  const pd = getActiveProjectDraft(story);
-  if (!pd) return false;
-
-  const currentId =
-    layer === "concept"    ? pd.conceptDraftId :
-    layer === "characters" ? pd.charactersDraftId :
-    layer === "story"      ? pd.storyDraftId :
-                             pd.scriptDraftId;
-  const savedId =
-    layer === "concept"    ? pd.savedConceptDraftId :
-    layer === "characters" ? pd.savedCharactersDraftId :
-    layer === "story"      ? pd.savedStoryDraftId :
-                             pd.savedScriptDraftId;
-  if (savedId && currentId !== savedId) return true;
-
   const draft =
     layer === "concept"    ? getActiveConceptDraft(story) :
     layer === "characters" ? getActiveCharactersDraft(story) :
