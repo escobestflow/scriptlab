@@ -1415,10 +1415,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* Sync banner */
 .sync-banner {
+  position: relative;
   background: var(--sync-bg);
   border: 1px solid var(--sync-border);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 12px 36px 12px 14px; /* right padding leaves room for the close X */
   margin-bottom: 12px;
 }
 .sync-banner-text {
@@ -1430,6 +1431,28 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: flex;
   gap: 8px;
   margin-top: 10px;
+}
+.sync-banner-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--sync);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: background 160ms var(--ease), opacity 160ms var(--ease);
+}
+.sync-banner-close:hover { opacity: 1; }
+.sync-banner-close:active {
+  background: rgba(0, 0, 0, 0.05);
+  opacity: 1;
 }
 
 /* Character card styles */

@@ -2174,16 +2174,6 @@ function StoryTab({
     <>
       <LayerDraftPicker layer="story" label="Story" story={story} setStory={setStory} />
 
-      {/* Out-of-sync banner */}
-      {syncState.storyOutOfSync && (
-        <div className="sync-banner">
-          <div className="sync-banner-text">
-            <span className="sync-dot inline" />
-            Concept or Characters were updated. Your beat sheet may be out of date.
-          </div>
-        </div>
-      )}
-
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {beats.length === 0 && (
           <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
@@ -2420,7 +2410,10 @@ function ScriptTab({
   const d = getActiveScriptDraft(story);
   const syncState = getLayerSyncState(story);
   const writtenCount = beats.filter(b => b.status === "written").length;
-  const isOutOfSync = syncState.scriptOutOfSync;
+  // Only surface the sync banner once there's an actual script to be out of
+  // date — i.e., at least one scene has been written.
+  const hasProducedScript = writtenCount > 0;
+  const isOutOfSync = syncState.scriptOutOfSync && hasProducedScript;
 
   function dismissSync() {
     setStory(s => markLayerSynced(s, "script"));
@@ -2430,19 +2423,22 @@ function ScriptTab({
     <>
       <LayerDraftPicker layer="script" label="Script" story={story} setStory={setStory} />
 
-      {/* Out-of-sync banner */}
+      {/* Out-of-sync banner — only after a script has been produced */}
       {isOutOfSync && (
         <div className="sync-banner">
+          <button
+            className="sync-banner-close"
+            onClick={dismissSync}
+            aria-label="Dismiss"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          </button>
           <div className="sync-banner-text">
             <span className="sync-dot inline" />
             Upstream content was updated.
             <br />Your script may need to be refreshed.
-          </div>
-          <div className="sync-banner-actions">
-            <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 12px", minHeight: 0 }}
-              onClick={dismissSync}>
-              Keep current draft
-            </button>
           </div>
         </div>
       )}
