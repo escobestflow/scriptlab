@@ -771,7 +771,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: center;
   gap: 6px;
   margin-top: -13px;
-  margin-bottom: 5px;
+  margin-bottom: 0;
   background: none;
   border: none;
   padding: 4px 8px;
@@ -891,45 +891,57 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin: 4px 0;
 }
 
-/* Layer draft picker (inside each tab) */
+/* Layer draft picker (inside each tab) — iOS-style sticky toolbar */
 .layer-draft-picker {
   position: sticky;
   /* Top offset matches the pinned header's bottom (set at runtime via JS) */
   top: var(--draft-picker-top, 120px);
   z-index: 9;
-  /* Extend horizontally to page edges (tab body has 22px horizontal padding) */
-  margin: 0 -22px 12px;
-  padding: 10px 22px;
+  /* Extend horizontally to page edges (tab body has 22px horizontal padding).
+     Negative top margin = 1px overlap with the pinned tab bar to prevent any
+     sub-pixel seam from the offsetHeight-based --draft-picker-top calc. */
+  margin: -1px -22px 14px;
+  padding: 10px 20px 9px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  /* Solid bg on top so content scrolling under is cleanly masked, then fade */
-  background:
-    linear-gradient(180deg, var(--bg) 0%, var(--bg) 72%, rgba(253,254,254,0) 100%);
-  /* Hairline separator at bottom for clear edge when pinned */
-  box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+  gap: 12px;
+  min-height: 44px;
+  /* Frosted glass — translucent with saturation boost, like iOS nav bars */
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  /* Hairline separator at the bottom edge when pinned */
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
 }
 .layer-draft-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  background: var(--bg-secondary);
+  gap: 4px;
+  padding: 6px 2px;
+  background: transparent;
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-family: 'Lato', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--ink-soft);
+  font-family: 'Lato', -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  transition: opacity 140ms var(--ease);
 }
 .layer-draft-trigger:active {
-  background: var(--border);
+  opacity: 0.45;
+}
+.layer-draft-trigger .drafts-caret {
+  width: 9px;
+  height: 6px;
+  margin-left: 2px;
+  opacity: 0.55;
 }
 .layer-draft-label {
-  text-transform: uppercase;
+  /* Apple uses sentence case, not uppercase, for nav titles */
+  text-transform: none;
 }
 .layer-draft-menu {
   top: calc(100% + 4px);
@@ -939,26 +951,26 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   min-width: 200px;
 }
 
-/* Layer-level Save button — shown when layer has unsaved edits */
+/* Layer-level Save button — shown when layer has unsaved edits (Apple-style pill) */
 .draft-save-btn {
-  padding: 6px 14px;
+  padding: 7px 16px;
   background: var(--ink);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  font-family: 'Lato', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  border-radius: 999px;
+  font-family: 'Lato', -apple-system, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-transform: none;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-  transition: transform 160ms var(--ease), box-shadow 160ms var(--ease);
+  box-shadow: none;
+  transition: transform 140ms var(--ease), opacity 140ms var(--ease);
   animation: saveBtnIn 220ms var(--ease);
 }
 .draft-save-btn:active {
-  transform: scale(0.97);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  transform: scale(0.96);
+  opacity: 0.85;
 }
 
 /* Project-level Save Draft button — shown when combination changed */
@@ -1134,8 +1146,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   width: 100%;
   display: flex;
   justify-content: center;
-  padding: 4px 0 8px;
-  margin-top: 20px;
+  padding: 0;
+  margin-top: 0;
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */
