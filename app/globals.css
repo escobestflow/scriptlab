@@ -915,14 +915,23 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .layer-draft-picker-bg {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 0;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.72);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-  backdrop-filter: saturate(180%) blur(20px);
+  /* Solid near-white with a touch of alpha — matches .studio-header-sticky (#FBFCFD)
+     so the bar visually extends the sticky header when both are pinned. No
+     backdrop-filter here because it has compositing quirks on mobile Safari
+     where opacity transitions don't always commit. */
+  background: rgba(251, 252, 253, 0.94);
   border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
-  opacity: var(--picker-bg-opacity, 0);
+  /* Starts hidden. JS writes inline style.opacity directly from scroll events. */
+  opacity: 0;
+  /* Smooth any gap between rAF frames so the fade is never choppy. */
+  transition: opacity 60ms linear;
+  will-change: opacity;
 }
 /* Make sure the trigger + save button paint above the backdrop layer */
 .layer-draft-picker > :not(.layer-draft-picker-bg) {

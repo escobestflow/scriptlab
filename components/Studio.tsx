@@ -707,39 +707,79 @@ function LayerDraftPicker({
 }) {
   const [open, setOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const bgRef = useRef<HTMLDivElement>(null);
 
   // Fade the bar's background in as it approaches its sticky pinning point.
-  // The trigger + save button stay fully visible; only the backdrop fades.
+  // Uses direct inline style mutation on the bg layer (no CSS var indirection)
+  // plus both scroll-event and IntersectionObserver paths for reliability.
   useEffect(() => {
     const picker = pickerRef.current;
-    if (!picker) return;
-    const scroll = picker.closest(".studio-scroll") as HTMLElement | null;
-    const header = scroll?.querySelector(".studio-header-sticky") as HTMLElement | null;
-    if (!scroll || !header) return;
+    const bg = bgRef.current;
+    if (!picker || !bg) return;
 
-    const FADE_RANGE = 28; // px before pinning where the fade starts
+    const scroll = picker.closest(".studio-scroll") as HTMLElement | null;
+    // If we can't find the scroll container, show the background permanently
+    // so the bar is still readable. Better than invisible.
+    if (!scroll) {
+      bg.style.opacity = "1";
+      return;
+    }
+
+    const FADE_RANGE = 36; // px before pinning where the fade ramps 0 → 1
     let rafId = 0;
 
-    const check = () => {
+    const computeOpacity = () => {
       rafId = 0;
-      const stickyTop = Math.max(0, header.offsetHeight - 44);
+      const header = scroll.querySelector(".studio-header-sticky") as HTMLElement | null;
+      const stickyTop = header ? Math.max(0, header.offsetHeight - 44) : 0;
       const pickerTop =
         picker.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
       const distance = pickerTop - stickyTop; // 0 when pinned, positive before
       const progress = Math.max(0, Math.min(1, 1 - distance / FADE_RANGE));
-      picker.style.setProperty("--picker-bg-opacity", progress.toFixed(3));
+      bg.style.opacity = String(progress);
     };
 
     const onScroll = () => {
       if (rafId) return;
-      rafId = requestAnimationFrame(check);
+      rafId = requestAnimationFrame(computeOpacity);
     };
 
-    check();
+    // Initial compute + wire up listeners.
+    computeOpacity();
     scroll.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", computeOpacity);
+
+    // Safety net: if scroll listener doesn't fire for any reason, an
+    // IntersectionObserver will at least snap the bar fully opaque when
+    // pinned. We use rootMargin top = -(stickyTop + 1) so the observer
+    // fires right when the picker touches the sticky threshold.
+    let io: IntersectionObserver | null = null;
+    const header = scroll.querySelector(".studio-header-sticky") as HTMLElement | null;
+    if (header && "IntersectionObserver" in window) {
+      const stickyTop = Math.max(0, header.offsetHeight - 44);
+      io = new IntersectionObserver(
+        (entries) => {
+          for (const e of entries) {
+            // When picker is no longer intersecting (i.e. its top has crossed
+            // the sticky line), force bg to 1. Otherwise let scroll handler drive.
+            if (!e.isIntersecting) bg.style.opacity = "1";
+            else computeOpacity();
+          }
+        },
+        {
+          root: scroll,
+          rootMargin: `-${stickyTop + 1}px 0px 0px 0px`,
+          threshold: [0, 1],
+        }
+      );
+      io.observe(picker);
+    }
+
     return () => {
       scroll.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", computeOpacity);
       if (rafId) cancelAnimationFrame(rafId);
+      if (io) io.disconnect();
     };
   }, []);
 
@@ -780,7 +820,7 @@ function LayerDraftPicker({
 
   return (
     <div className="layer-draft-picker" ref={pickerRef}>
-      <div className="layer-draft-picker-bg" aria-hidden="true" />
+      <div className="layer-draft-picker-bg" ref={bgRef} aria-hidden="true" />
       <button
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
