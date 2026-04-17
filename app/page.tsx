@@ -315,8 +315,15 @@ export default function Page() {
     return (
       <>
         <div className="topbar topbar-dark">
-          <button className="topbar-btn" onClick={() => setMenuOpen(true)} aria-label="Menu">
-            <img src="/menu-icon.svg" alt="" style={{ width: 22, height: 15 }} />
+          <button
+            className="topbar-btn"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+          >
+            <span className={`menu-toggle ${menuOpen ? "open" : ""}`}>
+              <span /><span /><span />
+            </span>
           </button>
           <div className="topbar-center">
             <img src="/logo.svg" alt="Unfold" className="brand-logo-img" />
@@ -385,69 +392,72 @@ export default function Page() {
         </div>
       </nav>
 
-      {/* Menu drawer */}
-      <div
-        className={`menu-backdrop ${menuOpen ? "open" : ""}`}
-        onClick={() => setMenuOpen(false)}
-      />
-      <div className={`menu-drawer ${menuOpen ? "open" : ""}`}>
-        <div className="menu-header">
-          <img src="/logo.svg" alt="Unfold" style={{ width: 86, height: 18.5 }} />
-        </div>
-        {user && (
-          <div style={{ fontSize: 13, color: "var(--ink-mute)", marginBottom: 16 }}>
-            {user.email}
+      {/* Menu panel — drops down from the top nav. Topbar (z:10) stays
+          visible above the panel (z:5). Autosave is deprioritized to a
+          small row near the bottom; primary items are AI / Export. */}
+      <div className={`menu-panel ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}>
+        <div className="menu-panel-inner">
+          {user && (
+            <div className="menu-panel-account">{user.email}</div>
+          )}
+
+          <div className="menu-panel-list">
+            {[
+              { icon: <IconZap />,    label: "AI Connections" },
+              { icon: <IconExport />, label: "Export Scripts" },
+            ].map((item, i) => (
+              <button
+                key={item.label}
+                className="menu-panel-item"
+                style={{ ["--d" as any]: `${60 + i * 50}ms` }}
+                onClick={() => setMenuOpen(false)}
+              >
+                {item.icon}
+                <span className="label">{item.label}</span>
+                <span className="arrow">›</span>
+              </button>
+            ))}
           </div>
-        )}
-        {/* Autosave toggle — replaces the old "Settings" stub row.
-            Inline iOS-style toggle keeps menu flat; no sub-sheet needed. */}
-        <div
-          className="menu-item menu-item-toggle"
-          onClick={() => setAutosaveEnabled(!autosaveEnabled)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setAutosaveEnabled(!autosaveEnabled);
-            }
-          }}
-        >
-          <IconSettings />
-          <div className="menu-item-text">
-            <div className="label">Autosave edits</div>
-            <div className="menu-item-caption">
-              Saves drafts as you type. Turn off to use manual save buttons.
-            </div>
-          </div>
-          <button
-            type="button"
-            className={`toggle-switch ${autosaveEnabled ? "on" : ""}`}
-            aria-label="Toggle autosave"
-            aria-pressed={autosaveEnabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              setAutosaveEnabled(!autosaveEnabled);
+
+          <div className="menu-panel-spacer" />
+
+          {/* Deprioritized — small utility row, no caption */}
+          <div
+            className="menu-panel-utility"
+            style={{ ["--d" as any]: "220ms" }}
+            onClick={() => setAutosaveEnabled(!autosaveEnabled)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setAutosaveEnabled(!autosaveEnabled);
+              }
             }}
           >
-            <span className="toggle-switch-knob" />
+            <span className="label">Autosave edits</span>
+            <button
+              type="button"
+              className={`toggle-switch toggle-switch-dark ${autosaveEnabled ? "on" : ""}`}
+              aria-label="Toggle autosave"
+              aria-pressed={autosaveEnabled}
+              onClick={(e) => {
+                e.stopPropagation();
+                setAutosaveEnabled(!autosaveEnabled);
+              }}
+            >
+              <span className="toggle-switch-knob" />
+            </button>
+          </div>
+
+          <button
+            className="menu-panel-signout"
+            style={{ ["--d" as any]: "270ms" }}
+            onClick={() => { setMenuOpen(false); signOut(); }}
+          >
+            Sign out
           </button>
         </div>
-        {[
-          { icon: <IconZap />, label: "AI Connections" },
-          { icon: <IconExport />, label: "Export Scripts" },
-        ].map(item => (
-          <button key={item.label} className="menu-item" onClick={() => setMenuOpen(false)}>
-            {item.icon}
-            <span className="label">{item.label}</span>
-            <span className="arrow">›</span>
-          </button>
-        ))}
-        <button className="menu-item" onClick={() => { setMenuOpen(false); signOut(); }}
-          style={{ marginTop: 16, borderTop: "1px solid var(--border)", color: "var(--ink-mute)" }}>
-          <IconUser />
-          <span className="label">Sign out</span>
-        </button>
       </div>
 
       {/* Recording sheet */}

@@ -2311,77 +2311,204 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 /* ======= MENU DRAWER ======= */
 
-.menu-backdrop {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.15);
-  z-index: 60;
-  opacity: 0; pointer-events: none;
-  transition: opacity 300ms var(--ease);
-}
-.menu-backdrop.open { opacity: 1; pointer-events: auto; }
+/* ======= MENU PANEL (full-screen black drop-down under topbar) =======
 
-.menu-drawer {
+   The topbar itself (z:10) stays visible above the panel; the panel
+   slides down behind it from translateY(-100%) to 0, with a synchronized
+   fade. Items stagger in via a per-item `--d` delay set inline.
+
+   Paired with `.menu-toggle` (the hamburger ↔ X morph inside topbar-btn). */
+
+.menu-panel {
   position: fixed;
-  left: 0; top: 0; bottom: 0;
-  width: 280px;
-  z-index: 70;
-  background: var(--bg);
-  border-right: 1px solid var(--border);
-  transform: translateX(-100%);
-  transition: transform 380ms var(--ease);
-  padding: 60px 24px 40px;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 5;
+  background: #0b0b0f;
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 260ms var(--ease);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.menu-panel.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.menu-panel-inner {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  min-height: 100%;
+  /* Clear the topbar: safe-area + 14px top padding + 44px button + 14px bottom ≈ 72px */
+  padding: calc(env(safe-area-inset-top, 0px) + 84px) 28px
+           calc(env(safe-area-inset-bottom, 0px) + 40px);
 }
-.menu-drawer.open { transform: translateX(0); }
-.menu-drawer .menu-header {
-  font-weight: 900;
-  font-size: 22px;
-  letter-spacing: -0.02em;
-  margin-bottom: 28px;
+
+.menu-panel-account {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 24px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 260ms var(--ease) 40ms, transform 260ms var(--ease) 40ms;
 }
-.menu-item {
+.menu-panel.open .menu-panel-account {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.menu-panel-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-panel-item,
+.menu-panel-utility,
+.menu-panel-signout {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition:
+    opacity 320ms var(--ease) var(--d, 0ms),
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0ms),
+    color 180ms var(--ease),
+    padding 240ms var(--ease);
+}
+.menu-panel.open .menu-panel-item,
+.menu-panel.open .menu-panel-utility,
+.menu-panel.open .menu-panel-signout {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.menu-panel-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ink);
-  border-bottom: 1px solid var(--border);
-  transition: opacity 200ms;
-}
-.menu-item:active { opacity: 0.5; }
-.menu-item svg { width: 20px; height: 20px; stroke: var(--ink-soft); stroke-width: 1.6; fill: none; }
-.menu-item .label { flex: 1; }
-.menu-item .arrow { color: var(--ink-ghost); font-size: 16px; font-weight: 300; }
-
-/* Toggle row in menu — icon + stacked (label, caption) + toggle switch */
-.menu-item-toggle {
+  gap: 18px;
+  padding: 22px 0;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: rgba(255, 255, 255, 0.92);
   cursor: pointer;
-  align-items: flex-start;
-  padding-top: 14px;
-  padding-bottom: 14px;
+  text-align: left;
 }
-.menu-item-toggle .menu-item-text {
-  flex: 1;
-  min-width: 0;
+.menu-panel-item svg {
+  width: 22px;
+  height: 22px;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1.6;
+  fill: none;
+  transition: stroke 180ms var(--ease);
+}
+.menu-panel-item .label { flex: 1; }
+.menu-panel-item .arrow {
+  font-size: 22px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.35);
+  transition: color 180ms var(--ease), transform 180ms var(--ease);
+}
+.menu-panel-item:hover,
+.menu-panel-item:active {
+  color: #fff;
+}
+.menu-panel-item:hover svg,
+.menu-panel-item:active svg { stroke: #fff; }
+.menu-panel-item:hover .arrow,
+.menu-panel-item:active .arrow {
+  color: rgba(255, 255, 255, 0.8);
+  transform: translateX(3px);
+}
+
+.menu-panel-spacer { flex: 1; min-height: 24px; }
+
+/* Deprioritized autosave row — small, no caption */
+.menu-panel-utility {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  cursor: pointer;
 }
-.menu-item-toggle .label {
-  flex: initial;
-  font-size: 16px;
+.menu-panel-utility .label { flex: 1; }
+
+/* Dark-bg variant of the iOS toggle — off state reads on black */
+.toggle-switch-dark {
+  background: rgba(255, 255, 255, 0.18);
+}
+.toggle-switch-dark.on {
+  background: #34C759;
+}
+
+.menu-panel-signout {
+  margin-top: 18px;
+  padding: 14px 0;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 120, 120, 0.85);
+  cursor: pointer;
+  text-align: left;
+  align-self: flex-start;
 }
-.menu-item-caption {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--ink-mute);
-  line-height: 1.35;
+.menu-panel-signout:active { color: #ff8a8a; }
+
+/* ======= Hamburger ↔ X morph (three 2px bars on the topbar button) ======= */
+
+.menu-toggle {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 15px;
 }
+.menu-toggle span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: center;
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    top 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms var(--ease);
+}
+.menu-toggle span:nth-child(1) { top: 0; }
+.menu-toggle span:nth-child(2) { top: 6.5px; }
+.menu-toggle span:nth-child(3) { top: 13px; }
+.menu-toggle.open span:nth-child(1) {
+  top: 6.5px;
+  transform: rotate(45deg);
+}
+.menu-toggle.open span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0.2);
+}
+.menu-toggle.open span:nth-child(3) {
+  top: 6.5px;
+  transform: rotate(-45deg);
+}
+/* Inside the dark topbar, color inherits currentColor which is white */
+.topbar-dark .menu-toggle span { background: #fff; }
 
 /* iOS-style toggle switch */
 .toggle-switch {
