@@ -54,6 +54,10 @@ export default function Page() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState(0);
   const [createDraft, setCreateDraft] = useState<Story | null>(null);
+  // New idea (moment) sheet — mirrors the Project/Idea creation UX.
+  const [newIdeaOpen, setNewIdeaOpen] = useState(false);
+  const [newIdeaText, setNewIdeaText] = useState("");
+  const [newIdeaType, setNewIdeaType] = useState<Moment["type"]>("scene");
   const recognitionRef = useRef<any>(null);
   const capturedRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -343,7 +347,11 @@ export default function Page() {
               <MomentsTab
                 moments={moments}
                 onEdit={(m) => setEditingMoment(m)}
-                onAdd={saveDraftMoment}
+                onNew={() => {
+                  setNewIdeaText("");
+                  setNewIdeaType("scene");
+                  setNewIdeaOpen(true);
+                }}
               />
             )}
           </div>
@@ -457,6 +465,73 @@ export default function Page() {
           >
             Sign out
           </button>
+        </div>
+      </div>
+
+      {/* New Idea sheet — lightweight moment capture without voice. */}
+      <div
+        className={`sheet-backdrop ${newIdeaOpen ? "open" : ""}`}
+        onClick={() => setNewIdeaOpen(false)}
+      />
+      <div className={`sheet ${newIdeaOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">New Idea</div>
+          <Button variant="secondary" size="sm" onClick={() => setNewIdeaOpen(false)}>
+            Close
+          </Button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+            Type
+          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+            {(["scene", "dialogue", "joke", "memory", "character", "image"] as const).map(t => (
+              <Selector
+                key={t}
+                selected={newIdeaType === t}
+                onClick={() => setNewIdeaType(t)}
+              >
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </Selector>
+            ))}
+          </div>
+
+          <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+            Idea
+          </span>
+          <Textarea
+            value={newIdeaText}
+            onChange={e => setNewIdeaText(e.target.value)}
+            placeholder="A line, a scene, a joke, a memory…"
+            rows={6}
+            autoFocus
+          />
+
+          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => setNewIdeaOpen(false)}
+              style={{ minWidth: 96 }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => {
+                const text = newIdeaText.trim();
+                if (!text) return;
+                saveDraftMoment(text, newIdeaType);
+                setNewIdeaOpen(false);
+              }}
+              disabled={!newIdeaText.trim()}
+              style={{ flex: 1 }}
+            >
+              Save Idea
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -810,6 +885,7 @@ function ProjectsTab({
           size="sm"
           onClick={onNew}
           icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
+          style={{ transform: "translateY(-3px)" }}
         >
           New Project
         </Button>
@@ -858,23 +934,14 @@ const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character
 function MomentsTab({
   moments,
   onEdit,
-  onAdd,
+  onNew,
 }: {
   moments: Moment[];
   onEdit: (m: Moment) => void;
-  onAdd: (text: string, type: Moment["type"]) => void;
+  onNew: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All");
-  const [newText, setNewText] = useState("");
-  const [newType, setNewType] = useState<Moment["type"]>("scene");
-
-  function submitNew() {
-    const text = newText.trim();
-    if (!text) return;
-    onAdd(text, newType);
-    setNewText("");
-  }
 
   const filtered = moments.filter(m => {
     if (filter !== "All" && m.type !== filter.toLowerCase()) return false;
@@ -896,45 +963,17 @@ function MomentsTab({
 
   return (
     <>
-      <div className="display" style={{ marginBottom: 20, marginTop: 40 }}>Moments</div>
-
-      {/* Manual add — type a moment without using voice capture. */}
-      <div className="card" style={{ marginBottom: 14 }}>
-        <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
-          Add a moment
-        </span>
-        <textarea
-          className="attr-text-input"
-          placeholder="A line, a scene, a joke, a memory…"
-          value={newText}
-          onChange={e => setNewText(e.target.value)}
-          rows={2}
-          style={{ marginBottom: 10 }}
-        />
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <select
-            value={newType}
-            onChange={e => setNewType(e.target.value as Moment["type"])}
-            className="attr-text-input"
-            style={{ width: "auto", flex: "0 0 auto", padding: "8px 10px" }}
-          >
-            <option value="scene">Scene</option>
-            <option value="dialogue">Dialogue</option>
-            <option value="joke">Joke</option>
-            <option value="memory">Memory</option>
-            <option value="character">Character</option>
-            <option value="image">Image</option>
-          </select>
-          <div style={{ flex: 1 }} />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={submitNew}
-            disabled={!newText.trim()}
-          >
-            Save moment
-          </Button>
-        </div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 }}>
+        <div className="display">Ideas</div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onNew}
+          icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
+          style={{ transform: "translateY(-3px)" }}
+        >
+          New Idea
+        </Button>
       </div>
 
       <div className="search-bar">
@@ -964,8 +1003,8 @@ function MomentsTab({
       {filtered.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px 0", color: "var(--ink-mute)", fontSize: 14 }}>
           {search || filter !== "All"
-            ? "No moments match your filter."
-            : "Tap the red button below, or use the Add a moment card above."}
+            ? "No ideas match your filter."
+            : "Tap New Idea above, or the red record button below, to capture your first idea."}
         </div>
       )}
 
