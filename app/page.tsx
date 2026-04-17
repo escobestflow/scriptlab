@@ -474,70 +474,44 @@ export default function Page() {
         </div>
       </div>
 
-      {/* New Idea sheet — lightweight moment capture without voice. */}
+      {/* New Idea sheet — shares the IdeaFields body with the View Idea
+          sheet so both read as the same view. No sheet-header (title /
+          close removed); heading "What's the idea?" lives inside the
+          body, styled like the New Project "What are you making?" header. */}
       <div
         className={`sheet-backdrop ${newIdeaOpen ? "open" : ""}`}
         onClick={() => setNewIdeaOpen(false)}
       />
       <div className={`sheet ${newIdeaOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
-        <div className="sheet-header">
-          <div className="sheet-title">New Idea</div>
-          <Button variant="secondary" size="sm" onClick={() => setNewIdeaOpen(false)}>
-            Close
-          </Button>
-        </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
-          <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
-            Type
-          </span>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-            {(["scene", "dialogue", "joke", "memory", "character", "image"] as const).map(t => (
-              <Selector
-                key={t}
-                selected={newIdeaType === t}
-                onClick={() => setNewIdeaType(t)}
-              >
-                {t.charAt(0).toUpperCase() + t.slice(1)}
-              </Selector>
-            ))}
+          <div className="display heading" style={{ marginTop: 25, marginBottom: 25 }}>
+            What&rsquo;s the idea?
           </div>
 
-          <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
-            Idea
-          </span>
-          <Textarea
-            value={newIdeaText}
-            onChange={e => setNewIdeaText(e.target.value)}
-            placeholder="A line, a scene, a joke, a memory…"
-            rows={6}
+          <IdeaFields
+            text={newIdeaText}
+            setText={setNewIdeaText}
+            type={newIdeaType}
+            setType={setNewIdeaType}
             autoFocus
           />
 
-          <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={() => setNewIdeaOpen(false)}
-              style={{ minWidth: 96 }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={() => {
-                const text = newIdeaText.trim();
-                if (!text) return;
-                saveDraftMoment(text, newIdeaType);
-                setNewIdeaOpen(false);
-              }}
-              disabled={!newIdeaText.trim()}
-              style={{ flex: 1 }}
-            >
-              Save Idea
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            onClick={() => {
+              const text = newIdeaText.trim();
+              if (!text) return;
+              saveDraftMoment(text, newIdeaType);
+              setNewIdeaOpen(false);
+            }}
+            disabled={!newIdeaText.trim()}
+            style={{ marginTop: 14 }}
+          >
+            Save Idea
+          </Button>
         </div>
       </div>
 
@@ -561,22 +535,28 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Moment edit sheet */}
+      {/* View Idea sheet — same body as the New Idea sheet (shared
+          IdeaFields), minus the heading. The top-right slot holds a
+          Delete button instead of the New Idea's Close / header. */}
       <div className={`sheet-backdrop ${!!editingMoment ? "open" : ""}`}
         onClick={() => setEditingMoment(null)} />
       <div className={`sheet ${!!editingMoment ? "open" : ""}`}>
         <div className="sheet-handle" />
-        <div className="sheet-header">
-          <div className="sheet-title">Edit moment</div>
-          <Button variant="secondary" size="sm" onClick={() => setEditingMoment(null)}>Close</Button>
+        <div className="sheet-header" style={{ justifyContent: "flex-end" }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => { if (editingMoment) deleteMoment(editingMoment.id); }}
+            style={{ color: "var(--record)", borderColor: "var(--record)" }}
+          >
+            Delete
+          </Button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           {editingMoment && (
             <MomentEditForm
               moment={editingMoment}
               onUpdate={(patch) => { updateMoment(editingMoment.id, patch); setEditingMoment({ ...editingMoment, ...patch }); }}
-              onDelete={() => deleteMoment(editingMoment.id)}
-              onClose={() => setEditingMoment(null)}
             />
           )}
         </div>
@@ -753,22 +733,124 @@ function RecordingForm({
 }
 
 /* ============================================ */
+/* ============ IDEA FORM FIELDS ============== */
+/* ============================================ */
+
+// AI-cleans a raw idea text. Streams /api/generate with a placeholder
+// story payload and pulls the "text" field out of the JSON response.
+async function cleanUpIdeaText(raw: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        story: { id: "", title: "", projectType: "feature", conceptDrafts: [{ id: "cd", number: 1, createdAt: "", updatedAt: "", logline: "", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, concept: { summary: "", tone: "", themes: [] } }], charactersDrafts: [{ id: "chd", number: 1, createdAt: "", updatedAt: "", characters: [] }], storyDrafts: [{ id: "sd", number: 1, createdAt: "", updatedAt: "", beats: [], ingredients: [], snippets: [] }], scriptDrafts: [{ id: "scd", number: 1, createdAt: "", updatedAt: "", script: { scenes: [], syncStatus: "synced" } }], projectDrafts: [{ id: "pd", number: 1, createdAt: "", updatedAt: "", conceptDraftId: "cd", charactersDraftId: "chd", storyDraftId: "sd", scriptDraftId: "scd" }], activeProjectDraftId: "pd", counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 }, updatedAt: "" },
+        action: { type: "clean_moment", payload: { rawText: raw } },
+      }),
+    });
+    if (!res.ok || !res.body) return null;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "", full = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
+      }
+    }
+    const match = full.match(/\{[\s\S]*\}/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      if (parsed.text) return parsed.text as string;
+    }
+    return null;
+  } catch { return null; }
+}
+
+// Shared idea body — used by both the New Idea and View/Edit sheets so
+// the two experiences read as the same view. Type chips + textarea +
+// Clean up button. Persistence + mode-specific actions (Save, Delete)
+// live in the parent sheet.
+function IdeaFields({
+  text, setText,
+  type, setType,
+  autoFocus,
+}: {
+  text: string;
+  setText: (v: string) => void;
+  type: Moment["type"];
+  setType: (t: Moment["type"]) => void;
+  autoFocus?: boolean;
+}) {
+  const [cleaning, setCleaning] = useState(false);
+
+  async function runCleanUp() {
+    if (!text.trim()) return;
+    setCleaning(true);
+    try {
+      const cleaned = await cleanUpIdeaText(text);
+      if (cleaned) setText(cleaned);
+    } finally {
+      setCleaning(false);
+    }
+  }
+
+  return (
+    <>
+      <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>Type</span>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {MOMENT_TYPES.map(t => (
+          <Selector key={t} selected={type === t} onClick={() => setType(t)}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </Selector>
+        ))}
+      </div>
+
+      <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>Idea</span>
+      <Textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="A line, a scene, a joke, a memory…"
+        rows={6}
+        autoFocus={autoFocus}
+      />
+
+      <Button
+        variant="secondary"
+        size="lg"
+        block
+        onClick={runCleanUp}
+        disabled={cleaning || !text.trim()}
+        style={{ marginTop: 14 }}
+      >
+        {cleaning ? "Cleaning…" : "\u2728 Clean up"}
+      </Button>
+    </>
+  );
+}
+
+/* ============================================ */
 /* ============ MOMENT EDIT FORM ============== */
 /* ============================================ */
 
+// Used inside the View Idea sheet. Delegates Type/Idea/Clean up to the
+// shared IdeaFields component; adds a tag editor underneath. All edits
+// stream through onUpdate immediately (auto-save on change).
 function MomentEditForm({
-  moment, onUpdate, onDelete, onClose,
+  moment, onUpdate,
 }: {
   moment: Moment;
   onUpdate: (patch: Partial<Moment>) => void;
-  onDelete: () => void;
-  onClose: () => void;
 }) {
   const [text, setText] = useState(moment.text);
   const [type, setType] = useState(moment.type);
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(moment.tags);
-  const [cleaning, setCleaning] = useState(false);
 
   function addTag() {
     const t = tagInput.trim().toLowerCase();
@@ -785,57 +867,14 @@ function MomentEditForm({
     onUpdate({ tags: next });
   }
 
-  async function cleanUp() {
-    if (!text.trim()) return;
-    setCleaning(true);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          story: { id: "", title: "", projectType: "feature", conceptDrafts: [{ id: "cd", number: 1, createdAt: "", updatedAt: "", logline: "", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, concept: { summary: "", tone: "", themes: [] } }], charactersDrafts: [{ id: "chd", number: 1, createdAt: "", updatedAt: "", characters: [] }], storyDrafts: [{ id: "sd", number: 1, createdAt: "", updatedAt: "", beats: [], ingredients: [], snippets: [] }], scriptDrafts: [{ id: "scd", number: 1, createdAt: "", updatedAt: "", script: { scenes: [], syncStatus: "synced" } }], projectDrafts: [{ id: "pd", number: 1, createdAt: "", updatedAt: "", conceptDraftId: "cd", charactersDraftId: "chd", storyDraftId: "sd", scriptDraftId: "scd" }], activeProjectDraftId: "pd", counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 }, updatedAt: "" },
-          action: { type: "clean_moment", payload: { rawText: text } },
-        }),
-      });
-      if (!res.ok || !res.body) return;
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "", full = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
-        }
-      }
-      try {
-        const match = full.match(/\{[\s\S]*\}/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          if (parsed.text) { setText(parsed.text); onUpdate({ text: parsed.text }); }
-        }
-      } catch {}
-    } finally { setCleaning(false); }
-  }
-
   return (
     <div className="stack">
-      <Textarea value={text} rows={5}
-        onChange={e => { setText(e.target.value); onUpdate({ text: e.target.value }); }} />
-
-      <div className="eyebrow">Type</div>
-      <div className="chip-row">
-        {MOMENT_TYPES.map(t => (
-          <Selector key={t} selected={type === t}
-            onClick={() => { setType(t); onUpdate({ type: t }); }}>
-            {t}
-          </Selector>
-        ))}
-      </div>
+      <IdeaFields
+        text={text}
+        setText={(v) => { setText(v); onUpdate({ text: v }); }}
+        type={type}
+        setType={(t) => { setType(t); onUpdate({ type: t }); }}
+      />
 
       <div className="eyebrow" style={{ marginTop: 8 }}>Tags</div>
       <div style={{ display: "flex", gap: 8 }}>
@@ -855,18 +894,6 @@ function MomentEditForm({
           ))}
         </div>
       )}
-
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <Button variant="secondary" size="lg" block onClick={cleanUp} disabled={cleaning}>
-          {cleaning ? "Cleaning…" : "✨ Clean up"}
-        </Button>
-      </div>
-
-      <Button variant="secondary" size="lg" block
-        style={{ color: "var(--record)", borderColor: "var(--record)", marginTop: 4 }}
-        onClick={onDelete}>
-        Delete moment
-      </Button>
     </div>
   );
 }
