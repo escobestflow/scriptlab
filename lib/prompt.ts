@@ -43,7 +43,14 @@ export type ActionType =
   | "brainstorm"
   | "clean_beat"
   | "generate_beat"
-  | "clean_moment";
+  | "clean_moment"
+  // Concept-tab per-field generators (Haiku, JSON-out)
+  | "generate_concept_title"
+  | "generate_concept_logline"
+  | "generate_concept_summary"
+  | "generate_concept_tone"
+  | "generate_concept_themes"
+  | "generate_concept_ending";
 
 export interface ActionRequest {
   type: ActionType;
@@ -63,6 +70,12 @@ export function modelForAction(type: ActionType): string {
     case "clean_beat":
     case "generate_beat":
     case "clean_moment":
+    case "generate_concept_title":
+    case "generate_concept_logline":
+    case "generate_concept_summary":
+    case "generate_concept_tone":
+    case "generate_concept_themes":
+    case "generate_concept_ending":
     default:
       return "claude-haiku-4-5"; // fast + cheap for structure work
   }

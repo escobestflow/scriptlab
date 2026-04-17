@@ -184,6 +184,49 @@ Raw transcription: "${action.payload.rawText}"
 Return STRICT JSON: { "text": string }
 - "text" = the cleaned-up moment`;
 
+    // ── Concept-tab per-field generators ──
+    // Each uses the full concept bible as context so generated values
+    // cohere with the user's existing choices. All return strict JSON.
+
+    case "generate_concept_title":
+      return `Generate ONE evocative working title for this project.
+Use the existing concept (format, genre, logline, summary, tone, themes, ending) above as the guiding brief. Titles should be short (1–5 words), cinematic, and memorable — not generic, not on-the-nose.
+
+Return STRICT JSON: { "title": string }
+- "title" = the single best option (not a list)`;
+
+    case "generate_concept_logline":
+      return `Write ONE logline for this project in 1–2 sentences, max 40 words.
+Use the existing concept (format, genre, title, summary, tone, themes, ending) above as the brief. A great logline contains: protagonist, inciting event, goal, central conflict, and stakes. Specificity beats abstraction. No adjective-stuffing.
+
+Return STRICT JSON: { "logline": string }`;
+
+    case "generate_concept_summary":
+      return `Write a premise/summary for this project. 3–5 sentences, ~80 words.
+Use the existing concept (format, genre, title, logline, tone, themes, ending) as the brief. The summary should establish world → protagonist → inciting event → central tension → thematic undertow. Prose, not outline. No headers, no bullets.
+
+Return STRICT JSON: { "summary": string }`;
+
+    case "generate_concept_tone":
+      return `Pick ONE tone descriptor for this project.
+Use the existing concept (format, genre, title, logline, summary, themes, ending) as the brief. The tone should be a short evocative phrase (2–6 words) that would guide a writer's room — e.g. "bone-dry deadpan", "neon-lit dread", "sun-bleached melancholy".
+
+Return STRICT JSON: { "tone": string }`;
+
+    case "generate_concept_themes":
+      return `Propose 3–5 thematic throughlines for this project.
+Use the existing concept (format, genre, title, logline, summary, tone, ending) as the brief. Themes should be punchy noun phrases (1–3 words each) — e.g. "grief", "inherited violence", "the cost of ambition". Avoid clichés and single-word banalities like "love" or "family" unless genuinely central. No duplicates of themes already present: ${d.concept?.themes?.length ? d.concept.themes.join(", ") : "(none yet)"}.
+
+Return STRICT JSON: { "themes": string[] }`;
+
+    case "generate_concept_ending": {
+      const existing = d.settings.endingTypes?.join(", ") || "(none yet)";
+      return `Pick the single most fitting ending type for this project from: happy, bittersweet, tragic, ambiguous, twist.
+Use the existing concept (format, genre, title, logline, summary, tone, themes) as the brief. The ending already selected is: ${existing}. Choose the one option that best matches the emotional logic of what's here — do not default to bittersweet unless the material earns it.
+
+Return STRICT JSON: { "ending": "happy" | "bittersweet" | "tragic" | "ambiguous" | "twist" }`;
+    }
+
     default:
       return `Unknown action.`;
   }

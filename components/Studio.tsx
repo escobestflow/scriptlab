@@ -630,6 +630,54 @@ function ProjectHeader({
 /* ============ CONCEPT TAB =================== */
 /* ============================================ */
 
+// 20 curated tone presets — evocative phrasings, not one-word moods
+const TONE_PRESETS: string[] = [
+  "bone-dry deadpan",
+  "neon-lit dread",
+  "sun-bleached melancholy",
+  "grim and grounded",
+  "playfully unhinged",
+  "slow-burn tension",
+  "warm and wistful",
+  "hard-boiled",
+  "absurdist comedy",
+  "lyrical and dreamlike",
+  "nervy and kinetic",
+  "quiet and observational",
+  "gothic and operatic",
+  "satirical",
+  "retro pulp",
+  "claustrophobic paranoia",
+  "elegiac",
+  "cold and clinical",
+  "tender and human",
+  "raucous and profane",
+];
+
+// 20 curated theme presets — punchy noun phrases
+const THEME_PRESETS: string[] = [
+  "grief",
+  "inherited violence",
+  "the cost of ambition",
+  "identity",
+  "found family",
+  "moral compromise",
+  "obsession",
+  "class and power",
+  "addiction",
+  "forgiveness",
+  "legacy",
+  "faith and doubt",
+  "memory",
+  "loneliness",
+  "revenge",
+  "freedom and control",
+  "coming of age",
+  "sacrifice",
+  "truth vs. myth",
+  "reinvention",
+];
+
 /* ── Collapsible attribute row ── */
 /* ── Layer draft picker ── */
 function LayerDraftPicker({
@@ -728,6 +776,8 @@ function AttrRow({
   onToggle,
   children,
   dot,
+  ai,
+  aiLoading,
 }: {
   label: string;
   values?: string[];
@@ -736,6 +786,8 @@ function AttrRow({
   onToggle: () => void;
   children: React.ReactNode;
   dot?: boolean;
+  ai?: () => void;
+  aiLoading?: boolean;
 }) {
   const hasValues = values && values.length > 0;
   return (
@@ -743,6 +795,7 @@ function AttrRow({
       <button className="attr-row-header" onClick={onToggle}>
         <span className="attr-label">
           {label}
+          {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
           {dot && <span className="sync-dot attr-dot" />}
         </span>
         <div className="attr-values">
@@ -764,6 +817,30 @@ function AttrRow({
   );
 }
 
+/* ── AI wand button — elegant sparkle, sits next to field labels ── */
+function AIWandButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button
+      type="button"
+      className={`ai-wand ${loading ? "loading" : ""}`}
+      onClick={e => { e.stopPropagation(); if (!loading) onClick(); }}
+      aria-label="Generate with AI"
+      disabled={loading}
+    >
+      {loading ? (
+        <svg viewBox="0 0 24 24" width="14" height="14" className="ai-wand-spin" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M12 3a9 9 0 1 0 9 9" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8L12 3z" />
+          <path d="M18.5 14l.8 2.1L21.5 17l-2.2.9L18.5 20l-.8-2.1L15.5 17l2.2-.9L18.5 14z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 /* ── Text attribute row — stays open once filled, input loses chrome when unfocused ── */
 function TextAttrRow({
   label,
@@ -772,6 +849,8 @@ function TextAttrRow({
   onChange,
   multiline,
   dot,
+  ai,
+  aiLoading,
 }: {
   label: string;
   value: string;
@@ -779,6 +858,8 @@ function TextAttrRow({
   onChange: (v: string) => void;
   multiline?: boolean;
   dot?: boolean;
+  ai?: () => void;
+  aiLoading?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -799,6 +880,7 @@ function TextAttrRow({
         <button className="attr-row-header" onClick={() => setFocused(true)}>
           <span className="attr-label">
             {label}
+            {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
             {dot && <span className="sync-dot attr-dot" />}
           </span>
           <div className="attr-values">
@@ -819,6 +901,7 @@ function TextAttrRow({
       <div className="attr-row-header attr-row-header-static">
         <span className="attr-label">
           {label}
+          {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
           {dot && <span className="sync-dot attr-dot" />}
         </span>
       </div>
@@ -885,19 +968,106 @@ function ConceptTab({
   const d = getActiveConceptDraft(story);
   const [openAttr, setOpenAttr] = useState<string | null>(null);
   const [themeInput, setThemeInput] = useState("");
+  const [toneInput, setToneInput] = useState("");
+  const [toneCustomOpen, setToneCustomOpen] = useState(false);
+  const [themeCustomOpen, setThemeCustomOpen] = useState(false);
+
+  // Track which AI generator is currently running (one at a time)
+  const [aiBusy, setAiBusy] = useState<null | "title" | "logline" | "summary" | "tone" | "themes" | "ending">(null);
 
   const toggle = (key: string) => setOpenAttr(prev => prev === key ? null : key);
   const updateDraft = (patch: Partial<ConceptLayerDraft>) => setStory(s => updateConceptDraft(s, patch));
 
-  function addTheme() {
-    const t = themeInput.trim();
+  function addTheme(raw?: string) {
+    const t = (raw ?? themeInput).trim();
     if (!t) return;
+    if (d.concept.themes.includes(t)) return;
     updateDraft({ concept: { ...d.concept, themes: [...d.concept.themes, t] } });
     setThemeInput("");
   }
 
   function removeTheme(theme: string) {
     updateDraft({ concept: { ...d.concept, themes: d.concept.themes.filter(t => t !== theme) } });
+  }
+
+  function setTone(t: string) {
+    updateDraft({ concept: { ...d.concept, tone: t } });
+  }
+
+  // ── AI generator: POST to /api/generate with current story+action, parse JSON result, apply ──
+  async function generateConcept(field: "title" | "logline" | "summary" | "tone" | "themes" | "ending") {
+    if (aiBusy) return;
+    setAiBusy(field);
+    try {
+      const type =
+        field === "title"   ? "generate_concept_title" :
+        field === "logline" ? "generate_concept_logline" :
+        field === "summary" ? "generate_concept_summary" :
+        field === "tone"    ? "generate_concept_tone" :
+        field === "themes"  ? "generate_concept_themes" :
+                              "generate_concept_ending";
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ story, action: { type, payload: {} } }),
+      });
+      if (!res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.type === "text") fullText += evt.value;
+          } catch {}
+        }
+      }
+      // Extract JSON from response (model may wrap in code fence or add prose)
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return;
+      const parsed = JSON.parse(jsonMatch[0]);
+      // Apply to draft based on field
+      setStory(s => {
+        if (field === "title")   return updateConceptDraft({ ...s, title: String(parsed.title ?? "") }, {});
+        if (field === "logline") return updateConceptDraft(s, { logline: String(parsed.logline ?? "") });
+        if (field === "summary") {
+          const c = getActiveConceptDraft(s);
+          return updateConceptDraft(s, { concept: { ...c.concept, summary: String(parsed.summary ?? "") } });
+        }
+        if (field === "tone") {
+          const c = getActiveConceptDraft(s);
+          return updateConceptDraft(s, { concept: { ...c.concept, tone: String(parsed.tone ?? "") } });
+        }
+        if (field === "themes") {
+          const c = getActiveConceptDraft(s);
+          const incoming: string[] = Array.isArray(parsed.themes) ? parsed.themes.map((x: any) => String(x)) : [];
+          const merged = Array.from(new Set([...c.concept.themes, ...incoming]));
+          return updateConceptDraft(s, { concept: { ...c.concept, themes: merged } });
+        }
+        if (field === "ending") {
+          const c = getActiveConceptDraft(s);
+          const val = String(parsed.ending ?? "").toLowerCase();
+          const allowed = ["happy","bittersweet","tragic","ambiguous","twist"];
+          if (!allowed.includes(val)) return s;
+          const existing = c.settings.endingTypes;
+          const endingTypes = existing.includes(val as any) ? existing : [...existing, val as any];
+          return updateConceptDraft(s, { settings: { ...c.settings, endingTypes } });
+        }
+        return s;
+      });
+    } catch (err) {
+      console.error("Concept generation failed:", err);
+    } finally {
+      setAiBusy(null);
+    }
   }
 
   const formatLabel = story.projectType === "tv-show" ? "TV Show" : story.projectType === "short" ? "Short Film" : "Feature Film";
@@ -968,6 +1138,8 @@ function ConceptTab({
         placeholder="Add a title"
         onChange={v => setStory(s => updateConceptDraft({ ...s, title: v }, {}))}
         dot={isConceptFieldDirty(story, "title")}
+        ai={() => generateConcept("title")}
+        aiLoading={aiBusy === "title"}
       />
 
       {/* Logline */}
@@ -978,6 +1150,8 @@ function ConceptTab({
         onChange={v => updateDraft({ logline: v })}
         multiline
         dot={isConceptFieldDirty(story, "logline")}
+        ai={() => generateConcept("logline")}
+        aiLoading={aiBusy === "logline"}
       />
 
       {/* Summary */}
@@ -988,18 +1162,68 @@ function ConceptTab({
         onChange={v => updateDraft({ concept: { ...d.concept, summary: v } })}
         multiline
         dot={isConceptFieldDirty(story, "summary")}
+        ai={() => generateConcept("summary")}
+        aiLoading={aiBusy === "summary"}
       />
 
-      {/* Tone */}
-      <TextAttrRow
+      {/* Tone — 20 presets + custom input */}
+      <AttrRow
         label="Tone"
-        value={d.concept.tone}
+        values={d.concept.tone ? [d.concept.tone] : undefined}
         placeholder="Set the tone"
-        onChange={v => updateDraft({ concept: { ...d.concept, tone: v } })}
+        expanded={openAttr === "tone"}
+        onToggle={() => toggle("tone")}
         dot={isConceptFieldDirty(story, "tone")}
-      />
+        ai={() => generateConcept("tone")}
+        aiLoading={aiBusy === "tone"}
+      >
+        <div className="chip-row" style={{ marginBottom: 10 }}>
+          {TONE_PRESETS.map(t => (
+            <button key={t}
+              className={`chip ${d.concept.tone === t ? "selected" : ""}`}
+              onClick={() => setTone(d.concept.tone === t ? "" : t)}>
+              {t}
+            </button>
+          ))}
+          <button
+            className={`chip chip-custom ${toneCustomOpen ? "selected" : ""}`}
+            onClick={() => setToneCustomOpen(o => !o)}>
+            + Custom
+          </button>
+        </div>
+        {toneCustomOpen && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              className="field"
+              value={toneInput}
+              onChange={e => setToneInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && toneInput.trim()) {
+                  setTone(toneInput.trim());
+                  setToneInput("");
+                  setToneCustomOpen(false);
+                }
+              }}
+              placeholder="Describe the tone"
+              style={{ flex: 1, marginBottom: 0 }}
+              autoFocus
+            />
+            <button className="btn-secondary"
+              onClick={() => {
+                if (!toneInput.trim()) return;
+                setTone(toneInput.trim());
+                setToneInput("");
+                setToneCustomOpen(false);
+              }}
+              disabled={!toneInput.trim()}
+              style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
+              Set
+            </button>
+          </div>
+        )}
+      </AttrRow>
 
-      {/* Themes */}
+      {/* Themes — 20 presets + custom input */}
       <AttrRow
         label="Themes"
         values={d.concept.themes.length > 0 ? d.concept.themes : undefined}
@@ -1007,28 +1231,55 @@ function ConceptTab({
         expanded={openAttr === "themes"}
         onToggle={() => toggle("themes")}
         dot={isConceptFieldDirty(story, "themes")}
+        ai={() => generateConcept("themes")}
+        aiLoading={aiBusy === "themes"}
       >
+        {d.concept.themes.length > 0 && (
+          <div className="chip-row" style={{ marginBottom: 10 }}>
+            {d.concept.themes.map(t => (
+              <button key={t} className="chip selected" onClick={() => removeTheme(t)}>
+                {t} &#10005;
+              </button>
+            ))}
+          </div>
+        )}
         <div className="chip-row" style={{ marginBottom: 10 }}>
-          {d.concept.themes.map(t => (
-            <button key={t} className="chip selected" onClick={() => removeTheme(t)}>
-              {t} &#10005;
+          {THEME_PRESETS.filter(t => !d.concept.themes.includes(t)).map(t => (
+            <button key={t} className="chip"
+              onClick={() => addTheme(t)}>
+              {t}
             </button>
           ))}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            className="field"
-            value={themeInput}
-            onChange={e => setThemeInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && addTheme()}
-            placeholder="Add a theme"
-            style={{ flex: 1, marginBottom: 0 }}
-          />
-          <button className="btn-secondary" onClick={addTheme} disabled={!themeInput.trim()}
-            style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
-            Add
+          <button
+            className={`chip chip-custom ${themeCustomOpen ? "selected" : ""}`}
+            onClick={() => setThemeCustomOpen(o => !o)}>
+            + Custom
           </button>
         </div>
+        {themeCustomOpen && (
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              className="field"
+              value={themeInput}
+              onChange={e => setThemeInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && themeInput.trim()) {
+                  addTheme();
+                  setThemeCustomOpen(false);
+                }
+              }}
+              placeholder="Add a theme"
+              style={{ flex: 1, marginBottom: 0 }}
+              autoFocus
+            />
+            <button className="btn-secondary"
+              onClick={() => { addTheme(); setThemeCustomOpen(false); }}
+              disabled={!themeInput.trim()}
+              style={{ fontSize: 13, padding: "10px 16px", minHeight: 0, flexShrink: 0 }}>
+              Add
+            </button>
+          </div>
+        )}
       </AttrRow>
 
       {/* Ending */}
@@ -1039,6 +1290,8 @@ function ConceptTab({
         expanded={openAttr === "ending"}
         onToggle={() => toggle("ending")}
         dot={isConceptFieldDirty(story, "endingTypes")}
+        ai={() => generateConcept("ending")}
+        aiLoading={aiBusy === "ending"}
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (

@@ -478,11 +478,26 @@ export default function Page() {
           )}
         </div>
         <div className="create-modal-footer">
-          {/* Progress dots */}
-          <div className="create-dots">
-            {[0, 1, 2].map(i => (
-              <div key={i} className={`create-dot ${i === createStep ? "active" : i < createStep ? "done" : ""}`} />
-            ))}
+          {/* Elevated step indicator — labeled stepper with connecting track */}
+          <div className="create-stepper" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={createStep + 1}>
+            {(["Format", "Title", "Genre"] as const).map((name, i) => {
+              const state = i < createStep ? "done" : i === createStep ? "active" : "upcoming";
+              return (
+                <div key={name} className={`create-step create-step-${state}`}>
+                  <div className="create-step-node">
+                    {state === "done" ? (
+                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <span className="create-step-num">{i + 1}</span>
+                    )}
+                  </div>
+                  <div className="create-step-label">{name}</div>
+                  {i < 2 && <div className="create-step-track" aria-hidden="true" />}
+                </div>
+              );
+            })}
           </div>
           <div className="create-modal-actions">
             {createStep > 0 && (

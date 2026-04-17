@@ -1206,6 +1206,63 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   top: -1px;
 }
 
+/* ======= AI WAND BUTTON (inline next to field labels) ======= */
+.ai-wand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #f6f0ff 0%, #eef4ff 100%);
+  color: #6a4ee2;
+  cursor: pointer;
+  vertical-align: -6px;
+  box-shadow:
+    0 1px 2px rgba(90, 60, 200, 0.10),
+    inset 0 0 0 1px rgba(106, 78, 226, 0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.ai-wand:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, #efe5ff 0%, #e2ecff 100%);
+  box-shadow:
+    0 3px 10px rgba(90, 60, 200, 0.22),
+    inset 0 0 0 1px rgba(106, 78, 226, 0.3);
+}
+.ai-wand:active {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 2px rgba(90, 60, 200, 0.10),
+    inset 0 0 0 1px rgba(106, 78, 226, 0.3);
+}
+.ai-wand.loading {
+  background: linear-gradient(135deg, #efe5ff 0%, #e2ecff 100%);
+  cursor: default;
+}
+.ai-wand-spin {
+  animation: ai-wand-spin 900ms linear infinite;
+}
+@keyframes ai-wand-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Custom chip — matches .chip but dashed outline to signal input action */
+.chip.chip-custom {
+  border: 1px dashed rgba(0,0,0,0.25);
+  background: transparent;
+  color: var(--ink-mute);
+}
+.chip.chip-custom.selected {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
 /* Sync banner */
 .sync-banner {
   background: var(--sync-bg);
@@ -1575,25 +1632,119 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin-top: 12px;
 }
 
-/* Step indicator dots */
-.create-dots {
+/* Elegant elevated stepper — labeled nodes with connecting track */
+.create-stepper {
   display: flex;
-  justify-content: center;
-  gap: 6px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 2px 8px 14px;
+  gap: 0;
+  user-select: none;
 }
-.create-dot {
-  width: 8px;
-  height: 8px;
+.create-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
+.create-step-node {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: var(--ink-ghost);
-  transition: background 240ms var(--ease), transform 240ms var(--ease);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1.5px solid rgba(0,0,0,0.10);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-mute);
+  position: relative;
+  z-index: 2;
+  transition:
+    background 260ms var(--ease),
+    border-color 260ms var(--ease),
+    color 260ms var(--ease),
+    transform 260ms var(--ease),
+    box-shadow 260ms var(--ease);
 }
-.create-dot.active {
+.create-step-num {
+  line-height: 1;
+}
+.create-step-label {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  transition: color 260ms var(--ease);
+  text-align: center;
+}
+/* Connecting track — sits behind the node, extends to next step */
+.create-step-track {
+  position: absolute;
+  top: 12px; /* vertically centered on 26px node (13 - half track) */
+  left: 50%;
+  right: -50%;
+  height: 2px;
+  background: rgba(0,0,0,0.08);
+  z-index: 1;
+  overflow: hidden;
+}
+.create-step-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: var(--ink);
-  transform: scale(1.2);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 420ms var(--ease);
 }
-.create-dot.done {
-  background: var(--ink-mute);
+
+/* Active state — elevated, inked ring */
+.create-step-active .create-step-node {
+  background: var(--bg);
+  border-color: var(--ink);
+  color: var(--ink);
+  transform: scale(1.08);
+  box-shadow:
+    0 6px 18px rgba(0,0,0,0.10),
+    inset 0 0 0 3px var(--bg);
+  /* subtle concentric ring to signal "you are here" */
+}
+.create-step-active .create-step-label {
+  color: var(--ink);
+}
+/* subtle pulse under active node — adds elevation without being noisy */
+.create-step-active .create-step-node::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: var(--ink);
+  opacity: 0.06;
+  z-index: -1;
+}
+
+/* Done state — filled ink node, filled track leading in */
+.create-step-done .create-step-node {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.create-step-done .create-step-label {
+  color: var(--ink);
+}
+.create-step-done .create-step-track::after {
+  transform: scaleX(1);
+}
+
+/* Upcoming (default) — understated */
+.create-step-upcoming .create-step-node {
+  opacity: 0.85;
 }
 
 /* ======= BEAT EDITOR (Design Tab) ======= */
