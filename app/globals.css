@@ -954,7 +954,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
    Uses the standard app button styling: 4pt corners, uppercase label. */
 .draft-save-btn {
   padding: 6px 14px;
-  background: var(--ink);
+  background: #3A3A3C; /* dark gray — sits one notch lighter than project-save */
   color: #fff;
   border: none;
   border-radius: 4px;
@@ -1794,7 +1794,32 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .create-modal-actions {
   display: flex;
   gap: 10px;
-  margin-top: 12px;
+}
+
+/* Stepper-in-header: takes the title's place, sits centered & elevated */
+.create-modal-header {
+  align-items: center;
+  padding: 4px 18px 10px;
+  gap: 12px;
+}
+.create-modal-header .create-stepper-compact {
+  flex: 1;
+  padding: 2px 4px 0;
+}
+.create-stepper-compact .create-step-node {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  border-width: 1.25px;
+}
+.create-stepper-compact .create-step-label {
+  font-size: 9px;
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+}
+.create-stepper-compact .create-step-track {
+  top: 9px; /* re-center on the smaller 20px node */
+  height: 1.5px;
 }
 
 /* Elegant elevated stepper — labeled nodes with connecting track */

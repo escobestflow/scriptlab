@@ -76,6 +76,7 @@ export function Studio({
   const [showSetup, setShowSetup] = useState(false);
   const [beatTrayOpen, setBeatTrayOpen] = useState(false);
   const [beatTrayInsertAt, setBeatTrayInsertAt] = useState<number | null>(null);
+  const [charTrayOpen, setCharTrayOpen] = useState(false);
   // TV show episode drill-in
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
 
@@ -412,7 +413,7 @@ export function Studio({
           {/* Project-level Save button — shown when layer combination changed */}
           {isProjectDraftDirty(story) && (
             <button className="project-save-btn" onClick={() => setStory(s => saveProjectDraft(s))}>
-              Save Project
+              Save Project Draft {activeProjectDraft.number}
             </button>
           )}
 
@@ -477,6 +478,7 @@ export function Studio({
               setStory={setStory}
               run={run}
               busy={busy}
+              openCharTray={() => setCharTrayOpen(true)}
             />
           )}
           {section === "story" && (
@@ -558,6 +560,42 @@ export function Studio({
               setBeatTrayInsertAt(null);
             }}
             busy={busy}
+          />
+        </div>
+      </div>
+
+      {/* Character creation tray — mirrors the beat tray UX */}
+      <div className={`sheet-backdrop ${charTrayOpen ? "open" : ""}`}
+        onClick={() => setCharTrayOpen(false)} />
+      <div className={`sheet sheet-tall ${charTrayOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">New character</div>
+          <button className="chip" onClick={() => setCharTrayOpen(false)}>Cancel</button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <CharacterCreationForm
+            onSave={(name, role) => {
+              const newChar: Character = {
+                id: "ch_" + Math.random().toString(36).slice(2),
+                name,
+                role: role as Character["role"],
+                archetype: "",
+                backstory: "",
+                motivations: "",
+                flaws: "",
+                want: "",
+                need: "",
+                relationships: [],
+                voice: "",
+                arc: "",
+                notes: "",
+              };
+              setStory(s => updateCharactersDraft(s, {
+                characters: [...getActiveCharactersDraft(s).characters, newChar],
+              }));
+              setCharTrayOpen(false);
+            }}
           />
         </div>
       </div>
@@ -752,8 +790,8 @@ function LayerDraftPicker({
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
       {isDirty && (
-        <button className="draft-save-btn" onClick={handleSave} aria-label={`Save ${label}`}>
-          Save {label}
+        <button className="draft-save-btn" onClick={handleSave} aria-label={`Save ${label} Draft ${active.number}`}>
+          Save {label} Draft {active.number}
         </button>
       )}
       {open && (
@@ -1599,36 +1637,17 @@ function CharactersTab({
   setStory,
   run,
   busy,
+  openCharTray,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
+  openCharTray: () => void;
 }) {
   const d = getActiveCharactersDraft(story);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingCharId, setEditingCharId] = useState<string | null>(null);
-
-  function addCharacter() {
-    const newChar: Character = {
-      id: "ch_" + Math.random().toString(36).slice(2),
-      name: "",
-      role: "supporting",
-      archetype: "",
-      backstory: "",
-      motivations: "",
-      flaws: "",
-      want: "",
-      need: "",
-      relationships: [],
-      voice: "",
-      arc: "",
-      notes: "",
-    };
-    setStory(s => updateCharactersDraft(s, { characters: [...getActiveCharactersDraft(s).characters, newChar] }));
-    setEditingCharId(newChar.id);
-    setExpandedId(newChar.id);
-  }
 
   function updateCharacter(id: string, patch: Partial<Character>) {
     setStory(s => updateCharactersDraft(s, {
@@ -1665,7 +1684,7 @@ function CharactersTab({
             Create your first character to bring your story to life.
           </div>
           <button className="btn-primary" style={{ fontSize: 14, padding: "14px 22px", minHeight: 0 }}
-            onClick={addCharacter}>
+            onClick={openCharTray}>
             + Add character
           </button>
         </div>
@@ -1725,7 +1744,7 @@ function CharactersTab({
         <button
           className="btn-secondary"
           style={{ width: "100%", marginTop: 12, fontSize: 13 }}
-          onClick={addCharacter}
+          onClick={openCharTray}
         >
           + Add character
         </button>
@@ -2673,6 +2692,63 @@ function BeatCreationForm({
         <button className="btn-primary" onClick={() => onSave(name || "Untitled beat", summary)}
           disabled={!summary.trim()}
           style={{ fontSize: 13, padding: "12px 20px", minHeight: 0 }}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================ */
+/* ======== CHARACTER CREATION FORM =========== */
+/* ============================================ */
+
+function CharacterCreationForm({
+  onSave,
+}: {
+  onSave: (name: string, role: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<string>("supporting");
+  const roles = [
+    { key: "protagonist",   label: "Protagonist" },
+    { key: "antagonist",    label: "Antagonist" },
+    { key: "supporting",    label: "Supporting" },
+    { key: "mentor",        label: "Mentor" },
+    { key: "love_interest", label: "Love Interest" },
+    { key: "comic_relief",  label: "Comic Relief" },
+  ];
+  return (
+    <div className="stack">
+      <input
+        className="field"
+        placeholder="Character name"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        autoFocus
+      />
+
+      <div className="eyebrow" style={{ marginTop: 8 }}>Role</div>
+      <div className="chip-row">
+        {roles.map(r => (
+          <button
+            key={r.key}
+            className={`chip ${role === r.key ? "selected" : ""}`}
+            onClick={() => setRole(r.key)}
+            style={{ fontSize: 12, padding: "8px 14px" }}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <button
+          className="btn-primary"
+          onClick={() => onSave(name.trim() || "Unnamed character", role)}
+          disabled={!name.trim()}
+          style={{ flex: 1, fontSize: 13, padding: "12px 20px", minHeight: 0 }}
+        >
           Save
         </button>
       </div>

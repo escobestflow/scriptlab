@@ -462,8 +462,28 @@ export default function Page() {
       <div className={`create-modal-backdrop ${createOpen ? "open" : ""}`} onClick={closeCreateModal} />
       <div className={`create-modal ${createOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
-        <div className="sheet-header">
-          <div className="sheet-title">New Project</div>
+        <div className="sheet-header create-modal-header">
+          {/* Elevated step indicator — replaces the "New Project" title */}
+          <div className="create-stepper create-stepper-compact" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={createStep + 1}>
+            {(["Format", "Title", "Genre"] as const).map((name, i) => {
+              const state = i < createStep ? "done" : i === createStep ? "active" : "upcoming";
+              return (
+                <div key={name} className={`create-step create-step-${state}`}>
+                  <div className="create-step-node">
+                    {state === "done" ? (
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <span className="create-step-num">{i + 1}</span>
+                    )}
+                  </div>
+                  <div className="create-step-label">{name}</div>
+                  {i < 2 && <div className="create-step-track" aria-hidden="true" />}
+                </div>
+              );
+            })}
+          </div>
           <button className="chip" onClick={closeCreateModal}>Cancel</button>
         </div>
         <div className="create-modal-body">
@@ -478,27 +498,6 @@ export default function Page() {
           )}
         </div>
         <div className="create-modal-footer">
-          {/* Elevated step indicator — labeled stepper with connecting track */}
-          <div className="create-stepper" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={createStep + 1}>
-            {(["Format", "Title", "Genre"] as const).map((name, i) => {
-              const state = i < createStep ? "done" : i === createStep ? "active" : "upcoming";
-              return (
-                <div key={name} className={`create-step create-step-${state}`}>
-                  <div className="create-step-node">
-                    {state === "done" ? (
-                      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    ) : (
-                      <span className="create-step-num">{i + 1}</span>
-                    )}
-                  </div>
-                  <div className="create-step-label">{name}</div>
-                  {i < 2 && <div className="create-step-track" aria-hidden="true" />}
-                </div>
-              );
-            })}
-          </div>
           <div className="create-modal-actions">
             {createStep > 0 && (
               <button className="btn-secondary" onClick={() => setCreateStep(s => s - 1)}
