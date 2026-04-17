@@ -891,7 +891,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin: 4px 0;
 }
 
-/* Layer draft picker (inside each tab) — iOS-style sticky toolbar */
+/* Layer draft picker (inside each tab) — iOS-style sticky toolbar.
+   The container itself is transparent. A ::before pseudo carries the
+   frosted-glass background, blur, and hairline border; its opacity is
+   driven by JS (via --picker-bg-opacity) so the bar fades in only as it
+   approaches its sticky pinning point. */
 .layer-draft-picker {
   position: sticky;
   /* Top offset matches the pinned header's bottom (set at runtime via JS) */
@@ -907,12 +911,23 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: center;
   gap: 12px;
   min-height: 44px;
-  /* Frosted glass — translucent with saturation boost, like iOS nav bars */
+  background: transparent;
+  /* New stacking context so the ::before can sit below the buttons
+     via z-index: -1 without escaping this element. */
+  isolation: isolate;
+}
+.layer-draft-picker::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background: rgba(255, 255, 255, 0.72);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   backdrop-filter: saturate(180%) blur(20px);
-  /* Hairline separator at the bottom edge when pinned */
   border-bottom: 0.5px solid rgba(0, 0, 0, 0.08);
+  /* Fades in as the bar approaches its sticky pin. */
+  opacity: var(--picker-bg-opacity, 0);
 }
 .layer-draft-trigger {
   display: inline-flex;

@@ -706,6 +706,43 @@ function LayerDraftPicker({
   setStory: (u: (s: Story) => Story) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Fade the bar's background in as it approaches its sticky pinning point.
+  // The trigger + save button stay fully visible; only the backdrop fades.
+  useEffect(() => {
+    const picker = pickerRef.current;
+    if (!picker) return;
+    const scroll = picker.closest(".studio-scroll") as HTMLElement | null;
+    const header = scroll?.querySelector(".studio-header-sticky") as HTMLElement | null;
+    if (!scroll || !header) return;
+
+    const FADE_RANGE = 28; // px before pinning where the fade starts
+    let rafId = 0;
+
+    const check = () => {
+      rafId = 0;
+      const stickyTop = Math.max(0, header.offsetHeight - 44);
+      const pickerTop =
+        picker.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
+      const distance = pickerTop - stickyTop; // 0 when pinned, positive before
+      const progress = Math.max(0, Math.min(1, 1 - distance / FADE_RANGE));
+      picker.style.setProperty("--picker-bg-opacity", progress.toFixed(3));
+    };
+
+    const onScroll = () => {
+      if (rafId) return;
+      rafId = requestAnimationFrame(check);
+    };
+
+    check();
+    scroll.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      scroll.removeEventListener("scroll", onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   const pool = (
     layer === "concept"    ? story.conceptDrafts :
     layer === "characters" ? story.charactersDrafts :
@@ -742,7 +779,7 @@ function LayerDraftPicker({
   };
 
   return (
-    <div className="layer-draft-picker">
+    <div className="layer-draft-picker" ref={pickerRef}>
       <button
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
