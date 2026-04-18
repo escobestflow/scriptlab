@@ -12,22 +12,35 @@
 
 import { Story, Scene, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft } from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
+import { WriterProfile, renderProfileForPrompt, isProfileMeaningful } from "./writerProfile";
 
 export interface BuiltPrompt {
   system: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }>;
   userMessage: string;
 }
 
-export function buildPrompt(story: Story, action: ActionRequest): BuiltPrompt {
+export function buildPrompt(
+  story: Story,
+  action: ActionRequest,
+  profile?: WriterProfile | null,
+): BuiltPrompt {
   const bible = storyBible(story);
   const ask = buildAsk(story, action);
-  return {
-    system: [
-      { type: "text", text: SYSTEM_BRAIN, cache_control: { type: "ephemeral" } },
-      { type: "text", text: bible, cache_control: { type: "ephemeral" } },
-    ],
-    userMessage: ask,
-  };
+  const system: BuiltPrompt["system"] = [
+    { type: "text", text: SYSTEM_BRAIN, cache_control: { type: "ephemeral" } },
+  ];
+  // Writer profile is injected as its own cached block — it changes only
+  // when the user captures new signals (not per-request), so the cache
+  // stays warm across most prompts inside a session.
+  if (isProfileMeaningful(profile)) {
+    system.push({
+      type: "text",
+      text: renderProfileForPrompt(profile),
+      cache_control: { type: "ephemeral" },
+    });
+  }
+  system.push({ type: "text", text: bible, cache_control: { type: "ephemeral" } });
+  return { system, userMessage: ask };
 }
 
 function storyBible(story: Story): string {

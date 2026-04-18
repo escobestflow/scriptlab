@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Story } from "@/lib/story";
 import { ActionRequest, modelForAction, costFromUsage } from "@/lib/prompt";
 import { buildPrompt } from "@/lib/contextBuilder";
+import type { WriterProfile } from "@/lib/writerProfile";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,13 +17,14 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: Request) {
   try {
-    const { story, action } = (await req.json()) as {
+    const { story, action, profile } = (await req.json()) as {
       story: Story;
       action: ActionRequest;
+      profile?: WriterProfile | null;
     };
 
     const model = modelForAction(action.type);
-    const { system, userMessage } = buildPrompt(story, action);
+    const { system, userMessage } = buildPrompt(story, action, profile);
 
     const encoder = new TextEncoder();
 

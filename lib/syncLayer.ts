@@ -35,6 +35,7 @@ import type {
 } from "./story";
 import { applySyncResult } from "./story";
 import type { ActionRequest, ActionType } from "./prompt";
+import type { WriterProfile } from "./writerProfile";
 
 // ── Canonical order ────────────────────────────────────────────────
 // Sort targets by this so that when the user checks several, they run
@@ -46,11 +47,15 @@ export function compareLayers(a: LayerKey, b: LayerKey): number {
 
 // ── /api/generate call ─────────────────────────────────────────────
 
-async function callGenerate(story: Story, action: ActionRequest): Promise<string> {
+async function callGenerate(
+  story: Story,
+  action: ActionRequest,
+  profile?: WriterProfile | null,
+): Promise<string> {
   const res = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ story, action }),
+    body: JSON.stringify({ story, action, profile }),
   });
   if (!res.ok || !res.body) {
     const body = await res.text().catch(() => "");
@@ -238,6 +243,7 @@ export async function syncLayer(
   story: Story,
   source: LayerKey,
   target: LayerKey,
+  profile?: WriterProfile | null,
 ): Promise<Story> {
   if (source === target) {
     throw new Error(`syncLayer: source and target must differ (got ${source})`);
@@ -246,7 +252,7 @@ export async function syncLayer(
     type: actionTypeFor(source, target),
     payload: {},
   };
-  const rawText = await callGenerate(story, action);
+  const rawText = await callGenerate(story, action, profile);
   const parsed = extractJson(rawText);
   const content = payloadToContent(target, parsed, story);
   return applySyncResult(story, content);
@@ -269,6 +275,7 @@ export async function syncLayers(
   source: LayerKey,
   targets: LayerKey[],
   onStep?: (target: LayerKey) => void,
+  profile?: WriterProfile | null,
 ): Promise<Story> {
   const ordered = [...targets]
     .filter(t => t !== source)
@@ -283,7 +290,7 @@ export async function syncLayers(
         payload: {},
       };
       // Always drive the LLM from the original source snapshot.
-      const rawText = await callGenerate(story, action);
+      const rawText = await callGenerate(story, action, profile);
       const parsed = extractJson(rawText);
       const content = payloadToContent(target, parsed, next);
       // Apply to the evolving story so draft numbering stays consistent

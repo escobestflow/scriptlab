@@ -22,6 +22,8 @@ import { REFERENCE_ASPECTS, WRITER_STYLES } from "@/lib/references";
 import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
+import { useProfileCapture } from "@/lib/writerProfileStore";
+import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
 
@@ -47,6 +49,9 @@ export function Studio({
   autosaveEnabled?: boolean;
 }) {
   const [section, setSection] = useState<Section>("concept");
+  // Writer-profile capture API — used to attach the profile to every AI
+  // request and to pass profile-awareness down to tab components.
+  const { profile } = useProfileCapture();
   // "Project Created" toast — shown briefly after a new project is
   // created, then auto-hides. Mirrors the Idea-Added toast on the
   // main page; rendered at Studio root so it floats over any tab.
@@ -133,6 +138,60 @@ export function Studio({
 
     if (next !== story) setStory(() => next);
   }, [story, autosaveEnabled, setStory]);
+
+  // ── Writer-profile prose capture ──────────────────────────────────
+  // Debounced 2.5s after any story change, walk the active drafts and
+  // submit any new prose fragments to the writer profile. A local ref
+  // set dedupes by (kind + text) so the same logline isn't counted
+  // multiple times across re-saves. `captureStyle` is internally safe
+  // to call with short/empty text (it no-ops below threshold).
+  const styleCaptureRef = useRef<Set<string>>(new Set());
+  const { captureStyle: captureStyleStudio } = useProfileCapture();
+  useEffect(() => {
+    if (!story) return;
+    const t = setTimeout(() => {
+      const capIfNew = (text: string | undefined | null, kind: ProfileExemplar["kind"]) => {
+        const v = (text ?? "").trim();
+        if (v.length < 20) return;
+        const sig = kind + ":" + v;
+        if (styleCaptureRef.current.has(sig)) return;
+        styleCaptureRef.current.add(sig);
+        captureStyleStudio(v, kind);
+      };
+
+      const concept = getActiveConceptDraft(story);
+      capIfNew(concept.logline, "logline");
+      capIfNew(concept.concept?.summary, "summary");
+
+      const chars = getActiveCharactersDraft(story);
+      for (const c of chars.characters) {
+        // Concatenate the free-prose character fields into one sample —
+        // the user's voice shows most clearly across backstory + voice
+        // + arc, not in their label-like fields.
+        const blob = [c.backstory, c.motivations, c.flaws, c.voice, c.arc, c.notes]
+          .filter(Boolean)
+          .join("\n\n");
+        capIfNew(blob, "character");
+      }
+
+      const storyL = getActiveStoryLayerDraft(story);
+      const beats = story.projectType === "tv-show"
+        ? (storyL.episodes ?? []).flatMap(ep => ep.beats)
+        : storyL.beats;
+      for (const b of beats) {
+        capIfNew(b.summary, "beat");
+        if (b.sceneContent) capIfNew(b.sceneContent, "scene");
+      }
+
+      const script = getActiveScriptDraft(story);
+      if (script) {
+        for (const s of script.script.scenes) {
+          capIfNew(s.content, "scene");
+        }
+      }
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [story, captureStyleStudio]);
 
   // Determine which beats we're editing
   const isTV = story.projectType === "tv-show";
@@ -239,7 +298,7 @@ export function Studio({
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ story, action }),
+        body: JSON.stringify({ story, action, profile }),
       });
       if (!res.ok || !res.body) {
         setOutput("Error: " + (await res.text()));
@@ -1106,6 +1165,7 @@ function LayerUpdateTray({
   const [checked, setChecked] = useState<Set<LayerKey>>(new Set());
   const [running, setRunning] = useState(false);
   const [currentTarget, setCurrentTarget] = useState<LayerKey | null>(null);
+  const { profile } = useProfileCapture();
 
   // Reset selection whenever the tray opens fresh for a new source.
   useEffect(() => {
@@ -1142,6 +1202,7 @@ function LayerUpdateTray({
         source,
         ordered,
         (t) => setCurrentTarget(t),
+        profile,
       );
       setStory(() => next);
       setSection(firstTarget);
@@ -1507,6 +1568,9 @@ function ConceptTab({
   const [referenceInput, setReferenceInput] = useState("");
   const [writerSheetOpen, setWriterSheetOpen] = useState(false);
   const [writerFilter, setWriterFilter] = useState("");
+  // Writer-profile capture — every chip toggle and saved prose sample
+  // feeds the cumulative per-user taste/voice model. See lib/writerProfile.ts.
+  const { profile, capture, captureStyle } = useProfileCapture();
 
   // Track which AI generator is currently running (one at a time)
   const [aiBusy, setAiBusy] = useState<null | "title" | "logline" | "summary" | "tone" | "themes" | "ending">(null);
@@ -1535,6 +1599,7 @@ function ConceptTab({
       aspects: [],
     };
     updateDraft({ settings: { ...d.settings, references: [...d.settings.references, newRef] } });
+    capture("referenceTitles", title);
     setReferenceInput("");
   }
   function removeReference(id: string) {
@@ -1543,6 +1608,8 @@ function ConceptTab({
     });
   }
   function toggleReferenceAspect(id: string, aspect: string) {
+    const ref = d.settings.references.find(r => r.id === id);
+    const adding = ref ? !ref.aspects.includes(aspect) : false;
     updateDraft({
       settings: {
         ...d.settings,
@@ -1553,17 +1620,21 @@ function ConceptTab({
         ),
       },
     });
+    // Only count adds as preference signal; removals don't tell us what they want.
+    if (adding) capture("referenceAspects", aspect);
   }
 
   // ── Writer-style helpers ──
   function toggleWriter(name: string) {
     const current = d.settings.writerStyles;
+    const adding = !current.includes(name);
     updateDraft({
       settings: {
         ...d.settings,
-        writerStyles: current.includes(name) ? current.filter(w => w !== name) : [...current, name],
+        writerStyles: adding ? [...current, name] : current.filter(w => w !== name),
       },
     });
+    if (adding) capture("writerStyles", name);
   }
   const filteredWriters = WRITER_STYLES.filter(w =>
     w.toLowerCase().includes(writerFilter.trim().toLowerCase())
@@ -1574,6 +1645,7 @@ function ConceptTab({
     if (!t) return;
     if (d.concept.themes.includes(t)) return;
     updateDraft({ concept: { ...d.concept, themes: [...d.concept.themes, t] } });
+    capture("themes", t);
     setThemeInput("");
   }
 
@@ -1583,6 +1655,7 @@ function ConceptTab({
 
   function setTone(t: string) {
     updateDraft({ concept: { ...d.concept, tone: t } });
+    if (t) capture("tones", t);
   }
 
   // ── AI generator: POST to /api/generate with current story+action, parse JSON result, apply ──
@@ -1600,7 +1673,7 @@ function ConceptTab({
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ story, action: { type, payload: {} } }),
+        body: JSON.stringify({ story, action: { type, payload: {} }, profile }),
       });
       if (!res.body) return;
       const reader = res.body.getReader();
@@ -1694,7 +1767,10 @@ function ConceptTab({
             <button
               key={pt.value}
               className={`choice ${story.projectType === pt.value ? "selected" : ""}`}
-              onClick={() => setStory(s => updateConceptDraft({ ...s, projectType: pt.value }, {}))}
+              onClick={() => {
+                setStory(s => updateConceptDraft({ ...s, projectType: pt.value }, {}));
+                capture("projectTypes", pt.value);
+              }}
               style={{ textAlign: "left", padding: "12px 17px" }}
             >
               <div className="choice-title">{pt.label}</div>
@@ -1731,6 +1807,7 @@ function ConceptTab({
                 updateDraft({
                   settings: { ...d.settings, genres: nextGenres, subGenres: nextSubGenres },
                 });
+                if (!isRemoving) capture("genres", g);
               }}>
               {g}
             </Selector>
@@ -1767,14 +1844,17 @@ function ConceptTab({
                       key={opt.id}
                       type="button"
                       className={`subgenre-option ${selected ? "selected" : ""}`}
-                      onClick={() => updateDraft({
-                        settings: {
-                          ...d.settings,
-                          subGenres: selected
-                            ? d.settings.subGenres.filter(x => x !== opt.id)
-                            : [...d.settings.subGenres, opt.id],
-                        },
-                      })}
+                      onClick={() => {
+                        updateDraft({
+                          settings: {
+                            ...d.settings,
+                            subGenres: selected
+                              ? d.settings.subGenres.filter(x => x !== opt.id)
+                              : [...d.settings.subGenres, opt.id],
+                          },
+                        });
+                        if (!selected) capture("subGenres", opt.name);
+                      }}
                       aria-pressed={selected}
                     >
                       <span className="subgenre-option-name">{opt.name}</span>
@@ -2100,14 +2180,18 @@ function ConceptTab({
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
             <Selector key={e}
               selected={d.settings.endingTypes.includes(e)}
-              onClick={() => updateDraft({
-                settings: {
-                  ...d.settings,
-                  endingTypes: d.settings.endingTypes.includes(e)
-                    ? d.settings.endingTypes.filter(x => x !== e)
-                    : [...d.settings.endingTypes, e],
-                },
-              })}>
+              onClick={() => {
+                const isAdding = !d.settings.endingTypes.includes(e);
+                updateDraft({
+                  settings: {
+                    ...d.settings,
+                    endingTypes: isAdding
+                      ? [...d.settings.endingTypes, e]
+                      : d.settings.endingTypes.filter(x => x !== e),
+                  },
+                });
+                if (isAdding) capture("endingTypes", e);
+              }}>
               {e}
             </Selector>
           ))}
@@ -2355,6 +2439,9 @@ function CharacterEditForm({
   const [archetypeCustomOpen, setArchetypeCustomOpen] = useState(false);
   const [archetypeInput, setArchetypeInput] = useState("");
   const [aiBusy, setAiBusy] = useState<CharAIField | null>(null);
+  // Writer profile — attached to every character-field AI call so the
+  // generated trait biases toward the user's recorded voice/preferences.
+  const { profile } = useProfileCapture();
 
   // Per-field AI generation history. Scoped by story + character id so it
   // follows the character across draft switches and persists across reloads.
@@ -2392,6 +2479,7 @@ function CharacterEditForm({
         body: JSON.stringify({
           story,
           action: { type: CHAR_AI_ACTION[field], payload: { characterId: ch.id } },
+          profile,
         }),
       });
       if (!res.body) return;
@@ -3081,13 +3169,16 @@ function BeatCreationForm({
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
+  // Writer profile — injected into beat-generation requests so the
+  // generated beat matches the user's voice + preference signature.
+  const { profile } = useProfileCapture();
 
   async function callAI(actionType: string, payload: Record<string, any>,
     onResult: (parsed: any) => void) {
     const res = await fetch("/api/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ story, action: { type: actionType, payload } }),
+      body: JSON.stringify({ story, action: { type: actionType, payload }, profile }),
     });
     if (!res.ok || !res.body) return;
     const reader = res.body.getReader();

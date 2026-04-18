@@ -9,6 +9,8 @@ import {
 } from "@/lib/storage";
 import { useAuth } from "@/lib/auth";
 import { Studio } from "@/components/Studio";
+import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
+import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
 import { useAutosavePref } from "@/lib/prefs";
 import { Button, Input, Textarea, Selector } from "@/components/ui";
@@ -38,6 +40,10 @@ const IconZap = () => (
 
 export default function Page() {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
+  // Writer profile — cumulative creative-preference + voice model used to
+  // bias every AI generation. Persisted per user in Supabase, mirrored to
+  // localStorage for instant first-paint. See lib/writerProfile.ts.
+  const profileAPI = useWriterProfile(user?.id ?? null);
   const [projects, setProjects] = useState<Story[]>([]);
   const [moments, setMoments] = useState<Moment[]>([]);
   const [view, setView] = useState<View>({ kind: "main" });
@@ -185,6 +191,9 @@ export default function Page() {
     };
     setMoments(prev => [m, ...prev]);
     if (user) saveMomentToDB(user.id, m);
+    // Profile signal: every saved moment is a prose sample in the user's
+    // own voice. Feeds the style-metric running averages + exemplar pool.
+    profileAPI.captureStyle(text, "moment");
     setRecordSheetOpen(false);
     setLiveTranscript("");
     setRecordType("scene");
@@ -383,6 +392,7 @@ export default function Page() {
   }
 
   return (
+   <WriterProfileContext.Provider value={profileAPI}>
     <div className="app">
       {renderContent()}
 
@@ -538,7 +548,7 @@ export default function Page() {
                 if (!newIdeaText.trim() || newIdeaCleaning) return;
                 setNewIdeaCleaning(true);
                 try {
-                  const cleaned = await cleanUpIdeaText(newIdeaText);
+                  const cleaned = await cleanUpIdeaText(newIdeaText, profileAPI.profile);
                   if (cleaned) setNewIdeaText(cleaned);
                 } finally {
                   setNewIdeaCleaning(false);
@@ -743,6 +753,7 @@ export default function Page() {
       {/* Success toast */}
       <div className={`toast ${toastVisible ? "show" : ""}`}>Idea Added</div>
     </div>
+   </WriterProfileContext.Provider>
   );
 }
 
@@ -756,7 +767,7 @@ const MOMENT_TYPES: Moment["type"][] = ["scene","dialogue","joke","memory","char
 
 // AI-cleans a raw idea text. Streams /api/generate with a placeholder
 // story payload and pulls the "text" field out of the JSON response.
-async function cleanUpIdeaText(raw: string): Promise<string | null> {
+async function cleanUpIdeaText(raw: string, profile?: WriterProfile | null): Promise<string | null> {
   try {
     const res = await fetch("/api/generate", {
       method: "POST",
@@ -764,6 +775,7 @@ async function cleanUpIdeaText(raw: string): Promise<string | null> {
       body: JSON.stringify({
         story: { id: "", title: "", projectType: "feature", conceptDrafts: [{ id: "cd", number: 1, createdAt: "", updatedAt: "", logline: "", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, concept: { summary: "", tone: "", themes: [] } }], charactersDrafts: [{ id: "chd", number: 1, createdAt: "", updatedAt: "", characters: [] }], storyDrafts: [{ id: "sd", number: 1, createdAt: "", updatedAt: "", beats: [], ingredients: [], snippets: [] }], scriptDrafts: [{ id: "scd", number: 1, createdAt: "", updatedAt: "", script: { scenes: [], syncStatus: "synced" } }], projectDrafts: [{ id: "pd", number: 1, createdAt: "", updatedAt: "", conceptDraftId: "cd", charactersDraftId: "chd", storyDraftId: "sd", scriptDraftId: "scd" }], activeProjectDraftId: "pd", counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 }, updatedAt: "" },
         action: { type: "clean_moment", payload: { rawText: raw } },
+        profile,
       }),
     });
     if (!res.ok || !res.body) return null;
@@ -819,12 +831,13 @@ function IdeaFields({
 }) {
   const [cleaning, setCleaning] = useState(false);
   const [tagInput, setTagInput] = useState("");
+  const { profile } = useProfileCapture();
 
   async function runCleanUp() {
     if (!text.trim()) return;
     setCleaning(true);
     try {
-      const cleaned = await cleanUpIdeaText(text);
+      const cleaned = await cleanUpIdeaText(text, profile);
       if (cleaned) setText(cleaned);
     } finally {
       setCleaning(false);
