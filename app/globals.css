@@ -1255,7 +1255,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   top: -1px;
 }
 
-/* ======= AI WAND BUTTON (inline next to field labels) ======= */
+/* ======= AI WAND BUTTON (inline next to field labels) =======
+   Emerald/teal palette — an elevated, jewel-toned accent that reads
+   as premium without the generic "AI purple" overtone. */
 .ai-wand {
   display: inline-flex;
   align-items: center;
@@ -1266,30 +1268,30 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 0;
   border: 0;
   border-radius: 7px;
-  background: linear-gradient(135deg, #f6f0ff 0%, #eef4ff 100%);
-  color: #6a4ee2;
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
+  color: #0f766e;
   cursor: pointer;
   vertical-align: -6px;
   box-shadow:
-    0 1px 2px rgba(90, 60, 200, 0.10),
-    inset 0 0 0 1px rgba(106, 78, 226, 0.18);
+    0 1px 2px rgba(15, 118, 110, 0.10),
+    inset 0 0 0 1px rgba(15, 118, 110, 0.22);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 .ai-wand:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, #efe5ff 0%, #e2ecff 100%);
+  background: linear-gradient(135deg, #d1fae5 0%, #ccfbf1 100%);
   box-shadow:
-    0 3px 10px rgba(90, 60, 200, 0.22),
-    inset 0 0 0 1px rgba(106, 78, 226, 0.3);
+    0 3px 10px rgba(15, 118, 110, 0.22),
+    inset 0 0 0 1px rgba(15, 118, 110, 0.32);
 }
 .ai-wand:active {
   transform: translateY(0);
   box-shadow:
-    0 1px 2px rgba(90, 60, 200, 0.10),
-    inset 0 0 0 1px rgba(106, 78, 226, 0.3);
+    0 1px 2px rgba(15, 118, 110, 0.10),
+    inset 0 0 0 1px rgba(15, 118, 110, 0.32);
 }
 .ai-wand.loading {
-  background: linear-gradient(135deg, #efe5ff 0%, #e2ecff 100%);
+  background: linear-gradient(135deg, #d1fae5 0%, #ccfbf1 100%);
   cursor: default;
 }
 .ai-wand-spin {
@@ -1670,6 +1672,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .attr-placeholder {
   font-size: 13px;
   color: var(--ink-ghost);
+  /* Drop placeholder labels 4px so they sit closer to the row's
+     optical baseline alongside filled attr-pill values. */
+  margin-top: 4px;
 }
 .attr-caret {
   width: 18px;
