@@ -37,10 +37,15 @@
   /* ── Motion ── */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* ── Shadows ── */
+  /* ── Shadows ──
+     Canonical card elevation — stacked crisp-contact + diffused ambient.
+     One value, reused everywhere (project cards, concept attr rows,
+     character/beat cards, generic .card, banners). Pairs with
+     --card-radius and a transparent border for a single unified look. */
   --card-shadow:
-    0 0 23px 0 rgba(0, 0, 0, 0.08),
-    -0.5px 0.5px 0 0 rgba(0, 0, 0, 0.25);
+    0 1px 2px rgba(10, 10, 15, 0.05),
+    0 8px 22px rgba(10, 10, 15, 0.07);
+  --card-radius: 18px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -221,14 +226,10 @@ button { cursor: pointer; }
   width: 100%;
   padding: 14px;
   margin-bottom: 14px;
-  border-radius: 18px;
+  border-radius: var(--card-radius);
   border: none;
   background: var(--surface);
-  /* Stacked elevation — crisp contact + diffused ambient. Scaled for the
-     smaller surface so the card lifts without looking puffy. */
-  box-shadow:
-    0 1px 2px rgba(10, 10, 15, 0.05),
-    0 8px 22px rgba(10, 10, 15, 0.07);
+  box-shadow: var(--card-shadow);
   text-align: left;
   cursor: pointer;
   align-items: stretch;
@@ -604,9 +605,10 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .card {
   padding: 20px;
   margin-bottom: 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  border: none;
   background: var(--surface);
+  box-shadow: var(--card-shadow);
 }
 .card .eyebrow { margin-bottom: 12px; display: block; }
 .stack > * + * { margin-top: 12px; }
@@ -1591,9 +1593,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 .attr-row {
   background: var(--surface);
-  border-radius: 4px;
-  box-shadow: none;
-  margin-bottom: 10px;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  margin-bottom: 14px;
   overflow: hidden;
 }
 .attr-row-header {
@@ -1990,14 +1992,19 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 /* ======= BEAT EDITOR (Design Tab) ======= */
 
 .beat-card {
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: none;
+  border-radius: var(--card-radius);
   background: var(--surface);
-  margin-bottom: 10px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 14px;
   overflow: hidden;
-  transition: border-color 260ms var(--ease);
+  transition: box-shadow 260ms var(--ease);
 }
-.beat-card.expanded { border-color: var(--border-strong); }
+.beat-card.expanded {
+  box-shadow:
+    0 2px 4px rgba(10, 10, 15, 0.06),
+    0 12px 28px rgba(10, 10, 15, 0.10);
+}
 
 .beat-header {
   display: flex;
