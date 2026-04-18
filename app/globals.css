@@ -1625,6 +1625,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .attr-row-header .attr-caret {
   margin-top: 3px;
 }
+.attr-row-header .attr-pill {
+  margin-top: 1px;
+}
 .attr-label {
   font-size: 14px;
   font-weight: 600;
@@ -1641,11 +1644,13 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .attr-pill {
   display: inline-flex;
-  /* top-anchored so padding-top directly sets the label's distance
-     from the pill top (flex-center was pulling the label too low). */
+  /* Top-anchored with explicit padding-top so we can optically center
+     all-caps text (Lato caps are ~7px tall at 9px font-size; centering
+     them in a 21px pill needs padding-top ≈ (21−7)/2 = 7, we use 6
+     which reads as centered without tipping low). */
   align-items: flex-start;
   height: 21px;
-  padding: 4px 8px 0;
+  padding: 6px 8px 0;
   line-height: 1;
   background: #F3F3F3;
   border: 1px solid #EDEDED;
