@@ -1612,7 +1612,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: flex-start;
   gap: 10px;
   width: 100%;
-  padding: 14px 16px;
+  /* top 17 · right 18 (caret inset) · bottom 17 · left 20 (label inset) */
+  padding: 17px 18px 17px 20px;
   background: none;
   border: none;
   cursor: pointer;
