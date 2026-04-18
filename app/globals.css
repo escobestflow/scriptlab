@@ -1650,7 +1650,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
      which reads as centered without tipping low). */
   align-items: flex-start;
   height: 21px;
-  padding: 6px 8px 0;
+  padding: 5px 8px 0;
   line-height: 1;
   background: #F3F3F3;
   border: 1px solid #EDEDED;
