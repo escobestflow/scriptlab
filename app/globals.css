@@ -1644,13 +1644,14 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .attr-pill {
   display: inline-flex;
-  /* Top-anchored with explicit padding-top so we can optically center
-     all-caps text (Lato caps are ~7px tall at 9px font-size; centering
-     them in a 21px pill needs padding-top ≈ (21−7)/2 = 7, we use 6
-     which reads as centered without tipping low). */
-  align-items: flex-start;
+  /* Flex-center the text, then push it upward with extra bottom
+     padding. The flex-center re-centers inside the reduced content
+     box, so net effect is a predictable upward shift. 3px bottom
+     padding lifts the label ~1.5px off math-center, enough to
+     optically center top-heavy all-caps glyphs. */
+  align-items: center;
   height: 21px;
-  padding: 5px 8px 0;
+  padding: 0 8px 3px;
   line-height: 1;
   background: #F3F3F3;
   border: 1px solid #EDEDED;
