@@ -577,7 +577,7 @@ export default function Page() {
                 <div key={name} className={`create-step create-step-${state}`}>
                   <div className="create-step-node">
                     {state === "done" && (
-                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                         <polyline points="20 6 9 17 4 12" />
                       </svg>
                     )}
@@ -1145,12 +1145,14 @@ function CreateStepTitle({
   return (
     <>
       <div className="display heading">Let{"'"}s name it.</div>
-      <Input
-        placeholder="The Quiet Room"
-        value={draft.title}
-        onChange={e => setDraft(s => ({ ...s, title: e.target.value }))}
-        autoFocus
-      />
+      <div style={{ marginTop: 25 }}>
+        <Input
+          placeholder="The Quiet Room"
+          value={draft.title}
+          onChange={e => setDraft(s => ({ ...s, title: e.target.value }))}
+          autoFocus
+        />
+      </div>
     </>
   );
 }
@@ -1176,7 +1178,7 @@ function CreateStepGenre({
   return (
     <>
       <div className="display heading">Set the genre.</div>
-      <div className="chip-row" style={{ marginTop: 8 }}>
+      <div className="chip-row" style={{ marginTop: 25 }}>
         {ALL_GENRES.map(g => (
           <Selector
             key={g}
