@@ -2933,6 +2933,45 @@ function BeatCreationForm({
 /* ============ SETTINGS TAB ================== */
 /* ============================================ */
 
+// Client-side center-crop + resize of a user-picked image into a 3:4
+// JPEG data URL. Target 192x256 / quality 0.85 — same shape as what the
+// DALL-E pipeline returns from /api/generate-thumbnail, so either source
+// saves/loads the same way through Supabase + localStorage.
+async function cropImageToPoster(file: File): Promise<string> {
+  const OUT_W = 192;
+  const OUT_H = 256; // 3:4
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const el = new Image();
+    el.onload = () => { URL.revokeObjectURL(url); resolve(el); };
+    el.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image failed to load")); };
+    el.src = url;
+  });
+
+  // Center-crop the source to 3:4 before drawing to the output canvas.
+  const srcAspect = img.width / img.height;
+  const targetAspect = OUT_W / OUT_H; // 0.75
+  let sx = 0, sy = 0, sw = img.width, sh = img.height;
+  if (srcAspect > targetAspect) {
+    // Too wide — trim the sides.
+    sw = Math.round(img.height * targetAspect);
+    sx = Math.round((img.width - sw) / 2);
+  } else if (srcAspect < targetAspect) {
+    // Too tall — trim the top/bottom.
+    sh = Math.round(img.width / targetAspect);
+    sy = Math.round((img.height - sh) / 2);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = OUT_W;
+  canvas.height = OUT_H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas 2d context unavailable");
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, OUT_W, OUT_H);
+  return canvas.toDataURL("image/jpeg", 0.85);
+}
+
 function SettingsTab({
   story, setStory,
   onLoadProjectDraft, onDeleteProjectDraft, onCreateProjectFromDraft,
@@ -2949,6 +2988,8 @@ function SettingsTab({
 }) {
   const concept = getActiveConceptDraft(story);
   const [generatingCover, setGeneratingCover] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   async function generateCover() {
     setGeneratingCover(true);
@@ -2970,6 +3011,27 @@ function SettingsTab({
       }
     } catch {} finally {
       setGeneratingCover(false);
+    }
+  }
+
+  // Upload + center-crop a user-supplied image into a 3:4 JPEG data URL
+  // matching the dimensions/quality produced by the DALL-E pipeline
+  // (192x256, JPEG ~0.85). Keeps localStorage + Supabase payload sizes
+  // comparable between generated and uploaded covers.
+  async function uploadCover(file: File) {
+    if (!file.type.startsWith("image/")) {
+      alert("Please choose an image file.");
+      return;
+    }
+    setUploadingCover(true);
+    try {
+      const dataUrl = await cropImageToPoster(file);
+      setStory(st => ({ ...st, thumbnail: dataUrl }));
+    } catch (e) {
+      alert(`Couldn't read that image: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setUploadingCover(false);
+      if (uploadInputRef.current) uploadInputRef.current.value = "";
     }
   }
 
@@ -3026,9 +3088,31 @@ function SettingsTab({
           style={{ marginBottom: 10 }}
         />
         <Button variant="secondary" size="sm" onClick={generateCover}
-          disabled={generatingCover}
+          disabled={generatingCover || uploadingCover}
           style={{ width: "100%" }}>
           {generatingCover ? "Generating..." : story.thumbnail ? "Regenerate cover" : "Generate cover"}
+        </Button>
+
+        {/* Upload your own image — center-cropped to 3:4 client-side so
+            the saved thumbnail matches the generated-cover dimensions. */}
+        <input
+          ref={uploadInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={e => {
+            const f = e.target.files?.[0];
+            if (f) uploadCover(f);
+          }}
+        />
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => uploadInputRef.current?.click()}
+          disabled={generatingCover || uploadingCover}
+          style={{ width: "100%", marginTop: 8 }}
+        >
+          {uploadingCover ? "Uploading..." : "Upload image"}
         </Button>
       </div>
 
