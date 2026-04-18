@@ -159,6 +159,10 @@ export default function Page() {
   }
 
   function saveDraftMoment(text: string, type: Moment["type"]) {
+    // Always stop the mic first — saving from the Record sheet should
+    // release speech recognition, not leave it listening in the
+    // background after the sheet closes.
+    stopRecording();
     const m: Moment = {
       id: "m_" + Math.random().toString(36).slice(2),
       text,
@@ -516,14 +520,20 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Recording sheet */}
+      {/* Recording sheet — while actively recording, the sheet is locked:
+          the backdrop is non-dismissive and the Close button is hidden.
+          User must either stop the recording (tap the red FAB inside)
+          or Save to leave. Prevents the mic from silently continuing to
+          listen after the sheet closes. */}
       <div className={`sheet-backdrop ${recordSheetOpen ? "open" : ""}`}
-        onClick={() => { stopRecording(); setRecordSheetOpen(false); }} />
+        onClick={() => { if (recording) return; setRecordSheetOpen(false); }} />
       <div className={`sheet ${recordSheetOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-header">
           <div className="sheet-title">{recording ? "Recording…" : "New moment"}</div>
-          <Button variant="secondary" size="sm" onClick={() => { stopRecording(); setRecordSheetOpen(false); }}>Close</Button>
+          {!recording && (
+            <Button variant="secondary" size="sm" onClick={() => setRecordSheetOpen(false)}>Close</Button>
+          )}
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <RecordingForm
