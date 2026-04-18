@@ -750,9 +750,11 @@ export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
       return s.beats.length === 0;
     }
     case "script": {
-      // Written scene prose is stored on beats (beat.sceneContent when
-      // beat.status === "written"), not only on script.scenes. Treat the
-      // Script layer as non-empty if either place has content.
+      // Written scene prose is stored on beats (beat.sceneContent),
+      // not only on script.scenes. Treat the Script layer as non-empty
+      // if either place has content. Any beat with non-empty
+      // sceneContent counts — don't gate on status, since a prior sync
+      // or edit may leave content in place while toggling status.
       const sc = getActiveScriptDraft(story);
       const hasScenes = !!sc && sc.script.scenes.length > 0;
       if (hasScenes) return false;
@@ -761,10 +763,10 @@ export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
       const allBeats = story.projectType === "tv-show"
         ? (sl.episodes ?? []).flatMap(ep => ep.beats)
         : sl.beats;
-      const hasWrittenBeat = allBeats.some(
-        b => b.status === "written" && (b.sceneContent ?? "").trim() !== ""
+      const hasSceneProse = allBeats.some(
+        b => (b.sceneContent ?? "").trim() !== ""
       );
-      return !hasWrittenBeat;
+      return !hasSceneProse;
     }
   }
 }
@@ -870,10 +872,20 @@ export function createAndActivateLayerDraftWith(story: Story, content: LayerCont
  * High-level "apply a sync result" helper: given a target layer and a
  * derived content payload, either overwrite the active draft (if empty)
  * or create a new draft and activate it (if non-empty).
+ *
+ * `emptyCheckStory` is an optional second story used ONLY for the
+ * empty-vs-nonempty decision. Default: `story`. Pass the pre-batch
+ * snapshot when running `syncLayers` so that, e.g., a prior Story sync
+ * doesn't trick the Script target into thinking Script is empty — the
+ * user's original written scene prose still counts as content.
  */
-export function applySyncResult(story: Story, content: LayerContent): Story {
+export function applySyncResult(
+  story: Story,
+  content: LayerContent,
+  emptyCheckStory: Story = story,
+): Story {
   const layer: LayerKey = content.kind;
-  if (isLayerDraftEmpty(story, layer)) {
+  if (isLayerDraftEmpty(emptyCheckStory, layer)) {
     switch (content.kind) {
       case "concept":    return replaceActiveConceptContent(story, content.patch);
       case "characters": return replaceActiveCharactersContent(story, content.characters);

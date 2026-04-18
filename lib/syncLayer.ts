@@ -287,8 +287,12 @@ export async function syncLayers(
       const parsed = extractJson(rawText);
       const content = payloadToContent(target, parsed, next);
       // Apply to the evolving story so draft numbering stays consistent
-      // if the same target somehow appears twice (defensive).
-      next = applySyncResult(next, content);
+      // if the same target somehow appears twice (defensive). Decide
+      // overwrite-vs-new-draft against the ORIGINAL `story` — otherwise
+      // a prior target's write (e.g. syncing to Story first) would reset
+      // that layer's content and trick the next empty-check (e.g. for
+      // Script, which cross-references written beats) into overwriting.
+      next = applySyncResult(next, content, story);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const err = new Error(`Sync to ${target} failed: ${msg}`) as Error & {
