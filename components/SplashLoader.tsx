@@ -102,9 +102,15 @@ export default function SplashLoader({
   async function handleSignIn() {
     // supabase.auth.signInWithOAuth({ provider: "google" }) redirects
     // the whole page to Google's consent screen, so we don't need to
-    // dismiss — the navigation tears the splash down for us. When the
-    // user returns, the parent sees a session and the splash either
-    // won't re-render (sessionStorage flag) or will auto-dismiss.
+    // dismiss — the navigation tears the splash down for us.
+    //
+    // IMPORTANT: set the "splash seen" flag BEFORE the redirect leaves.
+    // sessionStorage survives the Google OAuth round-trip (same-tab,
+    // same-origin on return), so when the user lands back on the app
+    // with a fresh session the splash skips itself instead of replaying
+    // a full 6.59s intro. Wrap in try/catch because storage can throw
+    // in private/partitioned contexts — worst case the splash replays.
+    try { window.sessionStorage.setItem("unfoldSplashSeen", "1"); } catch {}
     await signInWithGoogle();
   }
 
