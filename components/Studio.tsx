@@ -1301,9 +1301,9 @@ function AIWandButton({ onClick, loading }: { onClick: () => void; loading: bool
           <path d="M12 3a9 9 0 1 0 9 9" />
         </svg>
       ) : (
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8L12 3z" />
-          <path d="M18.5 14l.8 2.1L21.5 17l-2.2.9L18.5 20l-.8-2.1L15.5 17l2.2-.9L18.5 14z" />
+        // Lightning-bolt glyph from Noun Project (Damar Creative).
+        <svg viewBox="0 0 100 110" width="12" height="12" fill="currentColor" aria-hidden="true">
+          <path d="m41.785 60.52h-13.055c-0.52344-0.0078-1.0547-0.14844-1.5352-0.43359-1.4141-0.84766-1.8789-2.6836-1.0273-4.1016l31.906-53.211c0.60547-1.0117 1.7852-1.6094 3.0195-1.4141 1.6289 0.25391 2.7461 1.7773 2.4961 3.4102l-5.375 34.715h13.055c0.52344 0.0078 1.0547 0.14844 1.5352 0.43359 1.4141 0.84766 1.8789 2.6836 1.0273 4.1016l-31.906 53.211c-0.60547 1.0117-1.7852 1.6094-3.0195 1.4141-1.6289-0.25391-2.7461-1.7773-2.4961-3.4102z" />
         </svg>
       )}
     </button>
