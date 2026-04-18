@@ -1311,7 +1311,10 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 
 /* ======= AI HISTORY PAGER (inline near the wand) =======
-   Matches the AI wand's sapphire-blue palette (blue-700 #1d4ed8). */
+   Exact same fill + border treatment as .ai-wand so the two read as
+   one system. Uses the solid blue-50 → sky-50 gradient instead of a
+   translucent blue overlay (which shifted color depending on the
+   surface behind it). */
 .ai-pager {
   display: inline-flex;
   align-items: center;
@@ -1320,7 +1323,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin-left: 6px;
   padding: 0 5px;
   border-radius: 8px;
-  background: rgba(29, 78, 216, 0.06);
+  background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
   color: #1d4ed8;
   font-size: 13px;
   font-weight: 700;
