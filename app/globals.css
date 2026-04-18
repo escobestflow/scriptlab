@@ -931,13 +931,15 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
    Uses draft-bar-bg.svg as a fully-opaque gradient background. */
 .layer-draft-picker {
   position: sticky;
-  /* Top offset matches the pinned header's bottom (set at runtime via JS) */
-  top: var(--draft-picker-top, 120px);
+  /* Top offset matches the pinned header's bottom (set at runtime via JS)
+     plus a 6px gap so the picker sits clearly below the tab bar. */
+  top: calc(var(--draft-picker-top, 120px) + 6px);
   z-index: 9;
   /* Extend horizontally to page edges (tab body has 22px horizontal padding).
-     Negative top margin = 1px overlap with the pinned tab bar to prevent any
-     sub-pixel seam from the offsetHeight-based --draft-picker-top calc. */
-  margin: -1px -22px 14px;
+     margin-top: 5px gives a 6px visual gap from the tab bar in flow layout
+     (previously -1px, an intentional seam-prevention overlap — no longer
+     needed once a deliberate gap is part of the design). */
+  margin: 5px -22px 14px;
   padding: 10px 20px 9px;
   display: flex;
   justify-content: space-between;
@@ -1701,9 +1703,10 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .attr-text-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--border-strong);
+  /* Match .ds-input treatment: gray fill, no visible border. */
+  border: 1px solid transparent;
   border-radius: 4px;
-  background: var(--surface);
+  background: var(--bg-secondary);
   font-family: 'Lato', sans-serif;
   font-size: 14px;
   line-height: 1.45;
@@ -1714,13 +1717,16 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   transition: border-color 220ms var(--ease), background 220ms var(--ease), padding 220ms var(--ease);
 }
 .attr-text-input:focus {
-  border-color: var(--ink-mute);
+  /* Keep the same chromeless look on focus — no outline, gray fill. */
+  border-color: transparent;
 }
-/* Unfocused but has content: no chrome, left-aligned with the attr label */
+/* Unfocused but has content: no chrome, text left-aligned with the
+   attribute label (which sits at 20px from the row edge; body has
+   16px left padding, so +4px here puts the text at 20px). */
 .attr-text-input.unfocused-filled {
   border-color: transparent;
   background: transparent;
-  padding-left: 0;
+  padding-left: 4px;
   padding-right: 0;
 }
 /* Unified selector treatment inside open attribute rows.
@@ -2889,9 +2895,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
    picker + trigger align to the same bar edges. */
 .layer-bar {
   position: sticky;
-  top: var(--draft-picker-top, 120px);
+  top: calc(var(--draft-picker-top, 120px) + 6px);
   z-index: 9;
-  margin: -1px -22px 14px;
+  margin: 5px -22px 14px;
   padding: 10px 20px 9px;
   display: flex;
   align-items: center;

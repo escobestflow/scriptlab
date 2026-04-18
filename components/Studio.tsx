@@ -1611,7 +1611,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "genres")}
       >
         <div className="chip-row">
-          {(["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"] as const).map(g => (
+          {(["thriller","drama","comedy","sci-fi","horror","romance","action","mystery"] as const).map(g => (
             <Selector key={g}
               selected={d.settings.genres.includes(g)}
               onClick={() => updateDraft({
