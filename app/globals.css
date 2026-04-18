@@ -2700,6 +2700,67 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: block;
 }
 
+/* ---------- Clear-input button ---------- */
+/* `.ds-input-wrap` is a relative-positioned shell so the clear ✕ can be
+   absolute-positioned over the right edge of any Input/Textarea. The
+   wrapper does NOT add its own styling — the input keeps owning its
+   chrome. When `ds-input-has-clear` is present, the input gets extra
+   right padding so text never collides with the ✕. */
+.ds-input-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.ds-input-wrap-textarea { display: block; }
+
+.ds-input.ds-input-has-clear.ds-input-standard { padding-right: 44px; }
+.ds-input.ds-input-has-clear.ds-input-compact  { padding-right: 32px; }
+/* Compact inputs collapse their right padding when blurred+filled.
+   Keep room for the ✕ in both states. */
+.ds-input-compact.ds-input-has-clear:not(:focus):not(:placeholder-shown) {
+  padding-right: 24px;
+}
+
+.ds-input-clear {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--ink-ghost);
+  color: var(--bg, #fff);
+  border: none;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.9;
+  transition: opacity 140ms var(--ease), background-color 140ms var(--ease), transform 140ms var(--ease);
+}
+.ds-input-clear:hover  { opacity: 1; background: var(--ink-soft); }
+.ds-input-clear:active { transform: translateY(-50%) scale(0.9); }
+
+/* Textarea: pin to top-right so it hugs the first line, not vertical center. */
+.ds-input-clear-textarea {
+  top: 10px;
+  transform: none;
+}
+.ds-input-clear-textarea:active { transform: scale(0.9); }
+
+/* Compact inputs — smaller clear button tucked closer to the edge. */
+.ds-input-compact + .ds-input-clear,
+.ds-input-wrap > .ds-input-compact ~ .ds-input-clear {
+  width: 18px;
+  height: 18px;
+  right: 6px;
+  font-size: 9px;
+}
+
 /* ---------- Selector (chip) ---------- */
 .ds-selector {
   display: inline-flex;
