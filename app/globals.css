@@ -254,8 +254,9 @@ button { cursor: pointer; }
   position: absolute;
   left: 50%;
   top: 0;
-  width: 150px;
-  height: 210px;
+  /* 10% smaller than the prior 150 × 210. */
+  width: 135px;
+  height: 189px;
   border-radius: 14px;
   overflow: hidden;
   background: #222;
