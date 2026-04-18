@@ -1774,6 +1774,31 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin-top: 1px;
 }
 
+/* Sheet-level selector rows (New Idea / Record / View-Idea Type chips)
+   match the Concept attribute-row selector treatment so the app has
+   one consistent selector language across surfaces. */
+.sheet-selector-row {
+  gap: 8px;
+}
+.sheet-selector-row .ds-selector {
+  height: auto;
+  padding: 10px 16px;
+  border: 1px solid #EDEDED;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #3C3C42;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: capitalize;
+}
+.sheet-selector-row .ds-selector.is-selected {
+  background: #F3F3F3;
+  color: #3C3C42;
+  border-color: #EDEDED;
+}
+
 /* ======= SUCCESS BANNER ======= */
 
 .success-banner {

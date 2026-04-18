@@ -58,7 +58,9 @@ export default function Page() {
   const [newIdeaOpen, setNewIdeaOpen] = useState(false);
   const [newIdeaText, setNewIdeaText] = useState("");
   const [newIdeaType, setNewIdeaType] = useState<Moment["type"]>("scene");
-  const [newIdeaTags, setNewIdeaTags] = useState<string[]>([]);
+  // Clean-up spinner state for the New Idea sheet (Clean-up was hoisted
+  // out of IdeaFields so it can sit next to Save in the action row).
+  const [newIdeaCleaning, setNewIdeaCleaning] = useState(false);
   // Record sheet shares the unified idea composer — keep its type + tags
   // here so the two sheets behave identically except for the record FAB.
   const [recordType, setRecordType] = useState<Moment["type"]>("scene");
@@ -497,7 +499,6 @@ export default function Page() {
           setNewIdeaOpen(false);
           setNewIdeaText("");
           setNewIdeaType("scene");
-          setNewIdeaTags([]);
         }}
       />
       <div className={`sheet ${newIdeaOpen ? "open" : ""}`}>
@@ -512,29 +513,50 @@ export default function Page() {
             setText={setNewIdeaText}
             type={newIdeaType}
             setType={setNewIdeaType}
-            tags={newIdeaTags}
-            setTags={setNewIdeaTags}
             autoFocus
+            hideCleanUp
           />
 
-          <Button
-            variant="primary"
-            size="lg"
-            block
-            onClick={() => {
-              const text = newIdeaText.trim();
-              if (!text) return;
-              saveDraftMoment(text, newIdeaType, newIdeaTags);
-              setNewIdeaOpen(false);
-              setNewIdeaText("");
-              setNewIdeaType("scene");
-              setNewIdeaTags([]);
-            }}
-            disabled={!newIdeaText.trim()}
-            style={{ marginTop: 14 }}
-          >
-            Save Idea
-          </Button>
+          {/* Clean up + Save sit side-by-side in the action row. Clean up
+              rewrites newIdeaText in place via cleanUpIdeaText; Save commits
+              the draft moment and closes the sheet. Tags were removed from
+              this sheet per user request. */}
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={async () => {
+                if (!newIdeaText.trim() || newIdeaCleaning) return;
+                setNewIdeaCleaning(true);
+                try {
+                  const cleaned = await cleanUpIdeaText(newIdeaText);
+                  if (cleaned) setNewIdeaText(cleaned);
+                } finally {
+                  setNewIdeaCleaning(false);
+                }
+              }}
+              disabled={newIdeaCleaning || !newIdeaText.trim()}
+              style={{ flex: 1 }}
+            >
+              {newIdeaCleaning ? "Cleaning…" : "\u2728 Clean up"}
+            </Button>
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => {
+                const text = newIdeaText.trim();
+                if (!text) return;
+                saveDraftMoment(text, newIdeaType, []);
+                setNewIdeaOpen(false);
+                setNewIdeaText("");
+                setNewIdeaType("scene");
+              }}
+              disabled={!newIdeaText.trim()}
+              style={{ flex: 1 }}
+            >
+              Save
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -563,7 +585,7 @@ export default function Page() {
             setTags={setRecordTags}
             recordSlot={
               <>
-                <div style={{ display: "flex", justifyContent: "center", padding: "4px 0 0" }}>
+                <div style={{ display: "flex", justifyContent: "center", padding: "19px 0 0" }}>
                   <button
                     className={`record-fab ${recording ? "recording" : ""}`}
                     onClick={() => recording ? stopRecording() : startRecording()}
@@ -746,6 +768,7 @@ function IdeaFields({
   tags, setTags,
   autoFocus,
   recordSlot,
+  hideCleanUp,
 }: {
   text: string;
   setText: (v: string) => void;
@@ -757,6 +780,10 @@ function IdeaFields({
   /** Optional node rendered at the very top — used by the Record sheet
    *  to slot the red record FAB + status caption above the shared body. */
   recordSlot?: React.ReactNode;
+  /** When true, suppresses the block Clean-up button inside this body.
+   *  The New Idea sheet uses this so Clean-up can live alongside Save
+   *  in the sheet's action row instead of above it. */
+  hideCleanUp?: boolean;
 }) {
   const [cleaning, setCleaning] = useState(false);
   const [tagInput, setTagInput] = useState("");
@@ -788,7 +815,7 @@ function IdeaFields({
       {recordSlot}
 
       <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>Type</span>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+      <div className="chip-row sheet-selector-row" style={{ marginBottom: 16 }}>
         {MOMENT_TYPES.map(t => (
           <Selector key={t} selected={type === t} onClick={() => setType(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -805,16 +832,18 @@ function IdeaFields({
         autoFocus={autoFocus}
       />
 
-      <Button
-        variant="secondary"
-        size="lg"
-        block
-        onClick={runCleanUp}
-        disabled={cleaning || !text.trim()}
-        style={{ marginTop: 14 }}
-      >
-        {cleaning ? "Cleaning…" : "\u2728 Clean up"}
-      </Button>
+      {!hideCleanUp && (
+        <Button
+          variant="secondary"
+          size="lg"
+          block
+          onClick={runCleanUp}
+          disabled={cleaning || !text.trim()}
+          style={{ marginTop: 14 }}
+        >
+          {cleaning ? "Cleaning…" : "\u2728 Clean up"}
+        </Button>
+      )}
 
       {tags && setTags && (
         <>
