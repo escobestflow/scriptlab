@@ -76,11 +76,15 @@ export function parseScreenplay(raw: string): ScriptChunk[] {
     // Priority 0: a block that is a single ALL-CAPS line — a standalone
     // cue like "**MADISON**" — and whose following block is non-heading
     // prose. Treat as cue + dialogue pair, consume both blocks.
+    // NOTE: must skip scene headings ("INT. ROOM - DAY") because they
+    // also look like single-line all-caps text and would otherwise be
+    // swallowed as a character named "INT. ROOM - DAY".
     const blockLines = block.split("\n").map(l => l.trim()).filter(Boolean);
     if (
       blockLines.length === 1 &&
       blockLines[0].length <= 50 &&
       STANDALONE_CUE_RE.test(blockLines[0]) &&
+      !SCENE_HEADING_RE.test(blockLines[0]) &&
       bi + 1 < blocks.length
     ) {
       const nextClean = stripInlineMd(blocks[bi + 1]);

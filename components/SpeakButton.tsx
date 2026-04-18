@@ -54,6 +54,12 @@ export function SpeakButton(props: Props) {
     }
     const text = props.text?.trim();
     if (!text) return;
+
+    // CRITICAL: create/resume the AudioContext inside the synchronous click
+    // event. If we wait for the first `await` below, Safari/iOS consider
+    // the user gesture over and silently refuse to play audio.
+    playback.prime();
+
     setLoading(true);
     try {
       if (props.mode === "script") {
@@ -68,7 +74,7 @@ export function SpeakButton(props: Props) {
         });
       }
     } catch (err) {
-      console.error("speak failed", err);
+      console.error("[tts] speak failed", err);
     } finally {
       setLoading(false);
     }

@@ -159,6 +159,26 @@ class PlaybackController {
     return this.ctx!;
   }
 
+  /**
+   * Call this SYNCHRONOUSLY from the click handler that initiates playback.
+   * Most browsers (especially Safari/iOS) only allow a fresh AudioContext
+   * to be created — or a suspended one to be resumed — during the user
+   * gesture itself. If we wait for the first `await` in play(), the
+   * gesture has expired and nothing will produce audio.
+   */
+  prime(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const ctx = this.getCtx();
+      if (ctx.state === "suspended") {
+        // Fire-and-forget; the context is now latched to this gesture.
+        ctx.resume().catch(() => {});
+      }
+    } catch {
+      /* browser lacks Web Audio — callers will see a thrown error later */
+    }
+  }
+
   stop(): void {
     this.epoch++;
     for (const s of this.sources) {
@@ -221,6 +241,7 @@ class PlaybackController {
 
     let nextStart = ctx.currentTime + 0.04;
     const finished: Promise<void>[] = [];
+    let scheduled = 0;
 
     for (let i = 0; i < pending.length; i++) {
       if (myEpoch !== this.epoch || this.activeOwner !== owner) return;
@@ -249,6 +270,7 @@ class PlaybackController {
       src.connect(gain);
       src.start(startAt);
       this.sources.push(src);
+      scheduled++;
 
       nextStart = startAt + audioBuf.duration;
 
@@ -263,6 +285,14 @@ class PlaybackController {
     if (myEpoch === this.epoch && this.activeOwner === owner) {
       this.activeOwner = null;
       this.emit();
+    }
+
+    // If nothing ever played, surface the error so callers (and the UI)
+    // know to show a failure state instead of silently succeeding.
+    if (scheduled === 0) {
+      throw new Error(
+        "No audio chunks could be played. Check /api/tts responses in the Network tab.",
+      );
     }
   }
 }
