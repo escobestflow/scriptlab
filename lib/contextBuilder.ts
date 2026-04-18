@@ -354,6 +354,27 @@ function sourceLabel(source: "concept" | "characters" | "story" | "script"): str
        :                           "Script (scene prose)";
 }
 
+/**
+ * Context block that always ships the existing written script prose
+ * (from beat.sceneContent when status="written", and from script.scenes)
+ * to any sync prompt. This is the cohesion fix: even when the user taps
+ * "Update Characters from Concept", if scenes have already been written,
+ * the model should see them so the derived characters line up with what
+ * the script actually shows.
+ *
+ * Returns "" when no prose exists, so callers can concatenate safely.
+ * For `source === "script"` this is the *primary* source material; for
+ * every other source it's supplementary context for cohesion.
+ */
+function cohesionScriptBlock(story: Story, source: "concept" | "characters" | "story" | "script"): string {
+  const prose = scriptProseBlock(story);
+  if (!prose || prose === "(no scenes)") return "";
+  if (source === "script") {
+    return `\n\n## Source script prose\n${prose}`;
+  }
+  return `\n\n## Additional cohesion context — script prose already written\nThe project already has screenplay prose. Treat the ${sourceLabel(source)} above as the PRIMARY source of truth, but keep your output CONSISTENT with the specific characters, tone, and events shown below.\n\n${prose}`;
+}
+
 function scriptProseBlock(story: Story, maxChars = 12000): string {
   // Collect prose from two places: the ScriptLayerDraft's scenes array
   // AND any Story-layer beats with status="written" + sceneContent. The
@@ -396,8 +417,8 @@ function scriptProseBlock(story: Story, maxChars = 12000): string {
 }
 
 function syncPrompt_toCharacters(story: Story, source: "concept" | "story" | "script"): string {
-  const sourceBlock = source === "script" ? `\n\n## Source script prose\n${scriptProseBlock(story)}` : "";
-  return `Derive the Characters layer from the ${sourceLabel(source)} above${source === "script" ? " and the additional script prose below" : ""}.${sourceBlock}
+  const sourceBlock = cohesionScriptBlock(story, source);
+  return `Derive the Characters layer from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring your output is cohesive with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
 Produce a coherent cast of characters that plausibly anchors this project. ${
     source === "script"
@@ -435,10 +456,10 @@ function syncPrompt_toStory(story: Story, source: "concept" | "characters" | "sc
   const c = getActiveConceptDraft(story);
   const framework = c.settings.framework;
   const isTV = story.projectType === "tv-show";
-  const sourceBlock = source === "script" ? `\n\n## Source script prose\n${scriptProseBlock(story)}` : "";
+  const sourceBlock = cohesionScriptBlock(story, source);
 
   if (isTV) {
-    return `Derive the Story layer (beat sheet) for this TV project from the ${sourceLabel(source)} above.${sourceBlock}
+    return `Derive the Story layer (beat sheet) for this TV project from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
 ${source === "script" ? "Extract the beat structure implicit in the scene prose." : `Use the ${framework} framework.`} Return a single pilot episode's worth of beats (one episode).
 
@@ -455,7 +476,7 @@ Rules:
 - No prose outside the JSON.`;
   }
 
-  return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above.${sourceBlock}
+  return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
 ${source === "script" ? "Extract the beat structure implicit in the scene prose — one beat per narrative turn, not per scene." : `Use the ${framework} framework to produce the full beat sheet.`}
 
@@ -482,12 +503,20 @@ function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "s
       : isShort
       ? "6–10 scenes"
       : "14–22 scenes";
+  // When generating a fresh script but a prior script already exists,
+  // include the prior prose as tonal/character reference so the new
+  // draft feels cohesive with what the user has seen.
+  const existingProse = scriptProseBlock(story);
+  const priorScriptBlock =
+    existingProse && existingProse !== "(no scenes)"
+      ? `\n\n## Prior script prose (for tonal reference only)\nA prior version of this script exists. Treat it as reference for the project's voice, characters, and tone. You are writing a fresh take driven by the ${sourceLabel(source)} — feel free to restructure — but keep character names and established tone consistent.\n\n${existingProse}`
+      : "";
 
   return `Write a complete ${isShort ? "short-film" : story.projectType === "tv-show" ? "pilot-episode" : "feature-length"} screenplay driven by the ${sourceLabel(source)} above.
 
 Produce ${targetScenes}. Match the genres "${genres}" and the tone on the brief.
 
-${source !== "story" ? "No beat sheet has been written yet, so synthesize coherent scene structure as you go. The user will back-fill the Story layer separately." : ""}
+${source !== "story" ? "No beat sheet has been written yet, so synthesize coherent scene structure as you go. The user will back-fill the Story layer separately." : ""}${priorScriptBlock}
 
 Return STRICT JSON:
 {
@@ -509,8 +538,8 @@ No prose outside the JSON.`;
 }
 
 function syncPrompt_toConcept(story: Story, source: "characters" | "story" | "script"): string {
-  const sourceBlock = source === "script" ? `\n\n## Source script prose\n${scriptProseBlock(story)}` : "";
-  return `Derive a refreshed Concept layer from the ${sourceLabel(source)} above${source === "script" ? " and the script prose below" : ""}.${sourceBlock}
+  const sourceBlock = cohesionScriptBlock(story, source);
+  return `Derive a refreshed Concept layer from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
 The project's **title, format, and genres are fixed** — the user chose these at creation and they are NOT to be reconsidered. Do not include them in the output.
 
