@@ -236,7 +236,9 @@ button { cursor: pointer; }
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 60px 20px 40px;
+  /* Top padding reduced 60 → 35 to shift the hero (poster, heading,
+     body, CTA) up ~25px. */
+  padding: 35px 20px 40px;
   min-height: 70vh;
 }
 .projects-empty-art {

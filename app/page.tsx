@@ -953,22 +953,25 @@ function MomentEditForm({
    new slot. Front slot renders with the highest z-index. */
 const POSTER_SRCS = ["/poster1.png", "/poster2.png", "/poster3.png"];
 const POSTER_SLOTS = [
-  // slot 0: back-left
-  { x: -96, y: 14, rot: -8, z: 1 },
-  // slot 1: back-right
-  { x: 96, y: 14, rot: 8, z: 1 },
-  // slot 2: front-center
-  { x: 0, y: 58, rot: 0, z: 3 },
+  // slot 0: back-left — pulled inward so the front card noticeably
+  // overlaps it (centers ~65px off-midline, poster is 150px wide).
+  { x: -62, y: 6, rot: -7, z: 1 },
+  // slot 1: back-right — mirror of back-left.
+  { x: 62, y: 6, rot: 7, z: 1 },
+  // slot 2: front-center — sits on top, offset down just enough to
+  // let the top edges of the back cards peek out.
+  { x: 0, y: 38, rot: 0, z: 3 },
 ];
 function EmptyPosterStack() {
-  // order[i] = which poster index occupies slot i. Rotate every 4s.
-  const [order, setOrder] = useState<number[]>([0, 1, 2]);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setOrder((prev) => [prev[2], prev[0], prev[1]]);
-    }, 4000);
-    return () => clearInterval(id);
-  }, []);
+  // order[i] = which poster index occupies slot i. The shuffle is
+  // disabled for now — restore by uncommenting the useEffect below.
+  const [order /* , setOrder */] = useState<number[]>([0, 1, 2]);
+  // useEffect(() => {
+  //   const id = setInterval(() => {
+  //     setOrder((prev) => [prev[2], prev[0], prev[1]]);
+  //   }, 4000);
+  //   return () => clearInterval(id);
+  // }, []);
   // Pre-compute each poster's current slot so we can key by stable
   // poster index (keeps <img> mounted across reorders, which is what
   // lets the transition play).
