@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Story, getActiveConceptDraft, getActiveStoryLayerDraft, updateConceptDraft } from "@/lib/story";
-import { Moment, makeSampleSciFiComedy } from "@/lib/sampleData";
+import { Moment } from "@/lib/sampleData";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
@@ -75,9 +75,8 @@ export default function Page() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load data from Supabase when user is authenticated. First-time users
-  // (no projects, never seeded before) get a fully-populated sci-fi comedy
-  // sample project so the Studio renders with real content instead of an
-  // empty state.
+  // land on the Projects tab's empty state — no auto-seeded sample —
+  // and create their first project themselves from there.
   useEffect(() => {
     if (!user) { setHydrated(false); return; }
     (async () => {
@@ -85,17 +84,7 @@ export default function Page() {
         loadProjectsFromDB(user.id),
         loadMomentsFromDB(user.id),
       ]);
-      const seedFlagKey = `scriptlab.sampleSeeded.v1.${user.id}`;
-      const alreadySeeded =
-        typeof window !== "undefined" && window.localStorage.getItem(seedFlagKey) === "true";
-      if (p.length === 0 && !alreadySeeded) {
-        const sample = makeSampleSciFiComedy();
-        try { await saveProjectToDB(user.id, sample); } catch {}
-        if (typeof window !== "undefined") window.localStorage.setItem(seedFlagKey, "true");
-        setProjects([sample]);
-      } else {
-        setProjects(p);
-      }
+      setProjects(p);
       setMoments(m);
       setHydrated(true);
     })();
@@ -964,6 +953,24 @@ function ProjectsTab({
   onOpen: (id: string) => void;
   onNew: () => void;
 }) {
+  // First-run empty state — shown until the user has created their very
+  // first project. Swaps back to the standard header + list layout as
+  // soon as `projects` has at least one entry.
+  if (projects.length === 0) {
+    return (
+      <div className="projects-empty">
+        <img src="/empty-state-cards.svg" alt="" className="projects-empty-art" />
+        <h1 className="projects-empty-title">Your story starts here</h1>
+        <p className="projects-empty-sub">
+          Begin with an idea, shape the world around it,<br />and watch your story unfold.
+        </p>
+        <Button variant="primary" size="lg" onClick={onNew} style={{ minWidth: 180 }}>
+          GET STARTED
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 }}>

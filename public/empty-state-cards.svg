@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 340" fill="none" aria-hidden="true">
+  <defs>
+    <!-- Back-left card: sage/teal sunset scene -->
+    <linearGradient id="esc-teal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f8a8a"/>
+      <stop offset="0.55" stop-color="#2e6a75"/>
+      <stop offset="1" stop-color="#f5b270"/>
+    </linearGradient>
+    <!-- Back-right card: dark blue palms -->
+    <linearGradient id="esc-navy" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a363f"/>
+      <stop offset="0.8" stop-color="#0f1518"/>
+      <stop offset="1" stop-color="#e98a4a"/>
+    </linearGradient>
+    <!-- Front card: red ensemble -->
+    <linearGradient id="esc-red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d0483a"/>
+      <stop offset="1" stop-color="#9b2e26"/>
+    </linearGradient>
+    <clipPath id="esc-clip-left"><rect x="0" y="0" width="190" height="250" rx="16"/></clipPath>
+    <clipPath id="esc-clip-right"><rect x="0" y="0" width="190" height="250" rx="16"/></clipPath>
+    <clipPath id="esc-clip-front"><rect x="0" y="0" width="200" height="270" rx="18"/></clipPath>
+  </defs>
+
+  <!-- Soft ground shadow -->
+  <ellipse cx="180" cy="320" rx="120" ry="9" fill="#000" opacity="0.08"/>
+
+  <!-- ─── Back-left card (teal sunset) ─────────────────────────── -->
+  <g transform="translate(20 40) rotate(-8 95 125)">
+    <rect x="-2" y="-2" width="194" height="254" rx="18" fill="#fff"/>
+    <g clip-path="url(#esc-clip-left)">
+      <rect width="190" height="250" fill="url(#esc-teal)"/>
+      <!-- distant peak -->
+      <path d="M -10 175 L 50 135 L 95 165 L 140 120 L 200 170 L 200 250 L -10 250 Z" fill="#1b4a4a" opacity="0.6"/>
+      <!-- sun -->
+      <circle cx="135" cy="130" r="22" fill="#f6d39a" opacity="0.9"/>
+      <!-- water -->
+      <rect y="210" width="190" height="40" fill="#f5b270"/>
+      <path d="M0 220 Q 30 216 60 220 T 120 220 T 190 220" stroke="#fff" stroke-opacity="0.25" stroke-width="1" fill="none"/>
+    </g>
+  </g>
+
+  <!-- ─── Back-right card (navy palms) ─────────────────────────── -->
+  <g transform="translate(165 30) rotate(8 95 125)">
+    <rect x="-2" y="-2" width="194" height="254" rx="18" fill="#fff"/>
+    <g clip-path="url(#esc-clip-right)">
+      <rect width="190" height="250" fill="url(#esc-navy)"/>
+      <!-- moon -->
+      <circle cx="60" cy="70" r="16" fill="#f7d193" opacity="0.9"/>
+      <!-- palm 1 -->
+      <g fill="#000" opacity="0.85" transform="translate(130 130)">
+        <path d="M0 0 C -2 -40 2 -70 0 -90 C 4 -72 8 -55 22 -42 C 10 -48 6 -44 4 -38 C 18 -44 32 -38 40 -22 C 28 -30 18 -28 10 -20 C 24 -16 32 -6 34 8 C 22 -2 14 -2 6 4 C 14 10 18 22 14 34 C 8 22 2 18 -2 18 C 0 10 0 4 0 0 Z"/>
+        <rect x="-1.5" y="0" width="3" height="120"/>
+      </g>
+      <!-- palm 2 -->
+      <g fill="#000" opacity="0.85" transform="translate(165 155) scale(0.7)">
+        <path d="M0 0 C -2 -40 2 -70 0 -90 C 4 -72 8 -55 22 -42 C 10 -48 6 -44 4 -38 C 18 -44 32 -38 40 -22 C 28 -30 18 -28 10 -20 C 24 -16 32 -6 34 8 C 22 -2 14 -2 6 4 C 14 10 18 22 14 34 C 8 22 2 18 -2 18 C 0 10 0 4 0 0 Z"/>
+        <rect x="-1.5" y="0" width="3" height="120"/>
+      </g>
+      <!-- horizon -->
+      <rect y="210" width="190" height="40" fill="#1a2228"/>
+    </g>
+  </g>
+
+  <!-- ─── Front card (red ensemble) ────────────────────────────── -->
+  <g transform="translate(80 60)">
+    <rect x="-3" y="-3" width="206" height="276" rx="20" fill="#fff"/>
+    <g clip-path="url(#esc-clip-front)">
+      <rect width="200" height="270" fill="url(#esc-red)"/>
+
+      <!-- Four male silhouettes in the background -->
+      <g fill="#1b1b20">
+        <!-- far-left -->
+        <g transform="translate(10 70)">
+          <ellipse cx="20" cy="12" rx="12" ry="13" fill="#e2b78f"/>
+          <path d="M 3 30 Q 3 70 6 130 L 34 130 Q 37 70 37 30 Q 30 22 20 22 Q 10 22 3 30 Z"/>
+        </g>
+        <!-- mid-left -->
+        <g transform="translate(36 65)">
+          <ellipse cx="20" cy="12" rx="12.5" ry="13" fill="#d9a981"/>
+          <path d="M 3 30 Q 3 75 6 135 L 36 135 Q 37 75 37 30 Q 30 22 20 22 Q 10 22 3 30 Z"/>
+        </g>
+        <!-- mid-right -->
+        <g transform="translate(125 65)">
+          <ellipse cx="20" cy="12" rx="12.5" ry="13" fill="#caa079"/>
+          <path d="M 3 30 Q 3 75 6 135 L 36 135 Q 37 75 37 30 Q 30 22 20 22 Q 10 22 3 30 Z"/>
+        </g>
+        <!-- far-right -->
+        <g transform="translate(153 70)">
+          <ellipse cx="20" cy="12" rx="12" ry="13" fill="#d6a884"/>
+          <path d="M 3 30 Q 3 70 6 130 L 34 130 Q 37 70 37 30 Q 30 22 20 22 Q 10 22 3 30 Z"/>
+        </g>
+      </g>
+
+      <!-- Woman in red dress, foreground center -->
+      <g transform="translate(74 72)">
+        <!-- hair back -->
+        <path d="M 10 6 Q 10 -4 26 -4 Q 42 -4 42 6 L 44 42 L 8 42 Z" fill="#0e0e13"/>
+        <!-- face -->
+        <ellipse cx="26" cy="20" rx="14" ry="16" fill="#f1c7a6"/>
+        <!-- closed eyes (small arcs) -->
+        <path d="M 18 21 q 2 -2 4 0 M 30 21 q 2 -2 4 0" stroke="#1b1b20" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+        <!-- lips -->
+        <path d="M 22 27 q 4 2 8 0" stroke="#8b2a27" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <!-- neck -->
+        <rect x="22" y="32" width="8" height="8" fill="#e6b896"/>
+        <!-- dress bodice -->
+        <path d="M 4 42 Q 26 36 48 42 L 44 90 L 8 90 Z" fill="#b6282a"/>
+        <!-- dress skirt -->
+        <path d="M 2 90 Q 26 84 50 90 L 58 140 L -6 140 Z" fill="#b6282a"/>
+        <!-- bouquet of flowers -->
+        <g transform="translate(18 92)">
+          <circle cx="4" cy="4" r="4" fill="#e23a2e"/>
+          <circle cx="12" cy="2" r="4" fill="#e23a2e"/>
+          <circle cx="8" cy="10" r="4" fill="#e23a2e"/>
+          <circle cx="16" cy="10" r="3.5" fill="#e23a2e"/>
+          <rect x="7" y="12" width="2" height="18" fill="#1c4531"/>
+          <rect x="12" y="12" width="2" height="18" fill="#1c4531"/>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

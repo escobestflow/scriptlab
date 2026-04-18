@@ -225,6 +225,43 @@ button { cursor: pointer; }
    Genre chips reuse .attr-pill, matching the Concept-tab collapsed genre
    summary exactly. 18px corners align with .card / sheet surfaces. */
 
+/* First-run empty state for the Projects tab — centered hero with the
+   stacked-cards illustration, a welcome headline, supporting copy, and
+   a single primary CTA that kicks off the create-project flow. Only
+   rendered when `projects.length === 0`; the moment a project exists we
+   revert to the standard list-with-header layout. */
+.projects-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px 40px;
+  min-height: 70vh;
+}
+.projects-empty-art {
+  width: 240px;
+  height: auto;
+  margin-bottom: 32px;
+  user-select: none;
+  pointer-events: none;
+}
+.projects-empty-title {
+  font-family: var(--font-display, inherit);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+  color: var(--ink);
+}
+.projects-empty-sub {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-mute);
+  margin: 0 0 32px;
+  max-width: 320px;
+}
+
 .project-card {
   display: flex;
   flex-direction: row;
