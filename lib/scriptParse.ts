@@ -68,9 +68,37 @@ export function parseScreenplay(raw: string): ScriptChunk[] {
 
   const chunks: ScriptChunk[] = [];
 
-  for (const rawBlock of blocks) {
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const rawBlock = blocks[bi];
     // Always strip markdown first so regexes see clean text.
     const block = stripInlineMd(rawBlock);
+
+    // Priority 0: a block that is a single ALL-CAPS line — a standalone
+    // cue like "**MADISON**" — and whose following block is non-heading
+    // prose. Treat as cue + dialogue pair, consume both blocks.
+    const blockLines = block.split("\n").map(l => l.trim()).filter(Boolean);
+    if (
+      blockLines.length === 1 &&
+      blockLines[0].length <= 50 &&
+      STANDALONE_CUE_RE.test(blockLines[0]) &&
+      bi + 1 < blocks.length
+    ) {
+      const nextClean = stripInlineMd(blocks[bi + 1]);
+      if (!SCENE_HEADING_RE.test(nextClean)) {
+        const name = blockLines[0].replace(/\s*\([^)]*\)\s*$/, "").trim();
+        const dialogueLines = nextClean
+          .split("\n")
+          .map(l => l.trim())
+          .filter(Boolean)
+          .filter(l => !(l.startsWith("(") && l.endsWith(")"))); // drop parentheticals
+        const text = dialogueLines.join(" ").trim();
+        if (text) {
+          chunks.push({ kind: "dialogue", character: name, text: normalize(text) });
+          bi++; // consume the next block
+          continue;
+        }
+      }
+    }
 
     // 1. Scene heading
     if (SCENE_HEADING_RE.test(block)) {

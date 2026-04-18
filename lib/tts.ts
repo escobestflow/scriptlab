@@ -19,6 +19,7 @@ import {
 } from "./scriptParse";
 import type { Character, Genre, ProjectType } from "./story";
 import { DEFAULT_TTS_SPEED, getNarratorStyle, getStyleForProject } from "./ttsStyle";
+import { expandScreenwritingAbbreviations } from "./ttsExpand";
 
 // ── IndexedDB cache ─────────────────────────────────────────────────
 
@@ -89,14 +90,19 @@ async function fetchAudio(
   instructions: string,
   speed: number,
 ): Promise<ArrayBuffer> {
-  const key = await cacheKey(text, voice, instructions, speed);
+  // Spell out screenwriting abbreviations (INT. → "Interior", V.O. →
+  // "voice over", etc.) before both hashing and sending, so cache hits
+  // reflect what actually gets sent to the model.
+  const expanded = expandScreenwritingAbbreviations(text);
+
+  const key = await cacheKey(expanded, voice, instructions, speed);
   const cached = await getCached(key);
   if (cached) return cached;
 
   const res = await fetch("/api/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice, instructions, speed }),
+    body: JSON.stringify({ text: expanded, voice, instructions, speed }),
   });
   if (!res.ok) {
     const err = await res.text();
