@@ -1592,7 +1592,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .attr-row {
   background: var(--surface);
   border-radius: 4px;
-  box-shadow: var(--card-shadow);
+  box-shadow: none;
   margin-bottom: 10px;
   overflow: hidden;
 }
@@ -1607,7 +1607,9 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   cursor: pointer;
   text-align: left;
 }
-.attr-row-header .attr-label,
+.attr-row-header .attr-label {
+  margin-top: 0;
+}
 .attr-row-header .attr-caret {
   margin-top: 2px;
 }
