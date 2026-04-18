@@ -11,9 +11,13 @@
 //   0.00–3.89s  6 accelerating unfold steps
 //   3.89–4.39s  hold on full composition
 //   4.39–4.89s  stage fades out
-//   4.89–5.39s  logo fades in
-//   5.59–5.99s  tagline fades in
+//   4.89–5.29s  tagline "Let your story" fades in
+//   5.49–5.99s  logo (unfold wordmark) fades in underneath
 //   6.19–6.59s  sign-in button fades in (signed-out only)
+//
+// The tagline + wordmark together read "Let your story / unfold" as
+// two stacked lines — the tagline lands first, the wordmark completes
+// the sentence.
 //
 // Lifecycle:
 //   - Signed-in: auto-dismiss at ~6.2s after mount.
@@ -141,7 +145,7 @@ export default function SplashLoader({
         <path d="M41.249 0.0441078C41.2409 -0.0313894 41.3327 0.0119974 41.3767 0.0161945C42.4914 0.121577 43.806 0.364958 44.5456 1.28513C45.3476 2.28283 44.3458 3.20022 43.3933 2.47964C42.8715 2.08491 42.9437 1.48912 42.5478 1.00489C42.218 0.601563 41.7137 0.270498 41.249 0.0441583L41.249 0.0441078Z" fill="#FFFFFF"/>
       </svg>
 
-      <div className="unfold-tagline">Let your story unfold</div>
+      <div className="unfold-tagline">Let your story</div>
 
       <button className="signin-btn" type="button" onClick={handleSignIn}>
         <svg className="google-icon" viewBox="0 0 48 48" aria-hidden="true">
@@ -414,24 +418,14 @@ export default function SplashLoader({
           z-index: 5;
         }
 
-        [data-splash-root] .unfold-logo {
-          position: absolute;
-          top: calc(50% - 20px);
-          left: 50%;
-          width: 150px;
-          height: auto;
-          transform: translate(-50%, -50%);
-          opacity: 0;
-          z-index: 6;
-          pointer-events: none;
-          animation: unfoldSplashLogoFadeIn 0.50s cubic-bezier(0.22, 0.61, 0.36, 1) 4.89s forwards;
-        }
-
+        /* Tagline now lands FIRST (on top), then the logo fades in UNDER
+           it — together they read "Let your story / unfold" as two
+           stacked lines. */
         [data-splash-root] .unfold-tagline {
           position: absolute;
-          top: calc(50% + 12px);
+          top: calc(50% - 18px);
           left: 50%;
-          transform: translateX(-50%);
+          transform: translate(-50%, -50%);
           color: #FFFFFF;
           font-family: 'Lato', sans-serif;
           font-weight: 300;
@@ -441,7 +435,20 @@ export default function SplashLoader({
           z-index: 6;
           pointer-events: none;
           white-space: nowrap;
-          animation: unfoldSplashLogoFadeIn 0.40s cubic-bezier(0.22, 0.61, 0.36, 1) 5.59s forwards;
+          animation: unfoldSplashLogoFadeIn 0.40s cubic-bezier(0.22, 0.61, 0.36, 1) 4.89s forwards;
+        }
+
+        [data-splash-root] .unfold-logo {
+          position: absolute;
+          top: calc(50% + 12px);
+          left: 50%;
+          width: 150px;
+          height: auto;
+          transform: translate(-50%, -50%);
+          opacity: 0;
+          z-index: 6;
+          pointer-events: none;
+          animation: unfoldSplashLogoFadeIn 0.50s cubic-bezier(0.22, 0.61, 0.36, 1) 5.49s forwards;
         }
 
         [data-splash-root] .signin-btn {

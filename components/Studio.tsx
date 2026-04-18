@@ -524,13 +524,18 @@ export function Studio({
         <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
           <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
         </button>
-        <button className="project-header-btn" onClick={() => setShowHelp(true)} aria-label="How this page works">
-          <svg viewBox="0 0 24 24" style={{ width: 17, height: 17, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }}>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M9.5 9a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 3.5" strokeLinecap="round" />
-            <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
+        {/* Help question-mark icon hidden for now — revisit later.
+            The help sheet itself is still mounted below; this just
+            drops the trigger from the top nav. */}
+        {false && (
+          <button className="project-header-btn" onClick={() => setShowHelp(true)} aria-label="How this page works">
+            <svg viewBox="0 0 24 24" style={{ width: 17, height: 17, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }}>
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.5 9a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 3.5" strokeLinecap="round" />
+              <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Scroll container — extends behind nav */}
@@ -1947,7 +1952,7 @@ function ConceptTab({
               : <span className="attr-placeholder">Pick writers you want to echo</span>}
           </div>
         </div>
-        <div className="attr-row-body">
+        <div className="attr-row-body" style={{ paddingTop: 16 }}>
           <Button
             variant="secondary"
             size="lg"
@@ -3101,7 +3106,10 @@ function ScriptTab({
         </div>
       ))}
 
-      {beats.length > 0 && (
+      {/* Add Twist / Brainstorm row hidden for now — revisit later.
+          Keeping the JSX in a gated block (rather than deleting) so the
+          handlers and action wiring stay intact for when we restore it. */}
+      {false && beats.length > 0 && (
         <div style={{ marginTop: 14, display: "flex", gap: 10 }}>
           <Button variant="secondary" size="sm" disabled={busy} style={{ flex: 1 }}
             onClick={() => run({ type: "add_twist", payload: {} }, "Add twist")}>&#9889; Add twist</Button>
