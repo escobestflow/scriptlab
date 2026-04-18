@@ -88,23 +88,10 @@ export default function Page() {
   const recognitionRef = useRef<any>(null);
   const capturedRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Remember the last signed-in user id so we can detect a true sign-out
-  // transition (user went from truthy to null). That's our signal to
-  // replay the splash as the sign-back-in surface, rather than treating
-  // the null as a transient during OAuth/token-refresh.
-  const lastUserIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (authLoading) return;
-    const prevId = lastUserIdRef.current;
-    const currId = user?.id ?? null;
-    if (prevId && !currId) {
-      // Explicit sign-out while the app was mounted — drop the splash
-      // flag so the animated screen (not the minimal fallback) returns.
-      try { window.sessionStorage.removeItem("unfoldSplashSeen"); } catch {}
-      setSplashDone(false);
-    }
-    lastUserIdRef.current = currId;
-  }, [user, authLoading]);
+  // Note on splash gating: we don't reset splashDone on sign-out any more —
+  // the render gate below shows the splash whenever there's no confirmed
+  // session (user=null AND authLoading=false), so mid-session sign-outs
+  // naturally land on the animated sign-in screen without any state reset.
 
   // Load data from Supabase when user is authenticated. First-time users
   // land on the Projects tab's empty state — no auto-seeded sample —
@@ -257,14 +244,18 @@ export default function Page() {
     setEditingMoment(null);
   }
 
-  // ── Splash / sign-in ──
-  // The animated Unfold splash plays once per browser session. It doubles
-  // as both the loading screen AND the signed-out sign-in surface. Once
-  // it has fully played (or the user has kicked off Google OAuth from it
-  // — see SplashLoader's handleSignIn which sets the seen flag before
-  // redirect), the sessionStorage flag keeps it from replaying on route
-  // changes OR on return from the OAuth redirect-back.
-  if (!splashDone) {
+  // ── Splash / sign-in gate ──
+  // The animated Unfold splash is the sign-in surface AND the boot
+  // loading screen. Rules:
+  //   1. If the splash hasn't been dismissed on this tab yet → play it.
+  //      Fresh first-load and return-from-OAuth-redirect both land
+  //      here; for signed-in users the SplashLoader auto-dismisses.
+  //   2. If auth has resolved to a null user → show the splash again
+  //      as the sign-back-in surface (covers mid-session sign-out and
+  //      token expiry). Guarded by !authLoading so a transient null
+  //      during OAuth restore doesn't replay the animation.
+  const showSplash = !splashDone || (!authLoading && !user);
+  if (showSplash) {
     return (
       <SplashLoader
         authLoading={authLoading}
@@ -280,8 +271,8 @@ export default function Page() {
     );
   }
 
-  // Splash already played this session — fall through to a minimal
-  // loader while Supabase restores the session after OAuth redirect-back.
+  // Splash is done AND auth is loading — tiny bridge state while
+  // Supabase restores the session after OAuth redirect-back.
   if (authLoading) {
     return (
       <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
@@ -289,11 +280,6 @@ export default function Page() {
       </div>
     );
   }
-
-  // Note: a mid-session sign-out flips splashDone → false via the
-  // lastUserIdRef effect above, which re-enters the splash branch on
-  // the next render. So there's no separate "signed-out fallback" UI
-  // here — the splash is the single sign-in surface.
 
   if (!hydrated) {
     return (
@@ -489,17 +475,7 @@ export default function Page() {
               <span className="menu-panel-account-email">{user.email}</span>
               <button
                 className="menu-panel-account-signout"
-                onClick={() => {
-                  setMenuOpen(false);
-                  // Reset splash state synchronously before the auth
-                  // state flip, so the first render with user=null
-                  // already re-enters the SplashLoader branch instead
-                  // of briefly flashing the "Loading your projects…"
-                  // fallback.
-                  try { window.sessionStorage.removeItem("unfoldSplashSeen"); } catch {}
-                  setSplashDone(false);
-                  signOut();
-                }}
+                onClick={() => { setMenuOpen(false); signOut(); }}
               >
                 Sign out
               </button>
