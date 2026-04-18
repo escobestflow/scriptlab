@@ -1746,17 +1746,21 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .attr-row-body .ds-selector,
 .attr-row-body .chip {
   height: auto;
-  padding: 10px 14px;
+  padding: 10px 17px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: normal;
-  text-transform: none;
+  /* Title-case inline selector labels so "thriller" → "Thriller",
+     matching the Format selectors' label style. */
+  text-transform: capitalize;
 }
 
 .attr-row-body .choice .choice-title {
   font-weight: 500;
   font-size: 13px;
+  /* Nudge Format selector labels down 1px for vertical balance. */
+  margin-top: 1px;
 }
 
 /* ======= SUCCESS BANNER ======= */

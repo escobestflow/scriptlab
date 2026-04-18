@@ -1593,7 +1593,7 @@ function ConceptTab({
               key={pt.value}
               className={`choice ${story.projectType === pt.value ? "selected" : ""}`}
               onClick={() => setStory(s => updateConceptDraft({ ...s, projectType: pt.value }, {}))}
-              style={{ textAlign: "left", padding: "12px 14px" }}
+              style={{ textAlign: "left", padding: "12px 17px" }}
             >
               <div className="choice-title">{pt.label}</div>
             </button>
