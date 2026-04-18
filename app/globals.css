@@ -1623,7 +1623,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   margin-top: 1px;
 }
 .attr-row-header .attr-caret {
-  margin-top: 2px;
+  margin-top: 3px;
 }
 .attr-label {
   font-size: 14px;
