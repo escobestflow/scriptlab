@@ -1641,9 +1641,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 .attr-pill {
   display: inline-flex;
-  align-items: center;
+  /* top-anchored so padding-top directly sets the label's distance
+     from the pill top (flex-center was pulling the label too low). */
+  align-items: flex-start;
   height: 21px;
-  padding: 3px 8px 0;
+  padding: 4px 8px 0;
   line-height: 1;
   background: #F3F3F3;
   border: 1px solid #EDEDED;
