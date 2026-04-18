@@ -262,6 +262,37 @@ button { cursor: pointer; }
   max-width: 320px;
 }
 
+/* Settings → Cover: prompt input + Regenerate button share one row.
+   The input owns the flex remainder; the button shrinks to its content.
+   A leading pencil icon sits absolutely positioned inside the input to
+   signal "this is a prompt you edit," paired with the lightning-bolt
+   icon on the Regenerate button. */
+.cover-action-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.cover-prompt-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.cover-prompt-icon {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--ink-mute);
+  pointer-events: none;
+}
+.cover-prompt-input {
+  /* Match the Button's sm height so the row aligns cleanly. */
+  height: 38px;
+  padding: 0 12px 0 32px;
+}
+
 .project-card {
   display: flex;
   flex-direction: row;

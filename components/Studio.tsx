@@ -3387,24 +3387,49 @@ function SettingsTab({
             />
           </div>
         )}
-        <span className="eyebrow" style={{ display: "block", marginTop: 4 }}>
-          Custom prompt additions (optional)
-        </span>
-        <input
-          type="text"
-          className="attr-text-input"
-          placeholder="e.g. include a vintage red car, set at dawn"
-          value={story.thumbnailPromptExtra || ""}
-          onChange={e =>
-            setStory(st => ({ ...st, thumbnailPromptExtra: e.target.value }))
-          }
-          style={{ marginBottom: 10 }}
-        />
-        <Button variant="secondary" size="sm" onClick={generateCover}
-          disabled={generatingCover || uploadingCover}
-          style={{ width: "100%" }}>
-          {generatingCover ? "Generating..." : story.thumbnail ? "Regenerate cover" : "Generate cover"}
-        </Button>
+        {/* Prompt input + Regenerate button on one row. The input carries
+            a leading pencil icon as its visual label (replacing the old
+            "Custom prompt additions" eyebrow) and the button uses the
+            same lightning-bolt glyph as the AI wand. */}
+        <div className="cover-action-row">
+          <div className="cover-prompt-wrap">
+            <svg
+              className="cover-prompt-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+            <input
+              type="text"
+              className="attr-text-input cover-prompt-input"
+              placeholder="Prompt additions"
+              value={story.thumbnailPromptExtra || ""}
+              onChange={e =>
+                setStory(st => ({ ...st, thumbnailPromptExtra: e.target.value }))
+              }
+            />
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={generateCover}
+            disabled={generatingCover || uploadingCover}
+            icon={
+              <svg viewBox="0 0 100 110" fill="currentColor" aria-hidden="true">
+                <path d="m41.785 60.52h-13.055c-0.52344-0.0078-1.0547-0.14844-1.5352-0.43359-1.4141-0.84766-1.8789-2.6836-1.0273-4.1016l31.906-53.211c0.60547-1.0117 1.7852-1.6094 3.0195-1.4141 1.6289 0.25391 2.7461 1.7773 2.4961 3.4102l-5.375 34.715h13.055c0.52344 0.0078 1.0547 0.14844 1.5352 0.43359 1.4141 0.84766 1.8789 2.6836 1.0273 4.1016l-31.906 53.211c-0.60547 1.0117-1.7852 1.6094-3.0195 1.4141-1.6289-0.25391-2.7461-1.7773-2.4961-3.4102z" />
+              </svg>
+            }
+          >
+            {generatingCover ? "Generating..." : "Regenerate"}
+          </Button>
+        </div>
 
         {/* Upload your own image — center-cropped to 3:4 client-side so
             the saved thumbnail matches the generated-cover dimensions. */}
