@@ -1651,7 +1651,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
      optically center top-heavy all-caps glyphs. */
   align-items: center;
   height: 21px;
-  padding: 0 8px 3px;
+  padding: 0 8px 1px;
   line-height: 1;
   background: #F3F3F3;
   border: 1px solid #EDEDED;
