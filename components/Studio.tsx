@@ -2,7 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import {
-  Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings,
+  Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings, Reference,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, ProjectDraft,
   LayerKey, LayerSyncState,
   getActiveProjectDraft,
@@ -18,6 +18,7 @@ import {
 } from "@/lib/story";
 import { syncLayers } from "@/lib/syncLayer";
 import { subGenresFor, SUB_GENRES_BY_ID } from "@/lib/subGenres";
+import { REFERENCE_ASPECTS, WRITER_STYLES } from "@/lib/references";
 import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
@@ -1518,6 +1519,9 @@ function ConceptTab({
   const [toneInput, setToneInput] = useState("");
   const [toneCustomOpen, setToneCustomOpen] = useState(false);
   const [themeCustomOpen, setThemeCustomOpen] = useState(false);
+  const [referenceInput, setReferenceInput] = useState("");
+  const [writerSheetOpen, setWriterSheetOpen] = useState(false);
+  const [writerFilter, setWriterFilter] = useState("");
 
   // Track which AI generator is currently running (one at a time)
   const [aiBusy, setAiBusy] = useState<null | "title" | "logline" | "summary" | "tone" | "themes" | "ending">(null);
@@ -1530,6 +1534,55 @@ function ConceptTab({
 
   const toggle = (key: string) => setOpenAttr(prev => prev === key ? null : key);
   const updateDraft = (patch: Partial<ConceptLayerDraft>) => setStory(s => updateConceptDraft(s, patch));
+
+  // ── "Similar To" reference helpers ──
+  function addReference() {
+    const title = referenceInput.trim();
+    if (!title) return;
+    // Dedupe by case-insensitive title so the user can't stack "Se7en" / "SE7EN".
+    if (d.settings.references.some(r => r.title.toLowerCase() === title.toLowerCase())) {
+      setReferenceInput("");
+      return;
+    }
+    const newRef: Reference = {
+      id: "ref_" + Math.random().toString(36).slice(2, 10),
+      title,
+      aspects: [],
+    };
+    updateDraft({ settings: { ...d.settings, references: [...d.settings.references, newRef] } });
+    setReferenceInput("");
+  }
+  function removeReference(id: string) {
+    updateDraft({
+      settings: { ...d.settings, references: d.settings.references.filter(r => r.id !== id) },
+    });
+  }
+  function toggleReferenceAspect(id: string, aspect: string) {
+    updateDraft({
+      settings: {
+        ...d.settings,
+        references: d.settings.references.map(r =>
+          r.id !== id
+            ? r
+            : { ...r, aspects: r.aspects.includes(aspect) ? r.aspects.filter(a => a !== aspect) : [...r.aspects, aspect] }
+        ),
+      },
+    });
+  }
+
+  // ── Writer-style helpers ──
+  function toggleWriter(name: string) {
+    const current = d.settings.writerStyles;
+    updateDraft({
+      settings: {
+        ...d.settings,
+        writerStyles: current.includes(name) ? current.filter(w => w !== name) : [...current, name],
+      },
+    });
+  }
+  const filteredWriters = WRITER_STYLES.filter(w =>
+    w.toLowerCase().includes(writerFilter.trim().toLowerCase())
+  );
 
   function addTheme(raw?: string) {
     const t = (raw ?? themeInput).trim();
@@ -1751,6 +1804,103 @@ function ConceptTab({
           </AttrRow>
         );
       })()}
+
+      {/* Similar To — free-form references (films / shows) each tagged
+          with which craft aspects the user wants to mirror. */}
+      <AttrRow
+        label="Similar To"
+        values={d.settings.references.length > 0 ? d.settings.references.map(r => r.title.toUpperCase()) : undefined}
+        placeholder="Add films or shows"
+        expanded={openAttr === "references"}
+        onToggle={() => toggle("references")}
+      >
+        <div className="reference-list">
+          {d.settings.references.map(ref => (
+            <div key={ref.id} className="reference-card">
+              <div className="reference-card-head">
+                <span className="reference-card-title">{ref.title}</span>
+                <button
+                  type="button"
+                  className="reference-card-remove"
+                  aria-label={`Remove ${ref.title}`}
+                  onClick={() => removeReference(ref.id)}
+                >
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                    <line x1="6" y1="18" x2="18" y2="6" />
+                  </svg>
+                </button>
+              </div>
+              <div className="reference-card-caption">What do you want to mimic?</div>
+              <div className="aspect-chip-row">
+                {REFERENCE_ASPECTS.map(aspect => (
+                  <button
+                    key={aspect}
+                    type="button"
+                    className={`aspect-chip ${ref.aspects.includes(aspect) ? "is-selected" : ""}`}
+                    onClick={() => toggleReferenceAspect(ref.id, aspect)}
+                    aria-pressed={ref.aspects.includes(aspect)}
+                  >
+                    {aspect}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+          <div className="reference-add-row">
+            <input
+              className="attr-text-input"
+              placeholder="e.g. Breaking Bad, Uncut Gems"
+              value={referenceInput}
+              onChange={e => setReferenceInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addReference(); } }}
+              style={{ flex: 1 }}
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={addReference}
+              disabled={!referenceInput.trim()}
+            >
+              Add
+            </Button>
+          </div>
+        </div>
+      </AttrRow>
+
+      {/* Writer Style — roster of famous screenwriters, multi-select via
+          a fly-up sheet with a search filter. */}
+      <AttrRow
+        label="Writer Style"
+        values={d.settings.writerStyles.length > 0 ? d.settings.writerStyles.map(w => w.toUpperCase()) : undefined}
+        placeholder="Pick writers you want to echo"
+        expanded={openAttr === "writers"}
+        onToggle={() => toggle("writers")}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {d.settings.writerStyles.length > 0 && (
+            <div className="chip-row">
+              {d.settings.writerStyles.map(w => (
+                <Selector
+                  key={w}
+                  selected
+                  onClick={() => toggleWriter(w)}
+                >
+                  {w}
+                </Selector>
+              ))}
+            </div>
+          )}
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={() => { setWriterFilter(""); setWriterSheetOpen(true); }}
+          >
+            {d.settings.writerStyles.length > 0 ? "Edit writers" : "Select writers"}
+          </Button>
+        </div>
+      </AttrRow>
 
       {/* Title */}
       <TextAttrRow
@@ -1986,6 +2136,45 @@ function ConceptTab({
           ))}
         </div>
       </AttrRow>
+
+      {/* Writer-style picker — fly-up sheet with a filterable roster of
+          famous screenwriters. Multi-select; the ConceptTab's chip row
+          above reflects the current selection in real time. */}
+      <div
+        className={`sheet-backdrop ${writerSheetOpen ? "open" : ""}`}
+        onClick={() => setWriterSheetOpen(false)}
+      />
+      <div className={`sheet sheet-tall ${writerSheetOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">Writer style</div>
+          <Button variant="secondary" size="sm" onClick={() => setWriterSheetOpen(false)}>Done</Button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal", paddingTop: 0 }}>
+          <input
+            className="attr-text-input writer-filter-input"
+            placeholder="Filter writers…"
+            value={writerFilter}
+            onChange={e => setWriterFilter(e.target.value)}
+            autoFocus={false}
+          />
+          {filteredWriters.length === 0 ? (
+            <div className="caption" style={{ padding: "12px 0" }}>No writers match “{writerFilter}”.</div>
+          ) : (
+            <div className="chip-row writer-chip-row">
+              {filteredWriters.map(w => (
+                <Selector
+                  key={w}
+                  selected={d.settings.writerStyles.includes(w)}
+                  onClick={() => toggleWriter(w)}
+                >
+                  {w}
+                </Selector>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </>
   );
 }

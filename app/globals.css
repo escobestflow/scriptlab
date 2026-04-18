@@ -720,6 +720,99 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   line-height: 1.3;
   font-style: italic;
 }
+
+/* ── "Similar To" reference cards ───────────────────────────────────── */
+/* Each card holds one film/show reference + its aspect selections.
+   Stacked vertically. The trailing .reference-add-row hosts the input
+   and Add button for creating the next reference. */
+.reference-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.reference-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+}
+.reference-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.reference-card-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+.reference-card-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--ink-mute);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.reference-card-remove:active { background: var(--bg-secondary); }
+.reference-card-caption {
+  font-size: 11px;
+  color: var(--ink-mute);
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+/* Aspect chips are genre-chip-styled but tighter so ~24 labels fit in a
+   few wrapped rows. */
+.aspect-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.aspect-chip {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  line-height: 1;
+  transition: background 160ms var(--ease), border-color 160ms var(--ease);
+}
+.aspect-chip:active { transform: scale(0.97); }
+.aspect-chip.is-selected {
+  background: var(--bg-secondary);
+  border-color: var(--ink);
+}
+.reference-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ── Writer-style fly-up sheet ─────────────────────────────────────── */
+/* Filter input sticks at the top of the sheet body so the chip list
+   below can scroll freely without losing the search. */
+.writer-filter-input {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  margin-bottom: 12px;
+  background: var(--surface);
+}
+.writer-chip-row { gap: 8px; }
 .chip {
   padding: 12px 18px;
   border-radius: 999px;

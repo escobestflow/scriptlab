@@ -50,6 +50,12 @@ const PENDING_REVIEW_RAW = {
     framework: "save-the-cat",
     genres: ["sci-fi", "comedy"],
     subGenres: ["sci-fi:speculative", "comedy:satire", "comedy:dark-comedy"],
+    references: [
+      { id: "ref_office_space", title: "Office Space", aspects: ["tone", "humor", "dialogue"] },
+      { id: "ref_arrival", title: "Arrival", aspects: ["pacing", "emotional register", "structure"] },
+      { id: "ref_severance", title: "Severance", aspects: ["production design", "atmosphere", "themes"] },
+    ],
+    writerStyles: ["Armando Iannucci", "Mike Schur", "Charlie Brooker"],
     vibe: "fluorescent-lit, deadpan, end-of-the-world bureaucracy",
     unpredictability: 6,
     darkness: 7,

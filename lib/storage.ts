@@ -58,6 +58,16 @@ function normalizeSettings(s: any): StorySettings {
     genres: s?.genres ?? (s?.genre ? [s.genre] : []),
     // Older saves predate sub-genres — default to an empty list.
     subGenres: Array.isArray(s?.subGenres) ? s.subGenres : [],
+    // References + writerStyles were added in a later migration. Normalize
+    // defensively so older DB rows don't render with undefined fields.
+    references: Array.isArray(s?.references)
+      ? s.references.map((r: any, i: number) => ({
+          id: String(r?.id || `ref_${Date.now()}_${i}`),
+          title: String(r?.title || ""),
+          aspects: Array.isArray(r?.aspects) ? r.aspects.map((a: any) => String(a)) : [],
+        }))
+      : [],
+    writerStyles: Array.isArray(s?.writerStyles) ? s.writerStyles.map((w: any) => String(w)) : [],
     vibe: s?.vibe || "",
     unpredictability: s?.unpredictability ?? 5,
     darkness: s?.darkness ?? 5,

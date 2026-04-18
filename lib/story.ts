@@ -22,11 +22,25 @@ export interface StorySettings {
    *  Options are only surfaced in the UI when their parent genre is
    *  selected; unselecting a parent genre prunes its orphaned sub-genres. */
   subGenres: string[];
+  /** "Make it similar to" — films/shows the user wants to echo, each
+   *  tagged with which craft aspects (pacing, humor, etc.) to mirror. */
+  references: Reference[];
+  /** Writer style anchors, stored verbatim (e.g. "Aaron Sorkin"). The
+   *  canonical list lives in lib/references.ts. */
+  writerStyles: string[];
   vibe: string;
   unpredictability: number;  // 1-10
   darkness: number;          // 1-10
   pace: number;              // 1-10
   endingTypes: EndingType[];
+}
+
+export interface Reference {
+  id: string;
+  title: string;
+  /** Short aspect labels from REFERENCE_ASPECTS in lib/references.ts
+   *  (e.g. "pacing", "humor"). Stored verbatim. */
+  aspects: string[];
 }
 
 export interface Concept {
@@ -236,6 +250,8 @@ export function emptyConceptDraft(id: string, number: number, ts: string): Conce
       framework: "save-the-cat",
       genres: [],
       subGenres: [],
+      references: [],
+      writerStyles: [],
       vibe: "",
       unpredictability: 5,
       darkness: 5,
