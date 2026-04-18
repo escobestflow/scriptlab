@@ -1746,7 +1746,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .attr-row-body .ds-selector,
 .attr-row-body .chip {
   height: auto;
-  padding: 10px 17px;
+  padding: 10px 16px;
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
