@@ -108,13 +108,26 @@ async function fetchAudio(
 }
 
 // ── Playback controller ────────────────────────────────────────────
+//
+// Web Audio API rather than <audio> elements: lets us schedule each chunk
+// to start precisely at the previous chunk's tail (with a tiny overlap to
+// absorb the TTS model's trailing silence), so scene reads feel gapless.
 
 type Listener = (activeOwner: symbol | null) => void;
 
+// Overlap between chunks, in seconds. Absorbs ~40–60 ms of trailing silence
+// the TTS model tends to append to each clip. Tuning higher = tighter reads
+// but risks clipping the last phoneme of long chunks.
+const CHUNK_OVERLAP_S = 0.06;
+
 class PlaybackController {
-  private audio: HTMLAudioElement | null = null;
+  private ctx: AudioContext | null = null;
   private activeOwner: symbol | null = null;
   private listeners = new Set<Listener>();
+  private sources: AudioBufferSourceNode[] = [];
+  private gain: GainNode | null = null;
+  // Bumped every stop() so in-flight schedulers bail.
+  private epoch = 0;
 
   subscribe(fn: Listener): () => void {
     this.listeners.add(fn);
@@ -131,15 +144,37 @@ class PlaybackController {
     for (const l of this.listeners) l(this.activeOwner);
   }
 
+  private getCtx(): AudioContext {
+    if (!this.ctx) {
+      const Ctor =
+        (window as any).AudioContext || (window as any).webkitAudioContext;
+      this.ctx = new Ctor();
+    }
+    return this.ctx!;
+  }
+
   stop(): void {
-    if (this.audio) {
+    this.epoch++;
+    for (const s of this.sources) {
       try {
-        this.audio.pause();
+        s.stop();
+      } catch {
+        /* already stopped */
+      }
+      try {
+        s.disconnect();
       } catch {
         /* noop */
       }
-      if (this.audio.src.startsWith("blob:")) URL.revokeObjectURL(this.audio.src);
-      this.audio = null;
+    }
+    this.sources = [];
+    if (this.gain) {
+      try {
+        this.gain.disconnect();
+      } catch {
+        /* noop */
+      }
+      this.gain = null;
     }
     if (this.activeOwner !== null) {
       this.activeOwner = null;
@@ -154,45 +189,75 @@ class PlaybackController {
     this.stop();
     if (!producers.length) return;
     this.activeOwner = owner;
+    const myEpoch = this.epoch;
     this.emit();
 
-    // Fire every producer in parallel; the browser + server will handle
-    // concurrency. We play them back in sequence order.
+    const ctx = this.getCtx();
+    if (ctx.state === "suspended") {
+      try {
+        await ctx.resume();
+      } catch {
+        /* browser autoplay policy; will error below on start() */
+      }
+    }
+
+    const gain = ctx.createGain();
+    gain.connect(ctx.destination);
+    this.gain = gain;
+
+    // Fire every producer in parallel; play back in sequence order.
     const pending = producers.map(p =>
       p().catch(e => {
-        console.error("tts chunk failed", e);
+        console.error("[tts] chunk failed", e);
         return null;
       }),
     );
 
+    let nextStart = ctx.currentTime + 0.04;
+    const finished: Promise<void>[] = [];
+
     for (let i = 0; i < pending.length; i++) {
-      if (this.activeOwner !== owner) return;
+      if (myEpoch !== this.epoch || this.activeOwner !== owner) return;
       const buf = await pending[i];
-      if (this.activeOwner !== owner) return;
+      if (myEpoch !== this.epoch) return;
       if (!buf) continue;
-      await this.playOne(buf);
+
+      let audioBuf: AudioBuffer;
+      try {
+        // decodeAudioData detaches the buffer — give it a copy so the
+        // original ArrayBuffer stays cacheable.
+        audioBuf = await ctx.decodeAudioData(buf.slice(0));
+      } catch (e) {
+        console.error("[tts] decode failed", e);
+        continue;
+      }
+      if (myEpoch !== this.epoch) return;
+
+      // If chunks arrive slower than the playhead advances, clamp start
+      // forward so we don't schedule in the past.
+      const earliest = ctx.currentTime + 0.02;
+      const startAt = Math.max(earliest, nextStart - CHUNK_OVERLAP_S);
+
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(gain);
+      src.start(startAt);
+      this.sources.push(src);
+
+      nextStart = startAt + audioBuf.duration;
+
+      finished.push(
+        new Promise<void>(resolve => {
+          src.onended = () => resolve();
+        }),
+      );
     }
 
-    if (this.activeOwner === owner) {
+    await Promise.all(finished);
+    if (myEpoch === this.epoch && this.activeOwner === owner) {
       this.activeOwner = null;
       this.emit();
     }
-  }
-
-  private playOne(buf: ArrayBuffer): Promise<void> {
-    return new Promise(resolve => {
-      const blob = new Blob([buf], { type: "audio/mpeg" });
-      const url = URL.createObjectURL(blob);
-      const a = new Audio(url);
-      this.audio = a;
-      const done = () => {
-        URL.revokeObjectURL(url);
-        resolve();
-      };
-      a.onended = done;
-      a.onerror = done;
-      a.play().catch(done);
-    });
   }
 }
 
@@ -232,6 +297,21 @@ export async function speakScript(
 ): Promise<void> {
   const chunks = parseScreenplay(scriptText);
   if (!chunks.length) return;
+
+  // Diagnostic: log how the parser broke the scene apart. If multi-voice
+  // isn't engaging, the breakdown here tells us whether dialogue was
+  // detected at all and which characters / voices were assigned.
+  if (typeof console !== "undefined") {
+    const dialogue = chunks.filter(c => c.kind === "dialogue");
+    const speakers = Array.from(new Set(dialogue.map(d => d.character || "?")));
+    console.log("[tts] parsed", {
+      total: chunks.length,
+      dialogue: dialogue.length,
+      action: chunks.filter(c => c.kind === "action").length,
+      headings: chunks.filter(c => c.kind === "heading").length,
+      speakers,
+    });
+  }
 
   const narratorStyle = getNarratorStyle(opts.projectType, opts.genres);
   const charStyle = getStyleForProject(opts.projectType, opts.genres);

@@ -47,6 +47,17 @@ function normalize(t: string): string {
   return t.replace(/\s+/g, " ").trim();
 }
 
+// Strip markdown emphasis around a name so "**MADISON**: hey" or
+// "*Madison*: hey" still parses as a cue.
+function stripInlineMd(s: string): string {
+  return s.replace(/\*\*|__|\*/g, "").replace(/`/g, "").trim();
+}
+
+// Matches "NAME (CONT'D): dialogue" or "NAME: dialogue" with optional
+// parenthetical suffix inside the cue half.
+const INLINE_CUE_WITH_PARENS_RE =
+  /^([A-Z][A-Z0-9 .'#\-]{1,39}?)(?:\s*\([^)]{0,30}\))?\s*:\s*([\s\S]+)$/;
+
 export function parseScreenplay(raw: string): ScriptChunk[] {
   if (!raw) return [];
   const blocks = raw
@@ -57,25 +68,24 @@ export function parseScreenplay(raw: string): ScriptChunk[] {
 
   const chunks: ScriptChunk[] = [];
 
-  for (const block of blocks) {
+  for (const rawBlock of blocks) {
+    // Always strip markdown first so regexes see clean text.
+    const block = stripInlineMd(rawBlock);
+
     // 1. Scene heading
     if (SCENE_HEADING_RE.test(block)) {
       chunks.push({ kind: "heading", text: normalize(block) });
       continue;
     }
 
-    // 2. Inline "NAME: dialogue"
+    // 2. Inline "NAME: dialogue" (with optional parenthetical suffix).
+    //    Try strictest form first, then softer fallbacks.
     const inline =
+      block.match(INLINE_CUE_WITH_PARENS_RE) ||
       block.match(INLINE_CUE_RE) ||
-      // Soft fallback — only trust it when the text after the colon is
-      // substantial (avoid turning "Note:" or "INT: somewhere" into dialogue).
       (block.length > 20 ? block.match(SOFT_INLINE_CUE_RE) : null);
     if (inline) {
       const rawName = inline[1].trim();
-      // Reject if the "name" contains spaces that look like the start of an
-      // action line being misread (e.g., "Alice walks in, and she:" won't match
-      // INLINE_CUE_RE but could slip through SOFT — we already constrained
-      // length, and reject if the name contains >= 4 words).
       if (rawName.split(/\s+/).length <= 4) {
         const name = rawName.replace(/\s*\([^)]*\)\s*$/, "").trim();
         const text = stripActing(inline[2].trim());
@@ -86,7 +96,7 @@ export function parseScreenplay(raw: string): ScriptChunk[] {
       }
     }
 
-    // 3. Standalone cue format: first line is a cue, rest is dialogue + parens
+    // 3. Standalone cue format: first line is cue, rest is dialogue
     const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
     if (
       lines.length >= 2 &&

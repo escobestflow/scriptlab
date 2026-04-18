@@ -56,4 +56,4 @@ export function getNarratorStyle(
 // Tunable playback speed. gpt-4o-mini-tts accepts `speed` in [0.25, 4.0].
 // 1.0 was the default and felt sluggish — 1.1 is slightly quicker without
 // sounding sped-up. Expose it so we can tune from one place.
-export const DEFAULT_TTS_SPEED = 1.1;
+export const DEFAULT_TTS_SPEED = 1.2;
