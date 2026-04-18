@@ -18,6 +18,10 @@ export type ProjectType = "feature" | "short" | "tv-show";
 export interface StorySettings {
   framework: Framework;
   genres: Genre[];
+  /** Stable ids from lib/subGenres.ts (e.g. "action:spy", "horror:slasher").
+   *  Options are only surfaced in the UI when their parent genre is
+   *  selected; unselecting a parent genre prunes its orphaned sub-genres. */
+  subGenres: string[];
   vibe: string;
   unpredictability: number;  // 1-10
   darkness: number;          // 1-10
@@ -231,6 +235,7 @@ export function emptyConceptDraft(id: string, number: number, ts: string): Conce
     settings: {
       framework: "save-the-cat",
       genres: [],
+      subGenres: [],
       vibe: "",
       unpredictability: 5,
       darkness: 5,

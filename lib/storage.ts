@@ -56,6 +56,8 @@ function normalizeSettings(s: any): StorySettings {
   return {
     framework: s?.framework || "save-the-cat",
     genres: s?.genres ?? (s?.genre ? [s.genre] : []),
+    // Older saves predate sub-genres — default to an empty list.
+    subGenres: Array.isArray(s?.subGenres) ? s.subGenres : [],
     vibe: s?.vibe || "",
     unpredictability: s?.unpredictability ?? 5,
     darkness: s?.darkness ?? 5,
@@ -132,6 +134,8 @@ function normalizeScriptDraft(d: any, number = 1, ts?: string): ScriptLayerDraft
 function genId(prefix: string) {
   return prefix + "_" + Math.random().toString(36).slice(2);
 }
+
+export const normalizeStoryPublic = (s: any): Story => normalizeStory(s);
 
 function normalizeStory(s: any): Story {
   const now = s.updatedAt || new Date().toISOString();

@@ -17,6 +17,7 @@ import {
   isLayerDraftEmpty,
 } from "@/lib/story";
 import { syncLayers } from "@/lib/syncLayer";
+import { subGenresFor, SUB_GENRES_BY_ID } from "@/lib/subGenres";
 import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
@@ -85,6 +86,7 @@ export function Studio({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerBeatId, setPickerBeatId] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [beatTrayOpen, setBeatTrayOpen] = useState(false);
   const [beatTrayInsertAt, setBeatTrayInsertAt] = useState<number | null>(null);
   // Character sheet — a single sheet used for BOTH creation and editing.
@@ -454,6 +456,13 @@ export function Studio({
         <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
           <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
         </button>
+        <button className="project-header-btn" onClick={() => setShowHelp(true)} aria-label="How this page works">
+          <svg viewBox="0 0 24 24" style={{ width: 17, height: 17, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }}>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9.5 9a2.5 2.5 0 115 0c0 1.7-2.5 2-2.5 3.5" strokeLinecap="round" />
+            <circle cx="12" cy="16.5" r="0.9" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
       </div>
 
       {/* Scroll container — extends behind nav */}
@@ -600,6 +609,63 @@ export function Studio({
               onOpenUpdateTray={setUpdateTraySource}
             />
           )}
+        </div>
+      </div>
+
+      {/* "How this page works" help sheet — explains the layer-draft model
+          for first-time users. Opened from the (?) button in the top nav. */}
+      <div className={`sheet-backdrop ${showHelp ? "open" : ""}`} onClick={() => setShowHelp(false)} />
+      <div className={`sheet sheet-tall ${showHelp ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">How this page works</div>
+          <Button variant="secondary" size="sm" onClick={() => setShowHelp(false)}>Close</Button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal", lineHeight: 1.55 }}>
+          <p style={{ marginTop: 0 }}>
+            A <strong>project</strong> is one story you're working on. Inside it, your
+            work is split into four <strong>sections</strong> — shown as the tabs at
+            the bottom of this screen:
+          </p>
+          <ul style={{ paddingLeft: 18, margin: "8px 0 16px" }}>
+            <li style={{ marginBottom: 6 }}>
+              <strong>Concept</strong> — the premise, tone, genres, and themes. The
+              one-sentence version of what this story is.
+            </li>
+            <li style={{ marginBottom: 6 }}>
+              <strong>Characters</strong> — the people in it: their wants, needs,
+              flaws, and how they connect.
+            </li>
+            <li style={{ marginBottom: 6 }}>
+              <strong>Story</strong> — the beat outline. What happens, in order.
+            </li>
+            <li>
+              <strong>Script</strong> — the actual screenplay pages.
+            </li>
+          </ul>
+
+          <p>
+            Each section has its own <strong>versions</strong>. If you rewrite your
+            Concept, the old one isn't lost — it's kept as Concept v1, and your
+            new take becomes v2. Same for Characters, Story, and Script. Tap the
+            pill at the top of any section (e.g. <em>Concept v1</em>) to switch
+            between versions or create a new one.
+          </p>
+
+          <p>
+            A <strong>project version</strong> (the <em>Draft 1 ▾</em> pill at the
+            top of this page) is simply a chosen combination of one Concept
+            version + one Characters version + one Story version + one Script
+            version. That lets you keep a "known good" snapshot of the whole
+            project while you experiment with a new version of just one section.
+          </p>
+
+          <p style={{ marginBottom: 0 }}>
+            <strong>Rule of thumb:</strong> work inside a section freely — the app
+            tracks versions for you. When you've landed on a combination of
+            sections you like together, save it as a new project version so you
+            can always return to it.
+          </p>
         </div>
       </div>
 
@@ -1614,19 +1680,77 @@ function ConceptTab({
           {(["thriller","drama","comedy","sci-fi","horror","romance","action","mystery"] as const).map(g => (
             <Selector key={g}
               selected={d.settings.genres.includes(g)}
-              onClick={() => updateDraft({
-                settings: {
-                  ...d.settings,
-                  genres: d.settings.genres.includes(g)
-                    ? d.settings.genres.filter(x => x !== g)
-                    : [...d.settings.genres, g],
-                },
-              })}>
+              onClick={() => {
+                const isRemoving = d.settings.genres.includes(g);
+                const nextGenres = isRemoving
+                  ? d.settings.genres.filter(x => x !== g)
+                  : [...d.settings.genres, g];
+                // When a parent genre is removed, prune its sub-genre
+                // selections so we don't keep orphaned ids the user can no
+                // longer see in the picker.
+                const orphanPrefix = `${g}:`;
+                const nextSubGenres = isRemoving
+                  ? d.settings.subGenres.filter(id => !id.startsWith(orphanPrefix))
+                  : d.settings.subGenres;
+                updateDraft({
+                  settings: { ...d.settings, genres: nextGenres, subGenres: nextSubGenres },
+                });
+              }}>
               {g}
             </Selector>
           ))}
         </div>
       </AttrRow>
+
+      {/* Sub-Genre — options are derived from the selected parent genres.
+          Each option shows the sub-genre name plus three canonical film
+          examples underneath so the user can recognize it at a glance. */}
+      {(() => {
+        const subOptions = subGenresFor(d.settings.genres);
+        const selectedNames = d.settings.subGenres
+          .map(id => SUB_GENRES_BY_ID[id]?.name)
+          .filter(Boolean) as string[];
+        return (
+          <AttrRow
+            label="Sub-Genre"
+            values={selectedNames.length > 0 ? selectedNames.map(n => n.toUpperCase()) : undefined}
+            placeholder={d.settings.genres.length === 0 ? "Select a genre first" : "Select sub-genres"}
+            expanded={openAttr === "subgenre"}
+            onToggle={() => toggle("subgenre")}
+          >
+            {d.settings.genres.length === 0 ? (
+              <div className="caption" style={{ padding: "4px 0" }}>
+                Pick at least one genre above to see matching sub-genres.
+              </div>
+            ) : (
+              <div className="subgenre-list">
+                {subOptions.map(opt => {
+                  const selected = d.settings.subGenres.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      className={`subgenre-option ${selected ? "selected" : ""}`}
+                      onClick={() => updateDraft({
+                        settings: {
+                          ...d.settings,
+                          subGenres: selected
+                            ? d.settings.subGenres.filter(x => x !== opt.id)
+                            : [...d.settings.subGenres, opt.id],
+                        },
+                      })}
+                      aria-pressed={selected}
+                    >
+                      <span className="subgenre-option-name">{opt.name}</span>
+                      <span className="subgenre-option-examples">{opt.examples.join(", ")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </AttrRow>
+        );
+      })()}
 
       {/* Title */}
       <TextAttrRow

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Story, getActiveConceptDraft, getActiveStoryLayerDraft, updateConceptDraft } from "@/lib/story";
-import { Moment } from "@/lib/sampleData";
+import { Moment, makeSampleSciFiComedy } from "@/lib/sampleData";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
@@ -54,6 +54,11 @@ export default function Page() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState(0);
   const [createDraft, setCreateDraft] = useState<Story | null>(null);
+  // Track whether the user has actively chosen a format. newBlankProject()
+  // defaults projectType to "feature" so state is valid from the start,
+  // but visually we treat Format as "unselected" until the user taps a
+  // choice — which is what gates the Step 0 Continue button.
+  const [createFormatTouched, setCreateFormatTouched] = useState(false);
   // New idea (moment) sheet — mirrors the Project/Idea creation UX.
   const [newIdeaOpen, setNewIdeaOpen] = useState(false);
   const [newIdeaText, setNewIdeaText] = useState("");
@@ -69,7 +74,10 @@ export default function Page() {
   const capturedRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load data from Supabase when user is authenticated
+  // Load data from Supabase when user is authenticated. First-time users
+  // (no projects, never seeded before) get a fully-populated sci-fi comedy
+  // sample project so the Studio renders with real content instead of an
+  // empty state.
   useEffect(() => {
     if (!user) { setHydrated(false); return; }
     (async () => {
@@ -77,7 +85,17 @@ export default function Page() {
         loadProjectsFromDB(user.id),
         loadMomentsFromDB(user.id),
       ]);
-      setProjects(p);
+      const seedFlagKey = `scriptlab.sampleSeeded.v1.${user.id}`;
+      const alreadySeeded =
+        typeof window !== "undefined" && window.localStorage.getItem(seedFlagKey) === "true";
+      if (p.length === 0 && !alreadySeeded) {
+        const sample = makeSampleSciFiComedy();
+        try { await saveProjectToDB(user.id, sample); } catch {}
+        if (typeof window !== "undefined") window.localStorage.setItem(seedFlagKey, "true");
+        setProjects([sample]);
+      } else {
+        setProjects(p);
+      }
       setMoments(m);
       setHydrated(true);
     })();
@@ -279,6 +297,7 @@ export default function Page() {
   function openCreateModal() {
     setCreateDraft(newBlankProject());
     setCreateStep(0);
+    setCreateFormatTouched(false);
     setCreateOpen(true);
   }
 
@@ -286,6 +305,7 @@ export default function Page() {
     setCreateOpen(false);
     setCreateDraft(null);
     setCreateStep(0);
+    setCreateFormatTouched(false);
   }
 
   function finishCreate() {
@@ -675,7 +695,12 @@ export default function Page() {
         </div>
         <div className="create-modal-body">
           {createDraft && createStep === 0 && (
-            <CreateStepFormat draft={createDraft} setDraft={updateDraft} />
+            <CreateStepFormat
+              draft={createDraft}
+              setDraft={updateDraft}
+              touched={createFormatTouched}
+              onTouch={() => setCreateFormatTouched(true)}
+            />
           )}
           {createDraft && createStep === 1 && (
             <CreateStepTitle draft={createDraft} setDraft={updateDraft} />
@@ -693,14 +718,32 @@ export default function Page() {
               </Button>
             )}
             {createStep < 2 ? (
-              <Button variant="primary" size="lg" onClick={() => setCreateStep(s => s + 1)}
-                style={{ flex: 1 }}>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={() => setCreateStep(s => s + 1)}
+                // Each step gates Continue: Format must be actively chosen,
+                // Title must be non-empty.
+                disabled={
+                  (createStep === 0 && !createFormatTouched) ||
+                  (createStep === 1 && !createDraft?.title?.trim())
+                }
+                style={{ flex: 1 }}
+              >
                 Continue
               </Button>
             ) : (
-              <Button variant="primary" size="lg" onClick={finishCreate}
-                disabled={!createDraft?.title?.trim()}
-                style={{ flex: 1 }}>
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={finishCreate}
+                // Step 2 requires title + at least one selected genre.
+                disabled={
+                  !createDraft?.title?.trim() ||
+                  (createDraft ? getActiveConceptDraft(createDraft).settings.genres.length === 0 : true)
+                }
+                style={{ flex: 1 }}
+              >
                 Create Project
               </Button>
             )}
@@ -1086,10 +1129,12 @@ const PROJECT_TYPES: { value: ProjectType; title: string; sub: string }[] = [
 const ALL_GENRES: Genre[] = ["thriller","drama","comedy","horror","sci-fi","romance","action","mystery"];
 
 function CreateStepFormat({
-  draft, setDraft,
+  draft, setDraft, touched, onTouch,
 }: {
   draft: Story;
   setDraft: (u: (s: Story) => Story) => void;
+  touched: boolean;
+  onTouch: () => void;
 }) {
   const storyLayer = getActiveStoryLayerDraft(draft);
   return (
@@ -1099,8 +1144,14 @@ function CreateStepFormat({
         {PROJECT_TYPES.map(pt => (
           <button
             key={pt.value}
-            className={`choice ${draft.projectType === pt.value ? "selected" : ""}`}
-            onClick={() => setDraft(s => ({ ...s, projectType: pt.value }))}
+            // Only render the "selected" style once the user has explicitly
+            // tapped a format — prevents the default "feature" from looking
+            // pre-chosen before the user has engaged with the step.
+            className={`choice ${touched && draft.projectType === pt.value ? "selected" : ""}`}
+            onClick={() => {
+              setDraft(s => ({ ...s, projectType: pt.value }));
+              onTouch();
+            }}
             style={{ textAlign: "left" }}
           >
             <div className="choice-title">{pt.title}</div>
