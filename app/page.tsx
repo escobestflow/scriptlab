@@ -489,7 +489,17 @@ export default function Page() {
               <span className="menu-panel-account-email">{user.email}</span>
               <button
                 className="menu-panel-account-signout"
-                onClick={() => { setMenuOpen(false); signOut(); }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  // Reset splash state synchronously before the auth
+                  // state flip, so the first render with user=null
+                  // already re-enters the SplashLoader branch instead
+                  // of briefly flashing the "Loading your projects…"
+                  // fallback.
+                  try { window.sessionStorage.removeItem("unfoldSplashSeen"); } catch {}
+                  setSplashDone(false);
+                  signOut();
+                }}
               >
                 Sign out
               </button>
