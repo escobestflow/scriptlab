@@ -355,12 +355,37 @@ function sourceLabel(source: "concept" | "characters" | "story" | "script"): str
 }
 
 function scriptProseBlock(story: Story, maxChars = 12000): string {
+  // Collect prose from two places: the ScriptLayerDraft's scenes array
+  // AND any Story-layer beats with status="written" + sceneContent. The
+  // app writes generated scene prose onto the beat, so beats are the
+  // primary source today.
   const sc = getActiveScriptDraft(story);
-  const scenes = sc.script.scenes;
-  if (!scenes.length) return "(no scenes)";
+  const sl = getActiveStoryLayerDraft(story);
+  const chunks: string[] = [];
+
+  if (sc) {
+    for (const s of sc.script.scenes) {
+      if ((s.content ?? "").trim()) {
+        chunks.push(`\n\n--- ${s.heading || "SCENE"} ---\n${s.content}`);
+      }
+    }
+  }
+
+  if (sl) {
+    const beats = story.projectType === "tv-show"
+      ? (sl.episodes ?? []).flatMap(ep => ep.beats)
+      : sl.beats;
+    for (const b of beats) {
+      if (b.status === "written" && (b.sceneContent ?? "").trim()) {
+        chunks.push(`\n\n--- ${b.name || "SCENE"} ---\n${b.sceneContent}`);
+      }
+    }
+  }
+
+  if (!chunks.length) return "(no scenes)";
+
   let out = "";
-  for (const s of scenes) {
-    const chunk = `\n\n--- ${s.heading || "SCENE"} ---\n${s.content}`;
+  for (const chunk of chunks) {
     if (out.length + chunk.length > maxChars) {
       out += "\n\n[…truncated for length…]";
       break;

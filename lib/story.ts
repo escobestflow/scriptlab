@@ -728,14 +728,10 @@ export function getLayerSyncState(story: Story): LayerSyncState {
 export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
   switch (layer) {
     case "concept": {
-      const c = getActiveConceptDraft(story);
-      if (!c) return true;
-      return (
-        c.logline.trim() === "" &&
-        c.concept.summary.trim() === "" &&
-        c.concept.tone.trim() === "" &&
-        c.concept.themes.length === 0
-      );
+      // Concept is effectively never empty once a project exists: the
+      // user was required to pick a title + genres at creation, so there
+      // is always enough to derive from. Return false.
+      return false;
     }
     case "characters": {
       const c = getActiveCharactersDraft(story);
@@ -750,8 +746,21 @@ export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
       return s.beats.length === 0;
     }
     case "script": {
-      const s = getActiveScriptDraft(story);
-      return !s || s.script.scenes.length === 0;
+      // Written scene prose is stored on beats (beat.sceneContent when
+      // beat.status === "written"), not only on script.scenes. Treat the
+      // Script layer as non-empty if either place has content.
+      const sc = getActiveScriptDraft(story);
+      const hasScenes = !!sc && sc.script.scenes.length > 0;
+      if (hasScenes) return false;
+      const sl = getActiveStoryLayerDraft(story);
+      if (!sl) return true;
+      const allBeats = story.projectType === "tv-show"
+        ? (sl.episodes ?? []).flatMap(ep => ep.beats)
+        : sl.beats;
+      const hasWrittenBeat = allBeats.some(
+        b => b.status === "written" && (b.sceneContent ?? "").trim() !== ""
+      );
+      return !hasWrittenBeat;
     }
   }
 }

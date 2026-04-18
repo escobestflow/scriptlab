@@ -2867,13 +2867,41 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   user-select: none;
 }
 .layer-update-row:last-of-type { border-bottom: none; }
+/* Custom-styled checkbox so the box is visible on every platform
+   (native iOS Safari checkboxes render nearly invisible). */
 .layer-update-row input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 2px solid var(--ink);
+  border-radius: 5px;
+  background: transparent;
   cursor: pointer;
-  accent-color: var(--ink);
+  position: relative;
+  transition: background 120ms var(--ease), border-color 120ms var(--ease);
 }
-.layer-update-row input[type="checkbox"]:disabled { cursor: default; }
+.layer-update-row input[type="checkbox"]:checked {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.layer-update-row input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid var(--bg, #fff);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.layer-update-row input[type="checkbox"]:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .layer-update-row-label {
   flex: 1;
   font-family: 'Lato', -apple-system, system-ui, sans-serif;
