@@ -1256,8 +1256,8 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 }
 
 /* ======= AI WAND BUTTON (inline next to field labels) =======
-   Emerald/teal palette — an elevated, jewel-toned accent that reads
-   as premium without the generic "AI purple" overtone. */
+   Sapphire-blue palette — a refined accent with just the inset
+   border (no drop shadow) for a flatter, more tailored feel. */
 .ai-wand {
   display: inline-flex;
   align-items: center;
@@ -1268,30 +1268,26 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 0;
   border: 0;
   border-radius: 7px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdfa 100%);
-  color: #0f766e;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+  color: #1d4ed8;
   cursor: pointer;
-  vertical-align: -6px;
-  box-shadow:
-    0 1px 2px rgba(15, 118, 110, 0.10),
-    inset 0 0 0 1px rgba(15, 118, 110, 0.22);
+  /* -6px → -3px lifts the wand 3px closer to the cap-line of the
+     adjacent label. */
+  vertical-align: -3px;
+  box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.22);
   transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
 }
 .ai-wand:hover {
   transform: translateY(-1px);
-  background: linear-gradient(135deg, #d1fae5 0%, #ccfbf1 100%);
-  box-shadow:
-    0 3px 10px rgba(15, 118, 110, 0.22),
-    inset 0 0 0 1px rgba(15, 118, 110, 0.32);
+  background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+  box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.34);
 }
 .ai-wand:active {
   transform: translateY(0);
-  box-shadow:
-    0 1px 2px rgba(15, 118, 110, 0.10),
-    inset 0 0 0 1px rgba(15, 118, 110, 0.32);
+  box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.34);
 }
 .ai-wand.loading {
-  background: linear-gradient(135deg, #d1fae5 0%, #ccfbf1 100%);
+  background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
   cursor: default;
 }
 .ai-wand-spin {
