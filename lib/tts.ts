@@ -106,7 +106,8 @@ async function fetchAudio(
   });
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(err || `TTS failed (${res.status})`);
+    // Surface both status and server body so failures are actually debuggable.
+    throw new Error(`/api/tts ${res.status}: ${err || "(no body)"}`);
   }
   const buf = await res.arrayBuffer();
   putCached(key, buf).catch(() => {});
@@ -115,24 +116,17 @@ async function fetchAudio(
 
 // ── Playback controller ────────────────────────────────────────────
 //
-// Web Audio API rather than <audio> elements: lets us schedule each chunk
-// to start precisely at the previous chunk's tail (with a tiny overlap to
-// absorb the TTS model's trailing silence), so scene reads feel gapless.
+// Uses plain HTMLAudioElement, which plays reliably across every browser
+// we care about. We tried Web Audio for gapless chunk stitching, but the
+// autoplay-gesture rules are brittle and led to silent failures — trading
+// a small inter-chunk gap for actually-playing audio is the right call.
 
 type Listener = (activeOwner: symbol | null) => void;
 
-// Overlap between chunks, in seconds. Absorbs ~40–60 ms of trailing silence
-// the TTS model tends to append to each clip. Tuning higher = tighter reads
-// but risks clipping the last phoneme of long chunks.
-const CHUNK_OVERLAP_S = 0.06;
-
 class PlaybackController {
-  private ctx: AudioContext | null = null;
+  private audio: HTMLAudioElement | null = null;
   private activeOwner: symbol | null = null;
   private listeners = new Set<Listener>();
-  private sources: AudioBufferSourceNode[] = [];
-  private gain: GainNode | null = null;
-  // Bumped every stop() so in-flight schedulers bail.
   private epoch = 0;
 
   subscribe(fn: Listener): () => void {
@@ -150,57 +144,26 @@ class PlaybackController {
     for (const l of this.listeners) l(this.activeOwner);
   }
 
-  private getCtx(): AudioContext {
-    if (!this.ctx) {
-      const Ctor =
-        (window as any).AudioContext || (window as any).webkitAudioContext;
-      this.ctx = new Ctor();
-    }
-    return this.ctx!;
-  }
-
   /**
-   * Call this SYNCHRONOUSLY from the click handler that initiates playback.
-   * Most browsers (especially Safari/iOS) only allow a fresh AudioContext
-   * to be created — or a suspended one to be resumed — during the user
-   * gesture itself. If we wait for the first `await` in play(), the
-   * gesture has expired and nothing will produce audio.
+   * Called synchronously from the click handler. For HTMLAudioElement
+   * playback this is a no-op, but it preserves the API in case we move
+   * back to Web Audio later.
    */
   prime(): void {
-    if (typeof window === "undefined") return;
-    try {
-      const ctx = this.getCtx();
-      if (ctx.state === "suspended") {
-        // Fire-and-forget; the context is now latched to this gesture.
-        ctx.resume().catch(() => {});
-      }
-    } catch {
-      /* browser lacks Web Audio — callers will see a thrown error later */
-    }
+    /* intentionally empty */
   }
 
   stop(): void {
     this.epoch++;
-    for (const s of this.sources) {
+    if (this.audio) {
       try {
-        s.stop();
-      } catch {
-        /* already stopped */
-      }
-      try {
-        s.disconnect();
+        this.audio.pause();
       } catch {
         /* noop */
       }
-    }
-    this.sources = [];
-    if (this.gain) {
-      try {
-        this.gain.disconnect();
-      } catch {
-        /* noop */
-      }
-      this.gain = null;
+      if (this.audio.src.startsWith("blob:"))
+        URL.revokeObjectURL(this.audio.src);
+      this.audio = null;
     }
     if (this.activeOwner !== null) {
       this.activeOwner = null;
@@ -218,82 +181,74 @@ class PlaybackController {
     const myEpoch = this.epoch;
     this.emit();
 
-    const ctx = this.getCtx();
-    if (ctx.state === "suspended") {
-      try {
-        await ctx.resume();
-      } catch {
-        /* browser autoplay policy; will error below on start() */
-      }
-    }
-
-    const gain = ctx.createGain();
-    gain.connect(ctx.destination);
-    this.gain = gain;
-
     // Fire every producer in parallel; play back in sequence order.
+    // Track the first error so we can surface a real message to the user
+    // if every chunk fails — a generic "nothing played" is useless for
+    // debugging.
+    let firstError: unknown = null;
     const pending = producers.map(p =>
       p().catch(e => {
         console.error("[tts] chunk failed", e);
+        if (!firstError) firstError = e;
         return null;
       }),
     );
 
-    let nextStart = ctx.currentTime + 0.04;
-    const finished: Promise<void>[] = [];
-    let scheduled = 0;
-
+    let played = 0;
     for (let i = 0; i < pending.length; i++) {
       if (myEpoch !== this.epoch || this.activeOwner !== owner) return;
       const buf = await pending[i];
       if (myEpoch !== this.epoch) return;
       if (!buf) continue;
-
-      let audioBuf: AudioBuffer;
       try {
-        // decodeAudioData detaches the buffer — give it a copy so the
-        // original ArrayBuffer stays cacheable.
-        audioBuf = await ctx.decodeAudioData(buf.slice(0));
+        await this.playOne(buf, myEpoch);
+        played++;
       } catch (e) {
-        console.error("[tts] decode failed", e);
-        continue;
+        console.error("[tts] playOne failed", e);
+        if (!firstError) firstError = e;
       }
-      if (myEpoch !== this.epoch) return;
-
-      // If chunks arrive slower than the playhead advances, clamp start
-      // forward so we don't schedule in the past.
-      const earliest = ctx.currentTime + 0.02;
-      const startAt = Math.max(earliest, nextStart - CHUNK_OVERLAP_S);
-
-      const src = ctx.createBufferSource();
-      src.buffer = audioBuf;
-      src.connect(gain);
-      src.start(startAt);
-      this.sources.push(src);
-      scheduled++;
-
-      nextStart = startAt + audioBuf.duration;
-
-      finished.push(
-        new Promise<void>(resolve => {
-          src.onended = () => resolve();
-        }),
-      );
     }
 
-    await Promise.all(finished);
     if (myEpoch === this.epoch && this.activeOwner === owner) {
       this.activeOwner = null;
       this.emit();
     }
 
-    // If nothing ever played, surface the error so callers (and the UI)
-    // know to show a failure state instead of silently succeeding.
-    if (scheduled === 0) {
-      throw new Error(
-        "No audio chunks could be played. Check /api/tts responses in the Network tab.",
-      );
+    if (played === 0) {
+      const detail =
+        firstError instanceof Error ? firstError.message :
+        firstError ? String(firstError) :
+        "no chunks produced audio";
+      throw new Error(`TTS playback failed — ${detail}`);
     }
+  }
+
+  private playOne(buf: ArrayBuffer, myEpoch: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (myEpoch !== this.epoch) {
+        resolve();
+        return;
+      }
+      const blob = new Blob([buf], { type: "audio/mpeg" });
+      const url = URL.createObjectURL(blob);
+      const a = new Audio(url);
+      this.audio = a;
+      const cleanup = () => {
+        URL.revokeObjectURL(url);
+      };
+      a.onended = () => {
+        cleanup();
+        resolve();
+      };
+      a.onerror = () => {
+        cleanup();
+        reject(new Error("audio element error"));
+      };
+      a.play().catch(err => {
+        cleanup();
+        reject(err);
+      });
+    });
   }
 }
 

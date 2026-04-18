@@ -33,6 +33,7 @@ export function SpeakButton(props: Props) {
   const ownerRef = useRef<symbol>(Symbol("speakbtn"));
   const [active, setActive] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = playback.subscribe(owner => {
@@ -74,7 +75,17 @@ export function SpeakButton(props: Props) {
         });
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       console.error("[tts] speak failed", err);
+      // Make the failure loud and visible. Without this, a 500 from /api/tts
+      // or a browser audio-policy block is silent and the user just sees
+      // nothing happen.
+      setErrorMsg(msg);
+      if (typeof window !== "undefined") {
+        window.alert(`Read-aloud failed:\n\n${msg}`);
+      }
+      // Clear the red state after 4s so the button recovers visually.
+      setTimeout(() => setErrorMsg(null), 4000);
     } finally {
       setLoading(false);
     }
@@ -85,6 +96,7 @@ export function SpeakButton(props: Props) {
     `speak-btn-${size}`,
     active ? "is-playing" : "",
     loading ? "is-loading" : "",
+    errorMsg ? "is-error" : "",
     className,
   ]
     .filter(Boolean)
@@ -96,7 +108,7 @@ export function SpeakButton(props: Props) {
       className={cls}
       onClick={handleClick}
       aria-label={active ? "Stop reading" : "Read aloud"}
-      title={title ?? (active ? "Stop" : "Read aloud")}
+      title={errorMsg ?? title ?? (active ? "Stop" : "Read aloud")}
     >
       {active ? <PauseIcon /> : loading ? <SpinnerIcon /> : <PlayIcon />}
     </button>

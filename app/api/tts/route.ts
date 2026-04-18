@@ -27,13 +27,6 @@ export async function POST(req: Request) {
       ? body.instructions.toString()
       : undefined;
 
-    // `speed` is clamped to OpenAI's accepted range [0.25, 4.0].
-    const rawSpeed = Number(body?.speed);
-    const speed =
-      Number.isFinite(rawSpeed) && rawSpeed > 0
-        ? Math.min(4, Math.max(0.25, rawSpeed))
-        : 1.0;
-
     const text = rawText.trim().slice(0, MAX_CHARS);
     if (!text) {
       return new Response(JSON.stringify({ error: "text required" }), {
@@ -42,6 +35,10 @@ export async function POST(req: Request) {
       });
     }
 
+    // NOTE: we intentionally do NOT pass `speed` to gpt-4o-mini-tts.
+    // Pacing is baked into the `instructions` prompt instead — a recent
+    // change in OpenAI's API began rejecting certain speed values on
+    // this model, which caused silent TTS failures for our users.
     const res = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
       headers: {
@@ -52,7 +49,6 @@ export async function POST(req: Request) {
         model: "gpt-4o-mini-tts",
         input: text,
         voice,
-        speed,
         ...(instructions ? { instructions } : {}),
         response_format: "mp3",
       }),

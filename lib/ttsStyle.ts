@@ -9,15 +9,18 @@ import type { Genre, ProjectType } from "./story";
 
 // Shared baseline every instruction inherits. Forbids the two failure modes
 // we observed in practice: too-slow playback and too-flat delivery.
+//
+// Pacing is enforced via these instructions (the `speed` request param is
+// no longer sent — see /api/tts/route.ts).
 const BASE_DIALOGUE =
   "Perform this line like an engaged actor, not a narrator. " +
-  "Natural conversational pace — never slow, never rushed. " +
+  "Slightly brisk conversational pace — faster than default, never sluggish, never rushed. " +
   "Use full pitch range and inflection; absolutely not monotone. " +
   "Commit to the emotion.";
 
 const BASE_NARRATOR =
   "Read like a cinematic film-trailer narrator with life in the voice. " +
-  "Natural forward pace, clear cadence, moderately expressive. " +
+  "Slightly brisk forward pace — faster than default, clear cadence, moderately expressive. " +
   "Dynamic pitch; never flat, never ponderous.";
 
 const GENRE_FLAVOR: Record<Genre, string> = {
@@ -53,7 +56,7 @@ export function getNarratorStyle(
   return BASE_NARRATOR + " " + GENRE_FLAVOR[primary] + projectTag(projectType);
 }
 
-// Tunable playback speed. gpt-4o-mini-tts accepts `speed` in [0.25, 4.0].
-// 1.0 was the default and felt sluggish — 1.1 is slightly quicker without
-// sounding sped-up. Expose it so we can tune from one place.
-export const DEFAULT_TTS_SPEED = 1.2;
+// Kept for callsites but no longer sent to the OpenAI API (pacing lives
+// in the instructions above). Left here so future maintainers can re-enable
+// it without threading a new param through the whole chain.
+export const DEFAULT_TTS_SPEED = 1.0;

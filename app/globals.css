@@ -2759,6 +2759,16 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   border-color: var(--ink);
 }
 .speak-btn.is-loading { opacity: 0.7; }
+.speak-btn.is-error {
+  background: #FF3B30;
+  color: #fff;
+  border-color: #FF3B30;
+  animation: speakBtnErrorPulse 600ms ease-out 3;
+}
+@keyframes speakBtnErrorPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.12); }
+}
 .speak-btn-sm { width: 22px; height: 22px; }
 .speak-btn-md { width: 30px; height: 30px; }
 .speak-btn-spinner { animation: speakBtnSpin 900ms linear infinite; }
