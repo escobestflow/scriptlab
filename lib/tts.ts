@@ -18,7 +18,7 @@ import {
   type TtsVoice,
 } from "./scriptParse";
 import type { Character, Genre, ProjectType } from "./story";
-import { getNarratorStyle, getStyleForProject } from "./ttsStyle";
+import { DEFAULT_TTS_SPEED, getNarratorStyle, getStyleForProject } from "./ttsStyle";
 
 // ── IndexedDB cache ─────────────────────────────────────────────────
 
@@ -43,8 +43,11 @@ async function cacheKey(
   text: string,
   voice: string,
   instructions: string,
+  speed: number,
 ): Promise<string> {
-  const enc = new TextEncoder().encode(`${voice}\n${instructions}\n${text}`);
+  const enc = new TextEncoder().encode(
+    `${voice}\n${instructions}\n${speed}\n${text}`,
+  );
   const hash = await crypto.subtle.digest("SHA-256", enc);
   return Array.from(new Uint8Array(hash))
     .map(b => b.toString(16).padStart(2, "0"))
@@ -84,15 +87,16 @@ async function fetchAudio(
   text: string,
   voice: string,
   instructions: string,
+  speed: number,
 ): Promise<ArrayBuffer> {
-  const key = await cacheKey(text, voice, instructions);
+  const key = await cacheKey(text, voice, instructions, speed);
   const cached = await getCached(key);
   if (cached) return cached;
 
   const res = await fetch("/api/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice, instructions }),
+    body: JSON.stringify({ text, voice, instructions, speed }),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -202,6 +206,8 @@ export interface SpeakOpts {
   voice?: TtsVoice;
   /** Override style instruction (normally inferred from project + genre). */
   instructions?: string;
+  /** Playback speed 0.25–4.0. Defaults to DEFAULT_TTS_SPEED. */
+  speed?: number;
 }
 
 export async function speak(
@@ -212,7 +218,10 @@ export async function speak(
   const voice = opts.voice ?? "onyx";
   const instructions =
     opts.instructions ?? getStyleForProject(opts.projectType, opts.genres);
-  await playback.play(owner, [() => fetchAudio(text, voice, instructions)]);
+  const speed = opts.speed ?? DEFAULT_TTS_SPEED;
+  await playback.play(owner, [
+    () => fetchAudio(text, voice, instructions, speed),
+  ]);
 }
 
 export async function speakScript(
@@ -226,6 +235,7 @@ export async function speakScript(
 
   const narratorStyle = getNarratorStyle(opts.projectType, opts.genres);
   const charStyle = getStyleForProject(opts.projectType, opts.genres);
+  const speed = opts.speed ?? DEFAULT_TTS_SPEED;
 
   // Pre-seed voice map from the Characters layer so `voice` hints carry over.
   const voiceMap = new Map<string, TtsVoice>();
@@ -248,9 +258,9 @@ export async function speakScript(
     .filter(c => c.kind !== "parenthetical")
     .map(c => () => {
       if (c.kind === "heading" || c.kind === "action") {
-        return fetchAudio(c.text, "onyx", narratorStyle);
+        return fetchAudio(c.text, "onyx", narratorStyle, speed);
       }
-      return fetchAudio(c.text, voiceFor(c.character || ""), charStyle);
+      return fetchAudio(c.text, voiceFor(c.character || ""), charStyle, speed);
     });
 
   await playback.play(owner, producers);

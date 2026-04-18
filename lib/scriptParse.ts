@@ -1,16 +1,18 @@
-// Parses a screenplay plain-text blob into a sequence of TTS-ready chunks.
-// Handles the standard screenplay format:
+// Parses a screenplay-style blob into a sequence of TTS-ready chunks.
 //
-//   INT. LOCATION - DAY             ← scene heading
+// The app's scene generator produces "screenplay-adjacent" prose, which in
+// practice means one of these per paragraph (blank-line separated):
 //
-//   Action/description paragraph.   ← action
+//   INT. TACO STAND — DAY                        ← scene heading
+//   Action paragraph, sometimes multi-line.      ← action
+//   NORA: I've broken it into phases.            ← dialogue (inline cue)
+//   NORA                                         ← dialogue (standalone cue,
+//     (whispering)                                 spec format — kept as a
+//     I've broken it into phases.                  fallback)
 //
-//                   ALICE           ← character cue (ALL CAPS, possibly "(CONT'D)")
-//              (whispering)         ← parenthetical
-//      Dialogue goes here.          ← dialogue
-//
-// Parentheticals are parsed but excluded from playback by default —
-// they're acting directions, not lines to speak aloud.
+// We also accept `Nora:` (Title Case colon) as a softer fallback since LLMs
+// sometimes drop caps. Parentheticals are parsed but skipped in playback —
+// they're acting directions, not lines to speak.
 
 export type ChunkKind = "heading" | "action" | "dialogue" | "parenthetical";
 
@@ -22,93 +24,93 @@ export interface ScriptChunk {
 }
 
 const SCENE_HEADING_RE = /^(INT\.|EXT\.|INT\/EXT\.|EXT\/INT\.|I\/E\.)/i;
-// ALL-CAPS (plus digits, spaces, apostrophes, hyphens, #, dots, and optional parens)
-// Cue lines never contain lowercase letters outside parens.
-const CHARACTER_CUE_RE = /^[A-Z][A-Z0-9 .'#-]*(\s*\(.*\))?\s*$/;
+
+// Inline "NAME: dialogue" — NAME is ALL-CAPS letters + digits/spaces/punct,
+// 2–40 chars, followed by ':' and some text. This is the dominant format
+// from the scene generator (see sampleData.ts for reference).
+const INLINE_CUE_RE = /^([A-Z][A-Z0-9 .'#\-]{1,39}?)\s*:\s*([\s\S]+)$/;
+
+// Softer fallback: "Title Case Name: dialogue" or "Name: dialogue".
+// Requires capitalized first letter and a colon separator.
+const SOFT_INLINE_CUE_RE = /^([A-Z][A-Za-z0-9 .'#\-]{1,39}?)\s*:\s*([\s\S]+)$/;
+
+// Standalone cue line (spec format): ALL-CAPS name on its own line,
+// optional (CONT'D) / (V.O.) / (O.S.) suffix.
+const STANDALONE_CUE_RE = /^[A-Z][A-Z0-9 .'#\-]{0,48}(\s*\([^)]+\))?\s*$/;
+
+function stripActing(text: string): string {
+  // Drop a leading parenthetical direction like "(whispering) I meant it."
+  return text.replace(/^\(([^)]*)\)\s*/u, "").trim();
+}
+
+function normalize(t: string): string {
+  return t.replace(/\s+/g, " ").trim();
+}
 
 export function parseScreenplay(raw: string): ScriptChunk[] {
   if (!raw) return [];
-  const lines = raw.replace(/\r/g, "").split("\n");
+  const blocks = raw
+    .replace(/\r/g, "")
+    .split(/\n\s*\n/)
+    .map(b => b.trim())
+    .filter(Boolean);
+
   const chunks: ScriptChunk[] = [];
-  const actionBuf: string[] = [];
 
-  const flushAction = () => {
-    if (!actionBuf.length) return;
-    const text = actionBuf.join(" ").trim();
-    actionBuf.length = 0;
-    if (text) chunks.push({ kind: "action", text });
-  };
-
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      flushAction();
-      i++;
+  for (const block of blocks) {
+    // 1. Scene heading
+    if (SCENE_HEADING_RE.test(block)) {
+      chunks.push({ kind: "heading", text: normalize(block) });
       continue;
     }
 
-    if (SCENE_HEADING_RE.test(trimmed)) {
-      flushAction();
-      chunks.push({ kind: "heading", text: trimmed });
-      i++;
-      continue;
-    }
-
-    // Character cue requires:
-    //   - all-caps formatting (short line)
-    //   - previous line blank OR first line
-    //   - followed by at least one non-blank line (the dialogue / parenthetical)
-    const prevBlank = i === 0 || !lines[i - 1].trim();
-    const nextNonBlank = i + 1 < lines.length && !!lines[i + 1].trim();
-    if (
-      prevBlank &&
-      nextNonBlank &&
-      trimmed.length <= 50 &&
-      CHARACTER_CUE_RE.test(trimmed)
-    ) {
-      flushAction();
-      const name = trimmed.replace(/\s*\(.*\)\s*$/, "").trim();
-      i++;
-      const dialogueBuf: string[] = [];
-      while (i < lines.length) {
-        const dt = lines[i].trim();
-        if (!dt) break;
-        if (dt.startsWith("(") && dt.endsWith(")")) {
-          if (dialogueBuf.length) {
-            chunks.push({
-              kind: "dialogue",
-              character: name,
-              text: dialogueBuf.join(" ").trim(),
-            });
-            dialogueBuf.length = 0;
-          }
-          chunks.push({
-            kind: "parenthetical",
-            character: name,
-            text: dt.replace(/^\(|\)$/g, "").trim(),
-          });
-        } else {
-          dialogueBuf.push(dt);
+    // 2. Inline "NAME: dialogue"
+    const inline =
+      block.match(INLINE_CUE_RE) ||
+      // Soft fallback — only trust it when the text after the colon is
+      // substantial (avoid turning "Note:" or "INT: somewhere" into dialogue).
+      (block.length > 20 ? block.match(SOFT_INLINE_CUE_RE) : null);
+    if (inline) {
+      const rawName = inline[1].trim();
+      // Reject if the "name" contains spaces that look like the start of an
+      // action line being misread (e.g., "Alice walks in, and she:" won't match
+      // INLINE_CUE_RE but could slip through SOFT — we already constrained
+      // length, and reject if the name contains >= 4 words).
+      if (rawName.split(/\s+/).length <= 4) {
+        const name = rawName.replace(/\s*\([^)]*\)\s*$/, "").trim();
+        const text = stripActing(inline[2].trim());
+        if (text) {
+          chunks.push({ kind: "dialogue", character: name, text: normalize(text) });
+          continue;
         }
-        i++;
       }
-      if (dialogueBuf.length) {
-        chunks.push({
-          kind: "dialogue",
-          character: name,
-          text: dialogueBuf.join(" ").trim(),
-        });
-      }
-      continue;
     }
 
-    actionBuf.push(trimmed);
-    i++;
+    // 3. Standalone cue format: first line is a cue, rest is dialogue + parens
+    const lines = block.split("\n").map(l => l.trim()).filter(Boolean);
+    if (
+      lines.length >= 2 &&
+      lines[0].length <= 50 &&
+      STANDALONE_CUE_RE.test(lines[0])
+    ) {
+      const name = lines[0].replace(/\s*\([^)]*\)\s*$/, "").trim();
+      const body: string[] = [];
+      for (let i = 1; i < lines.length; i++) {
+        const l = lines[i];
+        if (l.startsWith("(") && l.endsWith(")")) continue;
+        body.push(l);
+      }
+      const text = body.join(" ").trim();
+      if (text) {
+        chunks.push({ kind: "dialogue", character: name, text: normalize(text) });
+        continue;
+      }
+    }
+
+    // 4. Otherwise action/description
+    chunks.push({ kind: "action", text: normalize(block) });
   }
-  flushAction();
+
   return chunks;
 }
 
@@ -132,7 +134,7 @@ function pickFrom(name: string, pool: readonly string[]): TtsVoice {
   return pool[hash(name) % pool.length] as TtsVoice;
 }
 
-// Deterministic so the same character always reads in the same voice.
+// Deterministic: the same character always reads in the same voice.
 // `hint` is the Characters-layer `voice` field (e.g. "gruff tenor, 40s").
 export function assignCharacterVoice(name: string, hint?: string): TtsVoice {
   const h = (hint || "").toLowerCase();

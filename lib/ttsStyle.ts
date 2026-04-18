@@ -1,32 +1,40 @@
 // Preset TTS style instructions derived from project type + primary genre.
-// These are baked-in — the user never sees or edits them. They shape how
-// gpt-4o-mini-tts delivers the line (pacing, register, warmth, restraint, etc.).
+// Baked-in; user never sees or edits. These shape how gpt-4o-mini-tts
+// performs a line: pacing, pitch range, emotional commitment, cadence.
+//
+// Design rule of thumb: prioritize *engaged, expressive, natural pace*.
+// Slow + measured instructions → monotone + sluggish. Avoid them.
 
 import type { Genre, ProjectType } from "./story";
 
-const GENRE_STYLE: Record<Genre, string> = {
-  thriller:
-    "Tense, grounded, and deliberate. Low register. Unhurried. Let silence do work between lines.",
-  horror:
-    "Measured and quietly unsettling. Withhold intensity — suggest dread rather than shout it.",
-  drama:
-    "Grounded, intimate, and unhurried. Let weight sit on the important words.",
-  comedy:
-    "Warm and lightly playful. Natural conversational rhythm. Never oversell the joke.",
-  action:
-    "Confident and forward-moving. Crisp consonants. Propulsive but never rushed.",
-  romance:
-    "Soft, close-mic intimacy. Warm, slightly breathy on the tender beats.",
-  "sci-fi":
-    "Curious, measured, faintly wondrous. Clean and cinematic.",
-  mystery:
-    "Hushed and observant, always a half-step behind the listener. Invite, don't push.",
+// Shared baseline every instruction inherits. Forbids the two failure modes
+// we observed in practice: too-slow playback and too-flat delivery.
+const BASE_DIALOGUE =
+  "Perform this line like an engaged actor, not a narrator. " +
+  "Natural conversational pace — never slow, never rushed. " +
+  "Use full pitch range and inflection; absolutely not monotone. " +
+  "Commit to the emotion.";
+
+const BASE_NARRATOR =
+  "Read like a cinematic film-trailer narrator with life in the voice. " +
+  "Natural forward pace, clear cadence, moderately expressive. " +
+  "Dynamic pitch; never flat, never ponderous.";
+
+const GENRE_FLAVOR: Record<Genre, string> = {
+  thriller: "Controlled intensity, clipped cadence on tense beats.",
+  horror: "Restrained menace, quiet dread — not shouted.",
+  drama: "Grounded emotional commitment; real, felt.",
+  comedy: "Warm playful energy, snappy comic timing, smile in the voice.",
+  action: "Crisp forward momentum, high energy without shouting.",
+  romance: "Tender intimate warmth; soft dynamics on close beats.",
+  "sci-fi": "Curious, wondrous, slightly awed.",
+  mystery: "Hushed inviting curiosity; quiet intensity.",
 };
 
 function projectTag(projectType: ProjectType | undefined): string {
-  if (projectType === "tv-show") return " Episodic TV pacing.";
-  if (projectType === "short") return " Short-film brevity — every beat matters.";
-  return " Feature-film cadence.";
+  if (projectType === "tv-show") return " Episodic TV delivery.";
+  if (projectType === "short") return " Short-film economy.";
+  return " Feature-film naturalism.";
 }
 
 export function getStyleForProject(
@@ -34,17 +42,18 @@ export function getStyleForProject(
   genres: Genre[] | undefined,
 ): string {
   const primary = (genres && genres[0]) || "drama";
-  return GENRE_STYLE[primary] + projectTag(projectType);
+  return BASE_DIALOGUE + " " + GENRE_FLAVOR[primary] + projectTag(projectType);
 }
 
-// Slightly different tilt for scene headings / action lines — a cinematic narrator
-// reading stage directions, not a character speaking lines.
 export function getNarratorStyle(
   projectType: ProjectType | undefined,
   genres: Genre[] | undefined,
 ): string {
-  return (
-    "Cinematic voiceover. Grounded, observational narrator. " +
-    getStyleForProject(projectType, genres)
-  );
+  const primary = (genres && genres[0]) || "drama";
+  return BASE_NARRATOR + " " + GENRE_FLAVOR[primary] + projectTag(projectType);
 }
+
+// Tunable playback speed. gpt-4o-mini-tts accepts `speed` in [0.25, 4.0].
+// 1.0 was the default and felt sluggish — 1.1 is slightly quicker without
+// sounding sped-up. Expose it so we can tune from one place.
+export const DEFAULT_TTS_SPEED = 1.1;

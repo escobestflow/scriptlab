@@ -27,6 +27,13 @@ export async function POST(req: Request) {
       ? body.instructions.toString()
       : undefined;
 
+    // `speed` is clamped to OpenAI's accepted range [0.25, 4.0].
+    const rawSpeed = Number(body?.speed);
+    const speed =
+      Number.isFinite(rawSpeed) && rawSpeed > 0
+        ? Math.min(4, Math.max(0.25, rawSpeed))
+        : 1.0;
+
     const text = rawText.trim().slice(0, MAX_CHARS);
     if (!text) {
       return new Response(JSON.stringify({ error: "text required" }), {
@@ -45,6 +52,7 @@ export async function POST(req: Request) {
         model: "gpt-4o-mini-tts",
         input: text,
         voice,
+        speed,
         ...(instructions ? { instructions } : {}),
         response_format: "mp3",
       }),
