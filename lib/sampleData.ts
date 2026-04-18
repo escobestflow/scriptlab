@@ -3,7 +3,7 @@
 export interface Moment {
   id: string;
   text: string;
-  type: "scene" | "dialogue" | "joke" | "memory" | "character" | "image" | "note";
+  type: "scene" | "dialogue" | "joke" | "memory" | "character" | "image" | "note" | "dream";
   tags: string[];
   createdAt: string;
   linkedProjectId?: string;

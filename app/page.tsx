@@ -12,7 +12,6 @@ import { Studio } from "@/components/Studio";
 import { Genre, ProjectType } from "@/lib/story";
 import { useAutosavePref } from "@/lib/prefs";
 import { Button, Input, Textarea, Selector } from "@/components/ui";
-import { SpeakButton } from "@/components/SpeakButton";
 
 type View =
   | { kind: "main" }
@@ -59,6 +58,11 @@ export default function Page() {
   const [newIdeaOpen, setNewIdeaOpen] = useState(false);
   const [newIdeaText, setNewIdeaText] = useState("");
   const [newIdeaType, setNewIdeaType] = useState<Moment["type"]>("scene");
+  const [newIdeaTags, setNewIdeaTags] = useState<string[]>([]);
+  // Record sheet shares the unified idea composer — keep its type + tags
+  // here so the two sheets behave identically except for the record FAB.
+  const [recordType, setRecordType] = useState<Moment["type"]>("scene");
+  const [recordTags, setRecordTags] = useState<string[]>([]);
   const recognitionRef = useRef<any>(null);
   const capturedRef = useRef("");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -158,7 +162,7 @@ export default function Page() {
     setRecording(false);
   }
 
-  function saveDraftMoment(text: string, type: Moment["type"]) {
+  function saveDraftMoment(text: string, type: Moment["type"], tags: string[] = []) {
     // Always stop the mic first — saving from the Record sheet should
     // release speech recognition, not leave it listening in the
     // background after the sheet closes.
@@ -167,13 +171,15 @@ export default function Page() {
       id: "m_" + Math.random().toString(36).slice(2),
       text,
       type,
-      tags: [],
+      tags,
       createdAt: new Date().toISOString(),
     };
     setMoments(prev => [m, ...prev]);
     if (user) saveMomentToDB(user.id, m);
     setRecordSheetOpen(false);
     setLiveTranscript("");
+    setRecordType("scene");
+    setRecordTags([]);
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), 2000);
   }
@@ -479,13 +485,20 @@ export default function Page() {
         </div>
       </div>
 
-      {/* New Idea sheet — shares the IdeaFields body with the View Idea
-          sheet so both read as the same view. No sheet-header (title /
-          close removed); heading "What's the idea?" lives inside the
-          body, styled like the New Project "What are you making?" header. */}
+      {/* New Idea sheet — shares the IdeaFields body with the Record and
+          View Idea sheets so all three read as the same view. The only
+          visual difference between this sheet and the Record sheet is
+          the record FAB + live caption that the Record sheet slots into
+          the top of IdeaFields. Heading "What's the idea?" lives inside
+          the body. */}
       <div
         className={`sheet-backdrop ${newIdeaOpen ? "open" : ""}`}
-        onClick={() => setNewIdeaOpen(false)}
+        onClick={() => {
+          setNewIdeaOpen(false);
+          setNewIdeaText("");
+          setNewIdeaType("scene");
+          setNewIdeaTags([]);
+        }}
       />
       <div className={`sheet ${newIdeaOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
@@ -499,6 +512,8 @@ export default function Page() {
             setText={setNewIdeaText}
             type={newIdeaType}
             setType={setNewIdeaType}
+            tags={newIdeaTags}
+            setTags={setNewIdeaTags}
             autoFocus
           />
 
@@ -509,8 +524,11 @@ export default function Page() {
             onClick={() => {
               const text = newIdeaText.trim();
               if (!text) return;
-              saveDraftMoment(text, newIdeaType);
+              saveDraftMoment(text, newIdeaType, newIdeaTags);
               setNewIdeaOpen(false);
+              setNewIdeaText("");
+              setNewIdeaType("scene");
+              setNewIdeaTags([]);
             }}
             disabled={!newIdeaText.trim()}
             style={{ marginTop: 14 }}
@@ -520,45 +538,73 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Recording sheet — while actively recording, the sheet is locked:
-          the backdrop is non-dismissive and the Close button is hidden.
-          User must either stop the recording (tap the red FAB inside)
-          or Save to leave. Prevents the mic from silently continuing to
-          listen after the sheet closes. */}
+      {/* Recording sheet — identical to the New Idea sheet (same shared
+          IdeaFields body), with the red record FAB + live-status caption
+          slotted at the top via the recordSlot prop. While actively
+          recording, the sheet is locked: backdrop is non-dismissive and
+          the Close button is hidden. User must stop the recording (tap
+          the red FAB) or Save to leave. Prevents the mic from silently
+          continuing to listen after the sheet closes. */}
       <div className={`sheet-backdrop ${recordSheetOpen ? "open" : ""}`}
         onClick={() => { if (recording) return; setRecordSheetOpen(false); }} />
       <div className={`sheet ${recordSheetOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
-        <div className="sheet-header">
-          <div className="sheet-title">{recording ? "Recording…" : "New moment"}</div>
-          {!recording && (
-            <Button variant="secondary" size="sm" onClick={() => setRecordSheetOpen(false)}>Close</Button>
-          )}
-        </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
-          <RecordingForm
-            liveTranscript={liveTranscript}
-            setLiveTranscript={setLiveTranscript}
-            recording={recording}
-            onToggleRecord={() => recording ? stopRecording() : startRecording()}
-            onSave={saveDraftMoment}
+          <div className="display heading" style={{ marginTop: 25, marginBottom: 25 }}>
+            What&rsquo;s the idea?
+          </div>
+
+          <IdeaFields
+            text={liveTranscript}
+            setText={setLiveTranscript}
+            type={recordType}
+            setType={setRecordType}
+            tags={recordTags}
+            setTags={setRecordTags}
+            recordSlot={
+              <>
+                <div style={{ display: "flex", justifyContent: "center", padding: "4px 0 0" }}>
+                  <button
+                    className={`record-fab ${recording ? "recording" : ""}`}
+                    onClick={() => recording ? stopRecording() : startRecording()}
+                    style={{ position: "static", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}
+                  >
+                    <div className="red-dot" />
+                  </button>
+                </div>
+                <div className="caption" style={{ textAlign: "center", marginTop: 8, marginBottom: 18 }}>
+                  {recording ? "Listening… tap to stop" : "Tap to record, or type below"}
+                </div>
+              </>
+            }
           />
+
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            onClick={() => {
+              const text = liveTranscript.trim();
+              if (!text) return;
+              saveDraftMoment(text, recordType, recordTags);
+            }}
+            disabled={!liveTranscript.trim()}
+            style={{ marginTop: 14 }}
+          >
+            Save Idea
+          </Button>
         </div>
       </div>
 
       {/* View Idea sheet — same body as the New Idea sheet (shared
           IdeaFields), minus the heading. The top-right slot holds a
-          Delete button instead of the New Idea's Close / header. */}
+          Delete button. (The voice play / SpeakButton was removed per
+          request — ideas stay silent in the composer/viewer.) */}
       <div className={`sheet-backdrop ${!!editingMoment ? "open" : ""}`}
         onClick={() => setEditingMoment(null)} />
       <div className={`sheet ${!!editingMoment ? "open" : ""}`}>
         <div className="sheet-handle" />
-        <div className="sheet-header" style={{ justifyContent: "space-between" }}>
-          {editingMoment?.text?.trim() ? (
-            <SpeakButton size="md" text={editingMoment.text} title="Read idea aloud" />
-          ) : (
-            <span />
-          )}
+        <div className="sheet-header" style={{ justifyContent: "flex-end" }}>
           <Button
             variant="secondary"
             size="sm"
@@ -647,110 +693,12 @@ export default function Page() {
 }
 
 /* ============================================ */
-/* ============ RECORDING FORM ================ */
-/* ============================================ */
-
-const MOMENT_TYPES: Moment["type"][] = ["scene","dialogue","joke","memory","character","image","note"];
-
-function RecordingForm({
-  liveTranscript, setLiveTranscript, recording, onToggleRecord, onSave,
-}: {
-  liveTranscript: string;
-  setLiveTranscript: (v: string) => void;
-  recording: boolean;
-  onToggleRecord: () => void;
-  onSave: (text: string, type: Moment["type"]) => void;
-}) {
-  const [type, setType] = useState<Moment["type"]>("scene");
-  const [cleaning, setCleaning] = useState(false);
-
-  async function cleanUp() {
-    if (!liveTranscript.trim()) return;
-    setCleaning(true);
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          story: { id: "", title: "", projectType: "feature", conceptDrafts: [{ id: "cd", number: 1, createdAt: "", updatedAt: "", logline: "", settings: { framework: "three-act", genres: [], vibe: "", unpredictability: 5, darkness: 5, pace: 5, endingTypes: [] }, concept: { summary: "", tone: "", themes: [] } }], charactersDrafts: [{ id: "chd", number: 1, createdAt: "", updatedAt: "", characters: [] }], storyDrafts: [{ id: "sd", number: 1, createdAt: "", updatedAt: "", beats: [], ingredients: [], snippets: [] }], scriptDrafts: [{ id: "scd", number: 1, createdAt: "", updatedAt: "", script: { scenes: [], syncStatus: "synced" } }], projectDrafts: [{ id: "pd", number: 1, createdAt: "", updatedAt: "", conceptDraftId: "cd", charactersDraftId: "chd", storyDraftId: "sd", scriptDraftId: "scd" }], activeProjectDraftId: "pd", counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 }, updatedAt: "" },
-          action: { type: "clean_moment", payload: { rawText: liveTranscript } },
-        }),
-      });
-      if (!res.ok || !res.body) return;
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "", full = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
-        }
-      }
-      try {
-        const match = full.match(/\{[\s\S]*\}/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          if (parsed.text) setLiveTranscript(parsed.text);
-        }
-      } catch {}
-    } finally {
-      setCleaning(false);
-    }
-  }
-
-  return (
-    <div className="stack">
-      <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
-        <button
-          className={`record-fab ${recording ? "recording" : ""}`}
-          onClick={onToggleRecord}
-          style={{ position: "static", boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}
-        >
-          <div className="red-dot" />
-        </button>
-      </div>
-      <div className="caption" style={{ textAlign: "center", marginBottom: 4 }}>
-        {recording ? "Listening… tap to stop" : "Tap to record, or type below"}
-      </div>
-
-      <Textarea placeholder="Your moment…"
-        value={liveTranscript} onChange={e => setLiveTranscript(e.target.value)} rows={4} />
-
-      {liveTranscript.trim() && (
-        <>
-          {/* Clean up — associated with the text above */}
-          <Button variant="secondary" size="lg" block onClick={cleanUp} disabled={cleaning}>
-            {cleaning ? "Cleaning…" : "✨ Clean up with AI"}
-          </Button>
-
-          {/* Type picker */}
-          <div className="eyebrow" style={{ marginTop: 8 }}>Type</div>
-          <div className="chip-row">
-            {MOMENT_TYPES.map(t => (
-              <Selector key={t} selected={type === t} onClick={() => setType(t)}>
-                {t}
-              </Selector>
-            ))}
-          </div>
-
-          <Button variant="primary" size="lg" block style={{ marginTop: 12 }}
-            onClick={() => onSave(liveTranscript.trim(), type)}>
-            Save moment
-          </Button>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* ============================================ */
 /* ============ IDEA FORM FIELDS ============== */
 /* ============================================ */
+
+// Canonical idea types. The Record sheet, New Idea sheet, and View/Edit
+// sheet all share the IdeaFields body below and pull from this list.
+const MOMENT_TYPES: Moment["type"][] = ["scene","dialogue","joke","memory","character","image","note","dream"];
 
 // AI-cleans a raw idea text. Streams /api/generate with a placeholder
 // story payload and pulls the "text" field out of the JSON response.
@@ -788,22 +736,30 @@ async function cleanUpIdeaText(raw: string): Promise<string | null> {
   } catch { return null; }
 }
 
-// Shared idea body — used by both the New Idea and View/Edit sheets so
-// the two experiences read as the same view. Type chips + textarea +
-// Clean up button. Persistence + mode-specific actions (Save, Delete)
-// live in the parent sheet.
+// Shared idea body — used by the New Idea, Record, and View/Edit sheets
+// so all three experiences read as the same view. Type chips + textarea +
+// Clean up + Tags. Optional record FAB at the top for the Record sheet.
+// Persistence + mode-specific actions (Save, Delete) live in the parent.
 function IdeaFields({
   text, setText,
   type, setType,
+  tags, setTags,
   autoFocus,
+  recordSlot,
 }: {
   text: string;
   setText: (v: string) => void;
   type: Moment["type"];
   setType: (t: Moment["type"]) => void;
+  tags?: string[];
+  setTags?: (t: string[]) => void;
   autoFocus?: boolean;
+  /** Optional node rendered at the very top — used by the Record sheet
+   *  to slot the red record FAB + status caption above the shared body. */
+  recordSlot?: React.ReactNode;
 }) {
   const [cleaning, setCleaning] = useState(false);
+  const [tagInput, setTagInput] = useState("");
 
   async function runCleanUp() {
     if (!text.trim()) return;
@@ -816,8 +772,21 @@ function IdeaFields({
     }
   }
 
+  function addTag() {
+    if (!setTags || !tags) return;
+    const t = tagInput.trim().toLowerCase();
+    if (t && !tags.includes(t)) setTags([...tags, t]);
+    setTagInput("");
+  }
+  function removeTag(tag: string) {
+    if (!setTags || !tags) return;
+    setTags(tags.filter(t => t !== tag));
+  }
+
   return (
     <>
+      {recordSlot}
+
       <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>Type</span>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         {MOMENT_TYPES.map(t => (
@@ -846,6 +815,37 @@ function IdeaFields({
       >
         {cleaning ? "Cleaning…" : "\u2728 Clean up"}
       </Button>
+
+      {tags && setTags && (
+        <>
+          <div className="eyebrow" style={{ marginTop: 16, marginBottom: 8 }}>Tags</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Input
+              size="compact"
+              placeholder="Add tag"
+              value={tagInput}
+              onChange={e => setTagInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addTag()}
+              style={{ flex: 1 }}
+            />
+            <Button variant="secondary" size="sm" onClick={addTag}>+</Button>
+          </div>
+          {tags.length > 0 && (
+            <div className="chip-row" style={{ marginTop: 8 }}>
+              {tags.map(t => (
+                <Selector
+                  key={t}
+                  selected
+                  onClick={() => removeTag(t)}
+                  style={{ fontSize: 11, padding: "4px 10px" }}
+                >
+                  {t} ✕
+                </Selector>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 }
@@ -854,8 +854,8 @@ function IdeaFields({
 /* ============ MOMENT EDIT FORM ============== */
 /* ============================================ */
 
-// Used inside the View Idea sheet. Delegates Type/Idea/Clean up to the
-// shared IdeaFields component; adds a tag editor underneath. All edits
+// Used inside the View Idea sheet. Delegates everything to the shared
+// IdeaFields component (tags now live inside IdeaFields). All edits
 // stream through onUpdate immediately (auto-save on change).
 function MomentEditForm({
   moment, onUpdate,
@@ -865,23 +865,7 @@ function MomentEditForm({
 }) {
   const [text, setText] = useState(moment.text);
   const [type, setType] = useState(moment.type);
-  const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>(moment.tags);
-
-  function addTag() {
-    const t = tagInput.trim().toLowerCase();
-    if (t && !tags.includes(t)) {
-      const next = [...tags, t];
-      setTags(next);
-      onUpdate({ tags: next });
-    }
-    setTagInput("");
-  }
-  function removeTag(tag: string) {
-    const next = tags.filter(t => t !== tag);
-    setTags(next);
-    onUpdate({ tags: next });
-  }
 
   return (
     <div className="stack">
@@ -890,26 +874,9 @@ function MomentEditForm({
         setText={(v) => { setText(v); onUpdate({ text: v }); }}
         type={type}
         setType={(t) => { setType(t); onUpdate({ type: t }); }}
+        tags={tags}
+        setTags={(next) => { setTags(next); onUpdate({ tags: next }); }}
       />
-
-      <div className="eyebrow" style={{ marginTop: 8 }}>Tags</div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <Input size="compact" placeholder="Add tag" value={tagInput}
-          onChange={e => setTagInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addTag()}
-          style={{ flex: 1 }} />
-        <Button variant="secondary" size="sm" onClick={addTag}>+</Button>
-      </div>
-      {tags.length > 0 && (
-        <div className="chip-row" style={{ marginTop: 4 }}>
-          {tags.map(t => (
-            <Selector key={t} selected onClick={() => removeTag(t)}
-              style={{ fontSize: 11, padding: "4px 10px" }}>
-              {t} ✕
-            </Selector>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -978,7 +945,7 @@ function ProjectsTab({
 /* ============ MOMENTS TAB =================== */
 /* ============================================ */
 
-const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image", "Note"] as const;
+const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image", "Note", "Dream"] as const;
 
 function MomentsTab({
   moments,
