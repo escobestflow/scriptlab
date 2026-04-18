@@ -946,6 +946,55 @@ function MomentEditForm({
 /* ============ PROJECTS TAB ================== */
 /* ============================================ */
 
+/* Animated three-card poster stack for the Projects empty state.
+   Holds a permutation of poster indices mapped to three fixed slots
+   (back-left, back-right, front). Every 4s the permutation rotates
+   by one, and CSS transitions smoothly slide each poster into its
+   new slot. Front slot renders with the highest z-index. */
+const POSTER_SRCS = ["/poster1.png", "/poster2.png", "/poster3.png"];
+const POSTER_SLOTS = [
+  // slot 0: back-left
+  { x: -96, y: 14, rot: -8, z: 1 },
+  // slot 1: back-right
+  { x: 96, y: 14, rot: 8, z: 1 },
+  // slot 2: front-center
+  { x: 0, y: 58, rot: 0, z: 3 },
+];
+function EmptyPosterStack() {
+  // order[i] = which poster index occupies slot i. Rotate every 4s.
+  const [order, setOrder] = useState<number[]>([0, 1, 2]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setOrder((prev) => [prev[2], prev[0], prev[1]]);
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+  // Pre-compute each poster's current slot so we can key by stable
+  // poster index (keeps <img> mounted across reorders, which is what
+  // lets the transition play).
+  const slotFor = (posterIdx: number) => order.indexOf(posterIdx);
+  return (
+    <div className="projects-empty-art" aria-hidden>
+      {POSTER_SRCS.map((src, posterIdx) => {
+        const slotIdx = slotFor(posterIdx);
+        const slot = POSTER_SLOTS[slotIdx];
+        return (
+          <div
+            key={posterIdx}
+            className="empty-poster"
+            style={{
+              transform: `translate(-50%, 0) translate(${slot.x}px, ${slot.y}px) rotate(${slot.rot}deg)`,
+              zIndex: slot.z,
+            }}
+          >
+            <img src={src} alt="" draggable={false} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProjectsTab({
   projects, onOpen, onNew,
 }: {
@@ -959,7 +1008,7 @@ function ProjectsTab({
   if (projects.length === 0) {
     return (
       <div className="projects-empty">
-        <img src="/empty-state-cards.svg" alt="" className="projects-empty-art" />
+        <EmptyPosterStack />
         <h1 className="projects-empty-title">Your story starts here</h1>
         <p className="projects-empty-sub">
           Begin with an idea, shape the world around it,<br />and watch your story unfold.
