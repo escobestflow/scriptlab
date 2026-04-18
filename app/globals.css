@@ -45,7 +45,13 @@
   --card-shadow:
     0 1px 2px rgba(10, 10, 15, 0.05),
     0 8px 22px rgba(10, 10, 15, 0.07);
-  --card-radius: 18px;
+  /* Unified corner radius — cards, attr rows, poster thumbnails all use
+     this single value so surfaces read as one family. */
+  --card-radius: 13px;
+  /* Minimum height for any card-like surface. Keeps short-content rows
+     (e.g. a concept attr row with a single value) from collapsing below
+     a tappable 60px target. */
+  --card-min-h: 60px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -224,6 +230,7 @@ button { cursor: pointer; }
   flex-direction: row;
   gap: 14px;
   width: 100%;
+  min-height: var(--card-min-h);
   padding: 14px;
   margin-bottom: 14px;
   border-radius: var(--card-radius);
@@ -249,7 +256,7 @@ button { cursor: pointer; }
 .project-cover {
   width: 100px;
   aspect-ratio: 3 / 4;
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   overflow: hidden;
   flex-shrink: 0;
   background: linear-gradient(135deg, #1f1f24 0%, #0b0b0f 100%);
@@ -604,6 +611,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 
 .card {
   padding: 20px;
+  min-height: var(--card-min-h);
   margin-bottom: 12px;
   border-radius: var(--card-radius);
   border: none;
@@ -1570,7 +1578,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .project-header-thumb {
   width: 72px;
   aspect-ratio: 3 / 4;
-  border-radius: 12px;
+  border-radius: var(--card-radius);
   object-fit: cover;
 }
 .project-header-thumb-placeholder {
@@ -1595,6 +1603,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background: var(--surface);
   border-radius: var(--card-radius);
   box-shadow: var(--card-shadow);
+  min-height: var(--card-min-h);
   margin-bottom: 14px;
   overflow: hidden;
 }
@@ -1996,6 +2005,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   border-radius: var(--card-radius);
   background: var(--surface);
   box-shadow: var(--card-shadow);
+  min-height: var(--card-min-h);
   margin-bottom: 14px;
   overflow: hidden;
   transition: box-shadow 260ms var(--ease);

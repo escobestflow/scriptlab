@@ -3067,7 +3067,7 @@ function SettingsTab({
               style={{
                 width: 160,
                 aspectRatio: "3 / 4",
-                borderRadius: 12,
+                borderRadius: 13,
                 objectFit: "cover",
                 display: "block",
               }}
