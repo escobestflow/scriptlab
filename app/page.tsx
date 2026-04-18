@@ -741,7 +741,7 @@ export default function Page() {
       </div>
 
       {/* Success toast */}
-      <div className={`toast ${toastVisible ? "show" : ""}`}>Moment added!</div>
+      <div className={`toast ${toastVisible ? "show" : ""}`}>Idea Added</div>
     </div>
   );
 }

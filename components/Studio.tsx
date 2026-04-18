@@ -47,7 +47,15 @@ export function Studio({
   autosaveEnabled?: boolean;
 }) {
   const [section, setSection] = useState<Section>("concept");
+  // "Project Created" toast — shown briefly after a new project is
+  // created, then auto-hides. Mirrors the Idea-Added toast on the
+  // main page; rendered at Studio root so it floats over any tab.
   const [showSuccess, setShowSuccess] = useState(isNew);
+  useEffect(() => {
+    if (!showSuccess) return;
+    const t = setTimeout(() => setShowSuccess(false), 2000);
+    return () => clearTimeout(t);
+  }, [showSuccess]);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -561,8 +569,6 @@ export function Studio({
             <ConceptTab
               story={story}
               setStory={setStory}
-              showSuccess={showSuccess}
-              onDismissSuccess={() => setShowSuccess(false)}
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
             />
@@ -788,6 +794,9 @@ export function Studio({
       />
 
       {confirmDeleteDialog}
+
+      {/* Project-created toast (same pattern as Idea Added on main page) */}
+      <div className={`toast ${showSuccess ? "show" : ""}`}>Project Created</div>
     </>
   );
 }
@@ -1478,38 +1487,14 @@ function TextAttrRow({
   );
 }
 
-/* ── Success banner (shown after project creation) ── */
-function SuccessBanner({ onDismiss }: { onDismiss: () => void }) {
-  return (
-    <div className="success-banner">
-      <div className="success-icon">&#10003;</div>
-      <div className="success-content">
-        <div className="success-title">Project created!</div>
-        <div className="success-text">
-          Add more details below to help AI generate better story structure, characters, and scenes.
-        </div>
-      </div>
-      <button className="success-dismiss" onClick={onDismiss} aria-label="Dismiss">
-        <svg viewBox="0 0 24 24" style={{width:16,height:16,stroke:"currentColor",strokeWidth:2,fill:"none"}}>
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>
-    </div>
-  );
-}
-
 function ConceptTab({
   story,
   setStory,
-  showSuccess,
-  onDismissSuccess,
   autosaveEnabled = true,
   onOpenUpdateTray,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
-  showSuccess: boolean;
-  onDismissSuccess: () => void;
   autosaveEnabled?: boolean;
   onOpenUpdateTray: (source: LayerKey) => void;
 }) {
@@ -1690,8 +1675,6 @@ function ConceptTab({
 
   return (
     <>
-      {showSuccess && <SuccessBanner onDismiss={onDismissSuccess} />}
-
       <LayerBar layer="concept" label="Concept" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
       {/* Format */}
