@@ -146,6 +146,7 @@ function normalizeBeat(raw: any, position: number): Beat {
     purpose: typeof raw?.purpose === "string" ? raw.purpose : "",
     position,
     momentIds: [],
+    characterIds: [],
     status: "design",
   };
 }

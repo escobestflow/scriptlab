@@ -270,11 +270,13 @@ export function Studio({
   }
 
   // Beat management
-  function addBeat(name: string, summary: string, insertAt?: number) {
+  function addBeat(name: string, summary: string, insertAt?: number, characterIds?: string[]) {
     const newBeat: Beat = {
       id: "b_" + Math.random().toString(36).slice(2),
       name, summary, purpose: "",
-      position: 0, momentIds: [], status: "design",
+      position: 0, momentIds: [],
+      characterIds: characterIds ?? [],
+      status: "design",
     };
     setBeats(bs => {
       const idx = insertAt != null ? insertAt : bs.length;
@@ -644,8 +646,8 @@ export function Studio({
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
           <BeatCreationForm
             story={story}
-            onSave={(name, summary) => {
-              addBeat(name, summary, beatTrayInsertAt ?? undefined);
+            onSave={(name, summary, characterIds) => {
+              addBeat(name, summary, beatTrayInsertAt ?? undefined, characterIds);
               setBeatTrayOpen(false);
               setBeatTrayInsertAt(null);
             }}
@@ -2351,7 +2353,7 @@ function StoryTab({
   setStory: (u: (s: Story) => Story) => void;
   beats: Beat[];
   moments: Moment[];
-  addBeat: (name: string, summary: string, insertAt?: number) => void;
+  addBeat: (name: string, summary: string, insertAt?: number, characterIds?: string[]) => void;
   updateBeat: (id: string, patch: Partial<Beat>) => void;
   moveBeat: (index: number, direction: "up" | "down") => void;
   removeBeat: (id: string) => void;
@@ -2769,7 +2771,7 @@ function BeatCreationForm({
   story, onSave, busy,
 }: {
   story: Story;
-  onSave: (name: string, summary: string) => void;
+  onSave: (name: string, summary: string, characterIds: string[]) => void;
   busy: boolean;
 }) {
   const [name, setName] = useState("");
@@ -2778,6 +2780,17 @@ function BeatCreationForm({
   const [generating, setGenerating] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiSettings, setAISettings] = useState<BeatAISettings>(loadBeatAISettings);
+
+  // Characters available for this beat — pulled from the active
+  // Characters-layer draft. Only named characters are shown.
+  const availableCharacters = getActiveCharactersDraft(story).characters
+    .filter(c => c.name && c.name.trim() !== "");
+  const [selectedCharIds, setSelectedCharIds] = useState<string[]>([]);
+  const toggleCharacter = (id: string) => {
+    setSelectedCharIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
 
   async function callAI(actionType: string, payload: Record<string, any>,
     onResult: (parsed: any) => void) {
@@ -2844,6 +2857,25 @@ function BeatCreationForm({
       <Textarea placeholder="Describe this beat"
         value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
 
+      {availableCharacters.length > 0 && (
+        <div style={{ marginTop: 4 }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>
+            Characters in this beat
+          </div>
+          <div className="chip-row">
+            {availableCharacters.map(c => (
+              <Selector
+                key={c.id}
+                selected={selectedCharIds.includes(c.id)}
+                onClick={() => toggleCharacter(c.id)}
+              >
+                {c.name}
+              </Selector>
+            ))}
+          </div>
+        </div>
+      )}
+
       {summary.trim() && (
         <Button variant="secondary" size="sm" block onClick={cleanUp}
           disabled={cleaning || busy || generating}>
@@ -2888,7 +2920,7 @@ function BeatCreationForm({
           style={{ flex: 1 }}>
           {generating ? "Creating..." : "Create with AI"}
         </Button>
-        <Button variant="primary" size="sm" onClick={() => onSave(name || "Untitled beat", summary)}
+        <Button variant="primary" size="sm" onClick={() => onSave(name || "Untitled beat", summary, selectedCharIds)}
           disabled={!summary.trim()}>
           Save
         </Button>

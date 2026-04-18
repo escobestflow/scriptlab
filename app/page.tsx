@@ -650,7 +650,7 @@ export default function Page() {
 /* ============ RECORDING FORM ================ */
 /* ============================================ */
 
-const MOMENT_TYPES: Moment["type"][] = ["scene","dialogue","joke","memory","character","image"];
+const MOMENT_TYPES: Moment["type"][] = ["scene","dialogue","joke","memory","character","image","note"];
 
 function RecordingForm({
   liveTranscript, setLiveTranscript, recording, onToggleRecord, onSave,
@@ -978,7 +978,7 @@ function ProjectsTab({
 /* ============ MOMENTS TAB =================== */
 /* ============================================ */
 
-const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image"] as const;
+const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image", "Note"] as const;
 
 function MomentsTab({
   moments,

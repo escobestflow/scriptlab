@@ -76,6 +76,10 @@ export interface Beat {
   purpose: string;
   position: number;
   momentIds: string[];
+  /** IDs of characters who appear in this beat. Populated from the
+   *  Characters-layer active draft. Optional so older saved beats
+   *  (pre-feature) still deserialize cleanly. */
+  characterIds?: string[];
   status: BeatStatus;
   sceneContent?: string;
 }
