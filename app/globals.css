@@ -1612,15 +1612,15 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   align-items: flex-start;
   gap: 10px;
   width: 100%;
-  /* top 17 · right 18 (caret inset) · bottom 17 · left 20 (label inset) */
-  padding: 17px 18px 17px 20px;
+  /* top 17 · right 20 (caret inset) · bottom 17 · left 20 (label inset) */
+  padding: 17px 20px 17px 20px;
   background: none;
   border: none;
   cursor: pointer;
   text-align: left;
 }
 .attr-row-header .attr-label {
-  margin-top: 0;
+  margin-top: 1px;
 }
 .attr-row-header .attr-caret {
   margin-top: 2px;
@@ -1643,7 +1643,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   display: inline-flex;
   align-items: center;
   height: 21px;
-  padding: 0 8px;
+  padding: 2px 8px 0;
   background: #F3F3F3;
   border: 1px solid #EDEDED;
   border-radius: 4px;
