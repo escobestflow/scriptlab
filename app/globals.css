@@ -245,7 +245,12 @@ button { cursor: pointer; }
   position: relative;
   width: 320px;
   height: 260px;
-  margin-bottom: 32px;
+  /* Visually drop the poster 18px without affecting the flex layout
+     below it — transform keeps title/sub/button anchored to the
+     margin-bottom slot. Then cut the margin by 15px so the copy +
+     CTA bubble up 15px together. */
+  transform: translateY(18px);
+  margin-bottom: 17px;
   user-select: none;
   pointer-events: none;
   overflow: visible;
