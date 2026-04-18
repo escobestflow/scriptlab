@@ -19,6 +19,7 @@ import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
 import { Button, Input, Textarea, Selector } from "@/components/ui";
+import { SpeakButton } from "@/components/SpeakButton";
 
 type Section = "concept" | "characters" | "story" | "script";
 
@@ -1117,6 +1118,7 @@ function TextAttrRow({
   ai,
   aiLoading,
   pager,
+  speak,
 }: {
   label: string;
   value: string;
@@ -1127,6 +1129,8 @@ function TextAttrRow({
   ai?: () => void;
   aiLoading?: boolean;
   pager?: React.ReactNode;
+  /** Optional slot rendered next to the AI wand (used for the read-aloud button). */
+  speak?: React.ReactNode;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -1148,6 +1152,7 @@ function TextAttrRow({
           <span className="attr-label">
             {label}
             {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+            {speak}
             {dot && <span className="sync-dot attr-dot" />}
           </span>
           <div className="attr-values">
@@ -1455,6 +1460,15 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "logline")}
         ai={() => generateConcept("logline")}
         aiLoading={aiBusy === "logline"}
+        speak={
+          d.logline?.trim() ? (
+            <SpeakButton
+              text={d.logline}
+              projectType={story.projectType}
+              genres={d.settings.genres}
+            />
+          ) : null
+        }
         pager={
           <HistoryPager
             history={loglineHistory.history}
@@ -2404,6 +2418,8 @@ function ScriptTab({
   autosaveEnabled?: boolean;
 }) {
   const d = getActiveScriptDraft(story);
+  const charactersDraft = getActiveCharactersDraft(story);
+  const conceptDraft = getActiveConceptDraft(story);
   const syncState = getLayerSyncState(story);
   const writtenCount = beats.filter(b => b.status === "written").length;
   // Only surface the sync banner once there's an actual script to be out of
@@ -2467,6 +2483,17 @@ function ScriptTab({
           </div>
           {beat.status === "written" && beat.sceneContent && (
             <div style={{ padding: "0 16px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                <SpeakButton
+                  mode="script"
+                  size="md"
+                  text={beat.sceneContent}
+                  characters={charactersDraft.characters}
+                  projectType={story.projectType}
+                  genres={conceptDraft.settings.genres}
+                  title="Read scene aloud"
+                />
+              </div>
               <div className="scene-content">{beat.sceneContent}</div>
             </div>
           )}

@@ -12,6 +12,7 @@ import { Studio } from "@/components/Studio";
 import { Genre, ProjectType } from "@/lib/story";
 import { useAutosavePref } from "@/lib/prefs";
 import { Button, Input, Textarea, Selector } from "@/components/ui";
+import { SpeakButton } from "@/components/SpeakButton";
 
 type View =
   | { kind: "main" }
@@ -542,7 +543,12 @@ export default function Page() {
         onClick={() => setEditingMoment(null)} />
       <div className={`sheet ${!!editingMoment ? "open" : ""}`}>
         <div className="sheet-handle" />
-        <div className="sheet-header" style={{ justifyContent: "flex-end" }}>
+        <div className="sheet-header" style={{ justifyContent: "space-between" }}>
+          {editingMoment?.text?.trim() ? (
+            <SpeakButton size="md" text={editingMoment.text} title="Read idea aloud" />
+          ) : (
+            <span />
+          )}
           <Button
             variant="secondary"
             size="sm"

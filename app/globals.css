@@ -2736,3 +2736,31 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   transform: none;
 }
 
+/* ======= SPEAK BUTTON (text-to-speech) ======= */
+.speak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 150ms var(--ease), border-color 150ms var(--ease),
+              transform 120ms var(--ease), color 150ms var(--ease);
+}
+.speak-btn:hover { background: var(--bg-secondary); }
+.speak-btn:active { transform: scale(0.92); }
+.speak-btn.is-playing {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
+}
+.speak-btn.is-loading { opacity: 0.7; }
+.speak-btn-sm { width: 22px; height: 22px; }
+.speak-btn-md { width: 30px; height: 30px; }
+.speak-btn-spinner { animation: speakBtnSpin 900ms linear infinite; }
+@keyframes speakBtnSpin { to { transform: rotate(360deg); } }
+
