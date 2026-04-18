@@ -61,7 +61,22 @@ export type ActionType =
   | "generate_character_need"
   | "generate_character_voice"
   | "generate_character_arc"
-  | "generate_character_notes";
+  | "generate_character_notes"
+  // ── Cross-layer sync (Update Other Layers) ──
+  // 12 combinations: from each of the 4 layers, derive any of the other 3.
+  // Each returns strict JSON matching the target layer's schema.
+  | "sync_concept_to_characters"
+  | "sync_concept_to_story"
+  | "sync_concept_to_script"
+  | "sync_characters_to_concept"
+  | "sync_characters_to_story"
+  | "sync_characters_to_script"
+  | "sync_story_to_concept"
+  | "sync_story_to_characters"
+  | "sync_story_to_script"
+  | "sync_script_to_concept"
+  | "sync_script_to_characters"
+  | "sync_script_to_story";
 
 export interface ActionRequest {
   type: ActionType;
@@ -73,6 +88,10 @@ export function modelForAction(type: ActionType): string {
   switch (type) {
     case "generate_scene":
     case "rewrite_beat":
+    // Sync → script is long-form prose — match generate_scene routing.
+    case "sync_concept_to_script":
+    case "sync_characters_to_script":
+    case "sync_story_to_script":
       return "claude-sonnet-4-5"; // quality matters for prose
     case "generate_beats":
     case "swap_ingredient":

@@ -89,7 +89,12 @@ export interface Episode {
 
 export interface Scene {
   id: string;
-  beatId: string;
+  /**
+   * ID of the Story-layer beat that produced this scene, or `null` for
+   * synthetic scenes created when an upstream beat doesn't exist yet
+   * (e.g. Concept→Script sync, before the user ever filled the Story tab).
+   */
+  beatId: string | null;
   heading: string;
   content: string;
   notes: string;
@@ -713,6 +718,157 @@ export function getLayerSyncState(story: Story): LayerSyncState {
     storyOutOfSync: conceptStale || charactersStale,
     scriptOutOfSync: conceptStale || charactersStale || storyStale,
   };
+}
+
+// ── Cross-layer sync helpers ──
+// "Empty" check: used by the Update-Other-Layers UI to decide whether to
+// hide the trigger (source has nothing to derive from) and whether to
+// overwrite-in-place or create a new draft when writing a target.
+
+export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
+  switch (layer) {
+    case "concept": {
+      const c = getActiveConceptDraft(story);
+      if (!c) return true;
+      return (
+        c.logline.trim() === "" &&
+        c.concept.summary.trim() === "" &&
+        c.concept.tone.trim() === "" &&
+        c.concept.themes.length === 0
+      );
+    }
+    case "characters": {
+      const c = getActiveCharactersDraft(story);
+      return !c || c.characters.length === 0;
+    }
+    case "story": {
+      const s = getActiveStoryLayerDraft(story);
+      if (!s) return true;
+      if (story.projectType === "tv-show") {
+        return (s.episodes ?? []).every(ep => ep.beats.length === 0);
+      }
+      return s.beats.length === 0;
+    }
+    case "script": {
+      const s = getActiveScriptDraft(story);
+      return !s || s.script.scenes.length === 0;
+    }
+  }
+}
+
+/**
+ * Concept content that a sync is allowed to write. Deliberately omits
+ * `title`, `projectType`, and `settings.genres` — those three are chosen
+ * by the user at project creation and must never be overwritten by a sync.
+ */
+export interface ConceptContentPatch {
+  logline?: string;
+  summary?: string;
+  tone?: string;
+  themes?: string[];
+  endingTypes?: EndingType[];
+}
+
+function applyConceptContent(draft: ConceptLayerDraft, patch: ConceptContentPatch): ConceptLayerDraft {
+  return {
+    ...draft,
+    logline: patch.logline ?? draft.logline,
+    concept: {
+      ...draft.concept,
+      summary: patch.summary ?? draft.concept.summary,
+      tone:    patch.tone    ?? draft.concept.tone,
+      themes:  patch.themes  ?? draft.concept.themes,
+    },
+    settings: {
+      ...draft.settings,
+      endingTypes: patch.endingTypes ?? draft.settings.endingTypes,
+    },
+  };
+}
+
+// Replace the content of the active layer draft in place (does NOT create
+// a new draft). Used when the target draft is empty.
+
+export function replaceActiveConceptContent(story: Story, patch: ConceptContentPatch): Story {
+  const now = new Date().toISOString();
+  const pd = getActiveProjectDraft(story);
+  return {
+    ...story,
+    conceptDrafts: story.conceptDrafts.map(d =>
+      d.id === pd.conceptDraftId ? { ...applyConceptContent(d, patch), updatedAt: now } : d
+    ),
+    updatedAt: now,
+  };
+}
+
+export function replaceActiveCharactersContent(story: Story, characters: Character[]): Story {
+  return updateCharactersDraft(story, { characters });
+}
+
+export function replaceActiveStoryContent(story: Story, beats: Beat[], episodes?: Episode[]): Story {
+  const patch: Partial<StoryLayerDraft> = episodes !== undefined
+    ? { beats, episodes }
+    : { beats };
+  return updateStoryLayerDraft(story, patch);
+}
+
+export function replaceActiveScriptContent(story: Story, scenes: Scene[]): Story {
+  const current = getActiveScriptDraft(story);
+  const now = new Date().toISOString();
+  return updateScriptDraft(story, {
+    script: {
+      ...current.script,
+      scenes,
+      syncStatus: "synced",
+      lastSyncedAt: now,
+    },
+  });
+}
+
+/**
+ * Create a new layer draft (branching from the current active one) and
+ * immediately populate its content from `content`. Activates the new draft.
+ * Used when the target layer already has content and we want to preserve
+ * the existing draft.
+ */
+export type LayerContent =
+  | { kind: "concept";    patch: ConceptContentPatch }
+  | { kind: "characters"; characters: Character[] }
+  | { kind: "story";      beats: Beat[]; episodes?: Episode[] }
+  | { kind: "script";     scenes: Scene[] };
+
+export function createAndActivateLayerDraftWith(story: Story, content: LayerContent): Story {
+  // Step 1: create a new draft (branches from active, becomes active).
+  const branched =
+    content.kind === "concept"    ? createNewConceptDraft(story) :
+    content.kind === "characters" ? createNewCharactersDraft(story) :
+    content.kind === "story"      ? createNewStoryLayerDraft(story) :
+                                    createNewScriptDraft(story);
+  // Step 2: apply the content to the now-active new draft.
+  switch (content.kind) {
+    case "concept":    return replaceActiveConceptContent(branched, content.patch);
+    case "characters": return replaceActiveCharactersContent(branched, content.characters);
+    case "story":      return replaceActiveStoryContent(branched, content.beats, content.episodes);
+    case "script":     return replaceActiveScriptContent(branched, content.scenes);
+  }
+}
+
+/**
+ * High-level "apply a sync result" helper: given a target layer and a
+ * derived content payload, either overwrite the active draft (if empty)
+ * or create a new draft and activate it (if non-empty).
+ */
+export function applySyncResult(story: Story, content: LayerContent): Story {
+  const layer: LayerKey = content.kind;
+  if (isLayerDraftEmpty(story, layer)) {
+    switch (content.kind) {
+      case "concept":    return replaceActiveConceptContent(story, content.patch);
+      case "characters": return replaceActiveCharactersContent(story, content.characters);
+      case "story":      return replaceActiveStoryContent(story, content.beats, content.episodes);
+      case "script":     return replaceActiveScriptContent(story, content.scenes);
+    }
+  }
+  return createAndActivateLayerDraftWith(story, content);
 }
 
 // Mark a downstream layer as synced against current upstreams.

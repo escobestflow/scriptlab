@@ -10,7 +10,7 @@
 // This means iterative edits inside a session reuse ~90% of input tokens
 // at 10% price. Without this pattern, heavy usage is uneconomical.
 
-import { Story, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft } from "./story";
+import { Story, Scene, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft } from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
 
 export interface BuiltPrompt {
@@ -305,7 +305,205 @@ Use the full project bible above (format, genre, logline, summary, tone, themes,
 Return STRICT JSON: { "${spec.returnKey}": ${spec.returnType} }`;
     }
 
+    // ── Cross-layer sync (Update Other Layers) ──
+    // The storyBible above already contains the current active drafts of
+    // every layer; these prompts just tell the model which to treat as
+    // source and which schema to emit for the target.
+
+    case "sync_concept_to_characters":
+      return syncPrompt_toCharacters(story, "concept");
+    case "sync_story_to_characters":
+      return syncPrompt_toCharacters(story, "story");
+    case "sync_script_to_characters":
+      return syncPrompt_toCharacters(story, "script");
+
+    case "sync_concept_to_story":
+      return syncPrompt_toStory(story, "concept");
+    case "sync_characters_to_story":
+      return syncPrompt_toStory(story, "characters");
+    case "sync_script_to_story":
+      return syncPrompt_toStory(story, "script");
+
+    case "sync_concept_to_script":
+      return syncPrompt_toScript(story, "concept");
+    case "sync_characters_to_script":
+      return syncPrompt_toScript(story, "characters");
+    case "sync_story_to_script":
+      return syncPrompt_toScript(story, "story");
+
+    case "sync_characters_to_concept":
+      return syncPrompt_toConcept(story, "characters");
+    case "sync_story_to_concept":
+      return syncPrompt_toConcept(story, "story");
+    case "sync_script_to_concept":
+      return syncPrompt_toConcept(story, "script");
+
     default:
       return `Unknown action.`;
   }
+}
+
+// ── Sync prompt builders ──
+// Each returns a task-specific user message appended to the shared story
+// bible. The model sees the bible + this ask; output is strict JSON.
+
+function sourceLabel(source: "concept" | "characters" | "story" | "script"): string {
+  return source === "concept"    ? "Concept"
+       : source === "characters" ? "Characters"
+       : source === "story"      ? "Story (beat sheet)"
+       :                           "Script (scene prose)";
+}
+
+function scriptProseBlock(story: Story, maxChars = 12000): string {
+  const sc = getActiveScriptDraft(story);
+  const scenes = sc.script.scenes;
+  if (!scenes.length) return "(no scenes)";
+  let out = "";
+  for (const s of scenes) {
+    const chunk = `\n\n--- ${s.heading || "SCENE"} ---\n${s.content}`;
+    if (out.length + chunk.length > maxChars) {
+      out += "\n\n[…truncated for length…]";
+      break;
+    }
+    out += chunk;
+  }
+  return out.trim();
+}
+
+function syncPrompt_toCharacters(story: Story, source: "concept" | "story" | "script"): string {
+  const sourceBlock = source === "script" ? `\n\n## Source script prose\n${scriptProseBlock(story)}` : "";
+  return `Derive the Characters layer from the ${sourceLabel(source)} above${source === "script" ? " and the additional script prose below" : ""}.${sourceBlock}
+
+Produce a coherent cast of characters that plausibly anchors this project. ${
+    source === "script"
+      ? "List every character who speaks or is central to the action in the prose. Do NOT invent characters who do not appear."
+      : source === "story"
+      ? "Derive characters implied by the beat sheet — every named role plus any clearly-required unnamed roles (protagonist, antagonist, etc.)."
+      : "Invent a small but specific cast (3–6 characters) that would power this concept."
+  }
+
+For each character, fill every field with a one-sentence-or-two inference grounded in the source. Do not duplicate archetypes across characters unless the story requires it.
+
+Return STRICT JSON:
+{
+  "characters": [
+    {
+      "name": string,
+      "role": string,            // "protagonist", "antagonist", "foil", "mentor", etc.
+      "archetype": string,       // short label, 1–4 words
+      "backstory": string,       // 1–3 sentences
+      "motivations": string,     // 1 sentence
+      "flaws": string,           // 1 sentence; concrete, not humblebrags
+      "want": string,            // external, 1 sentence
+      "need": string,            // internal, 1 sentence
+      "voice": string,           // how they speak, 1 sentence
+      "arc": string,             // start → end, 1–2 sentences
+      "notes": string            // supplementary, 0–1 sentence (may be empty)
+    }
+  ]
+}
+
+No prose outside the JSON.`;
+}
+
+function syncPrompt_toStory(story: Story, source: "concept" | "characters" | "script"): string {
+  const c = getActiveConceptDraft(story);
+  const framework = c.settings.framework;
+  const isTV = story.projectType === "tv-show";
+  const sourceBlock = source === "script" ? `\n\n## Source script prose\n${scriptProseBlock(story)}` : "";
+
+  if (isTV) {
+    return `Derive the Story layer (beat sheet) for this TV project from the ${sourceLabel(source)} above.${sourceBlock}
+
+${source === "script" ? "Extract the beat structure implicit in the scene prose." : `Use the ${framework} framework.`} Return a single pilot episode's worth of beats (one episode).
+
+Return STRICT JSON:
+{
+  "beats": [
+    { "name": string, "summary": string, "purpose": string }
+  ]
+}
+
+Rules:
+- 8–15 beats.
+- Each "summary" is 1–2 sentences; each "purpose" is 1 sentence naming what the beat does for the audience.
+- No prose outside the JSON.`;
+  }
+
+  return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above.${sourceBlock}
+
+${source === "script" ? "Extract the beat structure implicit in the scene prose — one beat per narrative turn, not per scene." : `Use the ${framework} framework to produce the full beat sheet.`}
+
+Return STRICT JSON:
+{
+  "beats": [
+    { "name": string, "summary": string, "purpose": string }
+  ]
+}
+
+Rules:
+- Produce a complete ${framework === "save-the-cat" ? "15-beat" : "full"} structure for a feature unless the source indicates a different scope.
+- Each "summary" is 1–2 sentences; each "purpose" is 1 sentence.
+- No prose outside the JSON.`;
+}
+
+function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "story"): string {
+  const c = getActiveConceptDraft(story);
+  const genres = c.settings.genres?.join(", ") || "drama";
+  const isShort = story.projectType === "short";
+  const targetScenes =
+    source === "story"
+      ? "one scene per beat in the beat sheet above"
+      : isShort
+      ? "6–10 scenes"
+      : "14–22 scenes";
+
+  return `Write a complete ${isShort ? "short-film" : story.projectType === "tv-show" ? "pilot-episode" : "feature-length"} screenplay driven by the ${sourceLabel(source)} above.
+
+Produce ${targetScenes}. Match the genres "${genres}" and the tone on the brief.
+
+${source !== "story" ? "No beat sheet has been written yet, so synthesize coherent scene structure as you go. The user will back-fill the Story layer separately." : ""}
+
+Return STRICT JSON:
+{
+  "scenes": [
+    {
+      "heading": string,   // slugline, e.g. "INT. DINER - NIGHT"
+      "content": string    // screenplay-style prose for the scene: action lines + dialogue in industry format (CHARACTER in caps, dialogue below)
+    }
+  ]
+}
+
+Formatting rules inside each "content":
+- Action lines in present tense, concrete and sensory.
+- Dialogue cues as CHARACTER NAME on its own line, followed by the line.
+- No scene numbering; no "FADE IN/OUT" surrounding the scenes.
+- Keep each scene 100–400 words.
+
+No prose outside the JSON.`;
+}
+
+function syncPrompt_toConcept(story: Story, source: "characters" | "story" | "script"): string {
+  const sourceBlock = source === "script" ? `\n\n## Source script prose\n${scriptProseBlock(story)}` : "";
+  return `Derive a refreshed Concept layer from the ${sourceLabel(source)} above${source === "script" ? " and the script prose below" : ""}.${sourceBlock}
+
+The project's **title, format, and genres are fixed** — the user chose these at creation and they are NOT to be reconsidered. Do not include them in the output.
+
+Write concept content that accurately reflects what exists in the source material. Each field:
+- logline: 1–2 sentences, ≤40 words. Protagonist + inciting event + goal + conflict + stakes.
+- summary: 3–5 sentences, ~80 words. World → protagonist → inciting event → central tension → thematic undertow.
+- tone: short evocative phrase (2–6 words), e.g. "bone-dry deadpan", "neon-lit dread".
+- themes: 3–5 punchy noun phrases (1–3 words each).
+- endingTypes: 1 or 2 entries from: "happy" | "bittersweet" | "tragic" | "ambiguous" | "twist" — whichever best fits what the source suggests.
+
+Return STRICT JSON:
+{
+  "logline": string,
+  "summary": string,
+  "tone": string,
+  "themes": string[],
+  "endingTypes": ("happy" | "bittersweet" | "tragic" | "ambiguous" | "twist")[]
+}
+
+No prose outside the JSON.`;
 }

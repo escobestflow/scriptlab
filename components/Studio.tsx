@@ -14,7 +14,9 @@ import {
   saveProjectDraft, isProjectDraftDirty,
   isLayerChangedForTabDot, isConceptFieldDirty, ConceptField,
   getLayerSyncState, markLayerSynced,
+  isLayerDraftEmpty,
 } from "@/lib/story";
+import { syncLayers } from "@/lib/syncLayer";
 import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
@@ -90,6 +92,8 @@ export function Studio({
   const [charSheetCharId, setCharSheetCharId] = useState<string | null>(null);
   // TV show episode drill-in
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
+  // Update-Other-Layers tray: null = closed, otherwise the source layer driving the sync.
+  const [updateTraySource, setUpdateTraySource] = useState<LayerKey | null>(null);
 
   // Active layer drafts — where all editing happens
   const activeProjectDraft = getActiveProjectDraft(story);
@@ -548,6 +552,7 @@ export function Studio({
               showSuccess={showSuccess}
               onDismissSuccess={() => setShowSuccess(false)}
               autosaveEnabled={autosaveEnabled}
+              onOpenUpdateTray={setUpdateTraySource}
             />
           )}
           {section === "characters" && (
@@ -559,6 +564,7 @@ export function Studio({
               openNewCharacter={openNewCharacterSheet}
               openCharacter={openExistingCharacterSheet}
               autosaveEnabled={autosaveEnabled}
+              onOpenUpdateTray={setUpdateTraySource}
             />
           )}
           {section === "story" && (
@@ -578,6 +584,7 @@ export function Studio({
               busy={busy}
               syncState={syncState}
               autosaveEnabled={autosaveEnabled}
+              onOpenUpdateTray={setUpdateTraySource}
             />
           )}
           {section === "script" && (
@@ -588,6 +595,7 @@ export function Studio({
               run={run}
               busy={busy}
               autosaveEnabled={autosaveEnabled}
+              onOpenUpdateTray={setUpdateTraySource}
             />
           )}
         </div>
@@ -700,6 +708,15 @@ export function Studio({
           </>
         );
       })()}
+
+      {/* Cross-layer "Update Other Layers" tray */}
+      <LayerUpdateTray
+        source={updateTraySource}
+        story={story}
+        setStory={setStory}
+        setSection={setSection}
+        onClose={() => setUpdateTraySource(null)}
+      />
 
       {confirmDeleteDialog}
     </>
@@ -925,6 +942,190 @@ function LayerDraftPicker({
         </>
       )}
     </div>
+  );
+}
+
+/* ============================================ */
+/* =========== LAYER BAR (wrapper) ============ */
+/* ============================================ */
+//
+// Wraps <LayerDraftPicker> plus the right-aligned "Update Other Layers"
+// trigger. The trigger is only rendered when the source layer has
+// content (derived via isLayerDraftEmpty). An empty source has nothing
+// to derive from, so the button stays hidden rather than disabled.
+
+function LayerBar({
+  layer,
+  label,
+  story,
+  setStory,
+  autosaveEnabled = true,
+  onOpenUpdateTray,
+}: {
+  layer: LayerKey;
+  label: string;
+  story: Story;
+  setStory: (u: (s: Story) => Story) => void;
+  autosaveEnabled?: boolean;
+  onOpenUpdateTray: (source: LayerKey) => void;
+}) {
+  const hasSource = !isLayerDraftEmpty(story, layer);
+  return (
+    <div className="layer-bar">
+      <LayerDraftPicker
+        layer={layer}
+        label={label}
+        story={story}
+        setStory={setStory}
+        autosaveEnabled={autosaveEnabled}
+      />
+      {hasSource && (
+        <button
+          className="layer-update-trigger"
+          onClick={() => onOpenUpdateTray(layer)}
+          aria-label="Update other layers"
+        >
+          <span>Update Other Layers</span>
+          <img src="/caret-sm.svg" alt="" className="drafts-caret" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ============================================ */
+/* ========== LAYER UPDATE TRAY =============== */
+/* ============================================ */
+//
+// Bottom sheet with three checkboxes (the layers other than the source).
+// The primary "Update (N)" button commits a syncLayers() run, shows a
+// per-row spinner while the matching target is in-flight, closes the
+// sheet on completion, and auto-switches the app to the first checked
+// target in canonical order so the user lands on the most-upstream
+// result.
+
+const ORDER_KEYS: LayerKey[] = ["concept", "characters", "story", "script"];
+const LAYER_LABEL: Record<LayerKey, string> = {
+  concept: "Concept",
+  characters: "Characters",
+  story: "Story",
+  script: "Script",
+};
+
+function LayerUpdateTray({
+  source,
+  story,
+  setStory,
+  setSection,
+  onClose,
+}: {
+  source: LayerKey | null;
+  story: Story;
+  setStory: (u: (s: Story) => Story) => void;
+  setSection: (s: Section) => void;
+  onClose: () => void;
+}) {
+  const [checked, setChecked] = useState<Set<LayerKey>>(new Set());
+  const [running, setRunning] = useState(false);
+  const [currentTarget, setCurrentTarget] = useState<LayerKey | null>(null);
+
+  // Reset selection whenever the tray opens fresh for a new source.
+  useEffect(() => {
+    if (source) {
+      setChecked(new Set());
+      setRunning(false);
+      setCurrentTarget(null);
+    }
+  }, [source]);
+
+  const open = source !== null;
+  const targets: LayerKey[] = source
+    ? ORDER_KEYS.filter(k => k !== source)
+    : [];
+
+  const toggle = (k: LayerKey) => {
+    if (running) return;
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  };
+
+  const commit = async () => {
+    if (!source || checked.size === 0 || running) return;
+    const ordered = ORDER_KEYS.filter(k => checked.has(k));
+    const firstTarget = ordered[0];
+    setRunning(true);
+    try {
+      const next = await syncLayers(
+        story,
+        source,
+        ordered,
+        (t) => setCurrentTarget(t),
+      );
+      setStory(() => next);
+      setSection(firstTarget);
+      onClose();
+    } catch (e: any) {
+      // Preserve any partial writes that landed before the failure.
+      if (e?.partialStory) setStory(() => e.partialStory);
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") {
+        window.alert(`Update failed:\n\n${msg}`);
+      }
+      onClose();
+    } finally {
+      setRunning(false);
+      setCurrentTarget(null);
+    }
+  };
+
+  return (
+    <>
+      <div
+        className={`sheet-backdrop ${open ? "open" : ""}`}
+        onClick={running ? undefined : onClose}
+      />
+      <div className={`sheet layer-update-sheet ${open ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <div className="display heading" style={{ marginTop: 25, marginBottom: 8 }}>
+            Update Other Layers
+          </div>
+          <div className="caption" style={{ marginBottom: 20 }}>
+            Derive the checked layers from your current {source ? LAYER_LABEL[source] : ""} draft.
+          </div>
+
+          {targets.map(t => (
+            <label key={t} className="layer-update-row">
+              <input
+                type="checkbox"
+                checked={checked.has(t)}
+                onChange={() => toggle(t)}
+                disabled={running}
+              />
+              <span className="layer-update-row-label">{LAYER_LABEL[t]}</span>
+              {running && currentTarget === t && (
+                <span className="layer-update-row-spinner" aria-hidden="true" />
+              )}
+            </label>
+          ))}
+
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            onClick={commit}
+            disabled={checked.size === 0 || running}
+            style={{ marginTop: 20 }}
+          >
+            {running ? "Updating…" : `Update (${checked.size})`}
+          </Button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1234,12 +1435,14 @@ function ConceptTab({
   showSuccess,
   onDismissSuccess,
   autosaveEnabled = true,
+  onOpenUpdateTray,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   showSuccess: boolean;
   onDismissSuccess: () => void;
   autosaveEnabled?: boolean;
+  onOpenUpdateTray: (source: LayerKey) => void;
 }) {
   const d = getActiveConceptDraft(story);
   const [openAttr, setOpenAttr] = useState<string | null>(null);
@@ -1368,7 +1571,7 @@ function ConceptTab({
     <>
       {showSuccess && <SuccessBanner onDismiss={onDismissSuccess} />}
 
-      <LayerDraftPicker layer="concept" label="Concept" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
+      <LayerBar layer="concept" label="Concept" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
       {/* Format */}
       <AttrRow
@@ -1755,6 +1958,7 @@ function CharactersTab({
   openNewCharacter,
   openCharacter,
   autosaveEnabled = true,
+  onOpenUpdateTray,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -1763,6 +1967,7 @@ function CharactersTab({
   openNewCharacter: () => void;
   openCharacter: (id: string) => void;
   autosaveEnabled?: boolean;
+  onOpenUpdateTray: (source: LayerKey) => void;
 }) {
   const d = getActiveCharactersDraft(story);
 
@@ -1777,7 +1982,7 @@ function CharactersTab({
 
   return (
     <>
-      <LayerDraftPicker layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
+      <LayerBar layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
       {/* Primary "+ Add character" lives at the top of the list. */}
       <Button
@@ -2140,6 +2345,7 @@ function StoryTab({
   beats, moments, addBeat, updateBeat, moveBeat, removeBeat,
   unlinkMoment, openMomentPicker, openBeatTray, run, busy, syncState,
   autosaveEnabled = true,
+  onOpenUpdateTray,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -2156,6 +2362,7 @@ function StoryTab({
   busy: boolean;
   syncState: LayerSyncState;
   autosaveEnabled?: boolean;
+  onOpenUpdateTray: (source: LayerKey) => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
@@ -2182,7 +2389,7 @@ function StoryTab({
 
   return (
     <>
-      <LayerDraftPicker layer="story" label="Story" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
+      <LayerBar layer="story" label="Story" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {beats.length === 0 && (
@@ -2409,6 +2616,7 @@ function ScriptTab({
   run,
   busy,
   autosaveEnabled = true,
+  onOpenUpdateTray,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -2416,6 +2624,7 @@ function ScriptTab({
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
   autosaveEnabled?: boolean;
+  onOpenUpdateTray: (source: LayerKey) => void;
 }) {
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
@@ -2433,7 +2642,7 @@ function ScriptTab({
 
   return (
     <>
-      <LayerDraftPicker layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} />
+      <LayerBar layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
       {/* Out-of-sync banner — only after a script has been produced */}
       {isOutOfSync && (

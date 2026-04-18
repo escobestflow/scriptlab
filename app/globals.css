@@ -2774,3 +2774,120 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
 .speak-btn-spinner { animation: speakBtnSpin 900ms linear infinite; }
 @keyframes speakBtnSpin { to { transform: rotate(360deg); } }
 
+/* ============================================ */
+/* ====== LAYER BAR + UPDATE-OTHERS ============ */
+/* ============================================ */
+/* `.layer-bar` is the sticky row that wraps the draft picker plus the
+   "Update Other Layers" trigger. Reuses the draft-bar sticky behavior
+   of `.layer-draft-picker` but drops its horizontal padding so the
+   picker + trigger align to the same bar edges. */
+.layer-bar {
+  position: sticky;
+  top: var(--draft-picker-top, 120px);
+  z-index: 9;
+  margin: -1px -22px 14px;
+  padding: 10px 20px 9px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  background-image: url('/draft-bar-bg.svg');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+/* When nested in the bar, the picker drops its own sticky + background
+   — the bar handles that now. */
+.layer-bar .layer-draft-picker {
+  position: static;
+  top: auto;
+  margin: 0;
+  padding: 0;
+  background: none;
+  min-height: 0;
+  z-index: auto;
+  flex: 0 0 auto;
+}
+
+.layer-update-trigger {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Lato', -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  transition: opacity 140ms var(--ease);
+}
+.layer-update-trigger:active { opacity: 0.45; }
+.layer-update-trigger:disabled { opacity: 0.4; cursor: default; }
+.layer-update-trigger .drafts-caret {
+  width: 9px; height: 6px;
+  margin-left: 2px;
+  opacity: 0.55;
+}
+.layer-update-trigger.is-error {
+  color: #c62828;
+  animation: layerUpdateErrorPulse 400ms ease-in-out 2;
+}
+@keyframes layerUpdateErrorPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+
+/* Narrow-screen label truncation — keep the trigger from pushing out. */
+@media (max-width: 360px) {
+  .layer-update-trigger > span:not(.drafts-caret) {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* ── Update-Other-Layers tray ── */
+.layer-update-sheet .sheet-body {
+  padding: 0 22px 24px;
+}
+.layer-update-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 4px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.layer-update-row:last-of-type { border-bottom: none; }
+.layer-update-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--ink);
+}
+.layer-update-row input[type="checkbox"]:disabled { cursor: default; }
+.layer-update-row-label {
+  flex: 1;
+  font-family: 'Lato', -apple-system, system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.layer-update-row-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--ink-ghost);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: speakBtnSpin 900ms linear infinite;
+}
+
