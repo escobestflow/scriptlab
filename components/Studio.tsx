@@ -1852,28 +1852,22 @@ function ConceptTab({
       </AttrRow>
 
       {/* Writer Style — roster of famous screenwriters, multi-select via
-          a fly-up sheet with a search filter. */}
-      <AttrRow
-        label="Writer Style"
-        values={d.settings.writerStyles.length > 0 ? d.settings.writerStyles.map(w => w.toUpperCase()) : undefined}
-        placeholder="Pick writers you want to echo"
-        expanded={openAttr === "writers"}
-        onToggle={() => toggle("writers")}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {d.settings.writerStyles.length > 0 && (
-            <div className="chip-row">
-              {d.settings.writerStyles.map(w => (
-                <Selector
-                  key={w}
-                  selected
-                  onClick={() => toggleWriter(w)}
-                >
-                  {w}
-                </Selector>
-              ))}
-            </div>
-          )}
+          a fly-up sheet with a search filter. Rendered as a non-collapsing
+          row: selected writers show inline as pills next to the label, and
+          the Select/Edit button is always exposed below (no caret, no
+          duplicate chip list). */}
+      <div className="attr-row">
+        <div className="attr-row-header attr-row-header-static">
+          <span className="attr-label">Writer Style</span>
+          <div className="attr-values">
+            {d.settings.writerStyles.length > 0
+              ? d.settings.writerStyles.map(w => (
+                  <span key={w} className="attr-pill">{w.toUpperCase()}</span>
+                ))
+              : <span className="attr-placeholder">Pick writers you want to echo</span>}
+          </div>
+        </div>
+        <div className="attr-row-body">
           <Button
             variant="secondary"
             size="lg"
@@ -1883,7 +1877,7 @@ function ConceptTab({
             {d.settings.writerStyles.length > 0 ? "Edit writers" : "Select writers"}
           </Button>
         </div>
-      </AttrRow>
+      </div>
 
       {/* Title */}
       <TextAttrRow
