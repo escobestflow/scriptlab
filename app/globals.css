@@ -1160,15 +1160,15 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
    Uses draft-bar-bg.svg as a fully-opaque gradient background. */
 .layer-draft-picker {
   position: sticky;
-  /* Top offset matches the pinned header's bottom (set at runtime via JS)
-     plus a 6px gap so the picker sits clearly below the tab bar. */
-  top: calc(var(--draft-picker-top, 120px) + 6px);
+  /* Top offset matches the pinned header's bottom (set at runtime via JS).
+     Bar sits 10px higher than the previous +6px offset for a tighter
+     stack against the tab bar. */
+  top: calc(var(--draft-picker-top, 120px) - 4px);
   z-index: 9;
   /* Extend horizontally to page edges (tab body has 22px horizontal padding).
-     margin-top: 5px gives a 6px visual gap from the tab bar in flow layout
-     (previously -1px, an intentional seam-prevention overlap — no longer
-     needed once a deliberate gap is part of the design). */
-  margin: 5px -22px 14px;
+     margin-top pulled up 10px to match the sticky offset so the bar
+     lands in the same spot whether pinned or in flow. */
+  margin: -5px -22px 14px;
   padding: 10px 20px 9px;
   display: flex;
   justify-content: space-between;
@@ -3161,9 +3161,11 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
    picker + trigger align to the same bar edges. */
 .layer-bar {
   position: sticky;
-  top: calc(var(--draft-picker-top, 120px) + 6px);
+  /* Matches .layer-draft-picker: sticky 10px higher than the prior
+     +6px offset to tighten the stack below the tab bar. */
+  top: calc(var(--draft-picker-top, 120px) - 4px);
   z-index: 9;
-  margin: 5px -22px 14px;
+  margin: -5px -22px 14px;
   padding: 10px 20px 9px;
   display: flex;
   align-items: center;
