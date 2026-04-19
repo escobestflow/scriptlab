@@ -1170,8 +1170,15 @@ function IdeaFields({
 /* ============================================ */
 
 // Used inside the View Idea sheet. Delegates everything to the shared
-// IdeaFields component (tags now live inside IdeaFields). All edits
-// stream through onUpdate immediately (auto-save on change).
+// IdeaFields component (tags now live inside IdeaFields).
+//
+// Save model: explicit. Local state holds the in-progress edits; the
+// Save button commits them to the parent via onUpdate only when the
+// user taps it. The button is disabled (gray) while the local state
+// matches the incoming moment, and only lights up once something has
+// actually changed. Closing the sheet without saving discards the
+// in-progress edits — consistent with every other explicit-save sheet
+// in the app.
 function MomentEditForm({
   moment, onUpdate,
 }: {
@@ -1182,16 +1189,40 @@ function MomentEditForm({
   const [type, setType] = useState(moment.type);
   const [tags, setTags] = useState<string[]>(moment.tags);
 
+  // If the user opens a different idea without closing the sheet in
+  // between (or the parent pushes a fresh moment after Save), re-seed
+  // local state so the form matches what's on screen.
+  useEffect(() => {
+    setText(moment.text);
+    setType(moment.type);
+    setTags(moment.tags);
+  }, [moment.id, moment.text, moment.type, moment.tags]);
+
+  const tagsDiffer =
+    tags.length !== moment.tags.length ||
+    tags.some((t, i) => t !== moment.tags[i]);
+  const isDirty = text !== moment.text || type !== moment.type || tagsDiffer;
+
   return (
     <div className="stack">
       <IdeaFields
         text={text}
-        setText={(v) => { setText(v); onUpdate({ text: v }); }}
+        setText={setText}
         type={type}
-        setType={(t) => { setType(t); onUpdate({ type: t }); }}
+        setType={setType}
         tags={tags}
-        setTags={(next) => { setTags(next); onUpdate({ tags: next }); }}
+        setTags={setTags}
       />
+      <Button
+        variant="primary"
+        size="lg"
+        block
+        onClick={() => { if (isDirty) onUpdate({ text, type, tags }); }}
+        disabled={!isDirty}
+        style={{ marginTop: 14 }}
+      >
+        Save
+      </Button>
     </div>
   );
 }
