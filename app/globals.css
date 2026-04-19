@@ -52,15 +52,65 @@
      (e.g. a concept attr row with a single value) from collapsing below
      a tappable 60px target. */
   --card-min-h: 60px;
+
+  /* Default body background. Overridden per-theme below so dark mode can
+     swap the paper-white backdrop for a deep neutral. Declared here (on
+     :root) rather than on `body` so the [data-theme="dark"] selector on
+     <html> can override it without a selector-specificity fight. */
+  --body-bg: url('/bg.svg') no-repeat center center / cover fixed;
+
+  color-scheme: light;
+}
+
+/* ── Dark theme overrides ─────────────────────────────────────────────
+   Engaged via <html data-theme="dark">, which the pre-hydration script
+   in app/layout.tsx sets synchronously before first paint. Every color
+   token from :root is re-declared with a dark equivalent; geometry/
+   motion tokens are inherited unchanged. Any surface that uses the
+   variables picks this up automatically — surfaces with hardcoded
+   colors may still read light and will be reported by the user for
+   follow-up. */
+html[data-theme="dark"] {
+  --bg: #0a0a0b;
+  --bg-secondary: #151517;
+  --surface: #17171a;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --border-ddd: #2a2a2e;
+
+  --ink: #f5f5f7;
+  --ink-soft: #c7c7cc;
+  --ink-tab-inactive: #8e8e93;
+  --ink-mute: #8e8e93;
+  --ink-ghost: #48484a;
+
+  --record: #FF453A;
+  --progress: #f5f5f7;
+
+  --sync: #f5a623;
+  --sync-bg: #2a2117;
+  --sync-border: #4a3a1e;
+
+  /* Shadows read as a subtle ring of darker-than-surface on a dark bg
+     rather than light-scattering ambient. Keep the same shape; just
+     deepen the rgba so the card still registers as elevated. */
+  --card-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 8px 22px rgba(0, 0, 0, 0.55);
+
+  /* Drop the paper bg.svg for a solid near-black so the whole app
+     reads as a single dark surface. */
+  --body-bg: #0a0a0b;
+
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior-y: none; }
 
 body {
-  background: url('/bg.svg') no-repeat center center;
-  background-size: cover;
-  background-attachment: fixed;
+  background: var(--body-bg);
   color: var(--ink);
   font-family: 'Lato', -apple-system, system-ui, sans-serif;
   font-weight: 400;

@@ -13,7 +13,7 @@ import SplashLoader from "@/components/SplashLoader";
 import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
 import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
-import { useAutosavePref } from "@/lib/prefs";
+import { useAutosavePref, useDarkModePref } from "@/lib/prefs";
 import { Button, Input, Textarea, Selector } from "@/components/ui";
 
 type View =
@@ -51,6 +51,7 @@ export default function Page() {
   const [mainTab, setMainTab] = useState<MainTab>("projects");
   const [menuOpen, setMenuOpen] = useState(false);
   const [autosaveEnabled, setAutosaveEnabled] = useAutosavePref();
+  const [darkMode, setDarkMode] = useDarkModePref();
   const [recording, setRecording] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
@@ -576,6 +577,37 @@ export default function Page() {
               </button>
             </div>
           )}
+
+          {/* Dark mode toggle — sits above Autosave in the utility stack.
+              Same row pattern as Autosave. Writes through useDarkModePref,
+              which flips <html data-theme> to engage globals.css overrides. */}
+          <div
+            className="menu-panel-utility"
+            style={{ ["--d" as any]: "240ms" }}
+            onClick={() => setDarkMode(!darkMode)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setDarkMode(!darkMode);
+              }
+            }}
+          >
+            <span className="label">Dark mode</span>
+            <button
+              type="button"
+              className={`toggle-switch toggle-switch-dark ${darkMode ? "on" : ""}`}
+              aria-label="Toggle dark mode"
+              aria-pressed={darkMode}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDarkMode(!darkMode);
+              }}
+            >
+              <span className="toggle-switch-knob" />
+            </button>
+          </div>
 
           {/* Deprioritized autosave — small utility row, no caption.
               Its top border is the divider that sits below the email row. */}
