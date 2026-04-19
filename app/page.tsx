@@ -57,6 +57,16 @@ export default function Page() {
   const [liveTranscript, setLiveTranscript] = useState("");
   const [editingMoment, setEditingMoment] = useState<Moment | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
+  // Email-send feedback — independent of the "Idea Added" toast so
+  // sending doesn't clobber a recent moment-capture confirmation, and
+  // vice versa. `null` = hidden; any non-empty string shows the
+  // message. Cleared after 3.5s so "Sent!" lingers long enough to
+  // read but doesn't persist.
+  const [emailToast, setEmailToast] = useState<string | null>(null);
+  // `true` while /api/send-email is in flight. Gates the Studio
+  // top-nav envelope icon and the hamburger menu item so the user
+  // can't double-fire a send.
+  const [emailBusy, setEmailBusy] = useState(false);
   // Splash flag — true once the animated splash has fully dismissed.
   // Persisted to sessionStorage so revisiting the root route mid-session
   // doesn't replay the 6.59s intro. Cleared when the tab closes.
@@ -328,6 +338,44 @@ export default function Page() {
     setCreateDraft(prev => prev ? u(prev) : prev);
   }
 
+  // ── Email the project bundle ──
+  // Single path used from two triggers (Studio top-nav + hamburger
+  // menu). The server renders the HTML body, .fountain, and .json
+  // attachments; the client just passes the Story + the signed-in
+  // user's email address. Errors surface via the emailToast banner.
+  async function sendProjectBundleEmail(story: Story) {
+    if (!user?.email) {
+      setEmailToast("You need to be signed in to email projects.");
+      setTimeout(() => setEmailToast(null), 3500);
+      return;
+    }
+    if (emailBusy) return;
+    setEmailBusy(true);
+    setEmailToast("Sending…");
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "project_bundle",
+          story,
+          toEmail: user.email,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      setEmailToast(`Sent to ${user.email}`);
+    } catch (err: any) {
+      setEmailToast(`Failed to send: ${err?.message ?? String(err)}`);
+    } finally {
+      setEmailBusy(false);
+      setTimeout(() => setEmailToast(null), 3500);
+    }
+  }
+
   /* ── Content area (changes with view, tab bar stays) ── */
   function renderContent() {
     if (view.kind === "studio" && studioProject) {
@@ -350,6 +398,8 @@ export default function Page() {
             setView({ kind: "main" });
           }}
           autosaveEnabled={autosaveEnabled}
+          onEmailProject={() => sendProjectBundleEmail(studioProject)}
+          emailProjectBusy={emailBusy}
         />
       );
     }
@@ -447,21 +497,49 @@ export default function Page() {
       <div className={`menu-panel ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}>
         <div className="menu-panel-inner">
           <div className="menu-panel-list">
-            {[
-              { icon: <IconZap />,    label: "AI Connections" },
-              { icon: <IconExport />, label: "Export Scripts" },
-            ].map((item, i) => (
-              <button
-                key={item.label}
-                className="menu-panel-item"
-                style={{ ["--d" as any]: `${60 + i * 50}ms` }}
-                onClick={() => setMenuOpen(false)}
-              >
-                {item.icon}
-                <span className="label">{item.label}</span>
-                <span className="arrow">›</span>
-              </button>
-            ))}
+            {/* Static items + one contextual item (email-this-project) that
+                only renders while a project is open. The contextual slot
+                keeps the menu's meaning stable across the app — it adapts
+                to what's in front of the user. */}
+            {(() => {
+              interface MenuItem {
+                icon: React.ReactNode;
+                label: string;
+                onClick: () => void;
+                disabled?: boolean;
+              }
+              const items: MenuItem[] = [
+                {
+                  icon: <IconZap />,
+                  label: "AI Connections",
+                  onClick: () => setMenuOpen(false),
+                },
+              ];
+              if (view.kind === "studio" && studioProject) {
+                items.push({
+                  icon: <IconExport />,
+                  label: emailBusy ? "Sending…" : "Email me this project",
+                  disabled: emailBusy,
+                  onClick: () => {
+                    setMenuOpen(false);
+                    void sendProjectBundleEmail(studioProject);
+                  },
+                });
+              }
+              return items.map((item, i) => (
+                <button
+                  key={item.label}
+                  className="menu-panel-item"
+                  style={{ ["--d" as any]: `${60 + i * 50}ms`, opacity: item.disabled ? 0.55 : 1 }}
+                  onClick={item.onClick}
+                  disabled={item.disabled}
+                >
+                  {item.icon}
+                  <span className="label">{item.label}</span>
+                  <span className="arrow">›</span>
+                </button>
+              ));
+            })()}
           </div>
 
           <div className="menu-panel-spacer" />
@@ -760,6 +838,12 @@ export default function Page() {
 
       {/* Success toast */}
       <div className={`toast ${toastVisible ? "show" : ""}`}>Idea Added</div>
+      {/* Email-send toast — sits on the same CSS track as the idea toast
+          but is keyed on its own state so they can't stomp each other.
+          Content is dynamic ("Sending…" / "Sent to …" / "Failed to send: …"). */}
+      <div className={`toast ${emailToast ? "show" : ""}`} style={{ bottom: 78 }}>
+        {emailToast}
+      </div>
     </div>
    </WriterProfileContext.Provider>
   );

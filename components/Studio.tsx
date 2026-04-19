@@ -38,6 +38,8 @@ export function Studio({
   onCreateProjectFromDraft,
   onDeleteProject,
   autosaveEnabled = true,
+  onEmailProject,
+  emailProjectBusy = false,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -47,6 +49,11 @@ export function Studio({
   onCreateProjectFromDraft?: (newStory: Story) => void;
   onDeleteProject?: () => void;
   autosaveEnabled?: boolean;
+  /** Fires when the user taps the email-icon in the top nav. The
+   *  parent (app/page.tsx) owns the fetch + toast; Studio just
+   *  invokes the callback and shows a pulsing state via `busy`. */
+  onEmailProject?: () => void;
+  emailProjectBusy?: boolean;
 }) {
   const [section, setSection] = useState<Section>("concept");
   // Writer-profile capture API — used to attach the profile to every AI
@@ -521,6 +528,24 @@ export function Studio({
           <span>BACK</span>
         </button>
         <div style={{ flex: 1 }} />
+        {/* Email this project — sends a bundle (HTML body + .fountain
+            + .json attachments) to the signed-in user's address. The
+            parent owns the fetch; we just fire the callback and reflect
+            the busy state via the envelope's opacity. */}
+        {onEmailProject && (
+          <button
+            className="project-header-btn"
+            onClick={() => { if (!emailProjectBusy) onEmailProject(); }}
+            aria-label={emailProjectBusy ? "Sending email…" : "Email me this project"}
+            disabled={emailProjectBusy}
+            style={{ opacity: emailProjectBusy ? 0.55 : 1 }}
+          >
+            <svg viewBox="0 0 24 24" style={{ width: 17, height: 17, stroke: "currentColor", strokeWidth: 1.8, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" }}>
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <path d="M3 7l9 6 9-6" />
+            </svg>
+          </button>
+        )}
         <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
           <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
         </button>
