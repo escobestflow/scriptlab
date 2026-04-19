@@ -93,27 +93,71 @@ async function callGenerate(
 
 // ── JSON parsing ───────────────────────────────────────────────────
 // Models return strict JSON per our prompts, but in practice sometimes
-// wrap in ```json fences or add a stray trailing newline. Be lenient.
+// wrap in ```json fences, add prose before/after, or truncate. Be lenient:
+//   1. Strip ```json fences.
+//   2. Locate the first `{` and walk balanced braces (string-aware) to
+//      find its matching `}` — robust to trailing prose.
+//   3. If the balance never closes (stream truncation), try the tail up
+//      to the last `}` we saw.
+//   4. On failure, include a preview of the raw output so the user has
+//      something actionable to report.
 
 function extractJson(text: string): any {
-  const trimmed = text.trim();
-  // Strip code fences if present.
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
-  const body = fenced ? fenced[1] : trimmed;
-  // If there's leading prose before an object, grab from the first `{`.
+  let body = text.trim();
+  // Strip surrounding code fences.
+  const fenced = body.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  if (fenced) body = fenced[1].trim();
+
   const firstBrace = body.indexOf("{");
-  const candidate = firstBrace > 0 ? body.slice(firstBrace) : body;
+  if (firstBrace === -1) {
+    throw new Error(
+      `Sync result was not valid JSON: no '{' found. Response preview: ${snippet(body)}`
+    );
+  }
+
+  // Walk from the first `{`, tracking nesting and string state, to find
+  // the matching `}`. This lets us isolate the JSON object even when the
+  // model appended a stray trailing comment or sign-off.
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  let endIdx = -1;
+  for (let i = firstBrace; i < body.length; i++) {
+    const ch = body[i];
+    if (escape) { escape = false; continue; }
+    if (inString) {
+      if (ch === "\\") escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) { endIdx = i; break; }
+    }
+  }
+
+  // If the walk never closed, fall back to the last `}` we saw in the
+  // body — better to try parsing a truncated object than bail outright.
+  if (endIdx === -1) {
+    const lastBrace = body.lastIndexOf("}");
+    endIdx = lastBrace > firstBrace ? lastBrace : body.length - 1;
+  }
+
+  const candidate = body.slice(firstBrace, endIdx + 1);
   try {
     return JSON.parse(candidate);
   } catch (e) {
-    // Last resort: try to match the outermost balanced `{...}` block.
-    const lastBrace = candidate.lastIndexOf("}");
-    if (lastBrace > 0) {
-      try { return JSON.parse(candidate.slice(0, lastBrace + 1)); }
-      catch { /* fall through */ }
-    }
-    throw new Error(`Sync result was not valid JSON: ${(e as Error).message}`);
+    throw new Error(
+      `Sync result was not valid JSON: ${(e as Error).message}. Response preview: ${snippet(body)}`
+    );
   }
+}
+
+function snippet(s: string): string {
+  const clean = s.replace(/\s+/g, " ").trim();
+  return clean.length > 240 ? `${clean.slice(0, 240)}…` : clean;
 }
 
 // ── Payload → LayerContent normalization ───────────────────────────

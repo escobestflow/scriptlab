@@ -26,6 +26,26 @@ export async function POST(req: Request) {
     const model = modelForAction(action.type);
     const { system, userMessage } = buildPrompt(story, action, profile);
 
+    // Every `sync_*_to_*` action asks the model for strict JSON. Haiku
+    // occasionally ignores that instruction and opens with prose like
+    // "I'll extract the characters…". The reliable fix is Anthropic's
+    // prefill feature: seed the assistant turn with `{` so the model
+    // is literally forced to continue from inside a JSON object. We
+    // also emit that same `{` as the first streamed text chunk so the
+    // client reconstructs the complete JSON string.
+    const wantsJsonPrefill = action.type.startsWith("sync_");
+    const JSON_PREFILL = "{";
+
+    // Sync extractions can be large — a full-feature script's cast plus
+    // every character field can exceed 4k tokens. Give sync ops more
+    // headroom; keep everything else at the original default.
+    const maxTokens = wantsJsonPrefill ? 8192 : 4096;
+
+    const messages: any[] = [{ role: "user", content: userMessage }];
+    if (wantsJsonPrefill) {
+      messages.push({ role: "assistant", content: JSON_PREFILL });
+    }
+
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -34,12 +54,21 @@ export async function POST(req: Request) {
         let textOut = "";
         let finalUsage: any = null;
 
+        // Emit the prefill up-front so the client's concatenated text is
+        // a complete JSON payload, not a headless continuation.
+        if (wantsJsonPrefill) {
+          textOut += JSON_PREFILL;
+          controller.enqueue(encoder.encode(
+            JSON.stringify({ type: "text", value: JSON_PREFILL }) + "\n"
+          ));
+        }
+
         try {
           const response = await client.messages.stream({
             model,
-            max_tokens: 4096,
+            max_tokens: maxTokens,
             system: system as any,
-            messages: [{ role: "user", content: userMessage }],
+            messages,
           });
 
           for await (const event of response) {
