@@ -18,7 +18,13 @@ import {
   applySyncResult,
 } from "@/lib/story";
 import { syncLayers } from "@/lib/syncLayer";
-import { extractTextFromFile, splitScriptIntoScenes, IMPORT_ACCEPT } from "@/lib/scriptImport";
+import {
+  extractTextFromFile,
+  splitScriptIntoScenes,
+  extractCharactersFromScenes,
+  extractBeatsFromScenes,
+  IMPORT_ACCEPT,
+} from "@/lib/scriptImport";
 import { parseScreenplay } from "@/lib/scriptParse";
 import { subGenresFor, SUB_GENRES_BY_ID } from "@/lib/subGenres";
 import { REFERENCE_ASPECTS, WRITER_STYLES } from "@/lib/references";
@@ -306,43 +312,76 @@ export function Studio({
   };
 
   // Script-import pipeline. Bottom-of-Script-tab CTA accepts a .txt or
-  // .pdf screenplay, extracts plaintext client-side, splits into scenes
-  // on INT./EXT. headings, drops them into the Script layer (overwriting
-  // the active draft if it's empty, otherwise branching to a new draft),
-  // then runs `syncLayers(script → [concept, characters, story])` to
-  // backfill the other three layers from the imported script. Auto-
-  // switches to Concept on success so the user lands on the most
-  // upstream derived layer first.
+  // .pdf screenplay, extracts plaintext client-side, then populates
+  // three layers DETERMINISTICALLY — no AI interpretation:
+  //
+  //   Script layer — scenes split on INT./EXT. headings, each linked
+  //                  by beatId to its matching beat (below).
+  //   Story layer  — one beat per scene, status="written",
+  //                  sceneContent = exact scene prose (copy-paste).
+  //                  Beat names are derived from scene headings
+  //                  ("INT. TACO STAND — DAY" → "Taco Stand").
+  //   Characters   — unique speaking-character names extracted verbatim
+  //                  from dialogue cues, preserving first-appearance
+  //                  order. Other fields left empty for the user.
+  //
+  // Concept is NOT touched on import — the uploaded script doesn't
+  // dictate a logline or tone. The user can sync Concept manually
+  // via "Update Other Layers" from the Script tab if they want that.
+  //
+  // Each layer's write uses `applySyncResult(next, content, story)`
+  // with `story` (pre-import snapshot) as the empty-check, so the
+  // existing "empty → overwrite in place, non-empty → new draft"
+  // rule applies independently to each of the three layers.
+  //
+  // Lands the user on the Script tab afterward so they immediately
+  // see the result: every beat in "written" state with its scene
+  // content already populated.
   async function importScriptFromFile(file: File) {
     if (importing) return;
     setImporting(true);
     setImportStep(null);
     try {
       const text = await extractTextFromFile(file);
-      const scenes = splitScriptIntoScenes(text);
-      if (scenes.length === 0) {
+      const rawScenes = splitScriptIntoScenes(text);
+      if (rawScenes.length === 0) {
         throw new Error("No scene content found in this file.");
       }
-      // Write the imported scenes into the Script layer first. Use
-      // applySyncResult so an empty active Script draft is overwritten
-      // in place and a non-empty one branches to a fresh draft — same
-      // "preserve prior work" rule the sync orchestrator uses.
-      let next = applySyncResult(story, { kind: "script", scenes });
-      // Now derive Concept / Characters / Story from the just-written
-      // script. syncLayers drives from the evolving story so these
-      // actually see the imported scenes as source material.
-      next = await syncLayers(
-        next,
-        "script",
-        ["concept", "characters", "story"],
-        t => setImportStep(t),
-        profile,
-      );
+
+      // Deterministic extraction — all three layers built client-side
+      // from the file contents, no LLM involved.
+      const characters = extractCharactersFromScenes(rawScenes);
+      const { beats, scenes: linkedScenes } = extractBeatsFromScenes(rawScenes);
+
+      // Apply each layer against the pre-import `story` so the empty
+      // check looks at the user's state BEFORE import — exactly the
+      // same rule syncLayers uses.
+      let next = story;
+
+      setImportStep("script");
+      next = applySyncResult(next, { kind: "script", scenes: linkedScenes }, story);
+
+      setImportStep("characters");
+      next = applySyncResult(next, { kind: "characters", characters }, story);
+
+      setImportStep("story");
+      if (story.projectType === "tv-show") {
+        // TV projects keep beats on episodes, not at the top level.
+        // Put the entire imported script into a single Episode 1 —
+        // the user can rename/split later.
+        const episodeId = `ep_${Math.random().toString(36).slice(2, 10)}`;
+        next = applySyncResult(next, {
+          kind: "story",
+          beats: [],
+          episodes: [{ id: episodeId, title: "Episode 1", number: 1, beats }],
+        }, story);
+      } else {
+        next = applySyncResult(next, { kind: "story", beats }, story);
+      }
+
       setStory(() => next);
-      setSection("concept");
+      setSection("script");
     } catch (e: any) {
-      // Preserve any partial writes (e.g. script landed, then concept sync failed).
-      if (e?.partialStory) setStory(() => e.partialStory);
       const msg = e instanceof Error ? e.message : String(e);
       if (typeof window !== "undefined") {
         window.alert(`Script import failed:\n\n${msg}`);
@@ -3279,11 +3318,11 @@ function ScriptTab({
   onOpenUpdateTray: (source: LayerKey) => void;
   /** Open the read-through sheet — Studio owns state, ScriptTab just triggers. */
   onOpenReadThrough: () => void;
-  /** Import a .txt/.pdf screenplay; runs extract → split → syncLayers. */
+  /** Import a .txt/.pdf screenplay; deterministically populates
+   *  Script + Characters + Story layers from the file contents. */
   onImportScript: (file: File) => Promise<void>;
   importing: boolean;
-  /** Which derived layer is currently being synced (post-write). Drives
-   *  the progress label inside the import card. */
+  /** Which layer is currently being written (drives progress label). */
   importStep: LayerKey | null;
 }) {
   const d = getActiveScriptDraft(story);
@@ -3406,9 +3445,11 @@ function ScriptTab({
           Lives at the bottom of the Script tab because that's where
           a user who arrived here and realized "I already have a
           screenplay, let me just upload it" ends up looking. The card
-          does a lot under the hood: parse the file, split scenes,
-          write them into Script, then derive Concept + Characters +
-          Story via syncLayers. A single CTA for the whole pipeline. */}
+          parses the file, splits scenes on INT./EXT. headings, and
+          deterministically populates three layers: Script (scenes),
+          Story (one beat per scene, status=written, sceneContent
+          copy-pasted), and Characters (verbatim dialogue cues). No
+          AI interpretation — 100% fidelity to the uploaded file. */}
       <ImportScriptCard
         onImport={onImportScript}
         importing={importing}
@@ -3447,7 +3488,7 @@ function ImportScriptCard({
 
   const label = importing
     ? (importStep
-        ? `Generating ${LAYER_LABEL[importStep]}…`
+        ? `Writing ${LAYER_LABEL[importStep]}…`
         : "Reading file…")
     : "Import a script";
 
@@ -3455,9 +3496,9 @@ function ImportScriptCard({
     <div className="card import-script-card" style={{ marginTop: 16 }}>
       <span className="eyebrow">Have a finished script?</span>
       <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
-        Upload a .txt or .pdf screenplay. Unfold will read it, split it
-        into scenes, and auto-populate your Concept, Characters, and
-        Story layers from what's in the script.
+        Upload a .txt or .pdf screenplay. Unfold will split it into
+        scenes and populate your Script, Story beats, and Characters
+        exactly as written — no interpretation, no rewriting.
       </div>
       <input
         ref={inputRef}
@@ -3478,7 +3519,7 @@ function ImportScriptCard({
       </Button>
       {importing && (
         <div className="caption" style={{ marginTop: 10, textAlign: "center" }}>
-          This can take a minute for a feature-length script.
+          Reading your script and splitting it into scenes…
         </div>
       )}
     </div>

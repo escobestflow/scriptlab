@@ -15,7 +15,8 @@
 // `pdfjs-dist`, so the server-side bundle isn't weighed down. The worker
 // script is pinned to the same version as the package we installed.
 
-import type { Scene } from "./story";
+import type { Beat, Character, Scene } from "./story";
+import { parseScreenplay } from "./scriptParse";
 
 /** Accepted by the file-picker UI. */
 export const IMPORT_ACCEPT = ".txt,.pdf,text/plain,application/pdf";
@@ -173,4 +174,122 @@ function trimBlank(lines: string[]): string[] {
 
 function sceneId(): string {
   return `sc_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// ── Deterministic extractors (no AI) ──────────────────────────────
+//
+// When a user uploads a finished screenplay, the import must be a
+// FAITHFUL copy of what's in the file — not an AI interpretation.
+// Character names are taken verbatim from dialogue cues; beats are
+// one-per-scene with scene content copy-pasted into beat.sceneContent
+// and status="written"; scenes in the Script layer are linked back to
+// their originating beats so the sync-state logic stays coherent.
+//
+// The only AI-driven piece that used to live in the import pipeline
+// was Concept inference (logline/summary/tone/themes). We now skip
+// Concept entirely at import time — it's interpretive and the user
+// didn't ask for it. They can run "Update Other Layers" from the
+// Script tab later if they want a derived logline.
+
+/**
+ * Extract the unique set of speaking characters from a sequence of
+ * scenes. Walks every dialogue cue (via the existing screenplay
+ * parser), preserves first-appearance order, and returns Character
+ * records with just `name` populated. Other fields are left empty so
+ * the user can fill them in — we refuse to invent backstory or arcs
+ * the script doesn't explicitly contain.
+ */
+export function extractCharactersFromScenes(scenes: Scene[]): Character[] {
+  const seen = new Set<string>();     // upper-cased for dedupe only
+  const ordered: string[] = [];        // original casing, first-appearance order
+
+  for (const scene of scenes) {
+    const chunks = parseScreenplay(scene.content || "");
+    for (const c of chunks) {
+      if (c.kind !== "dialogue") continue;
+      const raw = (c.character || "").trim();
+      if (!raw) continue;
+      const key = raw.toUpperCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      ordered.push(raw);
+    }
+  }
+
+  return ordered.map(name => ({
+    id: characterId(),
+    name,
+    role: "",
+    archetype: "",
+    backstory: "",
+    motivations: "",
+    flaws: "",
+    want: "",
+    need: "",
+    relationships: [],
+    voice: "",
+    arc: "",
+    notes: "",
+  }));
+}
+
+/**
+ * Build a 1:1 beat-per-scene mapping from imported scenes. Each beat:
+ *   - `name`   = scene-heading location (INT./EXT. prefix + time suffix stripped)
+ *   - `summary`= "" (user fills in)
+ *   - `status` = "written" (the script is already written)
+ *   - `sceneContent` = exact scene content (copy-paste)
+ * The returned `scenes` have their `beatId` set to the new beat's id so
+ * Script-layer and Story-layer data stay in sync.
+ */
+export function extractBeatsFromScenes(
+  scenes: Scene[],
+): { beats: Beat[]; scenes: Scene[] } {
+  const newBeats: Beat[] = [];
+  const linkedScenes: Scene[] = [];
+
+  scenes.forEach((scene, i) => {
+    const bid = beatId();
+    newBeats.push({
+      id: bid,
+      name: deriveBeatName(scene.heading, i),
+      summary: "",
+      purpose: "",
+      position: i,
+      momentIds: [],
+      characterIds: [],
+      status: "written",
+      sceneContent: scene.content,
+    });
+    linkedScenes.push({ ...scene, beatId: bid });
+  });
+
+  return { beats: newBeats, scenes: linkedScenes };
+}
+
+// Turn a slug-style scene heading into a short, human-readable beat
+// name. "INT. TACO STAND — DAY" → "Taco Stand". On any failure to
+// parse, fall back to "Scene N".
+const TIME_SUFFIX_RE =
+  /\s+[-—–]\s+(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DUSK|DAWN|CONTINUOUS|LATER|SAME(?:\s+TIME)?|MOMENTS\s+LATER|FLASHBACK)\s*$/i;
+const SLUG_PREFIX_RE =
+  /^(INT\.?\/EXT\.?|EXT\.?\/INT\.?|INT\.?|EXT\.?|EST\.?|I\/E\.?)\s+/i;
+
+function deriveBeatName(heading: string, idx: number): string {
+  if (!heading) return `Scene ${idx + 1}`;
+  let s = heading.replace(SLUG_PREFIX_RE, "").replace(TIME_SUFFIX_RE, "").trim();
+  if (!s) return `Scene ${idx + 1}`;
+  return titleCase(s);
+}
+
+function titleCase(s: string): string {
+  return s.toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase());
+}
+
+function characterId(): string {
+  return `char_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function beatId(): string {
+  return `beat_${Math.random().toString(36).slice(2, 10)}`;
 }
