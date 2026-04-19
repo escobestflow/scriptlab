@@ -123,8 +123,25 @@ async function fetchAudio(
 
 type Listener = (activeOwner: symbol | null) => void;
 
+// Tiny silent WAV (8kHz mono, 4 sample frames) used to unlock the
+// HTMLAudioElement on iOS/Safari during the click gesture. Any valid
+// audio file works — we just need .play() to succeed once while the
+// user's tap is still "live," after which the element is free to play
+// subsequent sources without a fresh gesture.
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiwAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQgAAAAAAAAAAAAAAA==";
+
 class PlaybackController {
+  // One persistent HTMLAudioElement, reused across every chunk of every
+  // playback. iOS Safari gates *element* unlocking, not *controller* —
+  // so we unlock this single element once (via prime(), below) and then
+  // keep reassigning .src to new blob URLs for each chunk.
   private audio: HTMLAudioElement | null = null;
+  // Last blob URL so we can revoke it when we move on to the next chunk
+  // or stop. Stored separately from `audio.src` because after stop() we
+  // still want to keep the element alive and unlocked.
+  private currentBlobUrl: string | null = null;
+  private primed = false;
   private activeOwner: symbol | null = null;
   private listeners = new Set<Listener>();
   private epoch = 0;
@@ -144,13 +161,47 @@ class PlaybackController {
     for (const l of this.listeners) l(this.activeOwner);
   }
 
+  private ensureAudio(): HTMLAudioElement {
+    if (this.audio) return this.audio;
+    const a = new Audio();
+    a.preload = "auto";
+    this.audio = a;
+    return a;
+  }
+
   /**
-   * Called synchronously from the click handler. For HTMLAudioElement
-   * playback this is a no-op, but it preserves the API in case we move
-   * back to Web Audio later.
+   * Called synchronously from the click handler. Unlocks the shared
+   * HTMLAudioElement on iOS/Safari by playing a tiny silent WAV while
+   * the user gesture is still active. After this, subsequent
+   * reassignments of .src followed by .play() work without a new gesture
+   * — fixing the "NotAllowedError: request is not allowed by the user
+   * agent" that fires when audio fetches take longer than the gesture
+   * window.
    */
   prime(): void {
-    /* intentionally empty */
+    const a = this.ensureAudio();
+    if (this.primed) return;
+    try {
+      a.muted = true;
+      a.src = SILENT_WAV;
+      const p = a.play();
+      const finish = () => {
+        try { a.pause(); } catch { /* noop */ }
+        a.muted = false;
+        a.removeAttribute("src");
+        a.load();
+      };
+      if (p && typeof (p as any).then === "function") {
+        (p as Promise<void>).then(finish).catch(() => { a.muted = false; });
+      } else {
+        finish();
+      }
+      this.primed = true;
+    } catch {
+      // Priming failed (rare — e.g. bad data URL). Fall through; the
+      // subsequent .play() may still succeed on non-mobile browsers.
+      a.muted = false;
+    }
   }
 
   stop(): void {
@@ -161,9 +212,13 @@ class PlaybackController {
       } catch {
         /* noop */
       }
-      if (this.audio.src.startsWith("blob:"))
-        URL.revokeObjectURL(this.audio.src);
-      this.audio = null;
+      // Keep the element alive so the unlock survives across plays.
+      // Just clear the src so the old blob isn't held.
+      try { this.audio.removeAttribute("src"); this.audio.load(); } catch { /* noop */ }
+    }
+    if (this.currentBlobUrl) {
+      URL.revokeObjectURL(this.currentBlobUrl);
+      this.currentBlobUrl = null;
     }
     if (this.activeOwner !== null) {
       this.activeOwner = null;
@@ -229,23 +284,35 @@ class PlaybackController {
         resolve();
         return;
       }
+      const a = this.ensureAudio();
+
+      // Revoke the previous chunk's blob before we overwrite src.
+      if (this.currentBlobUrl) {
+        URL.revokeObjectURL(this.currentBlobUrl);
+        this.currentBlobUrl = null;
+      }
+
       const blob = new Blob([buf], { type: "audio/mpeg" });
       const url = URL.createObjectURL(blob);
-      const a = new Audio(url);
-      this.audio = a;
-      const cleanup = () => {
-        URL.revokeObjectURL(url);
-      };
-      a.onended = () => {
-        cleanup();
+      this.currentBlobUrl = url;
+
+      const onEnded = () => {
+        a.removeEventListener("ended", onEnded);
+        a.removeEventListener("error", onError);
         resolve();
       };
-      a.onerror = () => {
-        cleanup();
+      const onError = () => {
+        a.removeEventListener("ended", onEnded);
+        a.removeEventListener("error", onError);
         reject(new Error("audio element error"));
       };
+      a.addEventListener("ended", onEnded);
+      a.addEventListener("error", onError);
+
+      a.src = url;
       a.play().catch(err => {
-        cleanup();
+        a.removeEventListener("ended", onEnded);
+        a.removeEventListener("error", onError);
         reject(err);
       });
     });
