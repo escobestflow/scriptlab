@@ -17,12 +17,14 @@ import {
   isLayerDraftEmpty,
   applySyncResult,
 } from "@/lib/story";
-import { syncLayers } from "@/lib/syncLayer";
+import {
+  syncLayer,
+  syncLayers,
+  importExtractScenes,
+  importSummarizeScenesIntoBeats,
+} from "@/lib/syncLayer";
 import {
   extractTextFromFile,
-  splitScriptIntoScenes,
-  extractCharactersFromScenes,
-  extractBeatsFromScenes,
   IMPORT_ACCEPT,
 } from "@/lib/scriptImport";
 import { parseScreenplay } from "@/lib/scriptParse";
@@ -311,64 +313,79 @@ export function Studio({
     setCharSheetCharId(null);
   };
 
-  // Script-import pipeline. Bottom-of-Script-tab CTA accepts a .txt or
-  // .pdf screenplay, extracts plaintext client-side, then populates
-  // three layers DETERMINISTICALLY — no AI interpretation:
+  // Script-import pipeline — 4 explicit sequential steps.
   //
-  //   Script layer — scenes split on INT./EXT. headings, each linked
-  //                  by beatId to its matching beat (below).
-  //   Story layer  — one beat per scene, status="written",
-  //                  sceneContent = exact scene prose (copy-paste).
-  //                  Beat names are derived from scene headings
-  //                  ("INT. TACO STAND — DAY" → "Taco Stand").
-  //   Characters   — unique speaking-character names extracted verbatim
-  //                  from dialogue cues, preserving first-appearance
-  //                  order. Other fields left empty for the user.
+  //   Step 1 (script):    AI identifies scene line-ranges in the raw
+  //                       file text. Client SLICES the original lines
+  //                       by those ranges, so each scene's `content`
+  //                       is guaranteed word-for-word faithful to the
+  //                       source — the LLM only emits integers, never
+  //                       prose, so there's no paraphrasing risk.
   //
-  // Concept is NOT touched on import — the uploaded script doesn't
-  // dictate a logline or tone. The user can sync Concept manually
-  // via "Update Other Layers" from the Script tab if they want that.
+  //   Step 2 (story):     AI writes one beat per scene, in order, with
+  //                       a 2–5-word beat name, a 1–2-sentence summary,
+  //                       and a 1-sentence purpose. Client zips the
+  //                       returned beats 1:1 with the scenes.
   //
-  // Each layer's write uses `applySyncResult(next, content, story)`
-  // with `story` (pre-import snapshot) as the empty-check, so the
-  // existing "empty → overwrite in place, non-empty → new draft"
-  // rule applies independently to each of the three layers.
+  //   Step 3 (characters): Standard `sync_script_to_characters`. The
+  //                       model has the full scene prose + beats to
+  //                       reason over, so it returns a rich cast with
+  //                       motives, backstory, voice, arc, etc.
   //
-  // Lands the user on the Script tab afterward so they immediately
-  // see the result: every beat in "written" state with its scene
-  // content already populated.
+  //   Step 4 (concept):    Standard `sync_script_to_concept`. Title,
+  //                       format, and genres are preserved because (a)
+  //                       title + projectType live at the top level of
+  //                       Story and are never touched by sync writes,
+  //                       and (b) `normalizeConceptPatch` in syncLayer
+  //                       strips title/projectType/genres from the
+  //                       model's output before applying. The new
+  //                       concept draft is cloned from the active one
+  //                       via `createNewConceptDraft`, so the existing
+  //                       settings (genres included) come along for
+  //                       free. Only logline/summary/tone/themes/
+  //                       endingTypes are rewritten.
+  //
+  // Empty/new-draft rule: each step passes the PRE-IMPORT `story` as
+  // the empty-check baseline, so "empty → overwrite in place; non-empty
+  // → new draft" fires correctly per layer regardless of order.
+  //
+  // Lands the user on the Script tab so the faithful scene split is the
+  // first thing they see.
   async function importScriptFromFile(file: File) {
     if (importing) return;
     setImporting(true);
     setImportStep(null);
     try {
       const text = await extractTextFromFile(file);
-      const rawScenes = splitScriptIntoScenes(text);
-      if (rawScenes.length === 0) {
-        throw new Error("No scene content found in this file.");
+      if (!text.trim()) {
+        throw new Error(
+          "No text could be extracted from this file. If it's a PDF, " +
+          "its text layer may be image-based (scanned) — try re-exporting " +
+          "from your screenwriting app as a text-based PDF or .txt."
+        );
       }
 
-      // Deterministic extraction — all three layers built client-side
-      // from the file contents, no LLM involved.
-      const characters = extractCharactersFromScenes(rawScenes);
-      const { beats, scenes: linkedScenes } = extractBeatsFromScenes(rawScenes);
-
-      // Apply each layer against the pre-import `story` so the empty
-      // check looks at the user's state BEFORE import — exactly the
-      // same rule syncLayers uses.
-      let next = story;
-
+      // ── Step 1: Scenes (word-for-word) ─────────────────────────
       setImportStep("script");
-      next = applySyncResult(next, { kind: "script", scenes: linkedScenes }, story);
+      const scenes = await importExtractScenes(story, text, profile);
+      if (scenes.length === 0) {
+        const preview = text.trim().slice(0, 180).replace(/\s+/g, " ");
+        throw new Error(
+          "The AI could not identify any scenes in this file. The script " +
+          "must be in standard screenplay format with scene slugs " +
+          "(INT./EXT./EST.) at the start of each scene.\n\n" +
+          `Extracted preview: "${preview}${text.length > 180 ? "…" : ""}"`
+        );
+      }
+      let next = applySyncResult(story, { kind: "script", scenes }, story);
 
-      setImportStep("characters");
-      next = applySyncResult(next, { kind: "characters", characters }, story);
-
+      // ── Step 2: One beat per scene, with AI summary ────────────
       setImportStep("story");
+      const beats = await importSummarizeScenesIntoBeats(next, profile);
       if (story.projectType === "tv-show") {
-        // TV projects keep beats on episodes, not at the top level.
-        // Put the entire imported script into a single Episode 1 —
-        // the user can rename/split later.
+        // TV keeps beats on episodes, not top-level. Drop the whole
+        // imported script into a single Episode 1 — the user can rename
+        // or split into additional episodes afterward.
         const episodeId = `ep_${Math.random().toString(36).slice(2, 10)}`;
         next = applySyncResult(next, {
           kind: "story",
@@ -378,6 +395,14 @@ export function Studio({
       } else {
         next = applySyncResult(next, { kind: "story", beats }, story);
       }
+
+      // ── Step 3: Rich characters from scenes + beats ────────────
+      setImportStep("characters");
+      next = await syncLayer(next, "script", "characters", profile);
+
+      // ── Step 4: Fresh Concept draft (title/format/genres kept) ──
+      setImportStep("concept");
+      next = await syncLayer(next, "script", "concept", profile);
 
       setStory(() => next);
       setSection("script");
@@ -3237,6 +3262,49 @@ function StoryTab({
                       </>
                     )}
 
+                    {/* Characters-in-this-beat picker. Populated from the
+                        active Characters-layer draft (same source the
+                        BeatCreationForm uses) so the picker stays in
+                        sync with whatever the user has in Characters —
+                        add a character there and it immediately shows
+                        up as a selectable chip here. Selection persists
+                        onto `beat.characterIds`, which the AI consumes
+                        when generating scene prose for this beat. */}
+                    <div className="beat-section-label">Characters in this beat</div>
+                    {(() => {
+                      const namedChars = getActiveCharactersDraft(story).characters
+                        .filter(c => c.name && c.name.trim() !== "");
+                      if (namedChars.length === 0) {
+                        return (
+                          <div className="caption">
+                            No characters yet. Add some in the Characters tab.
+                          </div>
+                        );
+                      }
+                      const selectedIds = beat.characterIds ?? [];
+                      return (
+                        <div className="chip-row">
+                          {namedChars.map(c => {
+                            const on = selectedIds.includes(c.id);
+                            return (
+                              <Selector
+                                key={c.id}
+                                selected={on}
+                                onClick={() => {
+                                  const next = on
+                                    ? selectedIds.filter(x => x !== c.id)
+                                    : [...selectedIds, c.id];
+                                  updateBeat(beat.id, { characterIds: next });
+                                }}
+                              >
+                                {c.name}
+                              </Selector>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+
                     <div className="beat-section-label">Linked moments · {linkedMoments.length}</div>
                     {linkedMoments.length > 0 ? (
                       <div className="beat-moments">
@@ -3497,8 +3565,9 @@ function ImportScriptCard({
       <span className="eyebrow">Have a finished script?</span>
       <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
         Upload a .txt or .pdf screenplay. Unfold will split it into
-        scenes and populate your Script, Story beats, and Characters
-        exactly as written — no interpretation, no rewriting.
+        scenes word-for-word, then fill in Story beats, Characters, and
+        a fresh Concept draft — preserving your title, format, and
+        genres.
       </div>
       <input
         ref={inputRef}
@@ -3642,11 +3711,20 @@ function BeatCreationForm({
       <Textarea placeholder="Describe this beat"
         value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
 
-      {availableCharacters.length > 0 && (
-        <div style={{ marginTop: 4 }}>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>
-            Characters in this beat
+      {/* Character picker. Always rendered so the user sees the
+          feature exists even on a blank project; when no characters
+          have been created yet we show an empty-state hint instead of
+          hiding the whole section (hiding made new users think the
+          picker was missing). */}
+      <div style={{ marginTop: 4 }}>
+        <div className="eyebrow" style={{ marginBottom: 8 }}>
+          Characters in this beat
+        </div>
+        {availableCharacters.length === 0 ? (
+          <div className="caption">
+            No characters yet. Add some in the Characters tab.
           </div>
+        ) : (
           <div className="chip-row">
             {availableCharacters.map(c => (
               <Selector
@@ -3658,8 +3736,8 @@ function BeatCreationForm({
               </Selector>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {summary.trim() && (
         <Button variant="secondary" size="sm" block onClick={cleanUp}

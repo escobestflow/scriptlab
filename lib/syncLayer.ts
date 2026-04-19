@@ -283,6 +283,89 @@ function actionTypeFor(source: LayerKey, target: LayerKey): ActionType {
   return `sync_${source}_to_${target}` as ActionType;
 }
 
+// ── Import-pipeline helpers ───────────────────────────────────────
+// Used by the 4-step script-import flow in components/Studio.tsx. These
+// don't fit the syncLayer shape (step 1 takes raw text; step 2 returns
+// beats 1:1 with the active script) so they're separate entry points.
+
+/**
+ * Step 1 of the import pipeline.
+ *
+ * Ask the model to identify scene line-ranges in the supplied raw text,
+ * then slice the ORIGINAL text by those ranges to build Scene[] whose
+ * content is guaranteed word-for-word faithful to the source (the LLM
+ * never emits prose — only integers — so it cannot paraphrase).
+ */
+export async function importExtractScenes(
+  story: Story,
+  sourceText: string,
+  profile?: WriterProfile | null,
+): Promise<Scene[]> {
+  const action: ActionRequest = {
+    type: "import_extract_scenes",
+    payload: { sourceText },
+  };
+  const rawText = await callGenerate(story, action, profile);
+  const parsed = extractJson(rawText);
+
+  const lines = sourceText.split("\n");
+  const rawScenes = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
+
+  const scenes: Scene[] = [];
+  for (const s of rawScenes) {
+    const headingLine = Number(s?.headingLine);
+    const lastLine = Number(s?.lastLine);
+    const heading = typeof s?.heading === "string" ? s.heading : "";
+    if (!Number.isFinite(headingLine) || !Number.isFinite(lastLine)) continue;
+    if (headingLine < 1 || lastLine < headingLine) continue;
+    // Convert 1-indexed inclusive range to 0-indexed array slice.
+    // Heading line itself isn't part of content — we stored heading separately.
+    const bodyLines = lines.slice(headingLine, Math.min(lastLine, lines.length));
+    // Trim leading/trailing blank lines from the body; preserve internal blanks.
+    while (bodyLines.length && bodyLines[0].trim() === "") bodyLines.shift();
+    while (bodyLines.length && bodyLines[bodyLines.length - 1].trim() === "") bodyLines.pop();
+    scenes.push({
+      id: `sc_${Math.random().toString(36).slice(2, 10)}`,
+      beatId: null,
+      heading: heading.toUpperCase().trim() || `SCENE ${scenes.length + 1}`,
+      content: bodyLines.join("\n"),
+      notes: "",
+    });
+  }
+  return scenes;
+}
+
+/**
+ * Step 2 of the import pipeline.
+ *
+ * Pulls scene prose from the active Script draft (which step 1 just
+ * populated) and asks the model for one beat per scene. Returns the
+ * beats as Beat[] in scene order — caller drops them into either the
+ * top-level beats array or Episode 1, depending on projectType.
+ */
+export async function importSummarizeScenesIntoBeats(
+  story: Story,
+  profile?: WriterProfile | null,
+): Promise<Beat[]> {
+  const action: ActionRequest = {
+    type: "import_summarize_scenes",
+    payload: {},
+  };
+  const rawText = await callGenerate(story, action, profile);
+  const parsed = extractJson(rawText);
+  const rawBeats = Array.isArray(parsed?.beats) ? parsed.beats : [];
+  return rawBeats.map((b: any, i: number): Beat => ({
+    id: `b_${Math.random().toString(36).slice(2, 10)}`,
+    name: typeof b?.name === "string" ? b.name : `Scene ${i + 1}`,
+    summary: typeof b?.summary === "string" ? b.summary : "",
+    purpose: typeof b?.purpose === "string" ? b.purpose : "",
+    position: i,
+    momentIds: [],
+    characterIds: [],
+    status: "design",
+  }));
+}
+
 export async function syncLayer(
   story: Story,
   source: LayerKey,

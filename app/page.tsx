@@ -1286,7 +1286,7 @@ function ProjectsTab({
           size="sm"
           onClick={onNew}
           icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
-          style={{ transform: "translateY(-3px)" }}
+          style={{ transform: "translateY(-3px)", background: "#fff" }}
         >
           New Project
         </Button>
@@ -1371,7 +1371,7 @@ function MomentsTab({
           size="sm"
           onClick={onNew}
           icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
-          style={{ transform: "translateY(-3px)" }}
+          style={{ transform: "translateY(-3px)", background: "#fff" }}
         >
           New Idea
         </Button>

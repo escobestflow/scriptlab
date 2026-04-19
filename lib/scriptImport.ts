@@ -21,8 +21,15 @@ import { parseScreenplay } from "./scriptParse";
 /** Accepted by the file-picker UI. */
 export const IMPORT_ACCEPT = ".txt,.pdf,text/plain,application/pdf";
 
+// Scene-heading detector. Matches the standard screenplay slug prefixes
+// (INT. / EXT. / EST. / INT./EXT. / I/E.) — optionally preceded by a
+// shooting-script scene number like "1 ", "25A ", or "1. ". Without the
+// optional prefix, professional shooting-script PDFs (which *always*
+// number their scenes) would slip past the detector and the splitter
+// would fall through to the single-"SCRIPT" fallback, which is exactly
+// the symptom we hit on a user-uploaded PDF.
 const SCENE_HEADING_RE =
-  /^(INT\.?|EXT\.?|EST\.?|INT\.?\/EXT\.?|EXT\.?\/INT\.?|I\/E\.?)\b/i;
+  /^(?:[A-Z]?\d+[A-Z]?[.)]?\s+)?(INT\.?|EXT\.?|EST\.?|INT\.?\/EXT\.?|EXT\.?\/INT\.?|I\/E\.?)\b/i;
 
 // ── Top-level dispatch ─────────────────────────────────────────────
 
@@ -92,36 +99,56 @@ function reconstructPageText(rawItems: any[]): string {
   );
   if (items.length === 0) return "";
 
-  // Preserve order as pdfjs returns it (which is roughly top-down, left-
-  // to-right for most script PDFs). Bucket into lines by Y position, so
-  // within a line we keep the original X-order from the stream.
-  const lines: { y: number; parts: string[] }[] = [];
+  // Bucket purely by Y position, ignoring pdfjs's stream order. The
+  // earlier "walk-in-order, compare to last line" approach was brittle:
+  // for screenplay PDFs whose content stream isn't strictly top-down
+  // (any PDF with side-margin scene numbers, page headers, or dual-
+  // column dialogue), items from different visual lines arrive
+  // interleaved, and the sequential grouping scatters them across
+  // dozens of spurious line entries. The consequence in practice:
+  // "INT." and "LIVING ROOM - DAY" land on different lines, the
+  // scene-heading regex never matches a trimmed line, and the whole
+  // script collapses into the single-"SCRIPT" fallback.
+  //
+  // Pure Y-bucketing is order-independent: every item lands in the
+  // bucket whose Y it's closest to (within ~2pt), regardless of which
+  // order pdfjs emitted it in. Then we sort buckets top-to-bottom and
+  // within each bucket sort items left-to-right by X.
+  const TOLERANCE = 2;
+  const buckets: { y: number; items: PdfTextItem[] }[] = [];
   for (const it of items) {
     const y = it.transform[5];
-    const last = lines[lines.length - 1];
-    if (!last || Math.abs(last.y - y) > 2) {
-      lines.push({ y, parts: [it.str] });
+    const bucket = buckets.find(b => Math.abs(b.y - y) <= TOLERANCE);
+    if (bucket) {
+      bucket.items.push(it);
     } else {
-      last.parts.push(it.str);
-    }
-    if (it.hasEOL) {
-      // Force a break after an explicit EOL.
-      lines.push({ y: y - 1000, parts: [] });
+      buckets.push({ y, items: [it] });
     }
   }
-  return lines
-    .map(l => l.parts.join("").replace(/\s+$/u, ""))
-    .filter(s => s.length > 0)
-    .join("\n");
+
+  // PDF origin is bottom-left, so higher Y = higher on the page.
+  buckets.sort((a, b) => b.y - a.y);
+
+  const lines: string[] = [];
+  for (const bucket of buckets) {
+    bucket.items.sort((a, b) => a.transform[4] - b.transform[4]);
+    const line = bucket.items.map(it => it.str).join("").replace(/\s+$/u, "");
+    if (line.length > 0) lines.push(line);
+  }
+  return lines.join("\n");
 }
 
 // ── Scene splitting ────────────────────────────────────────────────
 
 /**
  * Break raw screenplay text into a Scene[]. Any content before the first
- * scene heading (title page, etc.) is dropped — scripts without a single
- * scene heading are returned as a single "SCRIPT" scene containing the
- * whole blob, so the user still sees something they can sync from.
+ * scene heading (title page, etc.) is dropped. If the file contains no
+ * recognizable scene headings at all, returns an empty array — callers
+ * must treat this as an import failure and surface a clear error. (We
+ * used to fall back to a single "SCRIPT" scene containing the whole
+ * blob, but that silently fed the AI a title-page-shaped input and
+ * produced one-character / one-beat imports that misled the user into
+ * thinking the import "worked".)
  */
 export function splitScriptIntoScenes(text: string): Scene[] {
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -142,18 +169,6 @@ export function splitScriptIntoScenes(text: string): Scene[] {
     // Lines before the first heading are dropped (preamble / title page).
   }
   if (current) blocks.push(current);
-
-  if (blocks.length === 0) {
-    const whole = normalized.trim();
-    if (!whole) return [];
-    return [{
-      id: sceneId(),
-      beatId: null,
-      heading: "SCRIPT",
-      content: whole,
-      notes: "",
-    }];
-  }
 
   return blocks.map(b => ({
     id: sceneId(),

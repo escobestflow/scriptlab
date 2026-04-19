@@ -76,7 +76,14 @@ export type ActionType =
   | "sync_story_to_script"
   | "sync_script_to_concept"
   | "sync_script_to_characters"
-  | "sync_script_to_story";
+  | "sync_script_to_story"
+  // ── Script-import pipeline ──
+  // Multi-step import of an uploaded .txt/.pdf screenplay. Step 1 slices
+  // the raw file into word-for-word scenes; step 2 generates one beat
+  // per scene with an AI-written summary. Characters + Concept use the
+  // existing sync_script_to_* actions as steps 3 and 4.
+  | "import_extract_scenes"
+  | "import_summarize_scenes";
 
 export interface ActionRequest {
   type: ActionType;
@@ -92,6 +99,11 @@ export function modelForAction(type: ActionType): string {
     case "sync_concept_to_script":
     case "sync_characters_to_script":
     case "sync_story_to_script":
+    // Import-pipeline extraction also benefits from Sonnet: scene
+    // identification against a 20–40k-token source needs high recall,
+    // and per-scene summarization over the full script is dense work.
+    case "import_extract_scenes":
+    case "import_summarize_scenes":
       return "claude-sonnet-4-5"; // quality matters for prose
     case "generate_beats":
     case "swap_ingredient":

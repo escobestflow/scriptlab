@@ -351,6 +351,72 @@ Return STRICT JSON: { "${spec.returnKey}": ${spec.returnType} }`;
     case "sync_script_to_concept":
       return syncPrompt_toConcept(story, "script");
 
+    // ── Script-import pipeline ──
+
+    case "import_extract_scenes": {
+      // Ask the model to identify scene boundaries by LINE NUMBER in the
+      // source we send it. Client will slice the exact original text by
+      // those line ranges, so the stored scene content is guaranteed
+      // word-for-word accurate — the LLM cannot paraphrase (it never
+      // emits prose, only integers).
+      const raw = String(action.payload?.sourceText ?? "");
+      const lines = raw.split("\n");
+      const numbered = lines.map((l, i) => `[${i + 1}] ${l}`).join("\n");
+      return `You are identifying scene boundaries in a screenplay. A scene starts with a slugline like "INT. LOCATION - TIME", "EXT. LOCATION - TIME", "EST. LOCATION", "INT./EXT. …", or "I/E. …" — optionally preceded by a shooting-script scene number like "1 ", "25A ", or "1. ".
+
+Do NOT rewrite the prose. Only identify line numbers. For each scene, return:
+- "headingLine": the 1-indexed line number in the source where the slugline appears.
+- "heading": the slugline text, cleaned and UPPERCASED (e.g. "INT. KITCHEN - DAY"). Drop any scene-number prefix.
+- "lastLine": the 1-indexed line number of the LAST line that belongs to this scene (inclusive). Typically one less than the next scene's headingLine; for the final scene it is the document's last non-empty line.
+
+Rules:
+- Do NOT invent scenes. Only identify what is actually present in the source.
+- Drop everything before the first slugline (title page, author, synopsis, table of contents).
+- headingLine < lastLine for every scene, and lastLine < nextScene.headingLine.
+- If the document has zero scene headings, return an empty array.
+
+Source text (1-indexed line numbers in brackets):
+${numbered}
+
+Return STRICT JSON:
+{ "scenes": [ { "headingLine": number, "heading": string, "lastLine": number } ] }
+
+No prose outside the JSON.`;
+    }
+
+    case "import_summarize_scenes": {
+      // Walk the active Script draft (which Step 1 just populated) and
+      // ask for one beat per scene, in order. The client will zip these
+      // into Beat objects 1:1 with the scenes.
+      const sc = getActiveScriptDraft(story);
+      const scenes = sc?.script.scenes ?? [];
+      const PER_SCENE_CHARS = 2500;
+      const sceneBlocks = scenes.map((s, i) => {
+        const body = (s.content || "").slice(0, PER_SCENE_CHARS);
+        const truncated = (s.content || "").length > PER_SCENE_CHARS
+          ? "\n[…truncated for length…]" : "";
+        return `### Scene ${i + 1}: ${s.heading || "(no heading)"}\n${body}${truncated}`;
+      }).join("\n\n");
+      return `Produce exactly ONE beat per scene, in order. There are ${scenes.length} scenes — return exactly ${scenes.length} beats in the same order.
+
+For each beat:
+- "name": a 2–5-word beat label evoking what happens (e.g. "The Meet-Cute", "First Betrayal", "Reunion"). NOT the scene heading.
+- "summary": 1–2 sentences describing what actually happens in that scene, grounded in the prose below.
+- "purpose": 1 sentence naming what this scene does for the audience (reveal, setup, pivot, payoff, etc.).
+
+Scenes:
+
+${sceneBlocks}
+
+Return STRICT JSON:
+{ "beats": [ { "name": string, "summary": string, "purpose": string } ] }
+
+Rules:
+- Exactly one beat per scene, in scene order. Do not merge or split.
+- Base every beat entirely on its scene's content — do not invent details.
+- No prose outside the JSON.`;
+    }
+
     default:
       return `Unknown action.`;
   }
