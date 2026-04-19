@@ -381,7 +381,35 @@ export function Studio({
 
       // ── Step 2: One beat per scene, with AI summary ────────────
       setImportStep("story");
-      const beats = await importSummarizeScenesIntoBeats(next, profile);
+      const rawBeats = await importSummarizeScenesIntoBeats(next, profile);
+
+      // Imported scripts are already written — pair each beat with its
+      // scene (they are 1:1 in order), carry the scene prose onto the
+      // beat as `sceneContent`, and flip status to "written" so the
+      // Script tab renders the prose instead of a "Write this scene"
+      // button. Also link each scene's `beatId` back to its matching
+      // beat so the cross-layer sync banner has a valid anchor.
+      const scriptDraftAfterStep1 = getActiveScriptDraft(next);
+      const rawScenes = scriptDraftAfterStep1?.script.scenes ?? [];
+      const beats = rawBeats.map((b, i) => ({
+        ...b,
+        status: "written" as const,
+        sceneContent: rawScenes[i]?.content ?? "",
+      }));
+      const linkedScenes = rawScenes.map((s, i) => ({
+        ...s,
+        beatId: beats[i]?.id ?? null,
+      }));
+      // Patch scene.beatId in place on the active script draft —
+      // avoids branching a second Script draft. Preserve the other
+      // fields on `script` (syncStatus etc.) by spreading the existing
+      // object before overriding `scenes`.
+      if (scriptDraftAfterStep1) {
+        next = updateScriptDraft(next, {
+          script: { ...scriptDraftAfterStep1.script, scenes: linkedScenes },
+        });
+      }
+
       if (story.projectType === "tv-show") {
         // TV keeps beats on episodes, not top-level. Drop the whole
         // imported script into a single Episode 1 — the user can rename
