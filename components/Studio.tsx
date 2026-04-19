@@ -505,6 +505,8 @@ export function Studio({
               onCreateProjectFromDraft={handleCreateProjectFromDraft}
               onDeleteLayerDraft={handleDeleteLayerDraft}
               onRequestDeleteProject={() => setConfirmDeleteProject(true)}
+              onEmailProject={onEmailProject}
+              emailProjectBusy={emailProjectBusy}
             />
           </div>
         </div>
@@ -528,24 +530,10 @@ export function Studio({
           <span>BACK</span>
         </button>
         <div style={{ flex: 1 }} />
-        {/* Email this project — sends a bundle (HTML body + .fountain
-            + .json attachments) to the signed-in user's address. The
-            parent owns the fetch; we just fire the callback and reflect
-            the busy state via the envelope's opacity. */}
-        {onEmailProject && (
-          <button
-            className="project-header-btn"
-            onClick={() => { if (!emailProjectBusy) onEmailProject(); }}
-            aria-label={emailProjectBusy ? "Sending email…" : "Email me this project"}
-            disabled={emailProjectBusy}
-            style={{ opacity: emailProjectBusy ? 0.55 : 1 }}
-          >
-            <svg viewBox="0 0 24 24" style={{ width: 17, height: 17, stroke: "currentColor", strokeWidth: 1.8, fill: "none", strokeLinecap: "round", strokeLinejoin: "round" }}>
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <path d="M3 7l9 6 9-6" />
-            </svg>
-          </button>
-        )}
+        {/* Email this project lives inside the Settings panel now — the
+            top-nav used to carry an envelope icon but it's been folded
+            into Settings to keep the nav light. The `onEmailProject`
+            callback threads through to `SettingsTab`. */}
         <button className="project-header-btn" onClick={() => setShowSetup(true)} aria-label="Settings">
           <img src="/settings-icon.svg" alt="" style={{ width: 17, height: 14 }} />
         </button>
@@ -3391,6 +3379,8 @@ function SettingsTab({
   onLoadProjectDraft, onDeleteProjectDraft, onCreateProjectFromDraft,
   onDeleteLayerDraft,
   onRequestDeleteProject,
+  onEmailProject,
+  emailProjectBusy,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -3399,6 +3389,10 @@ function SettingsTab({
   onCreateProjectFromDraft: (id: string) => void;
   onDeleteLayerDraft: (layer: LayerKey, draftId: string) => void;
   onRequestDeleteProject: () => void;
+  /** Opens the email picker sheet (owned by app/page.tsx). Optional
+   *  — renders the Email card only when provided. */
+  onEmailProject?: () => void;
+  emailProjectBusy?: boolean;
 }) {
   const concept = getActiveConceptDraft(story);
   const [generatingCover, setGeneratingCover] = useState(false);
@@ -3677,6 +3671,28 @@ function SettingsTab({
           </div>
         );
       })}
+
+      {/* Email this project — sends the selected artifacts (PDF,
+          .fountain, .json) to the signed-in user's email. Button
+          opens a picker sheet owned by app/page.tsx so the caller
+          chooses which attachments to include. */}
+      {onEmailProject && (
+        <div className="card" style={{ marginTop: 20 }}>
+          <span className="eyebrow">Email</span>
+          <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
+            Send this project — screenplay PDF, Fountain file, and JSON backup — to your inbox.
+          </div>
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={() => { if (!emailProjectBusy) onEmailProject(); }}
+            disabled={emailProjectBusy}
+          >
+            {emailProjectBusy ? "Sending…" : "Email this project"}
+          </Button>
+        </div>
+      )}
 
       {/* Danger zone: delete project */}
       <div className="card" style={{ marginTop: 20 }}>

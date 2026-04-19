@@ -525,10 +525,10 @@ export default function Page() {
       <div className={`menu-panel ${menuOpen ? "open" : ""}`} aria-hidden={!menuOpen}>
         <div className="menu-panel-inner">
           <div className="menu-panel-list">
-            {/* Static items + one contextual item (email-this-project) that
-                only renders while a project is open. The contextual slot
-                keeps the menu's meaning stable across the app — it adapts
-                to what's in front of the user. */}
+            {/* Static menu items. The "Email me this project" CTA used to
+                live here as a contextual item when a studio project was
+                open, but it's been moved into the Settings panel so the
+                menu stays stable regardless of context. */}
             {(() => {
               interface MenuItem {
                 icon: React.ReactNode;
@@ -543,17 +543,6 @@ export default function Page() {
                   onClick: () => setMenuOpen(false),
                 },
               ];
-              if (view.kind === "studio" && studioProject) {
-                items.push({
-                  icon: <IconExport />,
-                  label: emailBusy ? "Sending…" : "Email me this project",
-                  disabled: emailBusy,
-                  onClick: () => {
-                    setMenuOpen(false);
-                    openEmailSheet(studioProject);
-                  },
-                });
-              }
               return items.map((item, i) => (
                 <button
                   key={item.label}
