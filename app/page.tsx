@@ -67,6 +67,18 @@ export default function Page() {
   // top-nav envelope icon and the hamburger menu item so the user
   // can't double-fire a send.
   const [emailBusy, setEmailBusy] = useState(false);
+  // Which project the email sheet is currently configured for; null
+  // when the sheet is closed. Holding the whole Story (not just an
+  // id) means the sheet captures the snapshot the user saw when they
+  // opened it — subsequent edits don't mid-flight the send.
+  const [emailSheetStory, setEmailSheetStory] = useState<Story | null>(null);
+  // Per-attachment toggles. Defaults: all three real artifacts on.
+  // The "coming soon" rows have no state — they're pure UI signals.
+  const [emailInclude, setEmailInclude] = useState({
+    pdf: true,
+    fountain: true,
+    json: true,
+  });
   // Splash flag — true once the animated splash has fully dismissed.
   // Persisted to sessionStorage so revisiting the root route mid-session
   // doesn't replay the 6.59s intro. Cleared when the tab closes.
@@ -339,11 +351,25 @@ export default function Page() {
   }
 
   // ── Email the project bundle ──
-  // Single path used from two triggers (Studio top-nav + hamburger
-  // menu). The server renders the HTML body, .fountain, and .json
-  // attachments; the client just passes the Story + the signed-in
-  // user's email address. Errors surface via the emailToast banner.
-  async function sendProjectBundleEmail(story: Story) {
+  // The triggers (Studio top-nav envelope + hamburger item) open a
+  // picker sheet so the user can choose which artifacts to attach.
+  // The actual send only fires from the sheet's "Send" button.
+
+  function openEmailSheet(story: Story) {
+    // Reset includes to defaults each open — the sheet is meant to
+    // feel like a quick checklist, not a persistent preference.
+    setEmailInclude({ pdf: true, fountain: true, json: true });
+    setEmailSheetStory(story);
+  }
+  function closeEmailSheet() {
+    if (emailBusy) return;   // lock closure during in-flight send
+    setEmailSheetStory(null);
+  }
+
+  async function sendProjectBundleEmail(
+    story: Story,
+    include: { pdf: boolean; fountain: boolean; json: boolean },
+  ) {
     if (!user?.email) {
       setEmailToast("You need to be signed in to email projects.");
       setTimeout(() => setEmailToast(null), 3500);
@@ -360,6 +386,7 @@ export default function Page() {
           type: "project_bundle",
           story,
           toEmail: user.email,
+          include,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -368,6 +395,7 @@ export default function Page() {
         throw new Error(msg);
       }
       setEmailToast(`Sent to ${user.email}`);
+      setEmailSheetStory(null);
     } catch (err: any) {
       setEmailToast(`Failed to send: ${err?.message ?? String(err)}`);
     } finally {
@@ -398,7 +426,7 @@ export default function Page() {
             setView({ kind: "main" });
           }}
           autosaveEnabled={autosaveEnabled}
-          onEmailProject={() => sendProjectBundleEmail(studioProject)}
+          onEmailProject={() => openEmailSheet(studioProject)}
           emailProjectBusy={emailBusy}
         />
       );
@@ -522,7 +550,7 @@ export default function Page() {
                   disabled: emailBusy,
                   onClick: () => {
                     setMenuOpen(false);
-                    void sendProjectBundleEmail(studioProject);
+                    openEmailSheet(studioProject);
                   },
                 });
               }
@@ -843,6 +871,138 @@ export default function Page() {
           Content is dynamic ("Sending…" / "Sent to …" / "Failed to send: …"). */}
       <div className={`toast ${emailToast ? "show" : ""}`} style={{ bottom: 78 }}>
         {emailToast}
+      </div>
+
+      {/* ── Email project picker sheet ──
+          Bottom-sheet with attachment checkboxes. Active rows (PDF,
+          Fountain, JSON) drive the real request; "Coming soon" rows
+          are placeholders for features we'll build next (audio,
+          storyboard prompts, storyboard sketches, collaborator
+          email). Same .sheet / .sheet-backdrop plumbing as New Idea
+          and Update Other Layers — visual consistency matters because
+          this is the user's first exposure to the feature roadmap. */}
+      <div
+        className={`sheet-backdrop ${emailSheetStory ? "open" : ""}`}
+        onClick={closeEmailSheet}
+      />
+      <div className={`sheet layer-update-sheet ${emailSheetStory ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <div className="display heading" style={{ marginTop: 25, marginBottom: 8 }}>
+            Email this project
+          </div>
+          <div className="caption" style={{ marginBottom: 20 }}>
+            {user?.email ? (
+              <>Sending to <strong>{user.email}</strong></>
+            ) : (
+              "Sign in to send"
+            )}
+          </div>
+
+          <div className="caption" style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--ink-ghost)",
+            marginBottom: 6,
+          }}>
+            What to include
+          </div>
+
+          {/* Active attachment rows — real toggles. */}
+          <label className="layer-update-row">
+            <input
+              type="checkbox"
+              checked={emailInclude.pdf}
+              onChange={() => setEmailInclude(v => ({ ...v, pdf: !v.pdf }))}
+              disabled={emailBusy}
+            />
+            <span className="layer-update-row-label">
+              Screenplay PDF
+            </span>
+          </label>
+          <label className="layer-update-row">
+            <input
+              type="checkbox"
+              checked={emailInclude.fountain}
+              onChange={() => setEmailInclude(v => ({ ...v, fountain: !v.fountain }))}
+              disabled={emailBusy}
+            />
+            <span className="layer-update-row-label">
+              Fountain file (.fountain)
+            </span>
+          </label>
+          <label className="layer-update-row">
+            <input
+              type="checkbox"
+              checked={emailInclude.json}
+              onChange={() => setEmailInclude(v => ({ ...v, json: !v.json }))}
+              disabled={emailBusy}
+            />
+            <span className="layer-update-row-label">
+              Project JSON backup
+            </span>
+          </label>
+
+          {/* Coming-soon placeholders. These exist to:
+                1. Signal the roadmap to users
+                2. Keep visual real-estate reserved so adding them later
+                   doesn't feel like a layout jump
+              They never toggle and never submit — the input is
+              permanently disabled and unchecked. */}
+          {[
+            "Audio readings (.mp3)",
+            "Midjourney storyboard prompts",
+            "Storyboard sketches",
+          ].map(label => (
+            <label key={label} className="layer-update-row email-placeholder-row">
+              <input type="checkbox" checked={false} disabled readOnly />
+              <span className="layer-update-row-label">{label}</span>
+              <span className="email-coming-soon">Coming soon</span>
+            </label>
+          ))}
+
+          <div className="caption" style={{
+            fontSize: 11,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--ink-ghost)",
+            margin: "22px 0 6px",
+          }}>
+            Send to
+          </div>
+          <label className="layer-update-row email-placeholder-row">
+            <input type="checkbox" checked={false} disabled readOnly />
+            <span className="layer-update-row-label">
+              Collaborator email
+            </span>
+            <span className="email-coming-soon">Coming soon</span>
+          </label>
+
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            onClick={() => {
+              if (!emailSheetStory) return;
+              void sendProjectBundleEmail(emailSheetStory, emailInclude);
+            }}
+            disabled={
+              emailBusy ||
+              !user?.email ||
+              (!emailInclude.pdf && !emailInclude.fountain && !emailInclude.json)
+            }
+            style={{ marginTop: 22 }}
+          >
+            {emailBusy
+              ? "Sending…"
+              : `Send (${
+                  (emailInclude.pdf ? 1 : 0) +
+                  (emailInclude.fountain ? 1 : 0) +
+                  (emailInclude.json ? 1 : 0)
+                })`}
+          </Button>
+        </div>
       </div>
     </div>
    </WriterProfileContext.Provider>

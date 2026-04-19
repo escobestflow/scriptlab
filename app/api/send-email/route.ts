@@ -1,15 +1,21 @@
 // Email delivery endpoint.
 //
-// POST body: { type: "project_bundle", story, toEmail }
+// POST body: {
+//   type: "project_bundle",
+//   story,
+//   toEmail,
+//   include?: { pdf?: boolean; fountain?: boolean; json?: boolean }
+// }
 //
-// Phase 1 only supports `project_bundle`. It renders three artifacts
-// from the same Story:
-//   - HTML body        → React Email, readable in the inbox
-//   - .fountain file   → lib/fountain.ts, attached
-//   - .json snapshot   → complete Story object, attached
+// Phase 1 only supports `project_bundle`. It renders up to four
+// artifacts from the same Story, gated by the `include` flags:
+//   - HTML body        → React Email, always included (it IS the email)
+//   - .pdf screenplay  → @react-pdf/renderer, attached (default: on)
+//   - .fountain file   → lib/fountain.ts, attached (default: on)
+//   - .json snapshot   → complete Story object, attached (default: on)
 // and hands them to Resend. Resend's total-attachment cap is 40 MB;
-// the .fountain and .json are pure text so we never approach it in
-// practice.
+// the plaintext attachments are always small, and the PDF is typically
+// under 1 MB even for a feature-length script.
 //
 // AUTH NOTE: we match the existing client-trust pattern in
 // /api/generate and /api/tts — no server-side Supabase session
@@ -39,13 +45,21 @@ import {
   serializeProjectJson,
   slugify,
 } from "@/lib/email/projectBundle";
+import { renderProjectPdfBuffer } from "@/lib/email/projectPdf";
 import { serializeFountain } from "@/lib/fountain";
 import type { Story } from "@/lib/story";
+
+interface AttachmentFlags {
+  pdf?: boolean;
+  fountain?: boolean;
+  json?: boolean;
+}
 
 interface SendRequest {
   type?: string;
   story?: Story;
   toEmail?: string;
+  include?: AttachmentFlags;
 }
 
 export async function POST(req: Request) {
@@ -61,7 +75,12 @@ export async function POST(req: Request) {
     return json({ error: "Invalid JSON body" }, 400);
   }
 
-  const { type, story, toEmail } = payload;
+  const { type, story, toEmail, include } = payload;
+  // Default every flag to ON so an empty `include` still sends the
+  // full bundle. Callers opt OUT by passing explicit `false`.
+  const wantPdf      = include?.pdf      !== false;
+  const wantFountain = include?.fountain !== false;
+  const wantJson     = include?.json     !== false;
 
   if (type !== "project_bundle") {
     return json({ error: `Unsupported email type: ${type ?? "(missing)"}` }, 400);
@@ -82,20 +101,40 @@ export async function POST(req: Request) {
   const titleSlug = slugify(story.title || "project");
   const subject = `Your project bundle — ${story.title || "Untitled"}`;
 
-  // Build all three artifacts. Any one failing should surface a
-  // useful error (not "attachments: undefined") so we try/catch.
+  // Build every requested artifact. Any one failing should surface a
+  // useful, targeted error (not "attachments: undefined") so each has
+  // its own try/catch naming the artifact that blew up.
   let html: string;
-  let fountainText: string;
-  let jsonText: string;
   try {
     html = await renderProjectBundleHtml(story, appUrl);
-    fountainText = serializeFountain(story);
-    jsonText = serializeProjectJson(story);
   } catch (err: any) {
-    return json(
-      { error: `Failed to render email artifacts: ${err?.message ?? String(err)}` },
-      500,
-    );
+    return json({ error: `Failed to render HTML body: ${err?.message ?? String(err)}` }, 500);
+  }
+
+  const attachments: Array<{ filename: string; content: Buffer }> = [];
+  if (wantPdf) {
+    try {
+      const pdfBuffer = await renderProjectPdfBuffer(story);
+      attachments.push({ filename: `${titleSlug}.pdf`, content: pdfBuffer });
+    } catch (err: any) {
+      return json({ error: `Failed to render PDF: ${err?.message ?? String(err)}` }, 500);
+    }
+  }
+  if (wantFountain) {
+    try {
+      const fountainText = serializeFountain(story);
+      attachments.push({ filename: `${titleSlug}.fountain`, content: Buffer.from(fountainText, "utf-8") });
+    } catch (err: any) {
+      return json({ error: `Failed to render Fountain: ${err?.message ?? String(err)}` }, 500);
+    }
+  }
+  if (wantJson) {
+    try {
+      const jsonText = serializeProjectJson(story);
+      attachments.push({ filename: `${titleSlug}.json`, content: Buffer.from(jsonText, "utf-8") });
+    } catch (err: any) {
+      return json({ error: `Failed to render JSON: ${err?.message ?? String(err)}` }, 500);
+    }
   }
 
   const resend = new Resend(apiKey);
@@ -105,16 +144,10 @@ export async function POST(req: Request) {
       to: toEmail,
       subject,
       html,
-      attachments: [
-        {
-          filename: `${titleSlug}.fountain`,
-          content: Buffer.from(fountainText, "utf-8"),
-        },
-        {
-          filename: `${titleSlug}.json`,
-          content: Buffer.from(jsonText, "utf-8"),
-        },
-      ],
+      // Resend accepts an empty attachments array — covers the edge
+      // case where the caller opted out of all three artifacts and
+      // just wants the HTML body.
+      attachments,
     });
 
     // Resend SDK returns { data, error } — error is null on success.
