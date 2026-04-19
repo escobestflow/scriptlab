@@ -15,8 +15,11 @@ import {
   isLayerChangedForTabDot, isConceptFieldDirty, ConceptField,
   getLayerSyncState, markLayerSynced,
   isLayerDraftEmpty,
+  applySyncResult,
 } from "@/lib/story";
 import { syncLayers } from "@/lib/syncLayer";
+import { extractTextFromFile, splitScriptIntoScenes, IMPORT_ACCEPT } from "@/lib/scriptImport";
+import { parseScreenplay } from "@/lib/scriptParse";
 import { subGenresFor, SUB_GENRES_BY_ID } from "@/lib/subGenres";
 import { REFERENCE_ASPECTS, WRITER_STYLES } from "@/lib/references";
 import { createProjectFromDraft } from "@/lib/storage";
@@ -117,6 +120,14 @@ export function Studio({
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
   // Update-Other-Layers tray: null = closed, otherwise the source layer driving the sync.
   const [updateTraySource, setUpdateTraySource] = useState<LayerKey | null>(null);
+  // Read-through player sheet (Script tab): shows the full script formatted
+  // for reading with per-character voice playback.
+  const [readThroughOpen, setReadThroughOpen] = useState(false);
+  // Script-import pipeline state. `importing` drives the CTA's spinner;
+  // `importStep` is whichever derived-layer is currently in flight so we
+  // can show "Generating Concept…" etc. in the card.
+  const [importing, setImporting] = useState(false);
+  const [importStep, setImportStep] = useState<LayerKey | null>(null);
 
   // Active layer drafts — where all editing happens
   const activeProjectDraft = getActiveProjectDraft(story);
@@ -293,6 +304,54 @@ export function Studio({
     });
     setCharSheetCharId(null);
   };
+
+  // Script-import pipeline. Bottom-of-Script-tab CTA accepts a .txt or
+  // .pdf screenplay, extracts plaintext client-side, splits into scenes
+  // on INT./EXT. headings, drops them into the Script layer (overwriting
+  // the active draft if it's empty, otherwise branching to a new draft),
+  // then runs `syncLayers(script → [concept, characters, story])` to
+  // backfill the other three layers from the imported script. Auto-
+  // switches to Concept on success so the user lands on the most
+  // upstream derived layer first.
+  async function importScriptFromFile(file: File) {
+    if (importing) return;
+    setImporting(true);
+    setImportStep(null);
+    try {
+      const text = await extractTextFromFile(file);
+      const scenes = splitScriptIntoScenes(text);
+      if (scenes.length === 0) {
+        throw new Error("No scene content found in this file.");
+      }
+      // Write the imported scenes into the Script layer first. Use
+      // applySyncResult so an empty active Script draft is overwritten
+      // in place and a non-empty one branches to a fresh draft — same
+      // "preserve prior work" rule the sync orchestrator uses.
+      let next = applySyncResult(story, { kind: "script", scenes });
+      // Now derive Concept / Characters / Story from the just-written
+      // script. syncLayers drives from the evolving story so these
+      // actually see the imported scenes as source material.
+      next = await syncLayers(
+        next,
+        "script",
+        ["concept", "characters", "story"],
+        t => setImportStep(t),
+        profile,
+      );
+      setStory(() => next);
+      setSection("concept");
+    } catch (e: any) {
+      // Preserve any partial writes (e.g. script landed, then concept sync failed).
+      if (e?.partialStory) setStory(() => e.partialStory);
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") {
+        window.alert(`Script import failed:\n\n${msg}`);
+      }
+    } finally {
+      setImporting(false);
+      setImportStep(null);
+    }
+  }
 
   async function run(action: ActionRequest, title: string) {
     if (busy) return;
@@ -691,6 +750,10 @@ export function Studio({
               busy={busy}
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
+              onOpenReadThrough={() => setReadThroughOpen(true)}
+              onImportScript={importScriptFromFile}
+              importing={importing}
+              importStep={importStep}
             />
           )}
         </div>
@@ -868,6 +931,15 @@ export function Studio({
         setStory={setStory}
         setSection={setSection}
         onClose={() => setUpdateTraySource(null)}
+      />
+
+      {/* Script read-through sheet — full formatted screenplay with
+          per-character voice playback. Mounted at Studio level so a
+          scene's playback state survives re-renders of ScriptTab. */}
+      <ReadThroughSheet
+        open={readThroughOpen}
+        story={story}
+        onClose={() => setReadThroughOpen(false)}
       />
 
       {confirmDeleteDialog}
@@ -1116,6 +1188,7 @@ function LayerBar({
   setStory,
   autosaveEnabled = true,
   onOpenUpdateTray,
+  onOpenReadThrough,
 }: {
   layer: LayerKey;
   label: string;
@@ -1123,6 +1196,10 @@ function LayerBar({
   setStory: (u: (s: Story) => Story) => void;
   autosaveEnabled?: boolean;
   onOpenUpdateTray: (source: LayerKey) => void;
+  /** Script tab only: opens the full-script read-through sheet. Shown
+   *  alongside the Update Other Layers trigger when the layer has
+   *  source content. */
+  onOpenReadThrough?: () => void;
 }) {
   const hasSource = !isLayerDraftEmpty(story, layer);
   return (
@@ -1134,6 +1211,17 @@ function LayerBar({
         setStory={setStory}
         autosaveEnabled={autosaveEnabled}
       />
+      {hasSource && onOpenReadThrough && (
+        <button
+          className="layer-read-trigger"
+          onClick={onOpenReadThrough}
+          aria-label="Read-through view"
+          title="Open read-through view"
+        >
+          <ReadIcon />
+          <span>Read-through</span>
+        </button>
+      )}
       {hasSource && (
         <button
           className="layer-update-trigger"
@@ -1145,6 +1233,19 @@ function LayerBar({
         </button>
       )}
     </div>
+  );
+}
+
+function ReadIcon() {
+  // Open-book glyph — keeps the trigger visually distinct from the
+  // adjacent Update-Other-Layers chevron. 12px to match the caret.
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H2z" />
+      <path d="M22 4h-7a3 3 0 0 0-3 3v13a2 2 0 0 1 2-2h8z" />
+    </svg>
   );
 }
 
@@ -1283,6 +1384,155 @@ function LayerUpdateTray({
         </div>
       </div>
     </>
+  );
+}
+
+/* ============================================ */
+/* ========== READ-THROUGH SHEET ============== */
+/* ============================================ */
+//
+// Tall bottom-sheet that renders the full active Script draft formatted
+// for reading (scene headings in caps, action paragraphs, inline
+// dialogue cues), with a single "Play all" button that uses
+// `speakScript` to read the whole thing with per-character voices.
+// Each scene also gets its own per-scene SpeakButton so a reader can
+// spot-play a single scene without queueing the whole read-through.
+
+function ReadThroughSheet({
+  open,
+  story,
+  onClose,
+}: {
+  open: boolean;
+  story: Story;
+  onClose: () => void;
+}) {
+  const scriptDraft = getActiveScriptDraft(story);
+  const charactersDraft = getActiveCharactersDraft(story);
+  const conceptDraft = getActiveConceptDraft(story);
+  const scenes = scriptDraft.script?.scenes ?? [];
+  const title = story.title || "Untitled";
+
+  // Build one big text blob for the "Play all" button — speakScript()
+  // parses headings + cues back out via scriptParse. Joining with two
+  // newlines makes sure every scene starts a fresh block.
+  const fullText = scenes
+    .map(s => [s.heading, s.content].filter(Boolean).join("\n\n"))
+    .join("\n\n");
+
+  return (
+    <>
+      <div
+        className={`sheet-backdrop ${open ? "open" : ""}`}
+        onClick={onClose}
+      />
+      <div className={`sheet sheet-tall read-through-sheet ${open ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">Read-through · {title}</div>
+          <Button variant="secondary" size="sm" onClick={onClose}>Close</Button>
+        </div>
+        {scenes.length > 0 && (
+          <div className="read-through-controls">
+            <div className="caption">
+              {scenes.length} scene{scenes.length === 1 ? "" : "s"}
+            </div>
+            <SpeakButton
+              mode="script"
+              size="md"
+              text={fullText}
+              characters={charactersDraft.characters}
+              projectType={story.projectType}
+              genres={conceptDraft.settings.genres}
+              title="Play the whole script"
+            />
+          </div>
+        )}
+        <div className="sheet-body read-through-body">
+          {scenes.length === 0 ? (
+            <div className="caption" style={{ textAlign: "center", padding: "40px 20px" }}>
+              No scenes in this Script draft yet.
+            </div>
+          ) : (
+            scenes.map((sc, i) => (
+              <ReadThroughScene
+                key={sc.id}
+                index={i}
+                scene={sc}
+                characters={charactersDraft.characters}
+                projectType={story.projectType}
+                genres={conceptDraft.settings.genres}
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function ReadThroughScene({
+  index,
+  scene,
+  characters,
+  projectType,
+  genres,
+}: {
+  index: number;
+  scene: Scene;
+  characters: Character[];
+  projectType: Story["projectType"];
+  genres: Story["conceptDrafts"][number]["settings"]["genres"];
+}) {
+  const chunks = parseScreenplay(scene.content || "");
+  // If the parser didn't find any structure, fall back to the raw prose
+  // so the reader still sees something.
+  const hasStructure = chunks.some(c => c.kind === "dialogue" || c.kind === "heading" || c.kind === "action");
+  const speakText = [scene.heading, scene.content].filter(Boolean).join("\n\n");
+
+  return (
+    <div className="read-through-scene">
+      <div className="read-through-scene-head">
+        <div className="read-through-scene-heading">
+          <span className="read-through-scene-number">{index + 1}.</span>
+          <span>{scene.heading || "SCENE"}</span>
+        </div>
+        <SpeakButton
+          mode="script"
+          size="sm"
+          text={speakText}
+          characters={characters}
+          projectType={projectType}
+          genres={genres}
+          title="Read this scene aloud"
+        />
+      </div>
+      <div className="read-through-scene-body">
+        {hasStructure ? (
+          chunks.map((c, i) => {
+            if (c.kind === "heading") return null; // already rendered above
+            if (c.kind === "action") {
+              return (
+                <p key={i} className="read-through-action">{c.text}</p>
+              );
+            }
+            if (c.kind === "dialogue") {
+              return (
+                <div key={i} className="read-through-dialogue">
+                  <div className="read-through-cue">{(c.character || "").toUpperCase()}</div>
+                  <div className="read-through-line">{c.text}</div>
+                </div>
+              );
+            }
+            return null;
+          })
+        ) : (
+          <p className="read-through-action" style={{ whiteSpace: "pre-wrap" }}>
+            {scene.content}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -3015,6 +3265,10 @@ function ScriptTab({
   busy,
   autosaveEnabled = true,
   onOpenUpdateTray,
+  onOpenReadThrough,
+  onImportScript,
+  importing,
+  importStep,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -3023,6 +3277,14 @@ function ScriptTab({
   busy: boolean;
   autosaveEnabled?: boolean;
   onOpenUpdateTray: (source: LayerKey) => void;
+  /** Open the read-through sheet — Studio owns state, ScriptTab just triggers. */
+  onOpenReadThrough: () => void;
+  /** Import a .txt/.pdf screenplay; runs extract → split → syncLayers. */
+  onImportScript: (file: File) => Promise<void>;
+  importing: boolean;
+  /** Which derived layer is currently being synced (post-write). Drives
+   *  the progress label inside the import card. */
+  importStep: LayerKey | null;
 }) {
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
@@ -3040,7 +3302,7 @@ function ScriptTab({
 
   return (
     <>
-      <LayerBar layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
+      <LayerBar layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} onOpenReadThrough={onOpenReadThrough} />
 
       {/* Out-of-sync banner — only after a script has been produced */}
       {isOutOfSync && (
@@ -3139,7 +3401,87 @@ function ScriptTab({
         <span className="info-icon">i</span>
         <span>Script uses your Concept, Characters, and Story as inputs for AI generation.</span>
       </div>
+
+      {/* ── Import an existing script ──────────────────────────────
+          Lives at the bottom of the Script tab because that's where
+          a user who arrived here and realized "I already have a
+          screenplay, let me just upload it" ends up looking. The card
+          does a lot under the hood: parse the file, split scenes,
+          write them into Script, then derive Concept + Characters +
+          Story via syncLayers. A single CTA for the whole pipeline. */}
+      <ImportScriptCard
+        onImport={onImportScript}
+        importing={importing}
+        importStep={importStep}
+      />
     </>
+  );
+}
+
+// ── Import Script card ─────────────────────────────────────────────
+
+function ImportScriptCard({
+  onImport,
+  importing,
+  importStep,
+}: {
+  onImport: (file: File) => Promise<void>;
+  importing: boolean;
+  importStep: LayerKey | null;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function openPicker() {
+    if (importing) return;
+    inputRef.current?.click();
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Clear the input so the same file can be re-selected later (onChange
+    // won't fire if the value didn't change).
+    if (inputRef.current) inputRef.current.value = "";
+    if (!file) return;
+    await onImport(file);
+  }
+
+  const label = importing
+    ? (importStep
+        ? `Generating ${LAYER_LABEL[importStep]}…`
+        : "Reading file…")
+    : "Import a script";
+
+  return (
+    <div className="card import-script-card" style={{ marginTop: 16 }}>
+      <span className="eyebrow">Have a finished script?</span>
+      <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
+        Upload a .txt or .pdf screenplay. Unfold will read it, split it
+        into scenes, and auto-populate your Concept, Characters, and
+        Story layers from what's in the script.
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={IMPORT_ACCEPT}
+        onChange={handleFile}
+        style={{ display: "none" }}
+      />
+      <Button
+        variant="secondary"
+        size="lg"
+        block
+        onClick={openPicker}
+        disabled={importing}
+      >
+        {importing && <span className="import-spinner" aria-hidden="true" />}
+        {label}
+      </Button>
+      {importing && (
+        <div className="caption" style={{ marginTop: 10, textAlign: "center" }}>
+          This can take a minute for a feature-length script.
+        </div>
+      )}
+    </div>
   );
 }
 

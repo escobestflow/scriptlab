@@ -3333,3 +3333,128 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   white-space: nowrap;
 }
 
+/* ── Read-through trigger (Script tab LayerBar) ─────────────────────
+   Lives between the draft picker and the Update-Other-Layers chevron,
+   so it gets `margin-left: auto` and the Update trigger loses its own
+   auto-margin via the adjacent-sibling rule below. */
+.layer-read-trigger {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  margin-right: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: 'Lato', -apple-system, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  transition: background 140ms var(--ease), opacity 140ms var(--ease);
+}
+.layer-read-trigger:hover { background: var(--surface, #f5f5f4); }
+.layer-read-trigger:active { opacity: 0.55; }
+.layer-read-trigger svg { opacity: 0.75; }
+/* When read-through is present, the Update trigger is no longer the
+   first auto-margin child — drop its auto so the two sit side-by-side. */
+.layer-read-trigger + .layer-update-trigger { margin-left: 0; }
+
+@media (max-width: 420px) {
+  .layer-read-trigger > span:not(:empty) {
+    display: none; /* icon-only on narrow screens */
+  }
+  .layer-read-trigger { padding: 6px 8px; }
+}
+
+/* ── Import-a-script card at the bottom of Script tab ─────────────── */
+.import-script-card .eyebrow {
+  display: block;
+}
+.import-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid var(--ink-ghost);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: speakBtnSpin 900ms linear infinite;
+}
+
+/* ── Read-through sheet ──────────────────────────────────────────── */
+.read-through-sheet.sheet.open { min-height: 90vh; }
+.read-through-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 22px 10px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.read-through-body {
+  padding: 18px 22px 32px;
+  white-space: normal;
+  line-height: 1.55;
+}
+
+.read-through-scene {
+  margin-bottom: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+.read-through-scene:last-of-type { border-bottom: none; }
+
+.read-through-scene-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.read-through-scene-heading {
+  flex: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.read-through-scene-number {
+  color: var(--ink-ghost);
+  font-weight: 500;
+}
+
+.read-through-scene-body {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.read-through-action {
+  margin: 0 0 12px;
+  white-space: normal;
+}
+.read-through-dialogue {
+  margin: 12px 0 12px 56px;
+}
+.read-through-cue {
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.read-through-line {
+  margin-left: 0;
+}
+
+@media (max-width: 520px) {
+  .read-through-dialogue { margin-left: 24px; }
+  .read-through-body { padding: 14px 16px 28px; }
+}
+
