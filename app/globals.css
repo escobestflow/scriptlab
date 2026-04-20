@@ -1272,12 +1272,13 @@ html[data-theme="dark"] .chip.selected {
   background-repeat: no-repeat;
   background-position: center;
 }
-/* Dark-mode override — drop the paper-gradient SVG for a flat black bar
-   so the sticky toolbar reads as a continuation of the dark topbar
-   rather than a light stripe breaking up the page. */
+/* Dark-mode override — drop the paper-gradient SVG for a flat charcoal
+   bar that matches the studio tab bar (#2a2a2e). This ties the sticky
+   toolbar into the same dark-surface family as the tab strip above it,
+   instead of reading as a black stripe breaking up the page. */
 html[data-theme="dark"] .layer-draft-picker {
   background-image: none;
-  background-color: #000;
+  background-color: #2a2a2e;
 }
 .layer-draft-trigger {
   display: inline-flex;
@@ -1560,6 +1561,13 @@ html[data-theme="dark"] .studio-tab-bar { background: #2a2a2e; }
   color: var(--ink);
   font-weight: 700;
 }
+
+/* Dark-mode deselected studio tabs — the hardcoded #3C3C42 light-mode
+   color reads nearly invisible against #2a2a2e. Promote to --ink-mute
+   so the deselected labels match the bottom main tab bar (PROJECTS /
+   IDEAS) for a consistent deselected-label tone across the app. */
+html[data-theme="dark"] .studio-tab { color: var(--ink-mute); }
+html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
 .studio-tab.active .studio-tab-label::after {
   transform: scaleX(1);
 }
@@ -2004,10 +2012,11 @@ html[data-theme="dark"] .project-header-btn img { filter: invert(1); }
   text-overflow: ellipsis;
 }
 /* Dark-mode attr-pill — the collapsed-row preview chips (e.g. "COMEDY"
-   in the Genre row). Light hardcoded grays become darker neutrals so
-   they blend with the dark surface rather than glaring off it. */
+   in the Genre row). Background matches the studio tab bar and layer
+   draft picker (#2a2a2e) so every dark neutral surface in the detail
+   view reads as one coordinated palette. */
 html[data-theme="dark"] .attr-pill {
-  background: #1c1c1f;
+  background: #2a2a2e;
   border-color: rgba(255, 255, 255, 0.08);
   color: var(--ink-soft);
 }
@@ -2092,25 +2101,28 @@ html[data-theme="dark"] .attr-pill {
   border-color: #EDEDED;
 }
 
-/* Dark-mode overrides for the expanded attribute-row pickers. Default
-   (light) rules hardcode white/#F3F3F3, which in dark mode glare as
-   bright patches and make unselected vs selected indistinguishable.
-   Dark mode: unselected is transparent with a subtle border + muted
-   text; selected inverts to a light fill with dark text so the chosen
-   option pops off the dark surface unambiguously. */
+/* Dark-mode overrides for the expanded attribute-row pickers. We mirror
+   the dark-mode treatment of the new-project format cards (.choice on
+   Feature Film / Short Film / TV Show): a soft surface for unselected
+   with a hairline border, and a crisp white outline + bg-secondary fill
+   for the selected option. Same visual language across the app's two
+   main "pick one from a list" surfaces. */
 html[data-theme="dark"] .attr-row-body .ds-selector,
 html[data-theme="dark"] .attr-row-body .chip,
 html[data-theme="dark"] .attr-row-body .choice {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--surface);
+  border-color: var(--border);
   color: var(--ink-soft);
 }
 html[data-theme="dark"] .attr-row-body .ds-selector.is-selected,
 html[data-theme="dark"] .attr-row-body .chip.selected,
 html[data-theme="dark"] .attr-row-body .choice.selected {
-  background: #f5f5f7;
-  color: #0a0a0b;
-  border-color: #f5f5f7;
+  background: var(--bg-secondary);
+  color: var(--ink);
+  /* --ink is near-white in dark mode, so this renders as a white-ish
+     outline — matching the .choice selected state on the project
+     creation step, which is the reference the user pointed to. */
+  border-color: var(--ink);
 }
 
 /* Inline chip selectors (genres, tones, themes, endings, archetypes,
