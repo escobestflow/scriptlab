@@ -2728,6 +2728,7 @@ function CharactersTab({
         onClick={openNewCharacter}
         style={{ marginBottom: 12 }}
         icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+        className="entity-create-btn"
       >
         Add character
       </Button>
@@ -3140,7 +3141,8 @@ function StoryTab({
               Start building your story structure — add your first beat.
             </div>
             <Button variant="primary" size="lg"
-              onClick={() => openBeatTray(0)}>
+              onClick={() => openBeatTray(0)}
+              className="entity-create-btn">
               + Add beat
             </Button>
           </div>
