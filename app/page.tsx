@@ -88,6 +88,19 @@ export default function Page() {
     try { return window.sessionStorage.getItem("unfoldSplashSeen") === "1"; }
     catch { return false; }
   });
+  // Mount gate for the splash. SSR can't read sessionStorage, so
+  // splashDone is always `false` on the server and the SSR'd HTML
+  // includes a <SplashLoader>. That DOM is painted before the
+  // component's `<style jsx global>` rules apply, so for one frame the
+  // Unfold wordmark + Google icon SVGs fall back to their default
+  // 300x150 box on the body's light bg → the "giant logos on white"
+  // flash. Gating the splash branch on `mounted` keeps SSR output
+  // neutral (just the .app shell, which picks up the theme bg via CSS);
+  // after hydration the real state from sessionStorage takes over and
+  // the splash plays normally for first-time visitors / signed-out
+  // sessions.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   // New project creation modal
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState(0);
@@ -277,6 +290,13 @@ export default function Page() {
   //      as the sign-back-in surface (covers mid-session sign-out and
   //      token expiry). Guarded by !authLoading so a transient null
   //      during OAuth restore doesn't replay the animation.
+  // Suppress the splash during SSR / pre-hydration so the server
+  // doesn't emit an unstyled SplashLoader DOM that flashes as giant
+  // logos before React takes over. Render a neutral app shell instead;
+  // the theme bg paints and the real splash decision runs after mount.
+  if (!mounted) {
+    return <div className="app" />;
+  }
   const showSplash = !splashDone || (!authLoading && !user);
   if (showSplash) {
     return (
