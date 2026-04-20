@@ -1567,73 +1567,78 @@ function MomentsTab({
       ))}
 
       {/* Convert-notes output sheet — dev-only, shown after the API
-          returns a list of AI coding prompts. Minimal chrome: just a
-          scrollable text box of the converted output with Copy + Close
-          actions. Closing clears `convertOutput` so nothing lingers
-          between opens — re-tapping Convert re-fetches fresh. */}
-      <div
-        className={`sheet-backdrop ${convertSheetOpen ? "open" : ""}`}
-        onClick={() => {
-          if (convertBusy) return;
-          setConvertSheetOpen(false);
-          setConvertOutput("");
-        }}
-      />
-      <div className={`sheet ${convertSheetOpen ? "open" : ""}`}>
-        <div className="sheet-handle" />
-        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          returns a list of AI coding prompts. We conditionally render
+          the whole tray (backdrop + sheet) so when closed it doesn't
+          exist in the DOM at all — no chance of a stray "module" at
+          the end of the list. Closing clears convertOutput so nothing
+          lingers between opens; re-tapping Convert re-fetches fresh. */}
+      {convertSheetOpen && (
+        <>
           <div
-            style={{
-              whiteSpace: "pre-wrap",
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              fontSize: 13,
-              lineHeight: 1.5,
-              background: "var(--bg-subtle, #f6f6f6)",
-              borderRadius: 8,
-              padding: 12,
-              maxHeight: "50vh",
-              overflowY: "auto",
-              marginTop: 20,
-              marginBottom: 14,
+            className="sheet-backdrop open"
+            onClick={() => {
+              if (convertBusy) return;
+              setConvertSheetOpen(false);
+              setConvertOutput("");
             }}
-          >
-            {convertBusy && !convertOutput ? "…" : convertOutput}
-          </div>
+          />
+          <div className="sheet open">
+            <div className="sheet-handle" />
+            <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+              <div
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                  background: "var(--bg-subtle, #f6f6f6)",
+                  borderRadius: 8,
+                  padding: 12,
+                  maxHeight: "50vh",
+                  overflowY: "auto",
+                  marginTop: 20,
+                  marginBottom: 14,
+                }}
+              >
+                {convertBusy && !convertOutput ? "…" : convertOutput}
+              </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={async () => {
-                if (!convertOutput) return;
-                try {
-                  await navigator.clipboard.writeText(convertOutput);
-                  setConvertCopied(true);
-                  setTimeout(() => setConvertCopied(false), 1500);
-                } catch {
-                  /* ignore — clipboard may be unavailable */
-                }
-              }}
-              disabled={!convertOutput || convertBusy}
-              style={{ flex: 1 }}
-            >
-              {convertCopied ? "Copied!" : "Copy"}
-            </Button>
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={() => {
-                setConvertSheetOpen(false);
-                setConvertOutput("");
-              }}
-              disabled={convertBusy}
-              style={{ flex: 1 }}
-            >
-              Close
-            </Button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={async () => {
+                    if (!convertOutput) return;
+                    try {
+                      await navigator.clipboard.writeText(convertOutput);
+                      setConvertCopied(true);
+                      setTimeout(() => setConvertCopied(false), 1500);
+                    } catch {
+                      /* ignore — clipboard may be unavailable */
+                    }
+                  }}
+                  disabled={!convertOutput || convertBusy}
+                  style={{ flex: 1 }}
+                >
+                  {convertCopied ? "Copied!" : "Copy"}
+                </Button>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={() => {
+                    setConvertSheetOpen(false);
+                    setConvertOutput("");
+                  }}
+                  disabled={convertBusy}
+                  style={{ flex: 1 }}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </>
   );
 }
