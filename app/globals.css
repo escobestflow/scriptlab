@@ -652,6 +652,17 @@ html[data-theme="dark"] .record-fab {
 }
 .search-bar input::placeholder { color: var(--ink-ghost); }
 
+/* Dark-mode search bar (Ideas → "Search moments"). The default white
+   fill reads as a bright slab on the dark page; lift it to the same
+   #2a2a2e surface the rest of the dark UI uses for raised controls
+   (tab bar, chips, disabled primaries) so it reads as a distinct but
+   muted input field. Border dropped to near-transparent since the
+   fill alone is enough to define the shape. */
+html[data-theme="dark"] .search-bar {
+  background: #2a2a2e;
+  border-color: transparent;
+}
+
 /* Filter pills row */
 .filter-row {
   display: flex;
