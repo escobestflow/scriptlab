@@ -1454,6 +1454,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 4px 0 0;
   background: #FBFCFD;
 }
+html[data-theme="dark"] .studio-header-sticky { background: #000; }
 .studio-header-sticky > :not(.studio-tabs-row) {
   padding-left: 20px;
   padding-right: 20px;
@@ -1479,6 +1480,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   overflow: hidden;
 }
+html[data-theme="dark"] .studio-tab-bar { background: #2a2a2e; }
 .studio-tab {
   flex: 1;
   height: 100%;
@@ -1860,6 +1862,7 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   padding: 8px 4px;
   cursor: pointer;
 }
+html[data-theme="dark"] .project-header-btn img { filter: invert(1); }
 .project-header-center {
   display: flex;
   flex-direction: column;
@@ -3029,6 +3032,10 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   border-color: var(--border-ddd);
 }
 .ds-btn-secondary:active { background: rgba(0, 0, 0, 0.04); }
+/* Secondary buttons with an inline background override (e.g. New Project,
+   New Idea which hardcode a white pill) need dark text so they remain
+   readable in dark mode — default `color: var(--ink)` renders near-white. */
+html[data-theme="dark"] .ds-btn-secondary[style*="background"] { color: #000; }
 
 /* ---------- Input + Textarea ---------- */
 .ds-input {
