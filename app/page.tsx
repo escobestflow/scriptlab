@@ -1427,49 +1427,12 @@ function MomentsTab({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All");
 
-  // Dev-only: "Convert all notes to AI prompt" — hidden later. When the
-  // Notes filter is selected, a button appears above the list that sends
-  // every filtered note to /api/convert-notes, which polishes them into
-  // AI coding prompts (they're app-edit shorthand the dev writes while
-  // using the app). The result is shown in a bottom sheet with a
-  // copy-to-clipboard button.
-  const [convertBusy, setConvertBusy] = useState(false);
-  const [convertSheetOpen, setConvertSheetOpen] = useState(false);
-  const [convertOutput, setConvertOutput] = useState("");
-  const [convertCopied, setConvertCopied] = useState(false);
-
   const filtered = moments.filter(m => {
     if (filter !== "All" && m.type !== filter.toLowerCase()) return false;
     if (search && !m.text.toLowerCase().includes(search.toLowerCase()) &&
         !m.tags.some(t => t.toLowerCase().includes(search.toLowerCase()))) return false;
     return true;
   });
-
-  async function convertNotesToPrompts() {
-    if (convertBusy) return;
-    const notes = filtered.map(m => m.text).filter(t => t.trim() !== "");
-    if (notes.length === 0) return;
-    setConvertBusy(true);
-    setConvertOutput("");
-    setConvertSheetOpen(true);
-    try {
-      const res = await fetch("/api/convert-notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
-      });
-      const text = await res.text();
-      if (!res.ok) {
-        setConvertOutput(`Error: ${text}`);
-      } else {
-        setConvertOutput(text);
-      }
-    } catch (e: any) {
-      setConvertOutput(`Error: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setConvertBusy(false);
-    }
-  }
 
   function formatTime(iso: string) {
     const d = new Date(iso);
@@ -1521,25 +1484,6 @@ function MomentsTab({
         ))}
       </div>
 
-      {/* Dev-only: Convert all notes to AI prompts. Shown only when the
-          Notes filter is active AND there is at least one matching note.
-          This will be hidden from end users once we stop using it. */}
-      {filter === "Note" && filtered.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <Button
-            variant="secondary"
-            size="lg"
-            block
-            onClick={convertNotesToPrompts}
-            disabled={convertBusy}
-          >
-            {convertBusy
-              ? "Converting…"
-              : `Convert all notes to AI prompt (${filtered.length})`}
-          </Button>
-        </div>
-      )}
-
       {filtered.length === 0 && (
         <div style={{ textAlign: "center", padding: "40px 0", color: "var(--ink-mute)", fontSize: 14 }}>
           {search || filter !== "All"
@@ -1566,79 +1510,6 @@ function MomentsTab({
         </div>
       ))}
 
-      {/* Convert-notes output sheet — dev-only, shown after the API
-          returns a list of AI coding prompts. We conditionally render
-          the whole tray (backdrop + sheet) so when closed it doesn't
-          exist in the DOM at all — no chance of a stray "module" at
-          the end of the list. Closing clears convertOutput so nothing
-          lingers between opens; re-tapping Convert re-fetches fresh. */}
-      {convertSheetOpen && (
-        <>
-          <div
-            className="sheet-backdrop open"
-            onClick={() => {
-              if (convertBusy) return;
-              setConvertSheetOpen(false);
-              setConvertOutput("");
-            }}
-          />
-          <div className="sheet open">
-            <div className="sheet-handle" />
-            <div className="sheet-body" style={{ whiteSpace: "normal" }}>
-              <div
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                  fontSize: 13,
-                  lineHeight: 1.5,
-                  background: "var(--bg-subtle, #f6f6f6)",
-                  borderRadius: 8,
-                  padding: 12,
-                  maxHeight: "50vh",
-                  overflowY: "auto",
-                  marginTop: 20,
-                  marginBottom: 14,
-                }}
-              >
-                {convertBusy && !convertOutput ? "…" : convertOutput}
-              </div>
-
-              <div style={{ display: "flex", gap: 10 }}>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={async () => {
-                    if (!convertOutput) return;
-                    try {
-                      await navigator.clipboard.writeText(convertOutput);
-                      setConvertCopied(true);
-                      setTimeout(() => setConvertCopied(false), 1500);
-                    } catch {
-                      /* ignore — clipboard may be unavailable */
-                    }
-                  }}
-                  disabled={!convertOutput || convertBusy}
-                  style={{ flex: 1 }}
-                >
-                  {convertCopied ? "Copied!" : "Copy"}
-                </Button>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={() => {
-                    setConvertSheetOpen(false);
-                    setConvertOutput("");
-                  }}
-                  disabled={convertBusy}
-                  style={{ flex: 1 }}
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
     </>
   );
 }
