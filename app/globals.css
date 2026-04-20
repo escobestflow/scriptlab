@@ -1465,6 +1465,20 @@ html[data-theme="dark"] .layer-draft-picker {
   padding: 9px 16px 0;
   z-index: 20;
   background: transparent;
+  /* Pass taps through the transparent middle region to the sticky
+     content beneath. When the title row pins to the top, its draft
+     dropdown trigger lives directly under this nav — without
+     pointer-events:none the nav's transparent center (the flex
+     spacer between Back and Settings) intercepts every tap and the
+     dropdown never opens. Buttons re-enable pointer-events below so
+     Back and Settings still work normally. No layer/z-index change. */
+  pointer-events: none;
+}
+/* Re-enable taps on the actual controls — only the buttons should
+   catch events; the spacer div stays inert so the draft trigger
+   below is reachable. */
+.studio-nav-fixed > button {
+  pointer-events: auto;
 }
 
 /* Scroll container — fills the entire app area, starts at y=0 (behind nav) */
