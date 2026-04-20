@@ -3117,15 +3117,66 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
    primary-button fill is near-white (--ink = #f5f5f7), which reads as
    a glaring white slab. The user prefers how the button looks in its
    :active tap state (darkened to #1a1a1a); make that the default in
-   dark mode. Light mode stays as designed — bright primary fill. */
+   dark mode. White border ties the shape to the rest of the
+   "white-outlined selected" affordances (format cards, attr-row
+   selectors). Light mode stays as designed — bright primary fill. */
 html[data-theme="dark"] .entity-create-btn.ds-btn-primary {
   background: #1a1a1a;
   color: #fff;
-  border-color: #1a1a1a;
+  border-color: var(--ink);
 }
 /* Keep the tap feedback visible — press state drops another notch. */
 html[data-theme="dark"] .entity-create-btn.ds-btn-primary:active {
   background: #0f0f0f;
+  border-color: var(--ink);
+}
+
+/* Ideas-tab filter pills — the active pill fills with --ink (near-white
+   in dark mode). Flip the label to the page bg so the selected filter
+   name is readable against that near-white chip. */
+html[data-theme="dark"] .filter-pill.active {
+  color: var(--bg);
+}
+
+/* Primary buttons in the New Project / New Idea sheets (and other
+   sheet CTAs). In dark mode the fill is near-white; default label
+   color of #fff disappears on it. Flip the label to the dark page bg
+   for readability, then restore white on :active because the press
+   state darkens the fill (see .ds-btn-primary:active earlier in this
+   file). Disabled state reads as a quiet dark-gray slab — matches the
+   rest of the dark surface language and avoids the bright #e5e5e5
+   block that the light-mode rule produced. */
+html[data-theme="dark"] .ds-btn-primary {
+  color: var(--bg);
+}
+html[data-theme="dark"] .ds-btn-primary:active {
+  color: #fff;
+}
+html[data-theme="dark"] .ds-btn-primary:disabled,
+html[data-theme="dark"] .ds-btn-primary[aria-disabled="true"] {
+  background: #2a2a2e;
+  border-color: #2a2a2e;
+  color: var(--ink-mute);
+}
+
+/* Generic .ds-selector (sheet-level selectors: New Idea Type chips,
+   Record-a-Moment type chips, etc.) and the sheet-selector-row variant
+   both need to mirror the attr-row-body treatment in dark mode so the
+   app speaks one selector language across surfaces: soft surface +
+   hairline border unselected; bg-secondary fill + crisp white outline
+   selected. Without this the light-mode #EDEDED border and #ffffff fill
+   bleed through in dark mode. */
+html[data-theme="dark"] .ds-selector,
+html[data-theme="dark"] .sheet-selector-row .ds-selector {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--ink-soft);
+}
+html[data-theme="dark"] .ds-selector.is-selected,
+html[data-theme="dark"] .sheet-selector-row .ds-selector.is-selected {
+  background: var(--bg-secondary);
+  color: var(--ink);
+  border-color: var(--ink);
 }
 
 .ds-btn-secondary {
