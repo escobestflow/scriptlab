@@ -16,7 +16,11 @@ export type EndingType =
 export type ProjectType = "feature" | "short" | "tv-show";
 
 export interface StorySettings {
-  framework: Framework;
+  /** Structural beat-skeleton the AI should use. `null` means the user
+   *  hasn't picked one yet — downstream prompts should omit any
+   *  framework-specific instructions and let the model choose what
+   *  fits the concept/genre. Not defaulted at project creation. */
+  framework: Framework | null;
   genres: Genre[];
   /** Stable ids from lib/subGenres.ts (e.g. "action:spy", "horror:slasher").
    *  Options are only surfaced in the UI when their parent genre is
@@ -247,7 +251,10 @@ export function emptyConceptDraft(id: string, number: number, ts: string): Conce
     id, number, createdAt: ts, updatedAt: ts, savedAt: ts,
     logline: "",
     settings: {
-      framework: "save-the-cat",
+      // Intentionally unset — the user picks Structure explicitly from
+      // the Concept tab. Defaulting to a framework biased every new
+      // project toward Save the Cat even when the writer had no opinion.
+      framework: null,
       genres: [],
       subGenres: [],
       references: [],

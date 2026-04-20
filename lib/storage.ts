@@ -54,7 +54,10 @@ function normalizeScript(s: any): Script {
 
 function normalizeSettings(s: any): StorySettings {
   return {
-    framework: s?.framework || "save-the-cat",
+    // Framework is optional. Legacy saves that explicitly stored a
+    // framework keep it; missing/empty normalizes to null so the UI
+    // can render "unset" and prompts can omit framework instructions.
+    framework: (s?.framework || null) as StorySettings["framework"],
     genres: s?.genres ?? (s?.genre ? [s.genre] : []),
     // Older saves predate sub-genres — default to an empty list.
     subGenres: Array.isArray(s?.subGenres) ? s.subGenres : [],

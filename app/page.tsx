@@ -1421,9 +1421,6 @@ function ProjectsTab({
                 {c.settings.genres?.length > 0 && c.settings.genres.map((g: string) => (
                   <span key={g} className="attr-pill">{g.toUpperCase()}</span>
                 ))}
-                <span className="attr-pill">
-                  {c.settings.framework.replace(/-/g, " ").toUpperCase()}
-                </span>
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
             </div>

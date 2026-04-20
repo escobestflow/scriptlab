@@ -2601,6 +2601,63 @@ function ConceptTab({
         )}
       </AttrRow>
 
+      {/* Structure — beat-skeleton framework the AI uses when generating
+          beats and syncing Story from other layers. Optional: if unset,
+          prompts tell the model to pick whatever fits the concept.
+          Rendered with the same .choice button treatment as Format, but
+          each option includes a 1–2 sentence description under the title
+          so newcomers can recognize what they're picking. */}
+      <AttrRow
+        label="Structure"
+        values={d.settings.framework
+          ? [d.settings.framework.replace(/-/g, " ").toUpperCase()]
+          : undefined}
+        placeholder="Pick a structure"
+        expanded={openAttr === "structure"}
+        onToggle={() => toggle("structure")}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {([
+            {
+              value: "save-the-cat" as const,
+              label: "Save the Cat",
+              description: "Blake Snyder's 15-beat feature template. Fixed landmarks — Catalyst, Midpoint, All Is Lost, Finale — mapped to page counts. Most common in studio film.",
+            },
+            {
+              value: "heros-journey" as const,
+              label: "Hero's Journey",
+              description: "Campbell and Vogler's 12-stage myth arc. Ordinary World → Call → Ordeal → Return with the elixir. Fits adventure, fantasy, and coming-of-age journeys.",
+            },
+            {
+              value: "three-act" as const,
+              label: "Three-Act",
+              description: "The classical Setup → Confrontation → Resolution scaffold. Minimal prescription — just three pivots. Works for any genre when other structures feel over-engineered.",
+            },
+            {
+              value: "story-circle" as const,
+              label: "Story Circle",
+              description: "Dan Harmon's 8-step circle: You → Need → Go → Search → Find → Take → Return → Change. Tight, character-focused, ideal for TV episodes and shorts.",
+            },
+          ]).map(f => (
+            <button
+              key={f.value}
+              className={`choice ${d.settings.framework === f.value ? "selected" : ""}`}
+              onClick={() => {
+                // Tap-to-toggle: tapping the already-selected structure
+                // clears it. Matches the behavior of single-select chips
+                // elsewhere in the Concept tab.
+                const next = d.settings.framework === f.value ? null : f.value;
+                updateDraft({ settings: { ...d.settings, framework: next } });
+              }}
+              style={{ textAlign: "left", padding: "12px 17px" }}
+            >
+              <div className="choice-title">{f.label}</div>
+              <div className="choice-sub">{f.description}</div>
+            </button>
+          ))}
+        </div>
+      </AttrRow>
+
       {/* Ending */}
       <AttrRow
         label="Ending"

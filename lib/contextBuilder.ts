@@ -64,7 +64,7 @@ ${logline || "(none yet)"}
 - Themes: ${concept?.themes?.join(", ") || "(none)"}
 
 ## Settings
-- Framework: ${settings.framework}
+- Framework: ${settings.framework ?? "unspecified (let the structure fit the concept)"}
 - Genres: ${settings.genres?.join(", ") || "none"}
 - Vibe: ${settings.vibe}
 - Unpredictability: ${settings.unpredictability}/10
@@ -114,7 +114,7 @@ function buildAsk(story: Story, action: ActionRequest): string {
   const d = { ...c, ...sl };
   switch (action.type) {
     case "generate_beats":
-      return `Generate a complete beat sheet for this project using the ${d.settings.framework} framework.
+      return `Generate a complete beat sheet for this project${d.settings.framework ? ` using the ${d.settings.framework} framework` : `, choosing whichever structural framework best fits the concept, genre, and tone`}.
 
 Return STRICT JSON in this exact schema:
 { "beats": [ { "name": string, "summary": string, "purpose": string } ] }
@@ -540,7 +540,11 @@ function syncPrompt_toStory(story: Story, source: "concept" | "characters" | "sc
   if (isTV) {
     return `Derive the Story layer (beat sheet) for this TV project from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
-${source === "script" ? "Extract the beat structure implicit in the scene prose." : `Use the ${framework} framework.`} Return a single pilot episode's worth of beats (one episode).
+${source === "script"
+  ? "Extract the beat structure implicit in the scene prose."
+  : framework
+    ? `Use the ${framework} framework.`
+    : "Choose whichever structural framework best fits the concept and genre, and apply it consistently."} Return a single pilot episode's worth of beats (one episode).
 
 Return STRICT JSON:
 {
@@ -557,7 +561,11 @@ Rules:
 
   return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
-${source === "script" ? "Extract the beat structure implicit in the scene prose — one beat per narrative turn, not per scene." : `Use the ${framework} framework to produce the full beat sheet.`}
+${source === "script"
+  ? "Extract the beat structure implicit in the scene prose — one beat per narrative turn, not per scene."
+  : framework
+    ? `Use the ${framework} framework to produce the full beat sheet.`
+    : "Choose whichever structural framework best fits the concept and genre, and produce the full beat sheet under it."}
 
 Return STRICT JSON:
 {
