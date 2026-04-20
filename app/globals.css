@@ -676,7 +676,8 @@ html[data-theme="dark"] .search-bar {
 .filter-row::-webkit-scrollbar { display: none; }
 .filter-pill {
   flex-shrink: 0;
-  padding: 8px 16px;
+  /* Vertical padding shaved 1px top + 1px bottom = 2px shorter pill. */
+  padding: 7px 16px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   font-size: 13px;
