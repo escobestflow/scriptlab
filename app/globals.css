@@ -525,6 +525,13 @@ html[data-theme="dark"] .topbar {
 html[data-theme="dark"] .tab .icon img { filter: invert(1); }
 .tab.active { color: var(--ink); }
 
+/* Dark-mode tab labels — the default --ink-ghost is too faint against
+   the near-black bg (reads as almost invisible). Promote deselected
+   labels to --ink-mute so they match the "REC" caption under the
+   record button and stay legible. Active tab still snaps to --ink. */
+html[data-theme="dark"] .tab { color: var(--ink-mute); }
+html[data-theme="dark"] .tab.active { color: var(--ink); }
+
 /* Record FAB — the centerpiece */
 .record-fab {
   width: 64px; height: 64px;
@@ -550,6 +557,13 @@ html[data-theme="dark"] .tab .icon img { filter: invert(1); }
   width: 22px; height: 22px;
   border-radius: 6px;
   background: var(--record);
+}
+/* Dark-mode record FAB — invert from black-on-dark to white-fill so the
+   button reads as a punchy beacon against the dark bg instead of melting
+   into it. The red dot stays red, now popping off the white fill. */
+html[data-theme="dark"] .record-fab {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.12);
 }
 .record-fab.recording {
   animation: fabPulse 1.4s ease-in-out infinite;
@@ -989,6 +1003,17 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   border-color: var(--ink);
 }
 
+/* Dark-mode generic .chip.selected — the light-mode default (var(--ink)
+   fill) inverts to a nearly-white pill in dark mode, which reads too
+   bright and loses the "selected = weighty" feel. Switch to a darker
+   neutral that sits one notch above the dark bg, paired with light ink
+   text, so selected chips read as a firm darker surface. */
+html[data-theme="dark"] .chip.selected {
+  background: #1c1c1f;
+  color: var(--ink);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
 /* ======= WIZARD PROGRESS ======= */
 
 .progress-dots {
@@ -1246,6 +1271,13 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background-size: 100% 100%;
   background-repeat: no-repeat;
   background-position: center;
+}
+/* Dark-mode override — drop the paper-gradient SVG for a flat black bar
+   so the sticky toolbar reads as a continuation of the dark topbar
+   rather than a light stripe breaking up the page. */
+html[data-theme="dark"] .layer-draft-picker {
+  background-image: none;
+  background-color: #000;
 }
 .layer-draft-trigger {
   display: inline-flex;
@@ -1971,6 +2003,14 @@ html[data-theme="dark"] .project-header-btn img { filter: invert(1); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Dark-mode attr-pill — the collapsed-row preview chips (e.g. "COMEDY"
+   in the Genre row). Light hardcoded grays become darker neutrals so
+   they blend with the dark surface rather than glaring off it. */
+html[data-theme="dark"] .attr-pill {
+  background: #1c1c1f;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--ink-soft);
+}
 .attr-placeholder {
   font-size: 13px;
   color: var(--ink-ghost);
@@ -2050,6 +2090,27 @@ html[data-theme="dark"] .project-header-btn img { filter: invert(1); }
   background: #F3F3F3;
   color: #3C3C42;
   border-color: #EDEDED;
+}
+
+/* Dark-mode overrides for the expanded attribute-row pickers. Default
+   (light) rules hardcode white/#F3F3F3, which in dark mode glare as
+   bright patches and make unselected vs selected indistinguishable.
+   Dark mode: unselected is transparent with a subtle border + muted
+   text; selected inverts to a light fill with dark text so the chosen
+   option pops off the dark surface unambiguously. */
+html[data-theme="dark"] .attr-row-body .ds-selector,
+html[data-theme="dark"] .attr-row-body .chip,
+html[data-theme="dark"] .attr-row-body .choice {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--ink-soft);
+}
+html[data-theme="dark"] .attr-row-body .ds-selector.is-selected,
+html[data-theme="dark"] .attr-row-body .chip.selected,
+html[data-theme="dark"] .attr-row-body .choice.selected {
+  background: #f5f5f7;
+  color: #0a0a0b;
+  border-color: #f5f5f7;
 }
 
 /* Inline chip selectors (genres, tones, themes, endings, archetypes,
