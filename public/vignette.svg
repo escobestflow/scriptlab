@@ -1,13 +1,13 @@
 <svg width="393" height="852" viewBox="0 0 393 852" preserveAspectRatio="none" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g clip-path="url(#clip0_90_1171)">
-<rect width="393" height="852" fill="url(#paint0_radial_90_1171)"/>
+<g clip-path="url(#clip0_105_1271)">
+<rect width="393" height="852" fill="url(#paint0_radial_105_1271)"/>
 </g>
 <defs>
-<radialGradient id="paint0_radial_90_1171" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(196.5 426) rotate(-90) scale(630.5 290.829)">
+<radialGradient id="paint0_radial_105_1271" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(196.5 426) rotate(-90) scale(630.5 290.829)">
 <stop stop-opacity="0"/>
-<stop offset="1"/>
+<stop offset="0.649038" stop-opacity="0.82"/>
 </radialGradient>
-<clipPath id="clip0_90_1171">
+<clipPath id="clip0_105_1271">
 <rect width="393" height="852" fill="white"/>
 </clipPath>
 </defs>
