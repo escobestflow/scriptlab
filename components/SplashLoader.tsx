@@ -157,21 +157,13 @@ export default function SplashLoader({
         <span>Sign in with Google</span>
       </button>
 
-      {/* Vignette overlay — radial gradient (transparent center → black edges) */}
-      <svg className="vignette-overlay" viewBox="0 0 393 852" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-        <defs>
-          <radialGradient id="vignetteGrad" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(196.5 426) rotate(-90) scale(630.5 290.829)">
-            <stop stopOpacity="0"/>
-            <stop offset="1"/>
-          </radialGradient>
-          <clipPath id="vignetteClip">
-            <rect width="393" height="852" fill="white"/>
-          </clipPath>
-        </defs>
-        <g clipPath="url(#vignetteClip)">
-          <rect width="393" height="852" fill="url(#vignetteGrad)"/>
-        </g>
-      </svg>
+      {/* Vignette overlay — loaded from /public/vignette.svg so the
+          asset can be swapped without touching component code. The
+          image stretches to fill the viewport (see .vignette-overlay
+          in the style block below: 100% x 100% on an <img> uses the
+          default object-fit: fill — exactly the "stretch to viewport"
+          behavior we want). */}
+      <img className="vignette-overlay" src="/vignette.svg" alt="" aria-hidden="true" />
 
       <div className="stage">
         {/* ===== STEP 6: OUTERMOST TOP ROW ===== */}
