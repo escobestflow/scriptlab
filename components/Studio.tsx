@@ -46,6 +46,8 @@ export function Studio({
   moments,
   onBack,
   isNew = false,
+  isFirstProject = false,
+  onOnboardingSeen,
   onCreateProjectFromDraft,
   onDeleteProject,
   autosaveEnabled = true,
@@ -57,6 +59,14 @@ export function Studio({
   moments: Moment[];
   onBack: () => void;
   isNew?: boolean;
+  /** True only for the user's very first project. Drives the one-time
+   *  welcome/onboarding sheet that explains drafts + Update Other Layers.
+   *  Must be combined with `isNew` for the sheet to show — we only greet
+   *  the user at the moment of creation, not on every re-entry. */
+  isFirstProject?: boolean;
+  /** Fires when the user dismisses the welcome sheet. Parent persists
+   *  the "has seen onboarding" flag so the sheet never appears again. */
+  onOnboardingSeen?: () => void;
   onCreateProjectFromDraft?: (newStory: Story) => void;
   onDeleteProject?: () => void;
   autosaveEnabled?: boolean;
@@ -70,10 +80,23 @@ export function Studio({
   // Writer-profile capture API — used to attach the profile to every AI
   // request and to pass profile-awareness down to tab components.
   const { profile } = useProfileCapture();
+  // First-project welcome/onboarding sheet — shown exactly once in the
+  // user's lifetime, right after they create their very first project.
+  // Explains what drafts are + how Update Other Layers works so they
+  // understand the layer model before they start editing. Dismissal
+  // calls onOnboardingSeen() so the parent persists the "seen" flag.
+  const [showWelcome, setShowWelcome] = useState(isNew && isFirstProject);
+  function dismissWelcome() {
+    setShowWelcome(false);
+    onOnboardingSeen?.();
+  }
   // "Project Created" toast — shown briefly after a new project is
   // created, then auto-hides. Mirrors the Idea-Added toast on the
   // main page; rendered at Studio root so it floats over any tab.
-  const [showSuccess, setShowSuccess] = useState(isNew);
+  // Suppressed when the welcome sheet is showing: the sheet itself is
+  // the confirmation in that case, and stacking the toast under it is
+  // redundant and visually noisy.
+  const [showSuccess, setShowSuccess] = useState(isNew && !(isNew && isFirstProject));
   useEffect(() => {
     if (!showSuccess) return;
     const t = setTimeout(() => setShowSuccess(false), 2000);
@@ -1035,6 +1058,59 @@ export function Studio({
       />
 
       {confirmDeleteDialog}
+
+      {/* First-project welcome sheet — shown once, right after the user
+          creates their very first project. Uses the same .sheet /
+          .sheet-backdrop plumbing as the other bottom sheets so it feels
+          native to the app. Backdrop tap and the primary button both
+          dismiss + mark onboarding seen. */}
+      <div
+        className={`sheet-backdrop ${showWelcome ? "open" : ""}`}
+        onClick={dismissWelcome}
+      />
+      <div className={`sheet sheet-tall ${showWelcome ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-body" style={{ whiteSpace: "normal", lineHeight: 1.55 }}>
+          <div className="display heading" style={{ marginTop: 25, marginBottom: 8 }}>
+            Nice job!
+          </div>
+          <div className="caption" style={{ marginBottom: 20 }}>
+            Your first project is live. Here's what to know before you dive in.
+          </div>
+
+          <p style={{ marginTop: 0 }}>
+            <strong>Make more projects.</strong> Every idea you're noodling on
+            deserves its own space — separate projects keep concepts, casts,
+            and scripts from bleeding into each other so you can jump between
+            them without losing your place.
+          </p>
+
+          <p>
+            <strong>Drafts are combinations.</strong> A project draft is just
+            one Concept + one Characters + one Story + one Script version
+            bundled together. Tweak a section freely — when you land on a
+            combo you like, save it as a new project draft and you can
+            always return to it.
+          </p>
+
+          <p style={{ marginBottom: 24 }}>
+            <strong>Skip ahead with Update Other Layers.</strong> You don't
+            have to fill every section yourself. Write a concept and tap
+            <em> Update Other Layers</em> on that tab to auto-generate
+            Characters, Story, and Script from what you have. Works from
+            any layer to any other.
+          </p>
+
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            onClick={dismissWelcome}
+          >
+            Got it
+          </Button>
+        </div>
+      </div>
 
       {/* Project-created toast (same pattern as Idea Added on main page) */}
       <div className={`toast ${showSuccess ? "show" : ""}`}>Project Created</div>

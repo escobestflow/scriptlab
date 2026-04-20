@@ -18,7 +18,28 @@ import { Button, Input, Textarea, Selector } from "@/components/ui";
 
 type View =
   | { kind: "main" }
-  | { kind: "studio"; projectId: string; isNew?: boolean };
+  | { kind: "studio"; projectId: string; isNew?: boolean; isFirstProject?: boolean };
+
+// localStorage key that gates the first-project onboarding sheet. Set once
+// the user dismisses the sheet; absence of this flag means "show welcome
+// the next time a new project is created". We intentionally don't tie this
+// to `projects.length === 0`: a user who deletes all projects and makes a
+// new one isn't a first-timer, so the flag is sticky across sessions.
+const ONBOARDING_FLAG_KEY = "unfold:first-project-onboarded";
+function hasSeenFirstProjectOnboarding(): boolean {
+  if (typeof window === "undefined") return true; // SSR: don't trigger
+  try {
+    return window.localStorage.getItem(ONBOARDING_FLAG_KEY) === "1";
+  } catch {
+    return true; // storage blocked → treat as seen so we don't nag
+  }
+}
+function markFirstProjectOnboardingSeen() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(ONBOARDING_FLAG_KEY, "1");
+  } catch { /* ignore */ }
+}
 
 type MainTab = "projects" | "moments";
 
@@ -363,7 +384,8 @@ export default function Page() {
     setProjects(ps => [saved, ...ps]);
     if (user) saveProjectToDB(user.id, saved);
     closeCreateModal();
-    setView({ kind: "studio", projectId: saved.id, isNew: true });
+    const firstTime = !hasSeenFirstProjectOnboarding();
+    setView({ kind: "studio", projectId: saved.id, isNew: true, isFirstProject: firstTime });
     generateThumbnail(saved.id, saved.title, getActiveConceptDraft(saved).logline, getActiveConceptDraft(saved).settings.genres);
   }
 
@@ -435,10 +457,13 @@ export default function Page() {
           moments={moments}
           onBack={() => setView({ kind: "main" })}
           isNew={(view as any).isNew ?? false}
+          isFirstProject={(view as any).isFirstProject ?? false}
+          onOnboardingSeen={markFirstProjectOnboardingSeen}
           onCreateProjectFromDraft={(newStory) => {
             setProjects(ps => [newStory, ...ps]);
             if (user) saveProjectToDB(user.id, newStory);
-            setView({ kind: "studio", projectId: newStory.id, isNew: true });
+            const firstTime = !hasSeenFirstProjectOnboarding();
+            setView({ kind: "studio", projectId: newStory.id, isNew: true, isFirstProject: firstTime });
           }}
           onDeleteProject={() => {
             const id = studioProject.id;
