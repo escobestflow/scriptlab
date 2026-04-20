@@ -667,7 +667,9 @@ html[data-theme="dark"] .search-bar {
 .filter-row {
   display: flex;
   gap: 8px;
-  padding-bottom: 16px;
+  /* Large padding-bottom creates the breathing room between the
+     horizontal filter-pill row and the first idea-list item beneath. */
+  padding-bottom: 160px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }

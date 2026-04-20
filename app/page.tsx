@@ -1369,7 +1369,7 @@ function ProjectsTab({
           size="sm"
           onClick={onNew}
           icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
-          style={{ transform: "translateY(-3px)", background: "#fff" }}
+          style={{ transform: "translateY(-7px)", background: "#fff" }}
         >
           New Project
         </Button>
@@ -1491,7 +1491,7 @@ function MomentsTab({
           size="sm"
           onClick={onNew}
           icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
-          style={{ transform: "translateY(-3px)", background: "#fff" }}
+          style={{ transform: "translateY(-7px)", background: "#fff" }}
         >
           New Idea
         </Button>
@@ -1500,7 +1500,7 @@ function MomentsTab({
       <div className="search-bar">
         <IconSearch />
         <input
-          placeholder="Search moments"
+          placeholder="Search ideas"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -1567,24 +1567,21 @@ function MomentsTab({
       ))}
 
       {/* Convert-notes output sheet — dev-only, shown after the API
-          returns a list of AI coding prompts. Copy button stamps the
-          whole block to the clipboard; Close dismisses. */}
+          returns a list of AI coding prompts. Minimal chrome: just a
+          scrollable text box of the converted output with Copy + Close
+          actions. Closing clears `convertOutput` so nothing lingers
+          between opens — re-tapping Convert re-fetches fresh. */}
       <div
         className={`sheet-backdrop ${convertSheetOpen ? "open" : ""}`}
-        onClick={() => { if (!convertBusy) setConvertSheetOpen(false); }}
+        onClick={() => {
+          if (convertBusy) return;
+          setConvertSheetOpen(false);
+          setConvertOutput("");
+        }}
       />
       <div className={`sheet ${convertSheetOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
-          <div className="display heading" style={{ marginTop: 25, marginBottom: 8 }}>
-            AI Prompts
-          </div>
-          <div className="caption" style={{ marginBottom: 20 }}>
-            {convertBusy
-              ? "Converting your notes into AI coding prompts…"
-              : `Polished prompts derived from ${filtered.length} note${filtered.length === 1 ? "" : "s"}.`}
-          </div>
-
           <div
             style={{
               whiteSpace: "pre-wrap",
@@ -1596,6 +1593,7 @@ function MomentsTab({
               padding: 12,
               maxHeight: "50vh",
               overflowY: "auto",
+              marginTop: 20,
               marginBottom: 14,
             }}
           >
@@ -1624,7 +1622,10 @@ function MomentsTab({
             <Button
               variant="primary"
               size="lg"
-              onClick={() => setConvertSheetOpen(false)}
+              onClick={() => {
+                setConvertSheetOpen(false);
+                setConvertOutput("");
+              }}
               disabled={convertBusy}
               style={{ flex: 1 }}
             >
