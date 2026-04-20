@@ -1272,13 +1272,14 @@ html[data-theme="dark"] .chip.selected {
   background-repeat: no-repeat;
   background-position: center;
 }
-/* Dark-mode override — drop the paper-gradient SVG for a flat charcoal
-   bar that matches the studio tab bar (#2a2a2e). This ties the sticky
-   toolbar into the same dark-surface family as the tab strip above it,
-   instead of reading as a black stripe breaking up the page. */
+/* Dark-mode override — drop the paper-gradient SVG entirely (it bakes
+   in light-tone pixels that can't be filtered on a dark bg) and
+   flatten the bar to the page background (var(--bg) = #0a0a0b). This
+   makes the layer-draft + update-other-layers row disappear into the
+   main surface, matching the home page bg. Light mode keeps the SVG. */
 html[data-theme="dark"] .layer-draft-picker {
   background-image: none;
-  background-color: #2a2a2e;
+  background-color: var(--bg);
 }
 .layer-draft-trigger {
   display: inline-flex;
@@ -1495,7 +1496,10 @@ html[data-theme="dark"] .layer-draft-picker {
   padding: 4px 0 0;
   background: #FBFCFD;
 }
-html[data-theme="dark"] .studio-header-sticky { background: #000; }
+/* Dark-mode sticky header — flatten to the page bg (--bg = #0a0a0b) so
+   the title + draft-dropdown row reads as part of the main surface,
+   not a separate dark-stripe container. Light mode keeps #FBFCFD. */
+html[data-theme="dark"] .studio-header-sticky { background: var(--bg); }
 .studio-header-sticky > :not(.studio-tabs-row) {
   padding-left: 20px;
   padding-right: 20px;
