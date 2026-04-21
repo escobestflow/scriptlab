@@ -1240,11 +1240,18 @@ html[data-theme="dark"] .chip.selected {
 }
 
 /* Step 4 — divider fades in just after the buttons land. Same
-   timing on both menus. */
+   timing on both menus. Visual styles (height/background/margin)
+   for the project-menu variant live alongside the layer variant
+   below so both render as matching 1px separators. */
 .project-draft-menu-divider,
 .layer-draft-menu-divider {
   opacity: 0;
   animation: projectDraftFadeIn 300ms cubic-bezier(0.22, 1, 0.36, 1) 380ms both;
+}
+.project-draft-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 0 10px;
 }
 
 /* Step 5 — draft items cascade in top-down via opacity only.
