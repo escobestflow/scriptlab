@@ -1194,7 +1194,7 @@ html[data-theme="dark"] .chip.selected {
 .drafts-dropdown-menu.project-draft-menu {
   min-width: 250px;
   max-width: 330px;
-  top: calc(100% - 82px);
+  top: calc(100% - 102px);
 }
 /* Cloned title + "Draft N ▾" trigger inside the project-draft
    dropdown, above the New Project Draft button. Overrides the
@@ -1214,7 +1214,7 @@ html[data-theme="dark"] .chip.selected {
 /* Pull the trigger up 4px so the title → "Draft N ▾" gap is
    visibly tighter than the original sticky-header spacing. */
 .project-draft-menu-header .drafts-dropdown-trigger {
-  margin-top: -4px;
+  margin-top: -7px;
 }
 .drafts-dropdown-item {
   display: flex;
