@@ -778,6 +778,23 @@ export function Studio({
             <>
               <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
               <div className="drafts-dropdown-menu project-draft-menu">
+                {/* Mirrored header: the same project title + "Draft N ▾"
+                    trigger pair that lives in the sticky studio header,
+                    duplicated here so the dropdown visibly "belongs" to
+                    the CTA that opened it. Tapping the cloned trigger
+                    closes the menu (it's the toggle counterpart of the
+                    one above). The caret is shown in the open state
+                    because the menu is, by definition, open. */}
+                <div className="project-draft-menu-header">
+                  <div className="project-header-title">{story.title || "Untitled"}</div>
+                  <button
+                    className="drafts-dropdown-trigger"
+                    onClick={() => setDraftsDropdownOpen(false)}
+                  >
+                    <span>Draft {activeProjectDraft.number}</span>
+                    <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
+                  </button>
+                </div>
                 <button className="drafts-dropdown-create" onClick={handleCreateNewProjectDraft}>
                   <span className="drafts-dropdown-create-icon">+</span>
                   <span>New Project Draft</span>

@@ -1192,9 +1192,27 @@ html[data-theme="dark"] .chip.selected {
    original compact width. Also drops below the trigger by 20px so
    the menu sits clearly off the CTA instead of nuzzling into it. */
 .drafts-dropdown-menu.project-draft-menu {
-  min-width: 260px;
-  max-width: 340px;
-  top: calc(100% - 20px);
+  min-width: 250px;
+  max-width: 330px;
+  top: calc(100% - 60px);
+}
+/* Cloned title + "Draft N ▾" trigger inside the project-draft
+   dropdown, above the New Project Draft button. Overrides the
+   trigger's negative top margin (which only makes sense under the
+   sticky header) so spacing inside the menu reads cleanly. A thin
+   separator + a bit of bottom padding keep it visually distinct
+   from the action button and the draft list below. */
+.project-draft-menu-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.project-draft-menu-header .drafts-dropdown-trigger {
+  margin-top: 0;
 }
 .drafts-dropdown-item {
   display: flex;
