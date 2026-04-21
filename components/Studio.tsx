@@ -8,7 +8,7 @@ import {
   getActiveProjectDraft,
   getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft,
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft,
-  createNewLayerDraft, switchLayerDraft, deleteLayerDraft,
+  createNewLayerDraft, createEmptyLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, duplicateActiveProjectDraft, createEmptyProjectDraft, switchProjectDraft, deleteProjectDraft,
   saveLayerDraft, isLayerDraftDirty,
   saveProjectDraft, isProjectDraftDirty,
@@ -1381,7 +1381,15 @@ function LayerDraftPicker({
   );
   const active = pool.find((d: any) => d.id === activeId) ?? pool[0];
 
+  // "New Draft" — fresh empty layer draft. For Concept this preserves
+  // the user's genres (project-identity level); everything else blanks.
   const handleCreate = () => {
+    setStory(s => createEmptyLayerDraft(s, layer));
+    setOpen(false);
+  };
+  // "Duplicate Draft" — clone the active draft's content forward
+  // under a new id + number (existing createNewLayerDraft semantics).
+  const handleDuplicate = () => {
     setStory(s => createNewLayerDraft(s, layer));
     setOpen(false);
   };
@@ -1419,10 +1427,31 @@ function LayerDraftPicker({
         <>
           <div className="drafts-dropdown-backdrop" onClick={() => setOpen(false)} />
           <div className="drafts-dropdown-menu layer-draft-menu">
-            <button className="drafts-dropdown-create" onClick={handleCreate}>
-              <span className="drafts-dropdown-create-icon">+</span>
-              <span>Create new draft</span>
-            </button>
+            {/* Same action-row pattern as the project-draft dropdown:
+                New Draft (primary, creates an empty draft) + Duplicate
+                Draft (secondary, clones the active draft forward). */}
+            <div className="layer-draft-menu-actions">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleCreate}
+                style={{ flex: 1 }}
+              >
+                New Draft
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleDuplicate}
+                style={{ flex: 1 }}
+              >
+                Duplicate Draft
+              </Button>
+            </div>
+            {/* Divider between the action row and the draft list, as
+                its own element so the entry animation can reveal it
+                with its own timing. */}
+            <div className="layer-draft-menu-divider" aria-hidden="true" />
             {sorted.map((d: any) => {
               const isActive = d.id === activeId;
               const date = new Date(d.updatedAt);

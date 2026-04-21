@@ -498,6 +498,114 @@ export function createNewScriptDraft(story: Story): Story {
   };
 }
 
+/**
+ * Create a fresh *empty* layer draft for the given layer and make it the
+ * active draft on the current project draft. Sibling to
+ * `createNewLayerDraft`, which clones the active draft's content forward
+ * (that's the "Duplicate" semantic). This is the "New Draft" semantic —
+ * start blank.
+ *
+ * Concept is a special case: genres are project-identity-level (chosen
+ * at project creation) so they carry forward onto the new Concept's
+ * settings. Everything else — logline, summary, tone, themes,
+ * framework, sub-genres, references, writer styles, vibe, numeric
+ * sliders, ending types — starts blank.
+ *
+ * For Characters / Story / Script, "empty" means no characters, no
+ * beats/episodes/ingredients/snippets, and no scenes respectively.
+ */
+export function createEmptyLayerDraft(story: Story, layer: LayerKey): Story {
+  const now = new Date().toISOString();
+  switch (layer) {
+    case "concept": {
+      const prevGenres = getActiveConceptDraft(story).settings.genres;
+      const draft = emptyConceptDraft(
+        genId("cd"),
+        nextDraftNumber(story.conceptDrafts),
+        now,
+      );
+      draft.settings = { ...draft.settings, genres: [...prevGenres] };
+      return {
+        ...story,
+        conceptDrafts: [...story.conceptDrafts, draft],
+        counters: {
+          ...story.counters,
+          concept: Math.max(story.counters.concept, draft.number),
+        },
+        projectDrafts: story.projectDrafts.map(pd =>
+          pd.id === story.activeProjectDraftId
+            ? { ...pd, conceptDraftId: draft.id, conceptSyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+    case "characters": {
+      const draft = emptyCharactersDraft(
+        genId("chd"),
+        nextDraftNumber(story.charactersDrafts),
+        now,
+      );
+      return {
+        ...story,
+        charactersDrafts: [...story.charactersDrafts, draft],
+        counters: {
+          ...story.counters,
+          characters: Math.max(story.counters.characters, draft.number),
+        },
+        projectDrafts: story.projectDrafts.map(pd =>
+          pd.id === story.activeProjectDraftId
+            ? { ...pd, charactersDraftId: draft.id, charactersSyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+    case "story": {
+      const draft = emptyStoryLayerDraft(
+        genId("sd"),
+        nextDraftNumber(story.storyDrafts),
+        now,
+      );
+      return {
+        ...story,
+        storyDrafts: [...story.storyDrafts, draft],
+        counters: {
+          ...story.counters,
+          story: Math.max(story.counters.story, draft.number),
+        },
+        projectDrafts: story.projectDrafts.map(pd =>
+          pd.id === story.activeProjectDraftId
+            ? { ...pd, storyDraftId: draft.id, storySyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+    case "script": {
+      const draft = emptyScriptDraft(
+        genId("scd"),
+        nextDraftNumber(story.scriptDrafts),
+        now,
+      );
+      return {
+        ...story,
+        scriptDrafts: [...story.scriptDrafts, draft],
+        counters: {
+          ...story.counters,
+          script: Math.max(story.counters.script, draft.number),
+        },
+        projectDrafts: story.projectDrafts.map(pd =>
+          pd.id === story.activeProjectDraftId
+            ? { ...pd, scriptDraftId: draft.id, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+  }
+}
+
 export function createNewLayerDraft(story: Story, layer: LayerKey): Story {
   switch (layer) {
     case "concept":    return createNewConceptDraft(story);
