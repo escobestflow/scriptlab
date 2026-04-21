@@ -1189,10 +1189,12 @@ html[data-theme="dark"] .chip.selected {
    row can fit "Concept N + Characters N + Story N + Script N" on one
    line without ellipsizing. Scoped via the extra .project-draft-menu
    class on the project dropdown, so layer-draft menus keep the
-   original compact width. */
+   original compact width. Also drops below the trigger by 20px so
+   the menu sits clearly off the CTA instead of nuzzling into it. */
 .drafts-dropdown-menu.project-draft-menu {
   min-width: 240px;
   max-width: 320px;
+  top: calc(100% + 20px);
 }
 .drafts-dropdown-item {
   display: flex;
