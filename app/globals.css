@@ -1185,6 +1185,15 @@ html[data-theme="dark"] .chip.selected {
   max-height: 60vh;
   overflow-y: auto;
 }
+/* Project-drafts variant — wider than the layer-draft menus so each
+   row can fit "Concept N + Characters N + Story N + Script N" on one
+   line without ellipsizing. Scoped via the extra .project-draft-menu
+   class on the project dropdown, so layer-draft menus keep the
+   original compact width. */
+.drafts-dropdown-menu.project-draft-menu {
+  min-width: 240px;
+  max-width: 320px;
+}
 .drafts-dropdown-item {
   display: flex;
   align-items: center;

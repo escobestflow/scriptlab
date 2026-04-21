@@ -777,10 +777,10 @@ export function Studio({
           {draftsDropdownOpen && (
             <>
               <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
-              <div className="drafts-dropdown-menu">
+              <div className="drafts-dropdown-menu project-draft-menu">
                 <button className="drafts-dropdown-create" onClick={handleCreateNewProjectDraft}>
                   <span className="drafts-dropdown-create-icon">+</span>
-                  <span>Create new project draft</span>
+                  <span>New Project Draft</span>
                 </button>
                 {[...story.projectDrafts]
                   .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -799,13 +799,21 @@ export function Studio({
                         className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
                         onClick={() => handleLoadProjectDraft(draft.id)}
                       >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-start" }}>
-                          <span>Draft {draft.number}</span>
+                        {/* Two stacked rows: top row carries the draft name on
+                            the left and its date on the far right (baseline
+                            aligned). Bottom row spells out the full layer
+                            combination so the user sees "Concept 1 +
+                            Characters 1 + Story 1 + Script 1" instead of the
+                            cryptic C/Ch/S/Sc shorthand. */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+                            <span>Draft {draft.number}</span>
+                            <span className="drafts-dropdown-date">{dateStr}</span>
+                          </div>
                           <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
-                            C{cNum} · Ch{chNum} · S{sNum} · Sc{scNum}
+                            Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
                           </span>
                         </div>
-                        <span className="drafts-dropdown-date">{dateStr}</span>
                       </button>
                     );
                   })}
