@@ -1198,6 +1198,95 @@ html[data-theme="dark"] .chip.selected {
   /* Base .drafts-dropdown-menu has padding: 6px; extra bottom space
      so the last draft item doesn't sit flush against the menu edge. */
   padding-bottom: 32px;
+
+  /* Entry animation — a single exhale from the trigger. The menu
+     unfurls from slightly above + slightly smaller, easing on a
+     custom curve that starts fast and decelerates long (cubic-bezier
+     shaped roughly like ease-out-quint). Transform origin is top-
+     center so the scale pivots from the CTA that opened it.
+     The base .drafts-dropdown-menu already uses translateX(-50%)
+     for horizontal centering, so the keyframes carry that translate
+     through every frame rather than clobbering it. */
+  transform-origin: 50% 0;
+  will-change: transform, opacity, filter;
+  animation: projectDraftMenuIn 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Children cascade — each direct child of the menu fades + lifts
+   into place on its own slightly delayed timeline, so the user's
+   eye tracks down the list rather than seeing everything land at
+   once. The stagger is small (30ms) to stay crisp, and the
+   opacity curve uses the same easing as the menu for cohesion. */
+.drafts-dropdown-menu.project-draft-menu > * {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: projectDraftItemIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(1) { animation-delay: 60ms; }
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(2) { animation-delay: 100ms; }
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(3) { animation-delay: 140ms; }
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(4) { animation-delay: 170ms; }
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(5) { animation-delay: 195ms; }
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(6) { animation-delay: 215ms; }
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(7) { animation-delay: 230ms; }
+.drafts-dropdown-menu.project-draft-menu > *:nth-child(n+8) { animation-delay: 240ms; }
+
+/* Backdrop gets a gentle fade-in so the context shift feels soft
+   instead of hard-cutting in alongside the menu. */
+.drafts-dropdown-backdrop {
+  animation: projectDraftBackdropIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes projectDraftMenuIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.96);
+    filter: blur(2px);
+  }
+  60% {
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes projectDraftItemIn {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes projectDraftBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Respect reduced-motion preferences — collapse animation to a
+   simple fade so motion-sensitive users still get the state
+   change without the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .drafts-dropdown-menu.project-draft-menu,
+  .drafts-dropdown-menu.project-draft-menu > *,
+  .drafts-dropdown-backdrop {
+    animation-duration: 160ms !important;
+    animation-timing-function: ease-out !important;
+    animation-delay: 0ms !important;
+  }
+  .drafts-dropdown-menu.project-draft-menu {
+    animation-name: projectDraftBackdropIn;
+  }
+  .drafts-dropdown-menu.project-draft-menu > * {
+    transform: none;
+    animation-name: projectDraftBackdropIn;
+  }
 }
 /* Side-by-side New Draft (primary) + Duplicate Draft (secondary)
    action row inside the project-draft menu. Each button flexes to
