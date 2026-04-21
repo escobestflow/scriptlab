@@ -9,7 +9,7 @@ import {
   getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft,
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft,
   createNewLayerDraft, switchLayerDraft, deleteLayerDraft,
-  createNewProjectDraft, switchProjectDraft, deleteProjectDraft,
+  createNewProjectDraft, duplicateActiveProjectDraft, switchProjectDraft, deleteProjectDraft,
   saveLayerDraft, isLayerDraftDirty,
   saveProjectDraft, isProjectDraftDirty,
   isLayerChangedForTabDot, isConceptFieldDirty, ConceptField,
@@ -263,6 +263,13 @@ export function Studio({
   // ── Draft management actions (project-level) ──
   const handleCreateNewProjectDraft = () => {
     setStory(s => createNewProjectDraft(s));
+    setDraftsDropdownOpen(false);
+  };
+  const handleDuplicateProjectDraft = () => {
+    // Deep-copy the active project draft: new PD + fresh clones of all
+    // four layer drafts, so edits to the new draft don't leak back into
+    // the source.
+    setStory(s => duplicateActiveProjectDraft(s));
     setDraftsDropdownOpen(false);
   };
   const handleLoadProjectDraft = (draftId: string) => {
@@ -795,6 +802,21 @@ export function Studio({
                     <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
                   </button>
                 </div>
+                {/* Duplicate = deep-clone the active draft (new PD + new
+                    copies of each layer draft) so subsequent edits don't
+                    leak back into the source. Small copy icon
+                    differentiates it from "New Project Draft" below,
+                    which creates a fresh draft that still shares layer
+                    pointers with the current draft. */}
+                <button className="drafts-dropdown-create" onClick={handleDuplicateProjectDraft}>
+                  <span className="drafts-dropdown-create-icon" aria-hidden="true">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="9" width="12" height="12" rx="2" />
+                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                    </svg>
+                  </span>
+                  <span>Duplicate Project Draft</span>
+                </button>
                 <button className="drafts-dropdown-create" onClick={handleCreateNewProjectDraft}>
                   <span className="drafts-dropdown-create-icon">+</span>
                   <span>New Project Draft</span>

@@ -703,6 +703,28 @@ export function createNewProjectDraft(story: Story): Story {
   };
 }
 
+/**
+ * Duplicate the currently active project draft into a fresh, independent
+ * copy. Unlike `createNewProjectDraft` — which creates a new project-draft
+ * row that still shares layer pointers with the original — this also
+ * clones each of the four underlying layer drafts so edits to the new
+ * project draft don't leak back into the source.
+ *
+ * Implementation: compose the existing primitives. `createNewProjectDraft`
+ * first creates the new project draft and makes it active; then each
+ * `createNewLayerDraft(next, <layer>)` clones the active layer draft and
+ * repoints the now-active (new) project draft at the clone. Result: a
+ * new PD whose four layer pointers are all freshly-minted.
+ */
+export function duplicateActiveProjectDraft(story: Story): Story {
+  let next = createNewProjectDraft(story);
+  next = createNewLayerDraft(next, "concept");
+  next = createNewLayerDraft(next, "characters");
+  next = createNewLayerDraft(next, "story");
+  next = createNewLayerDraft(next, "script");
+  return next;
+}
+
 export function switchProjectDraft(story: Story, id: string): Story {
   if (!story.projectDrafts.some(pd => pd.id === id)) return story;
   return {
