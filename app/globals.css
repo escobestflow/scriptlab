@@ -1194,39 +1194,48 @@ html[data-theme="dark"] .chip.selected {
 .drafts-dropdown-menu.project-draft-menu {
   min-width: 258px;
   max-width: 338px;
-  top: calc(100% - 115px);
-  /* Base .drafts-dropdown-menu has padding: 6px; add 24px below the
-     last draft item so it doesn't sit flush against the menu edge. */
-  padding-bottom: 30px;
+  top: calc(100% - 116px);
+  /* Base .drafts-dropdown-menu has padding: 6px; extra bottom space
+     so the last draft item doesn't sit flush against the menu edge. */
+  padding-bottom: 40px;
 }
 /* Side-by-side New Draft (primary) + Duplicate Draft (secondary)
    action row inside the project-draft menu. Each button flexes to
-   equal width so the row spans the content area cleanly. Bottom
-   margin separates the action group from the draft list below. */
+   equal width so the row spans the content area cleanly. The divider
+   lives under this row (rather than above it) so the action group
+   reads as an extension of the cloned header; the draft list below
+   begins cleanly after the separator. */
 .project-draft-menu-actions {
   display: flex;
   gap: 8px;
+  padding-bottom: 10px;
   margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
 }
 /* Cloned title + "Draft N ▾" trigger inside the project-draft
-   dropdown, above the New Project Draft button. Overrides the
-   trigger's negative top margin (which only makes sense under the
-   sticky header) so spacing inside the menu reads cleanly. A thin
-   separator + a bit of bottom padding keep it visually distinct
-   from the action button and the draft list below. */
+   dropdown, above the action row. Overrides the trigger's negative
+   top margin (which only makes sense under the sticky header) so
+   spacing inside the menu reads cleanly. No border here — the
+   divider moved down under the action row. */
 .project-draft-menu-header {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
   padding: 10px 8px 10px;
-  border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
 }
-/* Pull the trigger up 4px so the title → "Draft N ▾" gap is
-   visibly tighter than the original sticky-header spacing. */
+/* Pull the trigger up slightly so the title → "Draft N ▾" gap
+   reads tighter than the original sticky-header spacing. */
 .project-draft-menu-header .drafts-dropdown-trigger {
-  margin-top: -8px;
+  margin-top: -7px;
+}
+/* Small circular check glyph next to the currently-selected draft's
+   label. Inherits color from the item's text so it tracks active/hover
+   state without explicit overrides. */
+.drafts-dropdown-item-check {
+  flex-shrink: 0;
+  color: var(--ink);
 }
 .drafts-dropdown-item {
   display: flex;

@@ -373,10 +373,28 @@ export function updateScriptDraft(story: Story, patch: Partial<ScriptLayerDraft>
 // ── Helpers: create new layer draft ──
 // Snapshot current active layer content as a new draft, point active project draft at it.
 
+/**
+ * Compute the next draft number by taking max(existing numbers) + 1.
+ *
+ * We intentionally derive this from the *surviving* drafts rather than from
+ * a monotonically-growing counter. If the user has Draft 1, Draft 2, Draft 3
+ * and deletes Draft 3, the next created draft should be Draft 3 again — the
+ * visible sequence stays contiguous instead of jumping to Draft 4 and leaving
+ * a gap. A counter-based approach would produce "Draft 1, Draft 2, Draft 4",
+ * which reads as if a draft is missing.
+ *
+ * If an earlier draft is deleted (e.g., Draft 2 in a 1/2/3 list) max + 1
+ * still yields 4 → "Draft 1, Draft 3, Draft 4", which matches the user's
+ * phrasing: continue the sequence based off the *last* numbered draft.
+ */
+function nextDraftNumber(drafts: { number: number }[]): number {
+  return drafts.reduce((m, d) => (d.number > m ? d.number : m), 0) + 1;
+}
+
 export function createNewConceptDraft(story: Story): Story {
   const now = new Date().toISOString();
   const active = getActiveConceptDraft(story);
-  const nextNumber = story.counters.concept + 1;
+  const nextNumber = nextDraftNumber(story.conceptDrafts);
   const newDraft: ConceptLayerDraft = {
     ...active,
     id: genId("cd"),
@@ -408,7 +426,7 @@ export function createNewConceptDraft(story: Story): Story {
 export function createNewCharactersDraft(story: Story): Story {
   const now = new Date().toISOString();
   const active = getActiveCharactersDraft(story);
-  const nextNumber = story.counters.characters + 1;
+  const nextNumber = nextDraftNumber(story.charactersDrafts);
   const newDraft: CharactersLayerDraft = {
     ...active,
     id: genId("chd"),
@@ -433,7 +451,7 @@ export function createNewCharactersDraft(story: Story): Story {
 export function createNewStoryLayerDraft(story: Story): Story {
   const now = new Date().toISOString();
   const active = getActiveStoryLayerDraft(story);
-  const nextNumber = story.counters.story + 1;
+  const nextNumber = nextDraftNumber(story.storyDrafts);
   const newDraft: StoryLayerDraft = {
     ...active,
     id: genId("sd"),
@@ -458,7 +476,7 @@ export function createNewStoryLayerDraft(story: Story): Story {
 export function createNewScriptDraft(story: Story): Story {
   const now = new Date().toISOString();
   const active = getActiveScriptDraft(story);
-  const nextNumber = story.counters.script + 1;
+  const nextNumber = nextDraftNumber(story.scriptDrafts);
   const newDraft: ScriptLayerDraft = {
     ...active,
     id: genId("scd"),
@@ -675,7 +693,7 @@ export function deleteLayerDraft(story: Story, layer: LayerKey, draftId: string)
 export function createNewProjectDraft(story: Story): Story {
   const now = new Date().toISOString();
   const active = getActiveProjectDraft(story);
-  const nextNumber = story.counters.project + 1;
+  const nextNumber = nextDraftNumber(story.projectDrafts);
   const newPD: ProjectDraft = {
     id: genId("pd"),
     number: nextNumber,

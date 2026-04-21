@@ -835,6 +835,10 @@ export function Studio({
                     const isActive = draft.id === story.activeProjectDraftId;
                     const date = new Date(draft.updatedAt);
                     const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    // Timestamp in "11:47PM" form (no space between minutes and AM/PM).
+                    const timeStr = date
+                      .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+                      .replace(" ", "");
                     // Badge showing which layer drafts this project draft references
                     const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
                     const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
@@ -853,9 +857,28 @@ export function Studio({
                             Characters 1 + Story 1 + Script 1" instead of the
                             cryptic C/Ch/S/Sc shorthand. */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
-                            <span>Draft {draft.number}</span>
-                            <span className="drafts-dropdown-date">{dateStr}</span>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              Draft {draft.number}
+                              {isActive && (
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                  className="drafts-dropdown-item-check"
+                                >
+                                  <circle cx="12" cy="12" r="10" />
+                                  <path d="M9 12l2 2 4-4" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
                           </div>
                           <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
                             Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
