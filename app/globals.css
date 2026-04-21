@@ -1251,6 +1251,13 @@ html[data-theme="dark"] .chip.selected {
   height: 14px;
   margin-right: 2px;
 }
+/* Dark mode: the button's background uses var(--ink), which flips to
+   near-white in dark mode, making the hard-coded white label invisible.
+   Force the label (and its `+` icon) to black so the button reads. */
+html[data-theme="dark"] .drafts-dropdown-create,
+html[data-theme="dark"] .drafts-dropdown-create-icon {
+  color: #000;
+}
 .drafts-dropdown-date {
   font-size: 11px;
   color: var(--ink-mute);
@@ -1886,6 +1893,11 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
   font-size: 16px;
   font-weight: 900;
   flex-shrink: 0;
+}
+/* Dark mode: var(--ink) flips to near-white, so the hard-coded white
+   initial disappears on a white disc. Force the initial to black. */
+html[data-theme="dark"] .character-avatar {
+  color: #000;
 }
 .character-body {
   padding-top: 14px;
