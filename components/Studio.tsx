@@ -9,7 +9,7 @@ import {
   getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft,
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft,
   createNewLayerDraft, switchLayerDraft, deleteLayerDraft,
-  createNewProjectDraft, duplicateActiveProjectDraft, switchProjectDraft, deleteProjectDraft,
+  createNewProjectDraft, duplicateActiveProjectDraft, createEmptyProjectDraft, switchProjectDraft, deleteProjectDraft,
   saveLayerDraft, isLayerDraftDirty,
   saveProjectDraft, isProjectDraftDirty,
   isLayerChangedForTabDot, isConceptFieldDirty, ConceptField,
@@ -262,7 +262,12 @@ export function Studio({
 
   // ── Draft management actions (project-level) ──
   const handleCreateNewProjectDraft = () => {
-    setStory(s => createNewProjectDraft(s));
+    // "New Draft" = fresh empty project draft: new empty layer drafts
+    // across all four layers, but project-level identity (title, format,
+    // genres) is carried forward. Genres are preserved on the new Concept
+    // draft's settings; title + projectType live on Story itself so they
+    // naturally persist.
+    setStory(s => createEmptyProjectDraft(s));
     setDraftsDropdownOpen(false);
   };
   const handleDuplicateProjectDraft = () => {
@@ -806,8 +811,9 @@ export function Studio({
                     (secondary), side by side. Each takes equal width so
                     the row spans the same content area as the draft list
                     items below.
-                    - "New Draft" = createNewProjectDraft (new PD that
-                      still shares layer pointers with the current draft).
+                    - "New Draft" = createEmptyProjectDraft (fresh empty
+                      layer drafts across all four layers; preserves the
+                      project's title, format, and genres).
                     - "Duplicate Draft" = duplicateActiveProjectDraft
                       (deep-clone: new PD + fresh copies of all four
                       layer drafts, so edits don't leak back). */}

@@ -1194,10 +1194,10 @@ html[data-theme="dark"] .chip.selected {
 .drafts-dropdown-menu.project-draft-menu {
   min-width: 258px;
   max-width: 338px;
-  top: calc(100% - 116px);
+  top: calc(100% - 117px);
   /* Base .drafts-dropdown-menu has padding: 6px; extra bottom space
      so the last draft item doesn't sit flush against the menu edge. */
-  padding-bottom: 40px;
+  padding-bottom: 32px;
 }
 /* Side-by-side New Draft (primary) + Duplicate Draft (secondary)
    action row inside the project-draft menu. Each button flexes to

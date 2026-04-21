@@ -743,6 +743,88 @@ export function duplicateActiveProjectDraft(story: Story): Story {
   return next;
 }
 
+/**
+ * Create a brand-new, empty project draft and make it active.
+ *
+ * Unlike `createNewProjectDraft` (which inherits the current layer-draft
+ * pointers) or `duplicateActiveProjectDraft` (which deep-clones them),
+ * this creates a fresh empty draft in every layer. The only content
+ * carried forward is the user's original project-level choices:
+ *   - title (lives on Story itself, not a layer draft)
+ *   - projectType / format (lives on Story itself)
+ *   - genres (lives inside Concept.settings — preserved explicitly)
+ *
+ * Everything else — logline, summary, tone, themes, framework, sub-genres,
+ * references, writer styles, vibe, numeric sliders, ending types,
+ * characters, beats/episodes/ingredients/snippets, scenes — starts blank.
+ */
+export function createEmptyProjectDraft(story: Story): Story {
+  const now = new Date().toISOString();
+  const prevGenres = getActiveConceptDraft(story).settings.genres;
+
+  const conceptDraft = emptyConceptDraft(
+    genId("cd"),
+    nextDraftNumber(story.conceptDrafts),
+    now,
+  );
+  // Carry genres forward — the user chose them at project creation and
+  // they're project-identity level, not per-draft-exploration.
+  conceptDraft.settings = { ...conceptDraft.settings, genres: [...prevGenres] };
+
+  const charactersDraft = emptyCharactersDraft(
+    genId("chd"),
+    nextDraftNumber(story.charactersDrafts),
+    now,
+  );
+  const storyDraft = emptyStoryLayerDraft(
+    genId("sd"),
+    nextDraftNumber(story.storyDrafts),
+    now,
+  );
+  const scriptDraft = emptyScriptDraft(
+    genId("scd"),
+    nextDraftNumber(story.scriptDrafts),
+    now,
+  );
+
+  const newPD: ProjectDraft = {
+    id: genId("pd"),
+    number: nextDraftNumber(story.projectDrafts),
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    conceptDraftId: conceptDraft.id,
+    charactersDraftId: charactersDraft.id,
+    storyDraftId: storyDraft.id,
+    scriptDraftId: scriptDraft.id,
+    savedConceptDraftId: conceptDraft.id,
+    savedCharactersDraftId: charactersDraft.id,
+    savedStoryDraftId: storyDraft.id,
+    savedScriptDraftId: scriptDraft.id,
+    conceptSyncedAt: now,
+    charactersSyncedAt: now,
+    storySyncedAt: now,
+  };
+
+  return {
+    ...story,
+    conceptDrafts: [...story.conceptDrafts, conceptDraft],
+    charactersDrafts: [...story.charactersDrafts, charactersDraft],
+    storyDrafts: [...story.storyDrafts, storyDraft],
+    scriptDrafts: [...story.scriptDrafts, scriptDraft],
+    projectDrafts: [...story.projectDrafts, newPD],
+    activeProjectDraftId: newPD.id,
+    counters: {
+      concept: Math.max(story.counters.concept, conceptDraft.number),
+      characters: Math.max(story.counters.characters, charactersDraft.number),
+      story: Math.max(story.counters.story, storyDraft.number),
+      script: Math.max(story.counters.script, scriptDraft.number),
+      project: Math.max(story.counters.project, newPD.number),
+    },
+    updatedAt: now,
+  };
+}
+
 export function switchProjectDraft(story: Story, id: string): Story {
   if (!story.projectDrafts.some(pd => pd.id === id)) return story;
   return {
