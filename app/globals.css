@@ -1199,61 +1199,97 @@ html[data-theme="dark"] .chip.selected {
      so the last draft item doesn't sit flush against the menu edge. */
   padding-bottom: 32px;
 
-  /* Entry animation — a single exhale from the trigger. The menu
-     unfurls from slightly above + slightly smaller, easing on a
-     custom curve that starts fast and decelerates long (cubic-bezier
-     shaped roughly like ease-out-quint). Transform origin is top-
-     center so the scale pivots from the CTA that opened it.
-     The base .drafts-dropdown-menu already uses translateX(-50%)
-     for horizontal centering, so the keyframes carry that translate
+  /* ── Entry animation: sequenced reveal ──────────────────────────
+     Step 1 — the surface itself fades in (opacity + a whisper of
+     scale/lift). Everything inside is hidden at t=0 and reveals on
+     its own delayed timeline below, so the user sees the container
+     land first and then the contents cascade in a specific order:
+     header → New Draft → Duplicate Draft → divider → items (top→
+     bottom). Uses ease-out-quint shaping for a smooth, decelerating
+     motion. The base .drafts-dropdown-menu already uses
+     translateX(-50%) for horizontal centering; keyframes carry that
      through every frame rather than clobbering it. */
   transform-origin: 50% 0;
-  will-change: transform, opacity, filter;
-  animation: projectDraftMenuIn 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+  animation: projectDraftMenuIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Children cascade — each direct child of the menu fades + lifts
-   into place on its own slightly delayed timeline, so the user's
-   eye tracks down the list rather than seeing everything land at
-   once. The stagger is small (30ms) to stay crisp, and the
-   opacity curve uses the same easing as the menu for cohesion. */
-.drafts-dropdown-menu.project-draft-menu > * {
+/* Step 2 — cloned header (title + "Draft N ▾" trigger) fades in
+   just after the container lands, so the head of the menu reads
+   first before the action controls arrive. */
+.project-draft-menu-header {
+  opacity: 0;
+  animation: projectDraftFadeIn 280ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+}
+
+/* Step 3 — New Draft then Duplicate Draft, in that order. Each
+   button fades + lifts 4px into place. The buttons are siblings
+   inside the actions row; :nth-child targets them individually so
+   the primary action (New Draft) enters first and reads as the
+   lead, with Duplicate arriving just after. */
+.project-draft-menu-actions > * {
   opacity: 0;
   transform: translateY(4px);
-  animation: projectDraftItemIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: projectDraftLiftIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(1) { animation-delay: 60ms; }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(2) { animation-delay: 100ms; }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(3) { animation-delay: 140ms; }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(4) { animation-delay: 170ms; }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(5) { animation-delay: 195ms; }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(6) { animation-delay: 215ms; }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(7) { animation-delay: 230ms; }
-.drafts-dropdown-menu.project-draft-menu > *:nth-child(n+8) { animation-delay: 240ms; }
+.project-draft-menu-actions > *:nth-child(1) { animation-delay: 260ms; }
+.project-draft-menu-actions > *:nth-child(2) { animation-delay: 340ms; }
+
+/* Step 4 — divider reveals with a horizontal scaleX from the
+   center, so the line "draws in" from the middle outward. Uses
+   its own keyframe so the transform animates independently of
+   any translate/scale on ancestors. */
+.project-draft-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 10px 0 10px;
+  transform-origin: 50% 50%;
+  animation: projectDraftDividerIn 320ms cubic-bezier(0.22, 1, 0.36, 1) 440ms both;
+}
+
+/* Step 5 — draft items cascade in top-down. Items are the
+   direct-child buttons of the menu (the New Draft / Duplicate
+   Draft buttons live inside .project-draft-menu-actions, so they
+   are NOT counted by :nth-of-type here). Stagger is 55ms per
+   item — tight enough to feel brisk, loose enough to read as
+   sequential rather than simultaneous. */
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: projectDraftLiftIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(1) { animation-delay: 540ms; }
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(2) { animation-delay: 595ms; }
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(3) { animation-delay: 650ms; }
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(4) { animation-delay: 705ms; }
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(5) { animation-delay: 760ms; }
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(6) { animation-delay: 805ms; }
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(7) { animation-delay: 845ms; }
+.drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item:nth-of-type(n+8) { animation-delay: 880ms; }
 
 /* Backdrop gets a gentle fade-in so the context shift feels soft
    instead of hard-cutting in alongside the menu. */
 .drafts-dropdown-backdrop {
-  animation: projectDraftBackdropIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: projectDraftFadeIn 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes projectDraftMenuIn {
   0% {
     opacity: 0;
-    transform: translateX(-50%) translateY(-8px) scale(0.96);
-    filter: blur(2px);
-  }
-  60% {
-    filter: blur(0);
+    transform: translateX(-50%) translateY(-6px) scale(0.98);
   }
   100% {
     opacity: 1;
     transform: translateX(-50%) translateY(0) scale(1);
-    filter: blur(0);
   }
 }
 
-@keyframes projectDraftItemIn {
+@keyframes projectDraftFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes projectDraftLiftIn {
   0% {
     opacity: 0;
     transform: translateY(4px);
@@ -1264,42 +1300,38 @@ html[data-theme="dark"] .chip.selected {
   }
 }
 
-@keyframes projectDraftBackdropIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+@keyframes projectDraftDividerIn {
+  0%   { opacity: 0; transform: scaleX(0); }
+  100% { opacity: 1; transform: scaleX(1); }
 }
 
-/* Respect reduced-motion preferences — collapse animation to a
+/* Respect reduced-motion preferences — collapse everything to a
    simple fade so motion-sensitive users still get the state
    change without the movement. */
 @media (prefers-reduced-motion: reduce) {
   .drafts-dropdown-menu.project-draft-menu,
   .drafts-dropdown-menu.project-draft-menu > *,
+  .drafts-dropdown-menu.project-draft-menu > button.drafts-dropdown-item,
+  .project-draft-menu-header,
+  .project-draft-menu-actions > *,
+  .project-draft-menu-divider,
   .drafts-dropdown-backdrop {
     animation-duration: 160ms !important;
     animation-timing-function: ease-out !important;
     animation-delay: 0ms !important;
-  }
-  .drafts-dropdown-menu.project-draft-menu {
-    animation-name: projectDraftBackdropIn;
-  }
-  .drafts-dropdown-menu.project-draft-menu > * {
-    transform: none;
-    animation-name: projectDraftBackdropIn;
+    animation-name: projectDraftFadeIn !important;
+    transform: none !important;
   }
 }
 /* Side-by-side New Draft (primary) + Duplicate Draft (secondary)
    action row inside the project-draft menu. Each button flexes to
-   equal width so the row spans the content area cleanly. The divider
-   lives under this row (rather than above it) so the action group
-   reads as an extension of the cloned header; the draft list below
-   begins cleanly after the separator. */
+   equal width so the row spans the content area cleanly. The
+   divider lives as its own element (.project-draft-menu-divider)
+   between this row and the draft list, so it can reveal with its
+   own animation timing independent of either group. */
 .project-draft-menu-actions {
   display: flex;
   gap: 8px;
-  padding-bottom: 10px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--border);
 }
 /* Cloned title + "Draft N ▾" trigger inside the project-draft
    dropdown, above the action row. Overrides the trigger's negative
@@ -1318,13 +1350,6 @@ html[data-theme="dark"] .chip.selected {
    reads tighter than the original sticky-header spacing. */
 .project-draft-menu-header .drafts-dropdown-trigger {
   margin-top: -7px;
-}
-/* Small circular check glyph next to the currently-selected draft's
-   label. Inherits color from the item's text so it tracks active/hover
-   state without explicit overrides. */
-.drafts-dropdown-item-check {
-  flex-shrink: 0;
-  color: var(--ink);
 }
 .drafts-dropdown-item {
   display: flex;

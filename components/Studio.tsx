@@ -103,6 +103,23 @@ export function Studio({
     return () => clearTimeout(t);
   }, [showSuccess]);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
+  // Mutual exclusion between the project-drafts dropdown and any
+  // LayerDraftPicker dropdown: whenever one opens, it broadcasts a
+  // "draft-dropdown:open" event with its own id, and every other
+  // dropdown closes itself. Keeps only one list on screen at a time.
+  useEffect(() => {
+    if (draftsDropdownOpen) {
+      window.dispatchEvent(
+        new CustomEvent("draft-dropdown:open", { detail: "project" }),
+      );
+    }
+    const onOther = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail !== "project") setDraftsDropdownOpen(false);
+    };
+    window.addEventListener("draft-dropdown:open", onOther);
+    return () => window.removeEventListener("draft-dropdown:open", onOther);
+  }, [draftsDropdownOpen]);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const thumbRef = useRef<HTMLDivElement>(null);
@@ -835,6 +852,12 @@ export function Studio({
                     Duplicate Draft
                   </Button>
                 </div>
+                {/* Divider between the action row and the draft list.
+                    Pulled out as its own element (rather than a border
+                    on the actions row) so the entry animation can
+                    reveal it with its own timing — scaleX from center
+                    after both buttons have landed. */}
+                <div className="project-draft-menu-divider" aria-hidden="true" />
                 {[...story.projectDrafts]
                   .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
                   .map(draft => {
@@ -864,26 +887,7 @@ export function Studio({
                             cryptic C/Ch/S/Sc shorthand. */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                              Draft {draft.number}
-                              {isActive && (
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  aria-hidden="true"
-                                  className="drafts-dropdown-item-check"
-                                >
-                                  <circle cx="12" cy="12" r="10" />
-                                  <path d="M9 12l2 2 4-4" />
-                                </svg>
-                              )}
-                            </span>
+                            <span>Draft {draft.number}</span>
                             <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
                           </div>
                           <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
@@ -1344,6 +1348,23 @@ function LayerDraftPicker({
   autosaveEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+
+  // Mutual exclusion with the project-drafts dropdown and other
+  // layer dropdowns: when this one opens, broadcast our layer id so
+  // everyone else closes; when anyone else broadcasts, close this one.
+  useEffect(() => {
+    if (open) {
+      window.dispatchEvent(
+        new CustomEvent("draft-dropdown:open", { detail: layer }),
+      );
+    }
+    const onOther = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail !== layer) setOpen(false);
+    };
+    window.addEventListener("draft-dropdown:open", onOther);
+    return () => window.removeEventListener("draft-dropdown:open", onOther);
+  }, [open, layer]);
 
   const pool = (
     layer === "concept"    ? story.conceptDrafts :
