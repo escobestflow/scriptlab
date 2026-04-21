@@ -802,25 +802,33 @@ export function Studio({
                     <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
                   </button>
                 </div>
-                {/* Duplicate = deep-clone the active draft (new PD + new
-                    copies of each layer draft) so subsequent edits don't
-                    leak back into the source. Small copy icon
-                    differentiates it from "New Project Draft" below,
-                    which creates a fresh draft that still shares layer
-                    pointers with the current draft. */}
-                <button className="drafts-dropdown-create" onClick={handleDuplicateProjectDraft}>
-                  <span className="drafts-dropdown-create-icon" aria-hidden="true">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="12" height="12" rx="2" />
-                      <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                    </svg>
-                  </span>
-                  <span>Duplicate Project Draft</span>
-                </button>
-                <button className="drafts-dropdown-create" onClick={handleCreateNewProjectDraft}>
-                  <span className="drafts-dropdown-create-icon">+</span>
-                  <span>New Project Draft</span>
-                </button>
+                {/* Action row: New Draft (primary) + Duplicate Draft
+                    (secondary), side by side. Each takes equal width so
+                    the row spans the same content area as the draft list
+                    items below.
+                    - "New Draft" = createNewProjectDraft (new PD that
+                      still shares layer pointers with the current draft).
+                    - "Duplicate Draft" = duplicateActiveProjectDraft
+                      (deep-clone: new PD + fresh copies of all four
+                      layer drafts, so edits don't leak back). */}
+                <div className="project-draft-menu-actions">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleCreateNewProjectDraft}
+                    style={{ flex: 1 }}
+                  >
+                    New Draft
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleDuplicateProjectDraft}
+                    style={{ flex: 1 }}
+                  >
+                    Duplicate Draft
+                  </Button>
+                </div>
                 {[...story.projectDrafts]
                   .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
                   .map(draft => {

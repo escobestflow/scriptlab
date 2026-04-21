@@ -1194,25 +1194,18 @@ html[data-theme="dark"] .chip.selected {
 .drafts-dropdown-menu.project-draft-menu {
   min-width: 258px;
   max-width: 338px;
-  top: calc(100% - 112px);
-  /* Base .drafts-dropdown-menu has padding: 6px; add 14px below the
+  top: calc(100% - 115px);
+  /* Base .drafts-dropdown-menu has padding: 6px; add 24px below the
      last draft item so it doesn't sit flush against the menu edge. */
-  padding-bottom: 20px;
+  padding-bottom: 30px;
 }
-/* Inside the project-draft menu, normalize the create buttons
-   (Duplicate + New Project Draft) so they span the same content
-   width as the draft list items below. The base .drafts-dropdown-create
-   rule uses width: calc(100% - 12px) + horizontal margins for a pill
-   inset; that looks out of sync with the flush-width draft items in
-   this wider menu. Flushing them to 100% keeps everything aligned. */
-.project-draft-menu .drafts-dropdown-create {
-  width: 100%;
-  margin: 0 0 6px;
-}
-/* Extra gap between the second create button ("New Project Draft")
-   and the first draft list item — visually separates the action
-   group from the draft list. */
-.project-draft-menu .drafts-dropdown-create + .drafts-dropdown-create {
+/* Side-by-side New Draft (primary) + Duplicate Draft (secondary)
+   action row inside the project-draft menu. Each button flexes to
+   equal width so the row spans the content area cleanly. Bottom
+   margin separates the action group from the draft list below. */
+.project-draft-menu-actions {
+  display: flex;
+  gap: 8px;
   margin-bottom: 10px;
 }
 /* Cloned title + "Draft N ▾" trigger inside the project-draft
@@ -1233,7 +1226,7 @@ html[data-theme="dark"] .chip.selected {
 /* Pull the trigger up 4px so the title → "Draft N ▾" gap is
    visibly tighter than the original sticky-header spacing. */
 .project-draft-menu-header .drafts-dropdown-trigger {
-  margin-top: -9px;
+  margin-top: -8px;
 }
 .drafts-dropdown-item {
   display: flex;
