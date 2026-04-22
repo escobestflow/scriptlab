@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings, Reference,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, ProjectDraft,
@@ -811,17 +812,28 @@ export function Studio({
             New Draft / Duplicate Draft action pair is pinned to a
             sticky footer so it stays reachable regardless of list
             length. The sheet is always mounted so the CSS slide
-            transition can run both on open and close. */}
-        <div
-          className={`sheet-backdrop ${draftsDropdownOpen ? "open" : ""}`}
-          onClick={() => setDraftsDropdownOpen(false)}
-        />
-        <div className={`sheet draft-sheet ${draftsDropdownOpen ? "open" : ""}`}>
-          <div className="sheet-handle" />
-          <div className="draft-sheet-title">{story.title || "Untitled"}</div>
-          <div className="draft-sheet-subtitle">Project Drafts</div>
-          <div className="sheet-body">
-            {[...story.projectDrafts]
+            transition can run both on open and close.
+
+            Portaled to `document.body` so the backdrop's blur covers
+            the sticky studio header (title + draft trigger) and the
+            fixed studio-nav. Those ancestors sit in `.studio-scroll`,
+            which creates a Safari compositing layer via
+            `-webkit-overflow-scrolling: touch` — rendering the sheet
+            there traps it below the header visually, regardless of
+            z-index. Portaling escapes that compositing layer without
+            reordering our sticky DOM. */}
+        {typeof document !== "undefined" && createPortal(
+          <>
+            <div
+              className={`sheet-backdrop ${draftsDropdownOpen ? "open" : ""}`}
+              onClick={() => setDraftsDropdownOpen(false)}
+            />
+            <div className={`sheet draft-sheet ${draftsDropdownOpen ? "open" : ""}`}>
+              <div className="sheet-handle" />
+              <div className="draft-sheet-title">{story.title || "Untitled"}</div>
+              <div className="draft-sheet-subtitle">Project Drafts</div>
+              <div className="sheet-body">
+                {[...story.projectDrafts]
               .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
               .map(draft => {
                 const isActive = draft.id === story.activeProjectDraftId;
@@ -853,27 +865,30 @@ export function Studio({
                 );
               })}
           </div>
-          <div className="sheet-sticky-footer">
-            <div className="draft-sheet-actions">
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={handleCreateNewProjectDraft}
-                style={{ flex: 1 }}
-              >
-                New Draft
-              </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={handleDuplicateProjectDraft}
-                style={{ flex: 1 }}
-              >
-                Duplicate Draft
-              </Button>
+              <div className="sheet-sticky-footer">
+                <div className="draft-sheet-actions">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={handleCreateNewProjectDraft}
+                    style={{ flex: 1 }}
+                  >
+                    New Draft
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    onClick={handleDuplicateProjectDraft}
+                    style={{ flex: 1 }}
+                  >
+                    Duplicate Draft
+                  </Button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </>,
+          document.body,
+        )}
 
         {/* Tab content */}
         <div style={{ padding: "8px 22px 40px" }}>
@@ -1408,52 +1423,62 @@ function LayerDraftPicker({
           transition runs on open AND close — toggled by `open`,
           which also drives the trigger caret. Draft list scrolls
           inside `.sheet-body`; the New Draft / Duplicate Draft
-          actions pin to a sticky footer so they never scroll off. */}
-      <div
-        className={`sheet-backdrop ${open ? "open" : ""}`}
-        onClick={() => setOpen(false)}
-      />
-      <div className={`sheet draft-sheet ${open ? "open" : ""}`}>
-        <div className="sheet-handle" />
-        <div className="draft-sheet-title">{label} Drafts</div>
-        <div className="sheet-body">
-          {sorted.map((d: any) => {
-            const isActive = d.id === activeId;
-            const date = new Date(d.updatedAt);
-            const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-            return (
-              <button
-                key={d.id}
-                className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                onClick={() => handleSwitch(d.id)}
-              >
-                <span>Draft {d.number}</span>
-                <span className="drafts-dropdown-date">{dateStr}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="sheet-sticky-footer">
-          <div className="draft-sheet-actions">
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={handleCreate}
-              style={{ flex: 1 }}
-            >
-              New Draft
-            </Button>
-            <Button
-              variant="secondary"
-              size="lg"
-              onClick={handleDuplicate}
-              style={{ flex: 1 }}
-            >
-              Duplicate Draft
-            </Button>
+          actions pin to a sticky footer so they never scroll off.
+
+          Portaled to `document.body` so the backdrop's blur covers
+          the sticky studio header (title + draft trigger) and the
+          fixed studio-nav — same reasoning as the project-draft
+          sheet above. */}
+      {typeof document !== "undefined" && createPortal(
+        <>
+          <div
+            className={`sheet-backdrop ${open ? "open" : ""}`}
+            onClick={() => setOpen(false)}
+          />
+          <div className={`sheet draft-sheet ${open ? "open" : ""}`}>
+            <div className="sheet-handle" />
+            <div className="draft-sheet-title">{label} Drafts</div>
+            <div className="sheet-body">
+              {sorted.map((d: any) => {
+                const isActive = d.id === activeId;
+                const date = new Date(d.updatedAt);
+                const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                return (
+                  <button
+                    key={d.id}
+                    className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                    onClick={() => handleSwitch(d.id)}
+                  >
+                    <span>Draft {d.number}</span>
+                    <span className="drafts-dropdown-date">{dateStr}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="sheet-sticky-footer">
+              <div className="draft-sheet-actions">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={handleCreate}
+                  style={{ flex: 1 }}
+                >
+                  New Draft
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={handleDuplicate}
+                  style={{ flex: 1 }}
+                >
+                  Duplicate Draft
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </>,
+        document.body,
+      )}
     </div>
   );
 }
@@ -2004,25 +2029,27 @@ function EmptyLayerState({
       <div className="empty-layer-icon">{icon}</div>
       <div className="empty-layer-title">{title}</div>
       <div className="empty-layer-caption">{caption}</div>
+      {/* Stacked (primary / secondary) compact CTAs — the sticky bar
+          that appears post-first-item keeps the larger, side-by-side
+          treatment; the empty state uses a quieter pair so the icon +
+          copy stay the focal point of the first-paint surface. */}
       <div className="empty-layer-actions">
         <Button
           variant="secondary"
-          size="lg"
+          size="sm"
           onClick={onAdd}
           disabled={generating}
           icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
-          style={{ flex: 1 }}
         >
           {addLabel}
         </Button>
         <Button
           variant="primary"
-          size="lg"
+          size="sm"
           onClick={onGenerate}
           disabled={generating}
           icon={<AISparkleIcon />}
           className="empty-state-ai-btn"
-          style={{ flex: 1 }}
         >
           {generating ? "Creating…" : "Create everything for me"}
         </Button>
@@ -3114,11 +3141,15 @@ function CharactersTab({
     <>
       <LayerBar layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
-      {/* Top-of-content Tip — always rendered directly below the
-          draft-picker bar so teaching hints land before the list. */}
-      <Tip id="characters-distinct-voices">
-        Give each character a distinct voice and clear want — it&apos;s what makes dialogue feel alive on the page.
-      </Tip>
+      {/* Top-of-content Tip — only surfaces after the user has added
+          their first character. On an empty tab the EmptyLayerState
+          below is already teaching the main move; a second teaching
+          surface on top would clutter the first-paint view. */}
+      {hasCharacters && (
+        <Tip id="characters-distinct-voices">
+          Give each character a distinct voice and clear want — it&apos;s what makes dialogue feel alive on the page.
+        </Tip>
+      )}
 
       {!hasCharacters && (
         <EmptyLayerState
@@ -3549,11 +3580,14 @@ function StoryTab({
     <>
       <LayerBar layer="story" label="Story" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
-      {/* Top-of-content Tip — always rendered directly below the
-          draft-picker bar so teaching hints land before the list. */}
-      <Tip id="story-scenes-are-building-blocks">
-        Scenes are the building blocks of your script — long-press any scene to drag and reorder.
-      </Tip>
+      {/* Top-of-content Tip — only surfaces once the user has added a
+          first scene. The empty state carries its own teaching; a tip
+          on top of that would double the noise at first paint. */}
+      {hasBeats && (
+        <Tip id="story-scenes-are-building-blocks">
+          Scenes are the building blocks of your script — long-press any scene to drag and reorder.
+        </Tip>
+      )}
 
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {!hasBeats && (
@@ -3902,11 +3936,14 @@ function ScriptTab({
     <>
       <LayerBar layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} onOpenReadThrough={onOpenReadThrough} />
 
-      {/* Top-of-content Tip — sits directly below the draft-picker bar
-          so teaching hints arrive before the scene list. */}
-      <Tip id="script-scenes-from-outline">
-        Every scene in the Story tab becomes prose here — the tighter your outline, the smoother the draft.
-      </Tip>
+      {/* Top-of-content Tip — only surfaces once at least one scene
+          has been written. On an empty Script the empty state already
+          carries the primary teaching; this tip would pile on. */}
+      {hasProducedScript && (
+        <Tip id="script-scenes-from-outline">
+          Every scene in the Story tab becomes prose here — the tighter your outline, the smoother the draft.
+        </Tip>
+      )}
 
       {/* Out-of-sync banner — only after a script has been produced */}
       {isOutOfSync && (

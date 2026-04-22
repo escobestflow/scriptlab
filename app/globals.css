@@ -3064,8 +3064,11 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
 }
 .empty-layer-actions {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   align-items: stretch;
+  max-width: 260px;
+  margin: 0 auto;
 }
 /* The AI "Create everything for me" button gets a subtle gradient
    sheen so it visually signals "this does something magical" without
