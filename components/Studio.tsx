@@ -178,6 +178,51 @@ export function Studio({
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<LayerKey | null>(null);
 
+  // Full-screen "generating" scrim. Covers everything (including open
+  // sheets) while a "Create all" action is in flight. Any open sheet is
+  // closed at the start of the run so the scrim is the only thing on
+  // screen. Driven by runGenerateAll below.
+  const [generatingAll, setGeneratingAll] = useState(false);
+
+  /** Close every Studio-owned sheet. Called at the start of a Create-all
+   *  run so the scrim is unobstructed. LayerDraftPicker dropdowns live
+   *  inside each tab and don't expose a setter here, so we close them
+   *  via the existing `draft-dropdown:open` event bus — a detail value
+   *  that doesn't match any picker id causes each to close itself. */
+  const closeAllSheets = useCallback(() => {
+    setDraftsDropdownOpen(false);
+    setUpdateTraySource(null);
+    setShowHelp(false);
+    setShowSetup(false);
+    setSheetOpen(false);
+    setPickerOpen(false);
+    setBeatTrayOpen(false);
+    setReadThroughOpen(false);
+    setConfirmDeleteProject(false);
+    setCharSheetCharId(null);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("draft-dropdown:open", { detail: "__generating__" }),
+      );
+    }
+  }, []);
+
+  /** Wrap a Create-all async action: close sheets, show the scrim,
+   *  await the work, hide the scrim. Errors are rethrown so the caller
+   *  can still surface them (window.alert, etc.). */
+  const runGenerateAll = useCallback(
+    async (fn: () => Promise<void>) => {
+      closeAllSheets();
+      setGeneratingAll(true);
+      try {
+        await fn();
+      } finally {
+        setGeneratingAll(false);
+      }
+    },
+    [closeAllSheets],
+  );
+
   // Active layer drafts — where all editing happens
   const activeProjectDraft = getActiveProjectDraft(story);
   const activeConcept      = getActiveConceptDraft(story);
@@ -910,6 +955,7 @@ export function Studio({
               openCharacter={openExistingCharacterSheet}
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
+              runGenerateAll={runGenerateAll}
             />
           )}
           {section === "story" && (
@@ -930,6 +976,7 @@ export function Studio({
               syncState={syncState}
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
+              runGenerateAll={runGenerateAll}
             />
           )}
           {section === "script" && (
@@ -942,6 +989,7 @@ export function Studio({
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
               onOpenReadThrough={() => setReadThroughOpen(true)}
+              runGenerateAll={runGenerateAll}
               onImportScript={importScriptFromFile}
               importing={importing}
               importStep={importStep}
@@ -1142,6 +1190,19 @@ export function Studio({
       />
 
       {confirmDeleteDialog}
+
+      {/* Full-screen generating scrim. Portaled to <body> so its
+          blurred dark backdrop covers everything — sticky header,
+          fixed nav, the whole viewport — without fighting the
+          stacking inside .studio-scroll. Driven by the Studio-level
+          `generatingAll` flag; mounted only when true so there's no
+          idle z-index tax. */}
+      {generatingAll && typeof document !== "undefined" && createPortal(
+        <div className="generate-scrim" role="status" aria-live="polite" aria-label="Generating">
+          <div className="generate-scrim-spinner" />
+        </div>,
+        document.body,
+      )}
 
       {/* First-project welcome sheet — shown once, right after the user
           creates their very first project. Uses the same .sheet /
@@ -1533,7 +1594,12 @@ function LayerBar({
           <span>Read-through</span>
         </button>
       )}
-      {hasSource && (
+      {/* Update Other Layers trigger hidden for now — we may bring the
+          cross-layer sync surface back later. Gated on `false` instead
+          of deleted so the LayerUpdateTray, onOpenUpdateTray plumbing,
+          and sync action routes stay wired and ready to re-enable by
+          flipping this flag. */}
+      {false && hasSource && (
         <button
           className="layer-update-trigger"
           onClick={() => onOpenUpdateTray(layer)}
@@ -3103,6 +3169,7 @@ function CharactersTab({
   openCharacter,
   autosaveEnabled = true,
   onOpenUpdateTray,
+  runGenerateAll,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -3112,21 +3179,27 @@ function CharactersTab({
   openCharacter: (id: string) => void;
   autosaveEnabled?: boolean;
   onOpenUpdateTray: (source: LayerKey) => void;
+  /** Wrap a Create-all action with the Studio-level scrim + sheet-close
+   *  choreography. See `runGenerateAll` in Studio. */
+  runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
 }) {
   const d = getActiveCharactersDraft(story);
   const { profile } = useProfileCapture();
 
-  // "Create everything for me" — one-tap cast generation driven by the
-  // active Concept draft. Uses the same cross-layer sync path the
-  // Update Other Layers tray uses, but scoped to a single target so the
-  // empty-state affordance is dead-simple.
+  // "Create all" — one-tap cast generation driven by the active Concept
+  // draft. Uses the same cross-layer sync path the Update Other Layers
+  // tray uses, but scoped to a single target so the empty-state
+  // affordance is dead-simple. Runs inside runGenerateAll so the full
+  // dark scrim + spinner is shown until the sync resolves.
   const [genBusy, setGenBusy] = useState(false);
   async function generateAllCharacters() {
     if (genBusy) return;
     setGenBusy(true);
     try {
-      const next = await syncLayer(story, "concept", "characters", profile);
-      setStory(() => next);
+      await runGenerateAll(async () => {
+        const next = await syncLayer(story, "concept", "characters", profile);
+        setStory(() => next);
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (typeof window !== "undefined") window.alert(msg);
@@ -3522,6 +3595,7 @@ function StoryTab({
   unlinkMoment, openMomentPicker, openBeatTray, run, busy, syncState,
   autosaveEnabled = true,
   onOpenUpdateTray,
+  runGenerateAll,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -3539,6 +3613,9 @@ function StoryTab({
   syncState: LayerSyncState;
   autosaveEnabled?: boolean;
   onOpenUpdateTray: (source: LayerKey) => void;
+  /** Wrap a Create-all action with the Studio-level scrim + sheet-close
+   *  choreography. See `runGenerateAll` in Studio. */
+  runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
@@ -3561,9 +3638,11 @@ function StoryTab({
     if (genBusy) return;
     setGenBusy(true);
     try {
-      const source: LayerKey = isLayerDraftEmpty(story, "characters") ? "concept" : "characters";
-      const next = await syncLayer(story, source, "story", profile);
-      setStory(() => next);
+      await runGenerateAll(async () => {
+        const source: LayerKey = isLayerDraftEmpty(story, "characters") ? "concept" : "characters";
+        const next = await syncLayer(story, source, "story", profile);
+        setStory(() => next);
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (typeof window !== "undefined") window.alert(msg);
@@ -3882,6 +3961,7 @@ function ScriptTab({
   importing,
   importStep,
   onAddScene,
+  runGenerateAll,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -3901,6 +3981,9 @@ function ScriptTab({
   /** Switch to Story tab + open the scene-creation tray.
    *  Wired by Studio because scenes (beats) are created in Story. */
   onAddScene: () => void;
+  /** Wrap a Create-all action with the Studio-level scrim + sheet-close
+   *  choreography. See `runGenerateAll` in Studio. */
+  runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
 }) {
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
@@ -3926,13 +4009,15 @@ function ScriptTab({
     if (genBusy) return;
     setGenBusy(true);
     try {
-      const source: LayerKey = !isLayerDraftEmpty(story, "story")
-        ? "story"
-        : !isLayerDraftEmpty(story, "characters")
-        ? "characters"
-        : "concept";
-      const next = await syncLayer(story, source, "script", profile);
-      setStory(() => next);
+      await runGenerateAll(async () => {
+        const source: LayerKey = !isLayerDraftEmpty(story, "story")
+          ? "story"
+          : !isLayerDraftEmpty(story, "characters")
+          ? "characters"
+          : "concept";
+        const next = await syncLayer(story, source, "script", profile);
+        setStory(() => next);
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (typeof window !== "undefined") window.alert(msg);

@@ -3137,6 +3137,41 @@ html[data-theme="dark"] .layer-sticky-bar {
     opacity: 1;
   }
 }
+/* ──────────────────────────────────────────────────────────────
+   Full-screen "generating" scrim — shown over everything while a
+   Create-all action is in flight. Sheets are closed on entry so
+   this is the only visual in play; exits by unmounting when the
+   sync completes. z-index is pinned above every sheet (sheets
+   top out at z:50) so the overlay fully covers the app.
+   ────────────────────────────────────────────────────────────── */
+.generate-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 14, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: generateScrimFadeIn 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes generateScrimFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.generate-scrim-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: generateScrimSpin 820ms linear infinite;
+}
+@keyframes generateScrimSpin {
+  to { transform: rotate(360deg); }
+}
+
 /* Spacer matching the sticky bar's height so the last list row
    isn't hidden behind the pinned bar. Placed as the last child of
    the tab content when the sticky bar is rendered. */
