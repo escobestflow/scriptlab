@@ -1668,6 +1668,107 @@ function SwipeToDelete({
   );
 }
 
+/**
+ * Ideas-tab empty-state hero carousel. Three 258×194 illustrations cycle
+ * every 4s and on horizontal swipe; the last slide wraps around to the
+ * first (and vice-versa). Three 6×6 dots under the frame indicate the
+ * active slide (#3E3E3E active, #D9D9D9 idle) and also serve as tap
+ * targets for direct navigation. Tap/swipe interaction resets the
+ * auto-advance timer so the user doesn't feel the carousel "fighting"
+ * them immediately after an input.
+ */
+const IDEAS_CAROUSEL_SRCS = [
+  "/ideas-carousel-1.png",
+  "/ideas-carousel-2.png",
+  "/ideas-carousel-3.png",
+];
+const IDEAS_CAROUSEL_MS = 4000;
+const IDEAS_CAROUSEL_SWIPE_PX = 40;
+
+function IdeasCarousel() {
+  const [index, setIndex] = useState(0);
+  // Touch tracking for swipe; we use refs rather than state so the
+  // frequent touchmove events don't re-render the component.
+  const touchStartX = useRef<number | null>(null);
+  const touchDx = useRef(0);
+  const [drag, setDrag] = useState(0); // live translate offset while dragging
+
+  // Auto-advance. Re-created on every `index` change so a manual jump
+  // gives the user a fresh 4s to look at their chosen slide.
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setIndex((i) => (i + 1) % IDEAS_CAROUSEL_SRCS.length);
+    }, IDEAS_CAROUSEL_MS);
+    return () => window.clearTimeout(id);
+  }, [index]);
+
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchDx.current = 0;
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    touchDx.current = e.touches[0].clientX - touchStartX.current;
+    setDrag(touchDx.current);
+  }
+  function onTouchEnd() {
+    const dx = touchDx.current;
+    touchStartX.current = null;
+    touchDx.current = 0;
+    setDrag(0);
+    if (Math.abs(dx) < IDEAS_CAROUSEL_SWIPE_PX) return;
+    // Swipe left (dx < 0) advances; swipe right (dx > 0) goes back.
+    setIndex((i) => {
+      const n = IDEAS_CAROUSEL_SRCS.length;
+      return dx < 0 ? (i + 1) % n : (i - 1 + n) % n;
+    });
+  }
+
+  return (
+    <div className="ideas-carousel">
+      <div
+        className="ideas-carousel-viewport"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+      >
+        <div
+          className="ideas-carousel-track"
+          style={{
+            transform: `translateX(calc(${-index * 100}% + ${drag}px))`,
+            transition: drag === 0 ? "transform 380ms var(--ease)" : "none",
+          }}
+        >
+          {IDEAS_CAROUSEL_SRCS.map((src, i) => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              className="ideas-carousel-slide"
+              draggable={false}
+              aria-hidden={i !== index}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="ideas-carousel-dots" role="tablist">
+        {IDEAS_CAROUSEL_SRCS.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            role="tab"
+            aria-selected={i === index}
+            aria-label={`Go to slide ${i + 1}`}
+            className={`ideas-carousel-dot ${i === index ? "active" : ""}`}
+            onClick={() => setIndex(i)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MomentsTab({
   moments,
   onEdit,
@@ -1746,6 +1847,7 @@ function MomentsTab({
   if (moments.length === 0) {
     return (
       <div className="projects-empty">
+        <IdeasCarousel />
         <h1 className="projects-empty-title">Start with a moment</h1>
         <p className="projects-empty-sub">
           Record ideas, memories, dreams, conversations, or unforgettable moments and let AI turn them into scenes and stories.
