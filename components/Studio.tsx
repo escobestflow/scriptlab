@@ -675,7 +675,7 @@ export function Studio({
           onSetup={() => setShowSetup(true)}
           subtitle={`${activeStoryLayer.episodes?.length ?? 0} episodes`}
         />
-        <SectionTabs section={section} setSection={setSection} story={story} />
+        <SectionTabs section={section} setSection={setSection} story={story} autosaveEnabled={autosaveEnabled} />
         <div className="screen-scroll">
           <div className="page-enter">
             {(activeStoryLayer.episodes ?? []).map(ep => (
@@ -1410,7 +1410,13 @@ function SectionTabs({
   return (
     <div className="studio-tab-bar">
       {tabs.map(t => {
-        const dot = !autosaveEnabled && isLayerChangedForTabDot(story, t.layer);
+        // Tab dirty-dot rendering rule: only show when autosave is
+        // TOGGLED ON in the main menu AND the layer has unsaved changes.
+        // Mirrors the counterintuitive semantics used by the layer-draft
+        // Save button above — the dot surfaces "something changed" only
+        // when the user has opted into autosave as their chosen mode.
+        // When autosave is OFF, we suppress tab dots entirely.
+        const dot = autosaveEnabled && isLayerChangedForTabDot(story, t.layer);
         return (
           <button
             key={t.key}
@@ -4321,11 +4327,11 @@ function ScriptTab({
         </div>
       )}
 
-      {hasBeats && (
-        <div className="caption" style={{ marginBottom: 14 }}>
-          {writtenCount}/{beats.length} scenes written.
-        </div>
-      )}
+      {/* Previously rendered a "{writtenCount}/{beats.length} scenes
+          written." caption at the top of the Script tab. Removed per
+          product direction — the per-scene cards already communicate
+          written vs. unwritten state visually (prose vs. "Write this
+          scene" button), so the aggregate counter was noisy overhead. */}
 
       {!hasBeats && (
         // Script's empty state is informational-only: no Add scene and
@@ -4356,7 +4362,12 @@ function ScriptTab({
               <div className="beat-name">{beat.name}</div>
               <div className="beat-summary-preview">{beat.summary}</div>
             </div>
-            <span className={`beat-status-badge ${beat.status}`}>{beat.status}</span>
+            {/* Status badge removed per product direction — the card's
+                body already telegraphs state (prose for "written", the
+                "Write this scene" button for "design"), so the small
+                uppercase flag was redundant noise. Keeping the wrapping
+                structure intact so future badges (e.g., "stale") can
+                slot back in without a layout rewrite. */}
           </div>
           {/* Linked moments — rendered under the beat summary so users
               skimming the Script tab see which personal moments fed each
