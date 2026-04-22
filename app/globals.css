@@ -2986,6 +2986,47 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
 }
 
 /* ──────────────────────────────────────────────────────────────
+   Unified empty-state card — used by Characters and Story tabs
+   (and anywhere else a layer has no content yet). Structure:
+     .empty-state-icon   (emoji or glyph)
+     .empty-state-title  (bold one-liner)
+     .empty-state-caption
+     primary button: "Create everything for me" (AI-driven)
+     secondary button: "Add X manually"
+   Both buttons are full-width so the two choices read as peers.
+   ────────────────────────────────────────────────────────────── */
+.empty-state-card {
+  text-align: center;
+  padding: 32px 20px;
+}
+.empty-state-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.empty-state-caption {
+  font-family: 'Lato', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+  margin-bottom: 20px;
+}
+/* The AI "Create everything for me" button gets a subtle gradient
+   sheen so it visually signals "this does something magical" without
+   breaking the design-system primary-button shape. */
+.empty-state-ai-btn.ds-btn-primary {
+  background: linear-gradient(135deg, var(--ink) 0%, var(--ink) 55%, #3b3b3b 100%);
+}
+html[data-theme="dark"] .empty-state-ai-btn.ds-btn-primary {
+  background: linear-gradient(135deg, var(--ink) 0%, var(--ink) 55%, #d9d9d9 100%);
+}
+
+/* ──────────────────────────────────────────────────────────────
    Tip cards — inline "did-you-know" style hints. Used to teach a
    UI feature or best practice at the moment it's most relevant
    (empty states, first-run prompts, etc.). Dismissible via the ×

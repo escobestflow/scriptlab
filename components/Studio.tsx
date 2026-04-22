@@ -1993,6 +1993,25 @@ function HistoryPager({
   );
 }
 
+/* ── AI sparkle glyph — standalone SVG for buttons that trigger
+ *    full-layer generation ("Create everything for me"). Scaled a
+ *    touch larger than the wand so it reads as a peer to the button
+ *    label rather than a tucked-in corner ornament. */
+function AISparkleIcon() {
+  return (
+    <svg
+      viewBox="0 0 100 110"
+      width="14"
+      height="14"
+      fill="currentColor"
+      aria-hidden="true"
+      style={{ flex: "0 0 auto" }}
+    >
+      <path d="m41.785 60.52h-13.055c-0.52344-0.0078-1.0547-0.14844-1.5352-0.43359-1.4141-0.84766-1.8789-2.6836-1.0273-4.1016l31.906-53.211c0.60547-1.0117 1.7852-1.6094 3.0195-1.4141 1.6289 0.25391 2.7461 1.7773 2.4961 3.4102l-5.375 34.715h13.055c0.52344 0.0078 1.0547 0.14844 1.5352 0.43359 1.4141 0.84766 1.8789 2.6836 1.0273 4.1016l-31.906 53.211c-0.60547 1.0117-1.7852 1.6094-3.0195 1.4141-1.6289-0.25391-2.7461-1.7773-2.4961-3.4102z" />
+    </svg>
+  );
+}
+
 /* ── AI wand button — elegant sparkle, sits next to field labels ── */
 function AIWandButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
   return (
@@ -2977,6 +2996,26 @@ function CharactersTab({
   onOpenUpdateTray: (source: LayerKey) => void;
 }) {
   const d = getActiveCharactersDraft(story);
+  const { profile } = useProfileCapture();
+
+  // "Create everything for me" — one-tap cast generation driven by the
+  // active Concept draft. Uses the same cross-layer sync path the
+  // Update Other Layers tray uses, but scoped to a single target so the
+  // empty-state affordance is dead-simple.
+  const [genBusy, setGenBusy] = useState(false);
+  async function generateAllCharacters() {
+    if (genBusy) return;
+    setGenBusy(true);
+    try {
+      const next = await syncLayer(story, "concept", "characters", profile);
+      setStory(() => next);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") window.alert(msg);
+    } finally {
+      setGenBusy(false);
+    }
+  }
 
   const roleLabels: Record<string, string> = {
     protagonist: "Protagonist",
@@ -3006,12 +3045,34 @@ function CharactersTab({
 
       {d.characters.length === 0 && (
         <>
-          <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
-            <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No characters yet</div>
-            <div className="caption">
+          <div className="card empty-state-card">
+            <div className="empty-state-icon">👤</div>
+            <div className="empty-state-title">No characters yet</div>
+            <div className="empty-state-caption">
               Create your first character to bring your story to life.
             </div>
+            <Button
+              variant="primary"
+              size="lg"
+              block
+              disabled={genBusy}
+              onClick={generateAllCharacters}
+              icon={<AISparkleIcon />}
+              className="empty-state-ai-btn"
+            >
+              {genBusy ? "Creating…" : "Create everything for me"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              block
+              onClick={openNewCharacter}
+              disabled={genBusy}
+              icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+              style={{ marginTop: 8 }}
+            >
+              Add character manually
+            </Button>
           </div>
           <Tip id="characters-save-drafts">
             Tap the draft picker above to save multiple versions of your cast — you can switch between them anytime.
@@ -3398,6 +3459,26 @@ function StoryTab({
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cloneRef = useRef<HTMLDivElement | null>(null);
 
+  // "Create everything for me" — one-tap beat generation. Derives from
+  // Characters if the cast is populated (richer source), otherwise falls
+  // back to Concept so the button still works on a brand-new project.
+  const { profile } = useProfileCapture();
+  const [genBusy, setGenBusy] = useState(false);
+  async function generateAllBeats() {
+    if (genBusy) return;
+    setGenBusy(true);
+    try {
+      const source: LayerKey = isLayerDraftEmpty(story, "characters") ? "concept" : "characters";
+      const next = await syncLayer(story, source, "story", profile);
+      setStory(() => next);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") window.alert(msg);
+    } finally {
+      setGenBusy(false);
+    }
+  }
+
   function startEdit(beatId: string, field: "name" | "summary", currentValue: string) {
     setEditingField({ beatId, field });
     setEditValue(currentValue);
@@ -3416,16 +3497,33 @@ function StoryTab({
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {beats.length === 0 && (
           <>
-            <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-              <div style={{ fontSize: 36, marginBottom: 8 }}>&#9670;</div>
-              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No beats yet</div>
-              <div className="caption" style={{ marginBottom: 16 }}>
+            <div className="card empty-state-card">
+              <div className="empty-state-icon">&#9670;</div>
+              <div className="empty-state-title">No beats yet</div>
+              <div className="empty-state-caption">
                 Start building your story structure — add your first beat.
               </div>
-              <Button variant="primary" size="lg"
+              <Button
+                variant="primary"
+                size="lg"
+                block
+                disabled={genBusy}
+                onClick={generateAllBeats}
+                icon={<AISparkleIcon />}
+                className="empty-state-ai-btn"
+              >
+                {genBusy ? "Creating…" : "Create everything for me"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                block
                 onClick={() => openBeatTray(0)}
-                className="entity-create-btn">
-                + Add beat
+                disabled={genBusy}
+                icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+                style={{ marginTop: 8 }}
+              >
+                Add beat manually
               </Button>
             </div>
             <Tip id="story-beats-are-building-blocks">
