@@ -3137,6 +3137,16 @@ html[data-theme="dark"] .layer-sticky-bar {
     opacity: 1;
   }
 }
+/* Hide the layer sticky bar whenever ANY bottom sheet is open. Sheets
+   own their own sticky footer primary action (e.g. the character
+   sheet's "Save" button), and the underlying tab-level "Add X" bar
+   should step aside so the sheet's CTA is the only one on screen.
+   Uses :has() — modern Safari/Chrome/Firefox — and falls back to
+   covered-by-backdrop on older browsers (the backdrop sits at z:40,
+   the sticky bar at z:15, so it's visually hidden regardless). */
+body:has(.sheet.open) .layer-sticky-bar {
+  display: none;
+}
 /* ──────────────────────────────────────────────────────────────
    Full-screen "generating" scrim — shown over everything while a
    Create-all action is in flight. Sheets are closed on entry so

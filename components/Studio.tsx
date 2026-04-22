@@ -2149,22 +2149,15 @@ function EmptyLayerState({
 function LayerStickyBar({
   addLabel,
   onAdd,
-  onGenerate,
-  generating,
-  generateLabel = "Create all",
-  generatingLabel = "Creating…",
+  disabled,
 }: {
   addLabel: string;
   onAdd: () => void;
-  onGenerate: () => void;
-  generating: boolean;
-  /** Primary-button label. Defaults to "Create all"; Story/Script
-   *  tabs pass "Write all" to better reflect the AI action
-   *  (writing beat/scene prose, not creating new entities). */
-  generateLabel?: string;
-  /** In-flight label — defaults to "Creating…"; Story/Script pass
-   *  "Writing…" to pair with "Write all". */
-  generatingLabel?: string;
+  /** When true, the add button is disabled (e.g. a generation is
+   *  in-flight elsewhere in the tab). The generate-all CTA used to
+   *  live here too but was removed — "Create all" / "Write all" now
+   *  exist only on the empty-state card. */
+  disabled?: boolean;
 }) {
   const bar = (
     <div className="layer-sticky-bar">
@@ -2172,22 +2165,11 @@ function LayerStickyBar({
         variant="secondary"
         size="lg"
         onClick={onAdd}
-        disabled={generating}
+        disabled={!!disabled}
         icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
         style={{ flex: 1 }}
       >
         {addLabel}
-      </Button>
-      <Button
-        variant="primary"
-        size="lg"
-        onClick={onGenerate}
-        disabled={generating}
-        icon={<AISparkleIcon />}
-        className="empty-state-ai-btn"
-        style={{ flex: 1 }}
-      >
-        {generating ? generatingLabel : generateLabel}
       </Button>
     </div>
   );
@@ -3293,8 +3275,7 @@ function CharactersTab({
           <LayerStickyBar
             addLabel="Add character"
             onAdd={openNewCharacter}
-            onGenerate={generateAllCharacters}
-            generating={genBusy}
+            disabled={genBusy}
           />
         </>
       )}
@@ -3955,10 +3936,7 @@ function StoryTab({
           <LayerStickyBar
             addLabel="Add scene"
             onAdd={() => openBeatTray(beats.length)}
-            onGenerate={generateAllBeats}
-            generating={genBusy}
-            generateLabel="Write all"
-            generatingLabel="Writing…"
+            disabled={genBusy}
           />
         </>
       )}
@@ -4196,10 +4174,7 @@ function ScriptTab({
           <LayerStickyBar
             addLabel="Add scene"
             onAdd={onAddScene}
-            onGenerate={generateAllScript}
-            generating={genBusy}
-            generateLabel="Write all"
-            generatingLabel="Writing…"
+            disabled={genBusy}
           />
         </>
       )}
@@ -4241,7 +4216,7 @@ function ImportScriptCard({
     : "Import a script";
 
   return (
-    <div className="card import-script-card" style={{ marginTop: 41 }}>
+    <div className="card import-script-card" style={{ marginTop: 47 }}>
       <span className="eyebrow">Have a finished script?</span>
       <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
         Upload a .txt or .pdf screenplay. Unfold will split it into
