@@ -38,6 +38,7 @@ import { useProfileCapture } from "@/lib/writerProfileStore";
 import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
+import { useDraftPickerStylePref, type DraftPickerStyle } from "@/lib/prefs";
 
 type Section = "concept" | "characters" | "story" | "script";
 
@@ -104,6 +105,12 @@ export function Studio({
     return () => clearTimeout(t);
   }, [showSuccess]);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
+  // Draft-picker presentation toggle. "sheet" = bottom-sheet (default,
+  // current treatment); "popup" = inline dropdown menu that pops under
+  // the trigger (legacy treatment preserved behind this preference).
+  // Read once here and threaded into LayerDraftPicker so every draft
+  // picker in the app follows the same user choice.
+  const [draftPickerStyle] = useDraftPickerStylePref();
   // Mutual exclusion between the project-drafts dropdown and any
   // LayerDraftPicker dropdown: whenever one opens, it broadcasts a
   // "draft-dropdown:open" event with its own id, and every other
@@ -123,7 +130,11 @@ export function Studio({
   }, [draftsDropdownOpen]);
   const [confirmDeleteProject, setConfirmDeleteProject] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const thumbRef = useRef<HTMLDivElement>(null);
+  // HTMLElement so the ref can accept either a <div> or a <button> —
+  // currently the thumbnail renders as a <button> (tap-to-settings)
+  // but handleScroll only reads .style.opacity, which lives on
+  // HTMLElement, so this stays permissive.
+  const thumbRef = useRef<HTMLElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
@@ -806,8 +817,18 @@ export function Studio({
         ref={scrollRef}
         onScroll={handleScroll}
       >
-        {/* Thumbnail — scrolls with content, not sticky */}
-        <div className="studio-thumb-scroll" ref={thumbRef}>
+        {/* Thumbnail — scrolls with content, not sticky. Tapping it
+            opens the project Settings panel, matching the gear icon in
+            the top nav. Using a <button> (not the bare <div>) gives
+            proper keyboard + accessibility semantics and a tap surface
+            that doesn't fight with swipe gestures on iOS. */}
+        <button
+          type="button"
+          className="studio-thumb-scroll studio-thumb-button"
+          ref={thumbRef as React.RefObject<HTMLButtonElement>} /* see thumbRef decl — typed as HTMLElement to accept the <button> here */
+          onClick={() => setShowSetup(true)}
+          aria-label="Open project settings"
+        >
           {story.thumbnail ? (
             <img src={story.thumbnail} alt="" className="project-header-thumb" />
           ) : (
@@ -815,13 +836,23 @@ export function Studio({
               {story.title ? story.title.charAt(0).toUpperCase() : "?"}
             </div>
           )}
-        </div>
+        </button>
 
         {/* Title + drafts dropdown + tabs — sticky, sticks below nav */}
         <div className="studio-header-sticky" ref={headerRef}>
-          <div className="project-header-title">
+          {/* Tapping the title opens the project-drafts picker — same
+              action as the explicit "Draft N ▾" trigger below. Makes
+              the whole top of the studio feel like one tap target for
+              switching drafts; the sheet/popup respects whichever
+              treatment the user chose in Help › Draft picker style. */}
+          <button
+            type="button"
+            className="project-header-title project-header-title-btn"
+            onClick={() => setDraftsDropdownOpen(v => !v)}
+            aria-label="Open project drafts"
+          >
             {story.title || "Untitled"}
-          </div>
+          </button>
 
           {/* Project drafts dropdown trigger */}
           <button
@@ -848,6 +879,80 @@ export function Studio({
             <SectionTabs section={section} setSection={setSection} story={story} autosaveEnabled={autosaveEnabled} />
           </div>
 
+          {/* Legacy popup treatment for the project-drafts dropdown.
+              Rendered inline inside the sticky header so the menu
+              anchors to the trigger button via absolute positioning
+              (see .drafts-dropdown-menu in globals.css). Gated on the
+              "popup" preference — the default "sheet" mode skips this
+              block entirely and uses the portaled bottom-sheet below. */}
+          {draftPickerStyle === "popup" && draftsDropdownOpen && (
+            <>
+              <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
+              <div className="drafts-dropdown-menu project-draft-menu">
+                <div className="project-draft-menu-header">
+                  <div className="project-header-title">{story.title || "Untitled"}</div>
+                  <button
+                    className="drafts-dropdown-trigger"
+                    onClick={() => setDraftsDropdownOpen(false)}
+                  >
+                    <span>Draft {activeProjectDraft.number}</span>
+                    <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
+                  </button>
+                </div>
+                <div className="project-draft-menu-actions">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleCreateNewProjectDraft}
+                    style={{ flex: 1 }}
+                  >
+                    New Draft
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleDuplicateProjectDraft}
+                    style={{ flex: 1 }}
+                  >
+                    Duplicate Draft
+                  </Button>
+                </div>
+                <div className="project-draft-menu-divider" aria-hidden="true" />
+                {[...story.projectDrafts]
+                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                  .map(draft => {
+                    const isActive = draft.id === story.activeProjectDraftId;
+                    const date = new Date(draft.updatedAt);
+                    const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    const timeStr = date
+                      .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+                      .replace(" ", "");
+                    const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
+                    const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
+                    const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
+                    const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
+                    return (
+                      <button
+                        key={draft.id}
+                        className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                        onClick={() => handleLoadProjectDraft(draft.id)}
+                      >
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                            <span>Draft {draft.number}</span>
+                            <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
+                          </div>
+                          <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
+                            Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            </>
+          )}
+
         </div>
 
         {/* Project-drafts bottom sheet. Replaces the old inline
@@ -866,8 +971,12 @@ export function Studio({
             `-webkit-overflow-scrolling: touch` — rendering the sheet
             there traps it below the header visually, regardless of
             z-index. Portaling escapes that compositing layer without
-            reordering our sticky DOM. */}
-        {typeof document !== "undefined" && createPortal(
+            reordering our sticky DOM.
+
+            Skipped entirely when `draftPickerStyle === "popup"`, so
+            users who prefer the legacy inline dropdown never pay for
+            the portal + sheet markup at all. */}
+        {draftPickerStyle === "sheet" && typeof document !== "undefined" && createPortal(
           <>
             <div
               className={`sheet-backdrop ${draftsDropdownOpen ? "open" : ""}`}
@@ -984,6 +1093,7 @@ export function Studio({
               story={story}
               setStory={setStory}
               beats={sorted}
+              moments={moments}
               run={run}
               busy={busy}
               autosaveEnabled={autosaveEnabled}
@@ -1060,6 +1170,18 @@ export function Studio({
             sections you like together, save it as a new project version so you
             can always return to it.
           </p>
+
+          {/* Preferences — lives at the bottom of the help sheet so it
+              stays out of the way of first-time explainer copy but is
+              still reachable for anyone opening Help. Currently exposes
+              a single choice: how draft dropdowns appear on screen. */}
+          <div className="draft-picker-style-pref">
+            <div className="draft-picker-style-pref-label">Draft picker style</div>
+            <div className="draft-picker-style-pref-caption">
+              Choose how the project and section draft dropdowns appear.
+            </div>
+            <DraftPickerStyleToggle />
+          </div>
         </div>
       </div>
 
@@ -1405,6 +1527,11 @@ function LayerDraftPicker({
   autosaveEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Presentation style pref — "sheet" (default, bottom-sheet) or
+  // "popup" (legacy inline dropdown menu). Read here so every
+  // per-layer picker across the app tracks the same user choice
+  // without prop-threading through tab components.
+  const [pickerStyle] = useDraftPickerStylePref();
 
   // Mutual exclusion with the project-drafts dropdown and other
   // layer dropdowns: when this one opens, broadcast our layer id so
@@ -1480,6 +1607,53 @@ function LayerDraftPicker({
           Save {label} Draft {active.number}
         </button>
       )}
+
+      {/* Legacy popup treatment. Rendered inline (not portaled) so the
+          absolute-positioned menu anchors under the trigger via
+          .drafts-dropdown-menu.layer-draft-menu CSS. Gated on the
+          "popup" preference. */}
+      {pickerStyle === "popup" && open && (
+        <>
+          <div className="drafts-dropdown-backdrop" onClick={() => setOpen(false)} />
+          <div className="drafts-dropdown-menu layer-draft-menu">
+            <div className="layer-draft-menu-actions">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleCreate}
+                style={{ flex: 1 }}
+              >
+                New Draft
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleDuplicate}
+                style={{ flex: 1 }}
+              >
+                Duplicate Draft
+              </Button>
+            </div>
+            <div className="layer-draft-menu-divider" aria-hidden="true" />
+            {sorted.map((d: any) => {
+              const isActive = d.id === activeId;
+              const date = new Date(d.updatedAt);
+              const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              return (
+                <button
+                  key={d.id}
+                  className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                  onClick={() => handleSwitch(d.id)}
+                >
+                  <span>Draft {d.number}</span>
+                  <span className="drafts-dropdown-date">{dateStr}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {/* Layer-draft bottom sheet. Always mounted so the slide
           transition runs on open AND close — toggled by `open`,
           which also drives the trigger caret. Draft list scrolls
@@ -1489,8 +1663,11 @@ function LayerDraftPicker({
           Portaled to `document.body` so the backdrop's blur covers
           the sticky studio header (title + draft trigger) and the
           fixed studio-nav — same reasoning as the project-draft
-          sheet above. */}
-      {typeof document !== "undefined" && createPortal(
+          sheet above.
+
+          Skipped entirely when `pickerStyle === "popup"` so the
+          legacy inline dropdown above is the only surface rendered. */}
+      {pickerStyle === "sheet" && typeof document !== "undefined" && createPortal(
         <>
           <div
             className={`sheet-backdrop ${open ? "open" : ""}`}
@@ -1540,6 +1717,43 @@ function LayerDraftPicker({
         </>,
         document.body,
       )}
+    </div>
+  );
+}
+
+/* ============================================ */
+/* ====== DRAFT PICKER STYLE — PREF TOGGLE ===== */
+/* ============================================ */
+//
+// Two-option segmented control backing `useDraftPickerStylePref`.
+// Lives at the bottom of the "How this page works" help sheet so the
+// user can swap between bottom-sheet (default) and the legacy inline
+// popup for all draft dropdowns (project-level and per-layer). Change
+// takes effect on the next dropdown open — no reload needed.
+function DraftPickerStyleToggle() {
+  const [style, setStyle] = useDraftPickerStylePref();
+  const options: { value: DraftPickerStyle; label: string; hint: string }[] = [
+    { value: "sheet", label: "Bottom sheet", hint: "Slides up from the bottom." },
+    { value: "popup", label: "Popup",         hint: "Drops under the trigger." },
+  ];
+  return (
+    <div className="draft-picker-style-toggle" role="radiogroup" aria-label="Draft picker style">
+      {options.map(opt => {
+        const active = style === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            className={`draft-picker-style-option ${active ? "active" : ""}`}
+            onClick={() => setStyle(opt.value)}
+          >
+            <span className="draft-picker-style-option-label">{opt.label}</span>
+            <span className="draft-picker-style-option-hint">{opt.hint}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -2575,6 +2789,35 @@ function ConceptTab({
         </div>
       </AttrRow>
 
+      {/* Title — sits directly below Format per spec so the two
+          project-identity fields (format + title) cluster at the top
+          of Concept, before the genre/tone/theme triage begins. */}
+      <TextAttrRow
+        label="Title"
+        value={story.title}
+        placeholder="Add a title"
+        onChange={v => setStory(s => updateConceptDraft({ ...s, title: v }, {}))}
+        dot={!autosaveEnabled && isConceptFieldDirty(story, "title")}
+        ai={() => generateConcept("title")}
+        aiLoading={aiBusy === "title"}
+        pager={
+          <HistoryPager
+            history={titleHistory.history}
+            cursor={titleHistory.cursor}
+            canBack={titleHistory.canBack}
+            canForward={titleHistory.canForward}
+            onBack={() => {
+              const v = titleHistory.stepBack();
+              if (v !== null) setStory(s => updateConceptDraft({ ...s, title: v }, {}));
+            }}
+            onForward={() => {
+              const v = titleHistory.stepForward();
+              if (v !== null) setStory(s => updateConceptDraft({ ...s, title: v }, {}));
+            }}
+          />
+        }
+      />
+
       {/* Genre */}
       <AttrRow
         label="Genre"
@@ -2754,33 +2997,6 @@ function ConceptTab({
           </Button>
         </div>
       </div>
-
-      {/* Title */}
-      <TextAttrRow
-        label="Title"
-        value={story.title}
-        placeholder="Add a title"
-        onChange={v => setStory(s => updateConceptDraft({ ...s, title: v }, {}))}
-        dot={!autosaveEnabled && isConceptFieldDirty(story, "title")}
-        ai={() => generateConcept("title")}
-        aiLoading={aiBusy === "title"}
-        pager={
-          <HistoryPager
-            history={titleHistory.history}
-            cursor={titleHistory.cursor}
-            canBack={titleHistory.canBack}
-            canForward={titleHistory.canForward}
-            onBack={() => {
-              const v = titleHistory.stepBack();
-              if (v !== null) setStory(s => updateConceptDraft({ ...s, title: v }, {}));
-            }}
-            onForward={() => {
-              const v = titleHistory.stepForward();
-              if (v !== null) setStory(s => updateConceptDraft({ ...s, title: v }, {}));
-            }}
-          />
-        }
-      />
 
       {/* Logline */}
       <TextAttrRow
@@ -3956,9 +4172,10 @@ function StoryTab({
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            label="Write scene"
+            label="Add scene"
             onClick={() => openBeatTray(beats.length)}
             disabled={genBusy}
+            icon={<span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>}
           />
         </>
       )}
@@ -3974,6 +4191,7 @@ function ScriptTab({
   story,
   setStory,
   beats,
+  moments,
   run,
   busy,
   autosaveEnabled = true,
@@ -3988,6 +4206,9 @@ function ScriptTab({
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   beats: Beat[];
+  /** Forwarded from Studio so scene cards can render the moment text
+   *  + type of everything the user linked in the Story tab. */
+  moments: Moment[];
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
   autosaveEnabled?: boolean;
@@ -4113,7 +4334,14 @@ function ScriptTab({
         />
       )}
 
-      {beats.map((beat, i) => (
+      {beats.map((beat, i) => {
+        // Resolve the linked moments so the scene card can echo what the
+        // user attached back in Story — useful when scanning written prose
+        // to see which personal moments seeded each beat.
+        const linkedMoments = beat.momentIds
+          .map(id => moments.find(m => m.id === id))
+          .filter((m): m is Moment => !!m);
+        return (
         <div key={beat.id} className="beat-card">
           <div className="beat-header" style={{ cursor: "default" }}>
             <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>{i + 1}</div>
@@ -4123,6 +4351,21 @@ function ScriptTab({
             </div>
             <span className={`beat-status-badge ${beat.status}`}>{beat.status}</span>
           </div>
+          {/* Linked moments — rendered under the beat summary so users
+              skimming the Script tab see which personal moments fed each
+              scene. Each row shows the moment type ("scene", "dialogue",
+              "joke", …) as a small uppercase badge plus the moment text.
+              Hidden when the scene has no linked moments. */}
+          {linkedMoments.length > 0 && (
+            <div className="scene-linked-moments">
+              {linkedMoments.map(m => (
+                <div key={m.id} className="scene-linked-moment">
+                  <span className="scene-linked-moment-type">{m.type}</span>
+                  <span className="scene-linked-moment-text">{m.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {beat.status === "written" && beat.sceneContent && (
             <div style={{ padding: "0 16px 16px" }}>
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
@@ -4152,7 +4395,8 @@ function ScriptTab({
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
 
       {/* Add Twist / Brainstorm row hidden for now — revisit later.
           Keeping the JSX in a gated block (rather than deleting) so the
@@ -4194,9 +4438,10 @@ function ScriptTab({
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            label="Write all"
+            label="Write all with AI"
             onClick={generateAllScript}
             disabled={genBusy}
+            icon={<AISparkleIcon />}
           />
         </>
       )}

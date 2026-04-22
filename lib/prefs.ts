@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 
 const AUTOSAVE_KEY = "scriptlab:autosave";
 const DARKMODE_KEY = "scriptlab:darkmode";
+const DRAFT_PICKER_STYLE_KEY = "scriptlab:draftPickerStyle";
 
 /** Read the autosave pref. SSR-safe — returns the default (true) on the server. */
 export function loadAutosave(): boolean {
@@ -97,6 +98,61 @@ export function useDarkModePref(): [boolean, (v: boolean) => void] {
   const set = useCallback((next: boolean) => {
     setValue(next);
     saveDarkMode(next);
+  }, []);
+
+  return [value, set];
+}
+
+// ── Draft picker style ────────────────────────────────────────────────
+// "sheet"  — bottom-sheet that slides up from the bottom of the viewport
+//            (default; current treatment since apr 2026)
+// "popup"  — older inline dropdown menu that pops beneath the trigger
+//            (restored behind this preference for users who prefer the
+//            faster, less-modal popup UX)
+
+export type DraftPickerStyle = "sheet" | "popup";
+
+/** Read the draft-picker style pref. SSR-safe — returns "sheet" default. */
+export function loadDraftPickerStyle(): DraftPickerStyle {
+  if (typeof window === "undefined") return "sheet";
+  try {
+    const raw = window.localStorage.getItem(DRAFT_PICKER_STYLE_KEY);
+    return raw === "popup" ? "popup" : "sheet";
+  } catch {
+    return "sheet";
+  }
+}
+
+/** Persist the draft-picker style pref. No-op on the server. */
+export function saveDraftPickerStyle(v: DraftPickerStyle): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(DRAFT_PICKER_STYLE_KEY, v);
+  } catch {
+    /* localStorage may be disabled — fail silently */
+  }
+}
+
+/**
+ * React hook backing the draft-picker style pref. Consumers can switch
+ * between the modern bottom-sheet treatment ("sheet") and the legacy
+ * inline popup ("popup") for both the project-drafts dropdown and all
+ * layer-draft dropdowns. SSR-renders "sheet" and reconciles with
+ * localStorage on mount.
+ */
+export function useDraftPickerStylePref(): [
+  DraftPickerStyle,
+  (v: DraftPickerStyle) => void,
+] {
+  const [value, setValue] = useState<DraftPickerStyle>("sheet");
+
+  useEffect(() => {
+    setValue(loadDraftPickerStyle());
+  }, []);
+
+  const set = useCallback((next: DraftPickerStyle) => {
+    setValue(next);
+    saveDraftPickerStyle(next);
   }, []);
 
   return [value, set];
