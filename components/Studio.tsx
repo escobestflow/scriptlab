@@ -3255,6 +3255,8 @@ function CharactersTab({
           onAdd={openNewCharacter}
           onGenerate={generateAllCharacters}
           generating={genBusy}
+          generateLabel="Create all with AI"
+          generatingLabel="Creating…"
         />
       )}
 
@@ -3699,7 +3701,7 @@ function StoryTab({
             onAdd={() => openBeatTray(0)}
             onGenerate={generateAllBeats}
             generating={genBusy}
-            generateLabel="Write all"
+            generateLabel="Write all with AI"
             generatingLabel="Writing…"
           />
         )}
