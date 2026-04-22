@@ -358,7 +358,7 @@ html[data-theme="dark"] .topbar {
   line-height: 1.55;
   color: var(--ink-mute);
   margin: 0 0 32px;
-  max-width: 312px;
+  max-width: 308px;
 }
 
 /* Ideas empty-state hero carousel. Fixed 258×194 frame (matches the
@@ -368,20 +368,39 @@ html[data-theme="dark"] .topbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* +16px above the frame to push the whole carousel lower.
-     Below, 22px = the prior 42px minus 20px so the header/body/
-     CTA/arrow stack sits 20px higher than before. */
-  margin: 16px 0 22px;
+  /* Top margin pushes the carousel down; bottom margin now 18px
+     (prior 22px minus 4px) so the header/body/CTA/arrow stack
+     sits 4px higher than before. */
+  margin: 16px 0 18px;
   user-select: none;
 }
 .ideas-carousel-viewport {
-  /* +26px wider than the original 258×194 source; height scaled
-     proportionately to preserve aspect (194 × 284/258 ≈ 214). */
-  width: 284px;
-  height: 214px;
+  /* +30px wider than the original 258×194 source; height scaled
+     proportionately to preserve aspect (194 × 288/258 ≈ 217). */
+  width: 288px;
+  height: 217px;
   overflow: hidden;
   border-radius: 12px;
   touch-action: pan-y; /* allow vertical page scroll, capture horizontal */
+}
+
+/* Suppress page scroll while the Ideas tab is in its empty state.
+   The illustration + copy stack is designed to sit on one viewport;
+   we don't want a few px of overflow to pull the whole hero out of
+   position. Uses :has() to scope the override — the outer
+   .screen-scroll container still scrolls normally for every other
+   tab and for the populated Ideas list. */
+.screen-scroll:has(.ideas-empty) {
+  overflow: hidden;
+}
+.ideas-empty {
+  /* Ensure the empty state fills its parent without forcing the
+     document to grow beyond it. The 70vh min-height inherited from
+     .projects-empty is fine for taller copy but we clamp max-height
+     to the parent so the viewport can't scroll past it. */
+  min-height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 .ideas-carousel-track {
   display: flex;

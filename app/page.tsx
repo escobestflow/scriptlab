@@ -1846,7 +1846,7 @@ function MomentsTab({
   // by the down-arrow glyph pointing at the red record FAB below.
   if (moments.length === 0) {
     return (
-      <div className="projects-empty">
+      <div className="projects-empty ideas-empty">
         <IdeasCarousel />
         <h1 className="projects-empty-title">Start with a moment</h1>
         <p className="projects-empty-sub">
