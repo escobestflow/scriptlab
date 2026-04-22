@@ -4895,6 +4895,21 @@ function SettingsTab({
         </Button>
       </div>
 
+      {/* Preferences — currently just the draft-picker style toggle.
+          Sits between Cover and Project Drafts because it changes how
+          the Project Drafts picker below (and every layer-draft
+          picker) presents itself. */}
+      <div className="card">
+        <span className="eyebrow">Preferences</span>
+        <div className="draft-picker-style-pref" style={{ marginTop: 10, paddingTop: 0, borderTop: "none" }}>
+          <div className="draft-picker-style-pref-label">Draft picker style</div>
+          <div className="draft-picker-style-pref-caption">
+            Choose how the project and section draft dropdowns appear.
+          </div>
+          <DraftPickerStyleToggle />
+        </div>
+      </div>
+
       {/* Project drafts */}
       <div className="card">
         <span className="eyebrow">Project Drafts</span>
