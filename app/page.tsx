@@ -354,12 +354,25 @@ export default function Page() {
 
   // Replaces the old "Loading your projects…" gray bridge screen with a
   // cinematic handoff from the splash-end pose into the home topbar.
-  // Kept mounted until BOTH projects are loaded AND the transition has
-  // played through, so neither a fast hydration (which would cut the
-  // animation short) nor a slow one (which would land the user on a
-  // gray screen) breaks the illusion.
-  if (!hydrated || !postLoginDone) {
-    return <PostLoginTransition onDone={() => setPostLoginDone(true)} />;
+  //
+  // Orchestration:
+  //  - While NOT hydrated: render the overlay alone with `ready={false}`
+  //    — it holds on the splash-end pose (tagline + centered wordmark on
+  //    black) with no animation, so we never show a half-animated state
+  //    against an empty page.
+  //  - Once hydrated: fall through to the normal render, which paints
+  //    the real home screen behind the overlay. The overlay at the
+  //    bottom of the main return receives `ready={true}`, kicks off its
+  //    shrink, and the home content is progressively revealed as the
+  //    black bar collapses upward. A final 250ms opacity fade dissolves
+  //    the overlay into the identically-posed real topbar.
+  if (!hydrated) {
+    return (
+      <PostLoginTransition
+        ready={false}
+        onDone={() => setPostLoginDone(true)}
+      />
+    );
   }
 
   const studioProject = view.kind === "studio"
@@ -1081,6 +1094,16 @@ export default function Page() {
         </div>
       </div>
     </div>
+    {/* Post-login transition overlay, rendered on top of the real app
+        until the full fade → shrink → fade-out sequence completes. Its
+        position:fixed + pointer-events:none lets the user see (but not
+        yet touch) the content behind as the black bar collapses up. */}
+    {!postLoginDone && (
+      <PostLoginTransition
+        ready={true}
+        onDone={() => setPostLoginDone(true)}
+      />
+    )}
    </WriterProfileContext.Provider>
   );
 }

@@ -13,17 +13,24 @@
 //              (150px → 86px, viewport-center → topbar-center) while
 //              the black viewport simultaneously collapses vertically
 //              to the topbar's height
-//   1800ms+    hold at the final pose (visually identical to the real
-//              topbar: black strip + logo) until the parent unmounts
-//              us. The hamburger is owned by the real topbar — we do
-//              not render a duplicate here, so the only menu icon the
-//              user sees is the one that stays on screen post-swap.
+//   1800–2050ms overlay as a whole fades to transparent (quick 250ms
+//              opacity transition). While we fade, the real app is
+//              already mounted behind us, so the user sees a gentle
+//              cross-dissolve from the overlay's faux topbar to the
+//              real one — never an instant pop.
+//   2050ms+   onDone has fired and the parent unmounts us.
 //
-// The parent keeps this component mounted while `!hydrated || !done`,
-// so if projects finish loading mid-animation we still play the full
-// sequence. Once `onDone` fires AND hydration is complete, the parent
-// swaps us out for the real app. Because our final pose mirrors the
-// real topbar pixel-for-pixel, the swap is seamless.
+// The `ready` prop gates the animation: if false, we hold on the
+// splash-end pose indefinitely (tagline + centered wordmark over a
+// full-viewport black bg). The parent flips `ready` to true once
+// projects are hydrated, so when the shrink phase begins the real
+// home content is already rendered behind the overlay. As the black
+// bar collapses upward toward the topbar, the home content below is
+// progressively revealed — no gray bridge, no empty page flash.
+//
+// The hamburger is owned by the real topbar — we do not render a
+// duplicate here, so the only menu icon the user sees is the one
+// that stays on screen post-swap.
 
 import { useEffect, useState } from "react";
 
@@ -31,26 +38,40 @@ interface PostLoginTransitionProps {
   /** Fired once the internal sequence finishes. The parent still owns
    *  the unmount decision (it waits for projects to be loaded too). */
   onDone: () => void;
+  /** When false, hold indefinitely on the splash-end pose (tagline +
+   *  centered wordmark on black). When true, run the full fade →
+   *  shrink → fade-out sequence. Defaults to true for backwards-
+   *  compatible callers; the home screen passes `ready={hydrated}`
+   *  so the animation only kicks off after projects are loaded,
+   *  which lets the shrinking black bar reveal real content behind. */
+  ready?: boolean;
 }
 
-type Phase = "initial" | "fade-tagline" | "shrink" | "done";
+type Phase = "initial" | "fade-tagline" | "shrink" | "fade-out" | "done";
 
-export default function PostLoginTransition({ onDone }: PostLoginTransitionProps) {
+export default function PostLoginTransition({ onDone, ready = true }: PostLoginTransitionProps) {
   const [phase, setPhase] = useState<Phase>("initial");
 
   useEffect(() => {
+    // Hold on the initial pose until the parent signals content is
+    // ready. This is what makes the "reveal content underneath as the
+    // bar shrinks" effect work — we don't want to start shrinking
+    // before there's anything behind us to reveal.
+    if (!ready) return;
     const t1 = setTimeout(() => setPhase("fade-tagline"), 500);
     const t2 = setTimeout(() => setPhase("shrink"), 1000);
-    const t3 = setTimeout(() => {
+    const t3 = setTimeout(() => setPhase("fade-out"), 1800);
+    const t4 = setTimeout(() => {
       setPhase("done");
       onDone();
-    }, 1900);
+    }, 2050);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      clearTimeout(t4);
     };
-  }, [onDone]);
+  }, [ready, onDone]);
 
   return (
     <div className={`post-login-transition phase-${phase}`}>
@@ -65,6 +86,16 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
           z-index: 10000;
           pointer-events: none;
           overflow: hidden;
+          opacity: 1;
+          transition: opacity 250ms ease-out;
+        }
+        /* Final quick cross-fade to the real app, which has already
+           mounted behind us. Opacity is animated on the root so logo,
+           bar, and everything inside fade together — the user sees a
+           gentle dissolve instead of a hard unmount pop. */
+        .post-login-transition.phase-fade-out,
+        .post-login-transition.phase-done {
+          opacity: 0;
         }
 
         /* Full-viewport black box that collapses vertically to the
@@ -81,6 +112,7 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
           transition: height 800ms cubic-bezier(0.22, 1, 0.36, 1);
         }
         .post-login-transition.phase-shrink .post-login-bg,
+        .post-login-transition.phase-fade-out .post-login-bg,
         .post-login-transition.phase-done .post-login-bg {
           /* Mirrors the real .topbar's outer box on the dark home
              header: safe-area-top + 14px padding + 18.5px logo + 14px
@@ -110,6 +142,7 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
         }
         .post-login-transition.phase-fade-tagline .post-login-tagline,
         .post-login-transition.phase-shrink .post-login-tagline,
+        .post-login-transition.phase-fade-out .post-login-tagline,
         .post-login-transition.phase-done .post-login-tagline {
           opacity: 0;
         }
@@ -137,6 +170,7 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
             height 800ms cubic-bezier(0.22, 1, 0.36, 1);
         }
         .post-login-transition.phase-shrink .post-login-logo,
+        .post-login-transition.phase-fade-out .post-login-logo,
         .post-login-transition.phase-done .post-login-logo {
           /* Match .brand-logo-img inside .topbar-center: vertically
              centered within the topbar padding, 82px wide. Shifted
