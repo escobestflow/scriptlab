@@ -28,10 +28,24 @@ export interface TipProps {
   id: string;
   /** The tip body. Typically a short sentence. */
   children: ReactNode;
+  /** When false, the tip ignores the localStorage-persisted dismissal
+   *  flag entirely — it reads a fresh "not dismissed" state on every
+   *  mount, and tapping the dismiss button only hides it for the
+   *  current session (nothing is written to storage). Used by tabs
+   *  whose tip copy is actively being iterated on: the product team
+   *  wants to re-see the tip on every reload to validate the UI
+   *  continuously, rather than having to clear localStorage between
+   *  visits. Defaults to true (persist across sessions) to keep the
+   *  "teach once" contract intact for the rest of the app. */
+  persist?: boolean;
 }
 
-export function Tip({ id, children }: TipProps) {
+export function Tip({ id, children, persist = true }: TipProps) {
   const [dismissed, setDismissed] = useState<boolean>(() => {
+    // When persist=false we ALWAYS start as not-dismissed on mount,
+    // regardless of any historical localStorage flag. This is what
+    // makes "show this tip on every reload" work.
+    if (!persist) return false;
     if (typeof window === "undefined") return false;
     try {
       return localStorage.getItem(tipKey(id)) === "1";
@@ -43,10 +57,15 @@ export function Tip({ id, children }: TipProps) {
   if (dismissed) return null;
 
   const onDismiss = () => {
-    try {
-      localStorage.setItem(tipKey(id), "1");
-    } catch {
-      /* storage disabled — the tip simply stays dismissed for this session */
+    // Skip the storage write when persist=false so a mid-session
+    // dismiss doesn't re-suppress the tip across reloads. The
+    // setDismissed call below still hides the tip for this session.
+    if (persist) {
+      try {
+        localStorage.setItem(tipKey(id), "1");
+      } catch {
+        /* storage disabled — the tip simply stays dismissed for this session */
+      }
     }
     setDismissed(true);
   };

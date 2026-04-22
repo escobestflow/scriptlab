@@ -3543,7 +3543,7 @@ function CharactersTab({
           below is already teaching the main move; a second teaching
           surface on top would clutter the first-paint view. */}
       {hasCharacters && (
-        <Tip id="characters-distinct-voices">
+        <Tip id="characters-distinct-voices" persist={false}>
           Give each character a distinct voice and clear want — it&apos;s what makes dialogue feel alive on the page.
         </Tip>
       )}
@@ -3989,7 +3989,7 @@ function StoryTab({
           first scene. The empty state carries its own teaching; a tip
           on top of that would double the noise at first paint. */}
       {hasBeats && (
-        <Tip id="story-scenes-are-building-blocks">
+        <Tip id="story-scenes-are-building-blocks" persist={false}>
           Scenes are the building blocks of your script — long-press any scene to drag and reorder.
         </Tip>
       )}
@@ -4369,7 +4369,7 @@ function ScriptTab({
           has been written. On an empty Script the empty state already
           carries the primary teaching; this tip would pile on. */}
       {hasProducedScript && (
-        <Tip id="script-scenes-from-outline">
+        <Tip id="script-scenes-from-outline" persist={false}>
           Every scene in the Story tab becomes prose here — the tighter your outline, the smoother the draft.
         </Tip>
       )}
@@ -4744,8 +4744,10 @@ function BeatCreationForm({
           of CTAs reads as a balanced commit row; Save is primary
           (black) per the sheet's save-button convention, Clean Up is
           secondary + AI sparkle so the magic step is obvious. Clean
-          Up is disabled until there's summary text to clean. */}
-      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+          Up is disabled until there's summary text to clean.
+          marginTop bumped from 4 → 19 (+15) to breathe the row away
+          from the Describe textarea per design direction. */}
+      <div style={{ display: "flex", gap: 8, marginTop: 19 }}>
         <Button
           variant="secondary"
           size="sm"
