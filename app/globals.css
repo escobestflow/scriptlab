@@ -423,7 +423,10 @@ html[data-theme="dark"] .topbar {
    plain ink-black text with no pill chrome. */
 .projects-empty-cta-text {
   font-family: inherit;
-  font-weight: 500;
+  /* Two steps bolder than the matching .ds-btn-lg label (500 -> 700)
+     so the text-only CTA still reads as a primary action without the
+     pill chrome carrying weight for it. */
+  font-weight: 700;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
