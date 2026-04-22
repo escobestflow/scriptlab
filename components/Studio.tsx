@@ -4600,6 +4600,27 @@ function ImportScriptCard({
         block
         onClick={openPicker}
         disabled={importing}
+        /* Leading upload glyph — tray-with-up-arrow icon that reads as
+           "upload/import". Suppressed while importing so the spinner
+           takes the icon slot and we don't have two leading marks
+           competing. The Button's `icon` prop handles spacing. */
+        icon={
+          !importing ? (
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          ) : undefined
+        }
       >
         {importing && <span className="import-spinner" aria-hidden="true" />}
         {label}
