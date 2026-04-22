@@ -90,9 +90,12 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
         .post-login-transition.phase-done .post-login-bg {
           /* Mirrors the real .topbar's outer box on the dark home
              header: safe-area-top + 14px padding + 18.5px logo + 14px
-             padding. When this value matches the real topbar, the
-             unmount is visually seamless. */
-          height: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px + 14px);
+             padding + 21px (measured shortfall vs the live topbar on
+             device — the live bar includes internal button/chrome
+             padding that the simple safe-area+logo formula misses).
+             When this value matches the real topbar, the unmount is
+             visually seamless. */
+          height: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px + 14px + 21px);
         }
 
         /* Tagline — same pose, font, and typography as the splash's
@@ -138,9 +141,13 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
         .post-login-transition.phase-shrink .post-login-logo,
         .post-login-transition.phase-done .post-login-logo {
           /* Match .brand-logo-img inside .topbar-center: vertically
-             centered within the topbar padding, 86px wide. */
-          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2);
-          width: 86px;
+             centered within the topbar padding, 82px wide. Shifted
+             10px lower than the pure-math center so it lands where
+             the live topbar actually renders the wordmark (the live
+             topbar has additional internal chrome pushing the logo
+             down a touch from the geometric midpoint). */
+          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 10px);
+          width: 82px;
         }
 
         /* Hamburger — fixed at the topbar's left slot, hidden at start,

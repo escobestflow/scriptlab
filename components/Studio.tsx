@@ -3943,7 +3943,19 @@ function ScriptTab({
 
   return (
     <>
-      <LayerBar layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} onOpenReadThrough={onOpenReadThrough} />
+      {/* onOpenReadThrough gated on hasProducedScript: the read-through
+          sheet renders written scene prose, so the icon is meaningless
+          when the Script tab is in its empty state (no beats written).
+          Passing `undefined` tells LayerBar to skip the button entirely. */}
+      <LayerBar
+        layer="script"
+        label="Script"
+        story={story}
+        setStory={setStory}
+        autosaveEnabled={autosaveEnabled}
+        onOpenUpdateTray={onOpenUpdateTray}
+        onOpenReadThrough={hasProducedScript ? onOpenReadThrough : undefined}
+      />
 
       {/* Top-of-content Tip — only surfaces once at least one scene
           has been written. On an empty Script the empty state already
