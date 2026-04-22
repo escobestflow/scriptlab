@@ -2164,6 +2164,7 @@ function LayerStickyBar({
   label,
   onClick,
   disabled,
+  icon,
 }: {
   /** Single primary CTA label — Characters passes "Add character",
    *  Story passes "Write scene", Script passes "Write all". Whatever
@@ -2172,6 +2173,10 @@ function LayerStickyBar({
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  /** Optional leading glyph — Characters uses "+" on its add-button
+   *  for a recognizable "new item" cue. Other tabs generally pass no
+   *  icon because their actions aren't additive. */
+  icon?: React.ReactNode;
 }) {
   const bar = (
     <div className="layer-sticky-bar">
@@ -2180,6 +2185,7 @@ function LayerStickyBar({
         size="lg"
         onClick={onClick}
         disabled={!!disabled}
+        icon={icon}
         style={{ flex: 1 }}
       >
         {label}
@@ -3291,6 +3297,7 @@ function CharactersTab({
             label="Add character"
             onClick={openNewCharacter}
             disabled={genBusy}
+            icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
           />
         </>
       )}
@@ -4298,9 +4305,6 @@ function BeatCreationForm({
   const [name, setName] = useState("");
   const [summary, setSummary] = useState("");
   const [cleaning, setCleaning] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [showAISettings, setShowAISettings] = useState(false);
-  const [aiSettings, setAISettings] = useState<BeatAISettings>(loadBeatAISettings);
 
   // Characters available for this beat — pulled from the active
   // Characters-layer draft. Only named characters are shown.
@@ -4355,38 +4359,14 @@ function BeatCreationForm({
     } finally { setCleaning(false); }
   }
 
-  async function createWithAI() {
-    setGenerating(true);
-    saveBeatAISettings(aiSettings);
-    setShowAISettings(false);
-    try {
-      await callAI("generate_beat", {
-        position: getActiveStoryLayerDraft(story).beats.length,
-        weirdness: aiSettings.weirdness,
-        darkness: aiSettings.darkness,
-        humor: aiSettings.humor,
-        length: aiSettings.length,
-      }, (parsed) => {
-        if (parsed.name) setName(parsed.name);
-        if (parsed.summary) setSummary(parsed.summary);
-      });
-    } finally { setGenerating(false); }
-  }
-
   return (
     <div className="stack">
-      <Input placeholder="Scene name" value={name}
-        onChange={e => setName(e.target.value)} />
-
-      <Textarea placeholder="Describe this scene"
-        value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
-
-      {/* Character picker. Always rendered so the user sees the
-          feature exists even on a blank project; when no characters
-          have been created yet we show an empty-state hint instead of
-          hiding the whole section (hiding made new users think the
-          picker was missing). */}
-      <div style={{ marginTop: 4 }}>
+      {/* Characters first. The picker is the most scene-shaping
+          choice a writer makes, so it leads the sheet. Always
+          rendered so users see the feature even on a blank project;
+          if no characters exist yet, an empty-state hint takes the
+          place of the chip row. */}
+      <div>
         <div className="eyebrow" style={{ marginBottom: 8 }}>
           Characters in this scene
         </div>
@@ -4409,52 +4389,42 @@ function BeatCreationForm({
         )}
       </div>
 
-      {summary.trim() && (
-        <Button variant="secondary" size="sm" block onClick={cleanUp}
-          disabled={cleaning || busy || generating}>
-          {cleaning ? "Cleaning..." : "Clean Up With AI"}
-        </Button>
-      )}
+      {/* 15px between the characters pills and the title field.
+          Overrides the .stack sibling margin (12px) with an inline
+          marginTop so the gap is exactly what the spec calls for. */}
+      <Input
+        placeholder="Scene name"
+        value={name}
+        onChange={e => setName(e.target.value)}
+        style={{ marginTop: 15 }}
+      />
 
-      {showAISettings && (
-        <div className="card" style={{ marginTop: 4, border: "1px solid var(--border-strong)" }}>
-          <div className="eyebrow" style={{ marginBottom: 12 }}>AI scene settings</div>
-          {[
-            { key: "weirdness" as const, label: "Weirdness" },
-            { key: "darkness" as const,  label: "Darkness" },
-            { key: "humor" as const,     label: "Humor" },
-            { key: "length" as const,    label: "Length" },
-          ].map(({ key, label }) => (
-            <div key={key} style={{ marginBottom: 12 }}>
-              <div className="slider-row">
-                <div className="label">{label}</div>
-                <div className="value">{aiSettings[key]}</div>
-              </div>
-              <input type="range" min={1} max={10} value={aiSettings[key]}
-                onChange={e => setAISettings(s => ({ ...s, [key]: Number(e.target.value) }))} />
-            </div>
-          ))}
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button variant="primary" size="sm" onClick={createWithAI}
-              disabled={generating} style={{ flex: 1 }}>
-              {generating ? "Creating..." : "Create"}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setShowAISettings(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
+      <Textarea placeholder="Describe this scene"
+        value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
 
+      {/* Footer row: Clean Up With AI + Save. Equal-flex so the pair
+          of CTAs reads as a balanced commit row; Save is primary
+          (black) per the sheet's save-button convention, Clean Up is
+          secondary + AI sparkle so the magic step is obvious. Clean
+          Up is disabled until there's summary text to clean. */}
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-        <Button variant="secondary" size="sm"
-          onClick={() => setShowAISettings(true)}
-          disabled={busy || generating}
-          style={{ flex: 1 }}>
-          {generating ? "Creating..." : "Create with AI"}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={cleanUp}
+          disabled={!summary.trim() || cleaning || busy}
+          icon={<AISparkleIcon />}
+          style={{ flex: 1 }}
+        >
+          {cleaning ? "Cleaning..." : "Clean up with AI"}
         </Button>
-        <Button variant="primary" size="sm" onClick={() => onSave(name || "Untitled scene", summary, selectedCharIds)}
-          disabled={!summary.trim()}>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => onSave(name || "Untitled scene", summary, selectedCharIds)}
+          disabled={!summary.trim()}
+          style={{ flex: 1 }}
+        >
           Save
         </Button>
       </div>
