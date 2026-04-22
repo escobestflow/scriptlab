@@ -4404,11 +4404,12 @@ function ScriptTab({
             <div style={{ padding: "0 16px 16px" }}>
               <Button variant="primary" size="sm" disabled={busy}
                 style={{ width: "100%" }}
+                icon={<AISparkleIcon />}
                 onClick={() => run(
                   { type: "generate_scene", payload: { beatIndex: i } },
                   `Write · ${beat.name}`
                 )}>
-                Write this scene
+                Write this scene with AI
               </Button>
             </div>
           )}
@@ -4446,17 +4447,18 @@ function ScriptTab({
         importStep={importStep}
       />
 
-      {/* Sticky bottom action bar — mirrors Characters and Story.
-          Shows once there's at least one scene (beat) in the
-          outline: "Add scene" drops the user into Story to create
-          a new beat, "Create everything" generates prose for every
-          unwritten scene. Hidden on empty Script because the empty
-          state card already owns those CTAs. */}
-      {hasBeats && (
+      {/* Sticky bottom action bar — only renders when the outline has
+          at least TWO scenes (beats). With a single scene, the per-card
+          "Write this scene with AI" button is sufficient and a bulk
+          "Write all scenes with AI" CTA is redundant. Two-or-more is
+          the threshold at which batching becomes meaningful and the
+          sticky bar earns its real-estate. Hidden entirely on empty
+          Script because the empty-state card already owns those CTAs. */}
+      {beats.length >= 2 && (
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            label="Write all with AI"
+            label="Write all scenes with AI"
             onClick={generateAllScript}
             disabled={genBusy}
             icon={<AISparkleIcon />}
