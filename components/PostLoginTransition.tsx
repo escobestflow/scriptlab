@@ -131,9 +131,9 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
           top: calc(50% + 12px);
           left: 50%;
           width: 150px;
-          /* Explicit aspect-preserving height (150 × 18.5 / 86 ≈ 32.27px)
+          /* Explicit aspect-preserving height (150 x 18.5 / 86 ~= 32.27px)
              so the height property can interpolate smoothly into the
-             shrink-state height — `height: auto` can't animate. */
+             shrink-state height -- "height: auto" cannot animate. */
           height: calc(150px * 18.5 / 86);
           transform: translate(-50%, -50%);
           filter: invert(1);
@@ -151,8 +151,8 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
              topbar has additional internal chrome pushing the logo
              down a touch from the geometric midpoint).
              Height is the aspect-preserving value for 82px width
-             (≈17.64px) +1px — per-design tweak to match the live
-             wordmark's rendered height on device (SVG gets stretched
+             (~17.64px) +1px -- per-design tweak to match the live
+             wordmark rendered height on device (SVG gets stretched
              slightly taller than its intrinsic aspect). */
           top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 7px);
           width: 82px;
