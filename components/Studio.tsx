@@ -4402,7 +4402,13 @@ function ScriptTab({
           )}
           {beat.status === "design" && (
             <div style={{ padding: "0 16px 16px" }}>
-              <Button variant="primary" size="sm" disabled={busy}
+              {/* Secondary treatment on the per-scene CTA so it sits
+                  quieter inside the card; the sticky "Write all scenes
+                  with AI" bar remains the primary surface for bulk
+                  generation. This keeps one primary button per screen
+                  and lets the per-scene action read as an alternative,
+                  not a competing, CTA. */}
+              <Button variant="secondary" size="sm" disabled={busy}
                 style={{ width: "100%" }}
                 icon={<AISparkleIcon />}
                 onClick={() => run(
