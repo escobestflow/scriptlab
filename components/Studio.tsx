@@ -633,7 +633,7 @@ export function Studio({
                 </div>
                 <div className="project-info">
                   <div className="project-title">{ep.title}</div>
-                  <div className="caption">{ep.beats.length} beats</div>
+                  <div className="caption">{ep.beats.length} scenes</div>
                 </div>
                 <div className="project-arrow">›</div>
               </button>
@@ -957,6 +957,14 @@ export function Studio({
               onImportScript={importScriptFromFile}
               importing={importing}
               importStep={importStep}
+              onAddScene={() => {
+                // Scene (beat) creation lives on the Story tab. Switch
+                // over and open the creation tray inserting at the end
+                // so the user lands exactly where they expect.
+                setSection("story");
+                setBeatTrayInsertAt(sorted.length);
+                setBeatTrayOpen(true);
+              }}
             />
           )}
         </div>
@@ -1056,7 +1064,7 @@ export function Studio({
       <div className={`sheet sheet-tall ${beatTrayOpen ? "open" : ""}`}>
         <div className="sheet-handle" />
         <div className="sheet-header">
-          <div className="sheet-title">New beat</div>
+          <div className="sheet-title">New scene</div>
           <Button variant="secondary" size="sm" onClick={() => setBeatTrayOpen(false)}>Cancel</Button>
         </div>
         <div className="sheet-body" style={{ whiteSpace: "normal" }}>
@@ -1990,6 +1998,104 @@ function HistoryPager({
         </svg>
       </button>
     </span>
+  );
+}
+
+/* ── Unified empty-state for Characters / Story / Script tabs.
+ *    Lives on the plain gray background (no card). Icon + title +
+ *    caption + two side-by-side buttons: "Add X" (secondary) and
+ *    "Create everything for me" (primary AI). Used everywhere so a
+ *    fresh user sees the same choice on every layer. */
+function EmptyLayerState({
+  icon,
+  title,
+  caption,
+  addLabel,
+  onAdd,
+  onGenerate,
+  generating,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  caption: string;
+  addLabel: string;
+  onAdd: () => void;
+  onGenerate: () => void;
+  generating: boolean;
+}) {
+  return (
+    <div className="empty-layer-state">
+      <div className="empty-layer-icon">{icon}</div>
+      <div className="empty-layer-title">{title}</div>
+      <div className="empty-layer-caption">{caption}</div>
+      <div className="empty-layer-actions">
+        <Button
+          variant="secondary"
+          size="lg"
+          onClick={onAdd}
+          disabled={generating}
+          icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+          style={{ flex: 1 }}
+        >
+          {addLabel}
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={onGenerate}
+          disabled={generating}
+          icon={<AISparkleIcon />}
+          className="empty-state-ai-btn"
+          style={{ flex: 1 }}
+        >
+          {generating ? "Creating…" : "Create everything for me"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Sticky bottom action bar for Characters / Story.
+ *    Mounts (and animates up) only once the layer has at least one
+ *    item, matching the rule that it shouldn't appear on empty tabs
+ *    (the empty-state card owns those CTAs instead). Sits above the
+ *    bottom tabbar; adds a spacer into the scroll flow so the last
+ *    list row isn't obscured. */
+function LayerStickyBar({
+  addLabel,
+  onAdd,
+  onGenerate,
+  generating,
+}: {
+  addLabel: string;
+  onAdd: () => void;
+  onGenerate: () => void;
+  generating: boolean;
+}) {
+  return (
+    <div className="layer-sticky-bar">
+      <Button
+        variant="secondary"
+        size="lg"
+        onClick={onAdd}
+        disabled={generating}
+        icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+        style={{ flex: 1 }}
+      >
+        {addLabel}
+      </Button>
+      <Button
+        variant="primary"
+        size="lg"
+        onClick={onGenerate}
+        disabled={generating}
+        icon={<AISparkleIcon />}
+        className="empty-state-ai-btn"
+        style={{ flex: 1 }}
+      >
+        {generating ? "Creating…" : "Create everything for me"}
+      </Button>
+    </div>
   );
 }
 
@@ -3026,63 +3132,28 @@ function CharactersTab({
     comic_relief: "Comic Relief",
   };
 
+  const hasCharacters = d.characters.length > 0;
+
   return (
     <>
       <LayerBar layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
-      {/* Primary "+ Add character" lives at the top of the list. */}
-      <Button
-        variant="primary"
-        size="lg"
-        block
-        onClick={openNewCharacter}
-        style={{ marginBottom: 12 }}
-        icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
-        className="entity-create-btn"
-      >
-        Add character
-      </Button>
+      {/* Top-of-content Tip — always rendered directly below the
+          draft-picker bar so teaching hints land before the list. */}
+      <Tip id="characters-distinct-voices">
+        Give each character a distinct voice and clear want — it&apos;s what makes dialogue feel alive on the page.
+      </Tip>
 
-      {d.characters.length === 0 && (
-        <>
-          <div className="card empty-state-card">
-            <div className="empty-state-icon">👤</div>
-            <div className="empty-state-title">No characters yet</div>
-            <div className="empty-state-caption">
-              Create your first character to bring your story to life.
-            </div>
-            <Button
-              variant="primary"
-              size="lg"
-              block
-              disabled={genBusy}
-              onClick={generateAllCharacters}
-              icon={<AISparkleIcon />}
-              className="empty-state-ai-btn"
-            >
-              {genBusy ? "Creating…" : "Create everything for me"}
-            </Button>
-            <Button
-              variant="secondary"
-              size="lg"
-              block
-              onClick={openNewCharacter}
-              disabled={genBusy}
-              icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
-              style={{ marginTop: 8 }}
-            >
-              Add character manually
-            </Button>
-          </div>
-          <Tip id="characters-save-drafts">
-            Tap the draft picker above to save multiple versions of your cast — you can switch between them anytime.
-          </Tip>
-        </>
-      )}
-      {d.characters.length > 0 && (
-        <Tip id="characters-distinct-voices">
-          Give each character a distinct voice and clear want — it&apos;s what makes dialogue feel alive on the page.
-        </Tip>
+      {!hasCharacters && (
+        <EmptyLayerState
+          icon="👤"
+          title="No characters yet"
+          caption="Create your first character to bring your story to life."
+          addLabel="Add character"
+          onAdd={openNewCharacter}
+          onGenerate={generateAllCharacters}
+          generating={genBusy}
+        />
       )}
 
       {/* Character rows — tapping opens the unified character sheet. */}
@@ -3109,11 +3180,17 @@ function CharactersTab({
         </div>
       ))}
 
-      {/* Info banner */}
-      <div className="info-banner" style={{ marginTop: 16 }}>
-        <span className="info-icon">i</span>
-        <span>Characters inform AI-generated beats, scenes, and dialogue.</span>
-      </div>
+      {hasCharacters && (
+        <>
+          <div className="layer-sticky-bar-spacer" aria-hidden="true" />
+          <LayerStickyBar
+            addLabel="Add character"
+            onAdd={openNewCharacter}
+            onGenerate={generateAllCharacters}
+            generating={genBusy}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -3490,51 +3567,29 @@ function StoryTab({
     }
   }
 
+  const hasBeats = beats.length > 0;
+
   return (
     <>
       <LayerBar layer="story" label="Story" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
+      {/* Top-of-content Tip — always rendered directly below the
+          draft-picker bar so teaching hints land before the list. */}
+      <Tip id="story-scenes-are-building-blocks">
+        Scenes are the building blocks of your script — long-press any scene to drag and reorder.
+      </Tip>
+
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
-        {beats.length === 0 && (
-          <>
-            <div className="card empty-state-card">
-              <div className="empty-state-icon">&#9670;</div>
-              <div className="empty-state-title">No beats yet</div>
-              <div className="empty-state-caption">
-                Start building your story structure — add your first beat.
-              </div>
-              <Button
-                variant="primary"
-                size="lg"
-                block
-                disabled={genBusy}
-                onClick={generateAllBeats}
-                icon={<AISparkleIcon />}
-                className="empty-state-ai-btn"
-              >
-                {genBusy ? "Creating…" : "Create everything for me"}
-              </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                block
-                onClick={() => openBeatTray(0)}
-                disabled={genBusy}
-                icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
-                style={{ marginTop: 8 }}
-              >
-                Add beat manually
-              </Button>
-            </div>
-            <Tip id="story-beats-are-building-blocks">
-              Beats are the building blocks of your script — each one becomes a scene you can write in the Script tab.
-            </Tip>
-          </>
-        )}
-        {beats.length > 0 && (
-          <Tip id="story-drag-to-reorder">
-            Long-press any beat to drag and reorder — your scene list updates to match.
-          </Tip>
+        {!hasBeats && (
+          <EmptyLayerState
+            icon={<>&#9670;</>}
+            title="No scenes yet"
+            caption="Start building your story structure — add your first scene."
+            addLabel="Add scene"
+            onAdd={() => openBeatTray(0)}
+            onGenerate={generateAllBeats}
+            generating={genBusy}
+          />
         )}
 
         {beats.map((beat, i) => {
@@ -3629,7 +3684,7 @@ function StoryTab({
                     {i + 1}
                   </div>
                   <div className="beat-info">
-                    <div className="beat-name">{beat.name || "Untitled beat"}</div>
+                    <div className="beat-name">{beat.name || "Untitled scene"}</div>
                     {!isExpanded && (
                       <div className="beat-summary-preview">{beat.summary || "No summary"}</div>
                     )}
@@ -3689,7 +3744,7 @@ function StoryTab({
                         up as a selectable chip here. Selection persists
                         onto `beat.characterIds`, which the AI consumes
                         when generating scene prose for this beat. */}
-                    <div className="beat-section-label">Characters in this beat</div>
+                    <div className="beat-section-label">Characters in this scene</div>
                     {(() => {
                       const namedChars = getActiveCharactersDraft(story).characters
                         .filter(c => c.name && c.name.trim() !== "");
@@ -3766,15 +3821,27 @@ function StoryTab({
                 <button
                   className="beat-insert-btn"
                   onClick={() => openBeatTray(i + 1)}
-                  aria-label="Insert beat here"
+                  aria-label="Insert scene here"
                 >
-                  + Add beat
+                  + Add scene
                 </button>
               </div>
             </div>
           );
         })}
       </div>
+
+      {hasBeats && (
+        <>
+          <div className="layer-sticky-bar-spacer" aria-hidden="true" />
+          <LayerStickyBar
+            addLabel="Add scene"
+            onAdd={() => openBeatTray(beats.length)}
+            onGenerate={generateAllBeats}
+            generating={genBusy}
+          />
+        </>
+      )}
     </>
   );
 }
@@ -3795,6 +3862,7 @@ function ScriptTab({
   onImportScript,
   importing,
   importStep,
+  onAddScene,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -3811,6 +3879,9 @@ function ScriptTab({
   importing: boolean;
   /** Which layer is currently being written (drives progress label). */
   importStep: LayerKey | null;
+  /** Switch to Story tab + open the scene-creation tray.
+   *  Wired by Studio because scenes (beats) are created in Story. */
+  onAddScene: () => void;
 }) {
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
@@ -3821,14 +3892,45 @@ function ScriptTab({
   // date — i.e., at least one scene has been written.
   const hasProducedScript = writtenCount > 0;
   const isOutOfSync = syncState.scriptOutOfSync && hasProducedScript;
+  const hasBeats = beats.length > 0;
 
   function dismissSync() {
     setStory(s => markLayerSynced(s, "script"));
   }
 
+  // "Create everything for me" — picks the most upstream populated
+  // source so the button works whether the user has no layers filled,
+  // just Concept, or Concept + Characters + Story.
+  const { profile } = useProfileCapture();
+  const [genBusy, setGenBusy] = useState(false);
+  async function generateAllScript() {
+    if (genBusy) return;
+    setGenBusy(true);
+    try {
+      const source: LayerKey = !isLayerDraftEmpty(story, "story")
+        ? "story"
+        : !isLayerDraftEmpty(story, "characters")
+        ? "characters"
+        : "concept";
+      const next = await syncLayer(story, source, "script", profile);
+      setStory(() => next);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") window.alert(msg);
+    } finally {
+      setGenBusy(false);
+    }
+  }
+
   return (
     <>
       <LayerBar layer="script" label="Script" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} onOpenReadThrough={onOpenReadThrough} />
+
+      {/* Top-of-content Tip — sits directly below the draft-picker bar
+          so teaching hints arrive before the scene list. */}
+      <Tip id="script-scenes-from-outline">
+        Every scene in the Story tab becomes prose here — the tighter your outline, the smoother the draft.
+      </Tip>
 
       {/* Out-of-sync banner — only after a script has been produced */}
       {isOutOfSync && (
@@ -3850,25 +3952,22 @@ function ScriptTab({
         </div>
       )}
 
-      {beats.length > 0 && (
+      {hasBeats && (
         <div className="caption" style={{ marginBottom: 14 }}>
           {writtenCount}/{beats.length} scenes written.
         </div>
       )}
 
-      {beats.length === 0 && (
-        <>
-          <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>&#127916;</div>
-            <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No scenes yet</div>
-            <div className="caption">
-              Add beats in the <b>Story</b> tab first, then return here to write them into scenes.
-            </div>
-          </div>
-          <Tip id="script-beats-become-scenes">
-            Every beat in the Story tab becomes a scene here — the tighter your outline, the smoother the draft.
-          </Tip>
-        </>
+      {!hasBeats && (
+        <EmptyLayerState
+          icon={<>&#127916;</>}
+          title="No scenes yet"
+          caption="Sketch scenes in the Story tab, then return here to write them into prose."
+          addLabel="Add scene"
+          onAdd={onAddScene}
+          onGenerate={generateAllScript}
+          generating={genBusy}
+        />
       )}
 
       {beats.map((beat, i) => (
@@ -3926,12 +4025,6 @@ function ScriptTab({
             )}>&#9998; Brainstorm</Button>
         </div>
       )}
-
-      {/* Info banner */}
-      <div className="info-banner" style={{ marginTop: 16 }}>
-        <span className="info-icon">i</span>
-        <span>Script uses your Concept, Characters, and Story as inputs for AI generation.</span>
-      </div>
 
       {/* ── Import an existing script ──────────────────────────────
           Lives at the bottom of the Script tab because that's where
@@ -4129,10 +4222,10 @@ function BeatCreationForm({
 
   return (
     <div className="stack">
-      <Input placeholder="Beat name" value={name}
+      <Input placeholder="Scene name" value={name}
         onChange={e => setName(e.target.value)} />
 
-      <Textarea placeholder="Describe this beat"
+      <Textarea placeholder="Describe this scene"
         value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
 
       {/* Character picker. Always rendered so the user sees the
@@ -4142,7 +4235,7 @@ function BeatCreationForm({
           picker was missing). */}
       <div style={{ marginTop: 4 }}>
         <div className="eyebrow" style={{ marginBottom: 8 }}>
-          Characters in this beat
+          Characters in this scene
         </div>
         {availableCharacters.length === 0 ? (
           <div className="caption">
@@ -4172,7 +4265,7 @@ function BeatCreationForm({
 
       {showAISettings && (
         <div className="card" style={{ marginTop: 4, border: "1px solid var(--border-strong)" }}>
-          <div className="eyebrow" style={{ marginBottom: 12 }}>AI beat settings</div>
+          <div className="eyebrow" style={{ marginBottom: 12 }}>AI scene settings</div>
           {[
             { key: "weirdness" as const, label: "Weirdness" },
             { key: "darkness" as const,  label: "Darkness" },
@@ -4207,7 +4300,7 @@ function BeatCreationForm({
           style={{ flex: 1 }}>
           {generating ? "Creating..." : "Create with AI"}
         </Button>
-        <Button variant="primary" size="sm" onClick={() => onSave(name || "Untitled beat", summary, selectedCharIds)}
+        <Button variant="primary" size="sm" onClick={() => onSave(name || "Untitled scene", summary, selectedCharIds)}
           disabled={!summary.trim()}>
           Save
         </Button>
