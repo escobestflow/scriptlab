@@ -111,6 +111,14 @@ export function Studio({
   // Read once here and threaded into LayerDraftPicker so every draft
   // picker in the app follows the same user choice.
   const [draftPickerStyle] = useDraftPickerStylePref();
+  // Portaled popup position — we portal the project-drafts popup to
+  // document.body (same reasoning as the bottom-sheet) to escape the
+  // .studio-scroll `-webkit-overflow-scrolling: touch` compositing trap
+  // that hides inline-rendered descendants on iOS Safari. Portaling
+  // means we lose the absolute-positioning anchor on .studio-header-
+  // sticky, so we measure its on-screen rect at open time and pin the
+  // popup at that y coordinate via inline style.
+  const [projectPopupTop, setProjectPopupTop] = useState(0);
   // Mutual exclusion between the project-drafts dropdown and any
   // LayerDraftPicker dropdown: whenever one opens, it broadcasts a
   // "draft-dropdown:open" event with its own id, and every other
@@ -163,6 +171,22 @@ export function Studio({
     ro.observe(header);
     return () => ro.disconnect();
   }, []);
+
+  // When the project-drafts popup opens in "popup" mode, measure the
+  // sticky header's viewport position so the portaled menu can pin to
+  // it. Re-measured on every open (not continuously) — good enough
+  // because the popup closes on scroll/resize via its backdrop or an
+  // explicit interaction. If the user scrolls while it's open, the
+  // popup stays at its open-time y — acceptable tradeoff for
+  // simplicity vs. a RAF loop.
+  useEffect(() => {
+    if (!draftsDropdownOpen || draftPickerStyle !== "popup") return;
+    const h = headerRef.current;
+    if (!h) return;
+    const rect = h.getBoundingClientRect();
+    setProjectPopupTop(rect.top);
+  }, [draftsDropdownOpen, draftPickerStyle]);
+
   const [output, setOutput] = useState("");
   const [busy, setBusy] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -879,81 +903,89 @@ export function Studio({
             <SectionTabs section={section} setSection={setSection} story={story} autosaveEnabled={autosaveEnabled} />
           </div>
 
-          {/* Legacy popup treatment for the project-drafts dropdown.
-              Rendered inline inside the sticky header so the menu
-              anchors to the trigger button via absolute positioning
-              (see .drafts-dropdown-menu in globals.css). Gated on the
-              "popup" preference — the default "sheet" mode skips this
-              block entirely and uses the portaled bottom-sheet below. */}
-          {draftPickerStyle === "popup" && draftsDropdownOpen && (
-            <>
-              <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
-              <div className="drafts-dropdown-menu project-draft-menu">
-                <div className="project-draft-menu-header">
-                  <div className="project-header-title">{story.title || "Untitled"}</div>
-                  <button
-                    className="drafts-dropdown-trigger"
-                    onClick={() => setDraftsDropdownOpen(false)}
-                  >
-                    <span>Draft {activeProjectDraft.number}</span>
-                    <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
-                  </button>
-                </div>
-                <div className="project-draft-menu-actions">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleCreateNewProjectDraft}
-                    style={{ flex: 1 }}
-                  >
-                    New Draft
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleDuplicateProjectDraft}
-                    style={{ flex: 1 }}
-                  >
-                    Duplicate Draft
-                  </Button>
-                </div>
-                <div className="project-draft-menu-divider" aria-hidden="true" />
-                {[...story.projectDrafts]
-                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                  .map(draft => {
-                    const isActive = draft.id === story.activeProjectDraftId;
-                    const date = new Date(draft.updatedAt);
-                    const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                    const timeStr = date
-                      .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
-                      .replace(" ", "");
-                    const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
-                    const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
-                    const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
-                    const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
-                    return (
-                      <button
-                        key={draft.id}
-                        className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                        onClick={() => handleLoadProjectDraft(draft.id)}
-                      >
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                            <span>Draft {draft.number}</span>
-                            <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
-                          </div>
-                          <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
-                            Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-              </div>
-            </>
-          )}
-
         </div>
+
+        {/* Legacy popup treatment for the project-drafts dropdown.
+            Portaled to document.body so it escapes the .studio-scroll
+            `-webkit-overflow-scrolling: touch` compositing trap on iOS
+            Safari (which was making the inline-rendered popup
+            invisible). Position is measured from `.studio-header-
+            sticky` when the popup opens — `projectPopupTop` holds the
+            header's viewport y-coordinate at open time and the menu
+            pins there via inline `top`. Gated on the "popup"
+            preference; the default "sheet" mode uses the portaled
+            bottom-sheet below instead. */}
+        {draftPickerStyle === "popup" && draftsDropdownOpen && typeof document !== "undefined" && createPortal(
+          <>
+            <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
+            <div
+              className="drafts-dropdown-menu project-draft-menu"
+              style={{ position: "fixed", top: projectPopupTop }}
+            >
+              <div className="project-draft-menu-header">
+                <div className="project-header-title">{story.title || "Untitled"}</div>
+                <button
+                  className="drafts-dropdown-trigger"
+                  onClick={() => setDraftsDropdownOpen(false)}
+                >
+                  <span>Draft {activeProjectDraft.number}</span>
+                  <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
+                </button>
+              </div>
+              <div className="project-draft-menu-actions">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleCreateNewProjectDraft}
+                  style={{ flex: 1 }}
+                >
+                  New Draft
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDuplicateProjectDraft}
+                  style={{ flex: 1 }}
+                >
+                  Duplicate Draft
+                </Button>
+              </div>
+              <div className="project-draft-menu-divider" aria-hidden="true" />
+              {[...story.projectDrafts]
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                .map(draft => {
+                  const isActive = draft.id === story.activeProjectDraftId;
+                  const date = new Date(draft.updatedAt);
+                  const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                  const timeStr = date
+                    .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+                    .replace(" ", "");
+                  const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
+                  const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
+                  const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
+                  const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
+                  return (
+                    <button
+                      key={draft.id}
+                      className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                      onClick={() => handleLoadProjectDraft(draft.id)}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                          <span>Draft {draft.number}</span>
+                          <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
+                        </div>
+                        <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
+                          Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+          </>,
+          document.body,
+        )}
 
         {/* Project-drafts bottom sheet. Replaces the old inline
             dropdown menu: the trigger in the sticky header toggles
@@ -1538,6 +1570,13 @@ function LayerDraftPicker({
   // per-layer picker across the app tracks the same user choice
   // without prop-threading through tab components.
   const [pickerStyle] = useDraftPickerStylePref();
+  // Trigger ref + measured popup position — used when `pickerStyle`
+  // is "popup" so the popup can be portaled to document.body (same
+  // reason as the project-drafts popup: escape the `.studio-scroll`
+  // `-webkit-overflow-scrolling: touch` compositing trap on iOS
+  // Safari that otherwise hides inline-rendered descendants).
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [popupPos, setPopupPos] = useState({ top: 0, left: 0 });
 
   // Mutual exclusion with the project-drafts dropdown and other
   // layer dropdowns: when this one opens, broadcast our layer id so
@@ -1555,6 +1594,22 @@ function LayerDraftPicker({
     window.addEventListener("draft-dropdown:open", onOther);
     return () => window.removeEventListener("draft-dropdown:open", onOther);
   }, [open, layer]);
+
+  // Measure trigger position when the popup opens so the portaled
+  // menu can anchor just below the trigger (mirrors the original
+  // `top: calc(100% - 4px)` anchoring). Re-measured on every open —
+  // we don't track scroll/resize while open because the popup closes
+  // on backdrop click/scroll in practice.
+  useEffect(() => {
+    if (!open || pickerStyle !== "popup") return;
+    const t = triggerRef.current;
+    if (!t) return;
+    const rect = t.getBoundingClientRect();
+    setPopupPos({
+      top: rect.bottom - 4,
+      left: rect.left + rect.width / 2,
+    });
+  }, [open, pickerStyle]);
 
   const pool = (
     layer === "concept"    ? story.conceptDrafts :
@@ -1602,6 +1657,7 @@ function LayerDraftPicker({
   return (
     <div className="layer-draft-picker">
       <button
+        ref={triggerRef}
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
       >
@@ -1621,14 +1677,24 @@ function LayerDraftPicker({
         </button>
       )}
 
-      {/* Legacy popup treatment. Rendered inline (not portaled) so the
-          absolute-positioned menu anchors under the trigger via
-          .drafts-dropdown-menu.layer-draft-menu CSS. Gated on the
-          "popup" preference. */}
-      {pickerStyle === "popup" && open && (
+      {/* Legacy popup treatment. Portaled to document.body so the
+          menu escapes the `.studio-scroll` `-webkit-overflow-
+          scrolling: touch` compositing trap on iOS Safari (which
+          was hiding the inline-rendered version). Anchored below
+          the trigger via the measured `popupPos` computed above.
+          Gated on the "popup" preference. */}
+      {pickerStyle === "popup" && open && typeof document !== "undefined" && createPortal(
         <>
           <div className="drafts-dropdown-backdrop" onClick={() => setOpen(false)} />
-          <div className="drafts-dropdown-menu layer-draft-menu">
+          <div
+            className="drafts-dropdown-menu layer-draft-menu"
+            style={{
+              position: "fixed",
+              top: popupPos.top,
+              left: popupPos.left,
+              transform: "translateX(-50%)",
+            }}
+          >
             <div className="layer-draft-menu-actions">
               <Button
                 variant="primary"
@@ -1664,7 +1730,8 @@ function LayerDraftPicker({
               );
             })}
           </div>
-        </>
+        </>,
+        document.body,
       )}
 
       {/* Layer-draft bottom sheet. Always mounted so the slide

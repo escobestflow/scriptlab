@@ -386,7 +386,15 @@ html[data-theme="dark"] .topbar {
   color: var(--ink-mute);
   pointer-events: none;
 }
-.cover-prompt-input {
+/* Scoped with the wrap for specificity so this wins over
+   `.attr-text-input { padding: 10px 12px; }` (declared later in
+   the sheet); the extra class pushes us from (0,1,0) to (0,2,0).
+   `:focus` is included because `.attr-text-input:focus` also tries
+   to reset padding. Without this extra reach the 32px left pad
+   collapsed back to 12px, which let the placeholder sit on top of
+   the pencil icon rather than to the right of it. */
+.cover-prompt-wrap .cover-prompt-input,
+.cover-prompt-wrap .cover-prompt-input:focus {
   /* Match the Button's sm height so the row aligns cleanly. */
   height: 38px;
   padding: 0 12px 0 32px;
