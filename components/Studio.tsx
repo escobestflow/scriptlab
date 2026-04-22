@@ -2058,12 +2058,19 @@ function EmptyLayerState({
   );
 }
 
-/* ── Sticky bottom action bar for Characters / Story.
+/* ── Sticky bottom action bar for Characters / Story / Script.
  *    Mounts (and animates up) only once the layer has at least one
  *    item, matching the rule that it shouldn't appear on empty tabs
- *    (the empty-state card owns those CTAs instead). Sits above the
- *    bottom tabbar; adds a spacer into the scroll flow so the last
- *    list row isn't obscured. */
+ *    (the empty-state card owns those CTAs instead). Pinned flush to
+ *    the bottom of the viewport; adds a spacer into the scroll flow
+ *    so the last list row isn't obscured.
+ *
+ *    Portaled to `document.body` so it stacks cleanly with the
+ *    portaled draft sheets — inside `.studio-scroll`, the Safari
+ *    `-webkit-overflow-scrolling: touch` compositing layer was
+ *    trapping this bar and letting it paint above the sheet
+ *    backdrop regardless of z-index. Rendering at body level makes
+ *    the z:15 sticky-bar ↔ z:40/50 sheet stacking behave normally. */
 function LayerStickyBar({
   addLabel,
   onAdd,
@@ -2075,7 +2082,7 @@ function LayerStickyBar({
   onGenerate: () => void;
   generating: boolean;
 }) {
-  return (
+  const bar = (
     <div className="layer-sticky-bar">
       <Button
         variant="secondary"
@@ -2096,10 +2103,12 @@ function LayerStickyBar({
         className="empty-state-ai-btn"
         style={{ flex: 1 }}
       >
-        {generating ? "Creating…" : "Create everything for me"}
+        {generating ? "Creating…" : "Create everything"}
       </Button>
     </div>
   );
+  if (typeof document === "undefined") return null;
+  return createPortal(bar, document.body);
 }
 
 /* ── AI sparkle glyph — standalone SVG for buttons that trigger
@@ -4053,6 +4062,24 @@ function ScriptTab({
         importing={importing}
         importStep={importStep}
       />
+
+      {/* Sticky bottom action bar — mirrors Characters and Story.
+          Shows once there's at least one scene (beat) in the
+          outline: "Add scene" drops the user into Story to create
+          a new beat, "Create everything" generates prose for every
+          unwritten scene. Hidden on empty Script because the empty
+          state card already owns those CTAs. */}
+      {hasBeats && (
+        <>
+          <div className="layer-sticky-bar-spacer" aria-hidden="true" />
+          <LayerStickyBar
+            addLabel="Add scene"
+            onAdd={onAddScene}
+            onGenerate={generateAllScript}
+            generating={genBusy}
+          />
+        </>
+      )}
     </>
   );
 }

@@ -231,8 +231,15 @@ html[data-theme="dark"] .topbar {
 .screen-scroll {
   flex: 1;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 4px 20px 90px; /* extra bottom padding to clear the absolute tabbar */
+  /* `-webkit-overflow-scrolling: touch` removed: it's a legacy iOS-12-era
+     property, modern iOS gets momentum scrolling by default, and the
+     property is a known breaker of `position: sticky` inside the scroll
+     container (affected the Ideas filter-row — pills failed to pin at
+     the top on scroll). */
+  /* Top padding dropped to 0 so sticky children (.filter-row) can pin
+     flush with the top of the scroll port. Headings inside the scroll
+     carry their own margin-top for breathing room. */
+  padding: 0 20px 90px; /* extra bottom padding to clear the absolute tabbar */
 }
 
 /* ======= TYPOGRAPHY ======= */
@@ -635,7 +642,11 @@ html[data-theme="dark"] .record-fab {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  margin-bottom: 8px;
+  /* 16px of breathing room between the search field and the filter
+     pill row directly below. Previously 8px — the extra 8px gives
+     the pills a little more room to read as a distinct control
+     group, per design tune-up. */
+  margin-bottom: 16px;
   border-radius: 14px;
   background: #fff;
   border: 1px solid var(--border-strong);
@@ -3091,17 +3102,24 @@ html[data-theme="dark"] .empty-state-ai-btn.ds-btn-primary {
   position: fixed;
   left: 0;
   right: 0;
-  /* Pin above the bottom tabbar. Tabbar sits at bottom:0 with its
-     own safe-area padding, so we match its floor + its content
-     height (~72px). */
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  /* Pinned flush to the very bottom of the viewport. Studio has no
+     bottom tabbar (SectionTabs live in the sticky top header), so
+     the previous 72px offset was leaving a gap below. Safe-area
+     padding stacks on top of the 12px design padding so the buttons
+     stay inside the home-indicator zone on iPhones with a notch. */
+  bottom: 0;
   margin: 0 auto;
   max-width: 520px;
-  padding: 12px 20px;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
   display: flex;
   gap: 10px;
   background: var(--surface);
   border-top: 1px solid var(--border);
+  /* Sits above page content but BELOW the portaled draft sheets
+     (.sheet-backdrop z:40, .sheet z:50). The sticky bar is portaled
+     to <body> so its stacking context is the page root — the
+     z-index comparison is reliable and the draft sheet cleanly
+     covers it when opened. */
   z-index: 15;
   animation: layerStickyBarSlideUp 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
