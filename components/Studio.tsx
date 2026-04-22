@@ -4241,7 +4241,7 @@ function ImportScriptCard({
     : "Import a script";
 
   return (
-    <div className="card import-script-card" style={{ marginTop: 16 }}>
+    <div className="card import-script-card" style={{ marginTop: 41 }}>
       <span className="eyebrow">Have a finished script?</span>
       <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
         Upload a .txt or .pdf screenplay. Unfold will split it into
