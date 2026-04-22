@@ -2087,48 +2087,62 @@ function EmptyLayerState({
   icon: React.ReactNode;
   title: string;
   caption: string;
-  addLabel: string;
-  onAdd: () => void;
-  onGenerate: () => void;
-  generating: boolean;
-  /** Primary-button label. Defaults to "Create all"; Story/Script
-   *  tabs pass "Write all" since their AI action produces prose
-   *  rather than inventing new entities from scratch. */
+  /** When omitted, no "Add X" button renders. Script's empty state
+   *  uses this to show a pure info card (icon + title + caption). */
+  addLabel?: string;
+  onAdd?: () => void;
+  /** When omitted, no "Create/Write all" button renders. Same rule
+   *  as `onAdd` — used by Script's minimal empty state. */
+  onGenerate?: () => void;
+  generating?: boolean;
+  /** Primary-button label. Defaults to "Create all"; Story tab
+   *  passes "Write all" since its AI action produces prose rather
+   *  than inventing new entities from scratch. */
   generateLabel?: string;
   /** In-flight label shown while `generating` is true. Defaults
-   *  to "Creating…"; Story/Script pass "Writing…" to match. */
+   *  to "Creating…"; Story passes "Writing…" to match. */
   generatingLabel?: string;
 }) {
+  const hasActions = !!onAdd || !!onGenerate;
   return (
     <div className="empty-layer-state">
       <div className="empty-layer-icon">{icon}</div>
       <div className="empty-layer-title">{title}</div>
       <div className="empty-layer-caption">{caption}</div>
       {/* Stacked (primary / secondary) compact CTAs — the sticky bar
-          that appears post-first-item keeps the larger, side-by-side
+          that appears post-first-item keeps the larger, single-button
           treatment; the empty state uses a quieter pair so the icon +
-          copy stay the focal point of the first-paint surface. */}
-      <div className="empty-layer-actions">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={onAdd}
-          disabled={generating}
-          icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
-        >
-          {addLabel}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={onGenerate}
-          disabled={generating}
-          icon={<AISparkleIcon />}
-          className="empty-state-ai-btn"
-        >
-          {generating ? generatingLabel : generateLabel}
-        </Button>
-      </div>
+          copy stay the focal point of the first-paint surface.
+          Hidden entirely if no onAdd + no onGenerate were passed, for
+          tabs (like Script) that intentionally keep the empty state
+          informational-only. */}
+      {hasActions && (
+        <div className="empty-layer-actions">
+          {onAdd && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onAdd}
+              disabled={!!generating}
+              icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+            >
+              {addLabel}
+            </Button>
+          )}
+          {onGenerate && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onGenerate}
+              disabled={!!generating}
+              icon={<AISparkleIcon />}
+              className="empty-state-ai-btn"
+            >
+              {generating ? generatingLabel : generateLabel}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2147,29 +2161,28 @@ function EmptyLayerState({
  *    backdrop regardless of z-index. Rendering at body level makes
  *    the z:15 sticky-bar ↔ z:40/50 sheet stacking behave normally. */
 function LayerStickyBar({
-  addLabel,
-  onAdd,
+  label,
+  onClick,
   disabled,
 }: {
-  addLabel: string;
-  onAdd: () => void;
-  /** When true, the add button is disabled (e.g. a generation is
-   *  in-flight elsewhere in the tab). The generate-all CTA used to
-   *  live here too but was removed — "Create all" / "Write all" now
-   *  exist only on the empty-state card. */
+  /** Single primary CTA label — Characters passes "Add character",
+   *  Story passes "Write scene", Script passes "Write all". Whatever
+   *  the verb, the button is always styled black/primary for a
+   *  consistent "commit your intent for this tab" affordance. */
+  label: string;
+  onClick: () => void;
   disabled?: boolean;
 }) {
   const bar = (
     <div className="layer-sticky-bar">
       <Button
-        variant="secondary"
+        variant="primary"
         size="lg"
-        onClick={onAdd}
+        onClick={onClick}
         disabled={!!disabled}
-        icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
         style={{ flex: 1 }}
       >
-        {addLabel}
+        {label}
       </Button>
     </div>
   );
@@ -3273,8 +3286,8 @@ function CharactersTab({
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            addLabel="Add character"
-            onAdd={openNewCharacter}
+            label="Add character"
+            onClick={openNewCharacter}
             disabled={genBusy}
           />
         </>
@@ -3934,8 +3947,8 @@ function StoryTab({
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            addLabel="Add scene"
-            onAdd={() => openBeatTray(beats.length)}
+            label="Write scene"
+            onClick={() => openBeatTray(beats.length)}
             disabled={genBusy}
           />
         </>
@@ -4078,16 +4091,16 @@ function ScriptTab({
       )}
 
       {!hasBeats && (
+        // Script's empty state is informational-only: no Add scene and
+        // no Write all. The user is expected to sketch scenes in the
+        // Story tab first (copy below explains this), so surfacing a
+        // sticky "Add scene" here would invite entering this tab out
+        // of flow. "Write all" is hidden too — with zero beats there's
+        // nothing to generate prose from.
         <EmptyLayerState
           icon={<>&#127916;</>}
           title="No scenes yet"
           caption="Sketch scenes in the Story tab, then return here to write them into prose."
-          addLabel="Add scene"
-          onAdd={onAddScene}
-          onGenerate={generateAllScript}
-          generating={genBusy}
-          generateLabel="Write all"
-          generatingLabel="Writing…"
         />
       )}
 
@@ -4172,8 +4185,8 @@ function ScriptTab({
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            addLabel="Add scene"
-            onAdd={onAddScene}
+            label="Write all"
+            onClick={generateAllScript}
             disabled={genBusy}
           />
         </>
