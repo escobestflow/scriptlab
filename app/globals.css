@@ -361,6 +361,32 @@ html[data-theme="dark"] .topbar {
   max-width: 320px;
 }
 
+/* Ideas empty-state CTA: text-only variant of the primary-button label.
+   Matches `.btn-primary` typography (bold, black) but no pill chrome —
+   the user asked for a label, not a button. The down-arrow below it
+   points at the red record FAB anchored to the bottom of the viewport. */
+.projects-empty-cta-text {
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  margin: 0 0 16px;
+  transition: opacity 160ms var(--ease);
+}
+.projects-empty-cta-text:active { opacity: 0.6; }
+.projects-empty-down-arrow {
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+[data-theme="dark"] .projects-empty-down-arrow {
+  filter: invert(1);
+}
+
 /* Settings → Cover: prompt input + Regenerate button share one row.
    The input owns the flex remainder; the button shrinks to its content.
    A leading pencil icon sits absolutely positioned inside the input to

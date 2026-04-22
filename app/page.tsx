@@ -548,6 +548,7 @@ export default function Page() {
                   setNewIdeaType("scene");
                   setNewIdeaOpen(true);
                 }}
+                onStartRecording={startRecording}
               />
             )}
           </div>
@@ -1672,11 +1673,13 @@ function MomentsTab({
   onEdit,
   onDelete,
   onNew,
+  onStartRecording,
 }: {
   moments: Moment[];
   onEdit: (m: Moment) => void;
   onDelete: (id: string) => void;
   onNew: () => void;
+  onStartRecording: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All");
@@ -1733,6 +1736,36 @@ function MomentsTab({
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days}d ago`;
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  // First-run empty state for Ideas. Mirrors the Projects-tab empty-state
+  // pattern (same `.projects-empty` container, same title/sub typography)
+  // so the two tabs feel like a matched pair. The CTA is a plain text
+  // button (not a pill) styled with `.projects-empty-cta-text`, followed
+  // by the down-arrow glyph pointing at the red record FAB below.
+  if (moments.length === 0) {
+    return (
+      <div className="projects-empty">
+        <h1 className="projects-empty-title">Start with a moment</h1>
+        <p className="projects-empty-sub">
+          Record ideas, memories, dreams, conversations, or unforgettable moments and let AI turn them into scenes and stories.
+        </p>
+        <button
+          type="button"
+          className="projects-empty-cta-text"
+          onClick={onStartRecording}
+        >
+          Start Recording
+        </button>
+        <img
+          src="/down-arrow.svg"
+          alt=""
+          width={44}
+          height={50}
+          className="projects-empty-down-arrow"
+        />
+      </div>
+    );
   }
 
   return (
