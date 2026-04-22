@@ -368,10 +368,10 @@ html[data-theme="dark"] .topbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* +16px above the frame to push the whole carousel lower;
-     +18px below so the header/body/CTA/arrow stack keeps its
-     prior offset. */
-  margin: 16px 0 42px;
+  /* +16px above the frame to push the whole carousel lower.
+     Below, 22px = the prior 42px minus 20px so the header/body/
+     CTA/arrow stack sits 20px higher than before. */
+  margin: 16px 0 22px;
   user-select: none;
 }
 .ideas-carousel-viewport {
