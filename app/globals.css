@@ -353,6 +353,22 @@ html[data-theme="dark"] .topbar {
   margin: 0 0 10px;
   color: var(--ink);
 }
+
+/* Ideas empty-state title fades in on every carousel index change.
+   The element is re-keyed in React, which re-mounts it and re-runs
+   this animation. Fade-in only (no out): the old text is unmounted
+   instantly — the incoming text does the visible work, reading as a
+   quick swap that stays in sync with the image crossfade below. */
+.ideas-empty-title {
+  animation: ideas-empty-title-fade 420ms var(--ease) both;
+}
+@keyframes ideas-empty-title-fade {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ideas-empty-title { animation: none; }
+}
 .projects-empty-sub {
   font-size: 14px;
   line-height: 1.55;

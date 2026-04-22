@@ -1682,11 +1682,27 @@ const IDEAS_CAROUSEL_SRCS = [
   "/ideas-carousel-2.png",
   "/ideas-carousel-3.png",
 ];
+/** Headings paired 1:1 with IDEAS_CAROUSEL_SRCS — shown above the frame
+ *  and cross-faded whenever the active slide changes. */
+const IDEAS_CAROUSEL_HEADINGS = [
+  "Start with an idea",
+  "Record it",
+  "Put it in your script",
+];
 const IDEAS_CAROUSEL_MS = 4000;
 const IDEAS_CAROUSEL_SWIPE_PX = 40;
 
-function IdeasCarousel() {
+function IdeasCarousel({
+  onIndexChange,
+}: {
+  onIndexChange?: (i: number) => void;
+}) {
   const [index, setIndex] = useState(0);
+  // Broadcast index changes so the parent header can cross-fade in sync
+  // with the active slide.
+  useEffect(() => {
+    onIndexChange?.(index);
+  }, [index, onIndexChange]);
   // Touch tracking for swipe; we use refs rather than state so the
   // frequent touchmove events don't re-render the component.
   const touchStartX = useRef<number | null>(null);
@@ -1769,6 +1785,65 @@ function IdeasCarousel() {
   );
 }
 
+/**
+ * Ideas tab first-run hero. Owns the active carousel index so the
+ * heading above the frame can cross-fade to the string that matches
+ * the current illustration. The body copy, CTA, and down-arrow stay
+ * constant — only the title swaps with the image.
+ */
+function IdeasEmptyState({
+  onStartRecording,
+}: {
+  onStartRecording: () => void;
+}) {
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  // Stable callback so IdeasCarousel's broadcast effect doesn't
+  // re-fire on every parent render.
+  const handleIndexChange = useCallback((i: number) => {
+    setCarouselIndex(i);
+  }, []);
+
+  return (
+    <div className="projects-empty ideas-empty">
+      <IdeasCarousel onIndexChange={handleIndexChange} />
+      {/* `key` forces a fresh mount on every slide change so the CSS
+          fade-in animation re-runs; the outgoing element is dropped
+          instantly, which reads as a clean swap rather than a
+          cross-dissolve (simpler + cheaper). */}
+      <h1
+        key={carouselIndex}
+        className="projects-empty-title ideas-empty-title"
+      >
+        {IDEAS_CAROUSEL_HEADINGS[carouselIndex]}
+      </h1>
+      <p className="projects-empty-sub">
+        {/* Explicit line breaks guarantee the intended three-line
+            layout regardless of viewport / font-metric drift:
+              1. Record ideas, memories, dreams, conversations,
+              2. or unforgettable moments and let AI turn them
+              3. into scenes and stories. */}
+        Record ideas, memories, dreams, conversations,<br />
+        or unforgettable moments and let AI turn them<br />
+        into scenes and stories.
+      </p>
+      <button
+        type="button"
+        className="projects-empty-cta-text"
+        onClick={onStartRecording}
+      >
+        Start Recording
+      </button>
+      <img
+        src="/down-arrow.svg"
+        alt=""
+        width={44}
+        height={50}
+        className="projects-empty-down-arrow"
+      />
+    </div>
+  );
+}
+
 function MomentsTab({
   moments,
   onEdit,
@@ -1845,36 +1920,7 @@ function MomentsTab({
   // button (not a pill) styled with `.projects-empty-cta-text`, followed
   // by the down-arrow glyph pointing at the red record FAB below.
   if (moments.length === 0) {
-    return (
-      <div className="projects-empty ideas-empty">
-        <IdeasCarousel />
-        <h1 className="projects-empty-title">Start with a moment</h1>
-        <p className="projects-empty-sub">
-          {/* Explicit line breaks guarantee the intended three-line
-              layout regardless of viewport / font-metric drift:
-                1. Record ideas, memories, dreams, conversations,
-                2. or unforgettable moments and let AI turn them
-                3. into scenes and stories. */}
-          Record ideas, memories, dreams, conversations,<br />
-          or unforgettable moments and let AI turn them<br />
-          into scenes and stories.
-        </p>
-        <button
-          type="button"
-          className="projects-empty-cta-text"
-          onClick={onStartRecording}
-        >
-          Start Recording
-        </button>
-        <img
-          src="/down-arrow.svg"
-          alt=""
-          width={44}
-          height={50}
-          className="projects-empty-down-arrow"
-        />
-      </div>
-    );
+    return <IdeasEmptyState onStartRecording={onStartRecording} />;
   }
 
   return (
