@@ -413,26 +413,41 @@ html[data-theme="dark"] .topbar {
 }
 
 /* Ideas empty-state CTA: text-only variant of the primary-button label.
-   Matches `.btn-primary` typography (bold, black) but no pill chrome —
-   the user asked for a label, not a button. The down-arrow below it
-   points at the red record FAB anchored to the bottom of the viewport. */
+   Matches the `.ds-btn-lg` Projects "GET STARTED" label exactly
+   (500 weight, 12px, uppercase, 0.07em tracking) but rendered as
+   plain ink-black text with no pill chrome. */
 .projects-empty-cta-text {
-  font-weight: 900;
-  font-size: 15px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  line-height: 1;
   color: var(--ink);
   background: transparent;
   border: 0;
   padding: 0;
-  letter-spacing: 0.02em;
   cursor: pointer;
   margin: 0 0 16px;
   transition: opacity 160ms var(--ease);
 }
 .projects-empty-cta-text:active { opacity: 0.6; }
+
+/* Down-arrow glyph below the Start Recording CTA. Bobs gently 4px
+   up and down on a 1.6s loop to hint "the button that does this is
+   down there" — the red record FAB anchored to the bottom edge. */
 .projects-empty-down-arrow {
   display: block;
   user-select: none;
   pointer-events: none;
+  animation: projects-empty-down-arrow-bob 1.6s ease-in-out infinite;
+}
+@keyframes projects-empty-down-arrow-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .projects-empty-down-arrow { animation: none; }
 }
 [data-theme="dark"] .projects-empty-down-arrow {
   filter: invert(1);
