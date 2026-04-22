@@ -436,6 +436,16 @@ html[data-theme="dark"] .topbar {
   background: #3E3E3E;
 }
 
+/* Dark mode: swap the dot colors so the active/idle contrast matches
+   the light-mode treatment (active pops darker-than-idle in light,
+   lighter-than-idle in dark). */
+[data-theme="dark"] .ideas-carousel-dot {
+  background: #3E3E3E;
+}
+[data-theme="dark"] .ideas-carousel-dot.active {
+  background: #D9D9D9;
+}
+
 /* Ideas empty-state CTA: text-only variant of the primary-button label.
    Matches the `.ds-btn-lg` Projects "GET STARTED" label exactly
    (500 weight, 12px, uppercase, 0.07em tracking) but rendered as
