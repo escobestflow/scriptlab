@@ -13,12 +13,11 @@
 //              (150px → 86px, viewport-center → topbar-center) while
 //              the black viewport simultaneously collapses vertically
 //              to the topbar's height
-//   1400–1800ms hamburger menu icon fades in over the shrinking strip,
-//              timed to land on the topbar just as the strip reaches
-//              its final height
 //   1800ms+    hold at the final pose (visually identical to the real
-//              topbar: black strip, logo, hamburger) until the parent
-//              unmounts us
+//              topbar: black strip + logo) until the parent unmounts
+//              us. The hamburger is owned by the real topbar — we do
+//              not render a duplicate here, so the only menu icon the
+//              user sees is the one that stays on screen post-swap.
 //
 // The parent keeps this component mounted while `!hydrated || !done`,
 // so if projects finish loading mid-animation we still play the full
@@ -58,11 +57,6 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
       <div className="post-login-bg" />
       <div className="post-login-tagline">Let your story</div>
       <img className="post-login-logo" src="/logo.svg" alt="Unfold" />
-      <span className="post-login-menu" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </span>
 
       <style jsx global>{`
         .post-login-transition {
@@ -154,48 +148,9 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
              (~17.64px) +1px -- per-design tweak to match the live
              wordmark rendered height on device (SVG gets stretched
              slightly taller than its intrinsic aspect). */
-          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 7px);
+          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 12px);
           width: 82px;
           height: calc(82px * 18.5 / 86 + 1px);
-        }
-
-        /* Hamburger — fixed at the topbar's left slot, hidden at start,
-           fades in as the black box reaches its final height. Mirrors
-           the real .menu-toggle span geometry so the swap to the real
-           topbar is invisible. */
-        .post-login-menu {
-          position: absolute;
-          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2);
-          left: 42px; /* .topbar padding-left (20) + .topbar-btn width/2 (22) */
-          transform: translate(-50%, -50%);
-          width: 22px;
-          height: 15px;
-          opacity: 0;
-          transition: opacity 400ms cubic-bezier(0.22, 0.61, 0.36, 1)
-            400ms;
-        }
-        .post-login-menu span {
-          position: absolute;
-          left: 0;
-          height: 2px;
-          border-radius: 2px;
-          background: #ffffff;
-        }
-        .post-login-menu span:nth-child(1) {
-          top: 0;
-          width: 12px;
-        }
-        .post-login-menu span:nth-child(2) {
-          top: 6.5px;
-          width: 22px;
-        }
-        .post-login-menu span:nth-child(3) {
-          top: 13px;
-          width: 17px;
-        }
-        .post-login-transition.phase-shrink .post-login-menu,
-        .post-login-transition.phase-done .post-login-menu {
-          opacity: 1;
         }
 
         /* Center-constrain the overlay to the same max-width as the
@@ -213,8 +168,7 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
         @media (prefers-reduced-motion: reduce) {
           .post-login-bg,
           .post-login-tagline,
-          .post-login-logo,
-          .post-login-menu {
+          .post-login-logo {
             transition-duration: 200ms !important;
           }
         }
