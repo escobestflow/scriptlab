@@ -59,6 +59,11 @@ export default function SplashLoader({
   const startedAtRef = useRef<number>(Date.now());
   const [dismissing, setDismissing] = useState(false);
   const dismissedRef = useRef(false);
+  // Skip-intro state: when true, all in-flight animations are overridden
+  // to their final frame via CSS ([data-skipped="true"]). For signed-out
+  // users the Google button takes the Skip CTA's spot instantly; for
+  // signed-in users we dismiss straight into the app.
+  const [skipped, setSkipped] = useState(false);
 
   // Resolved auth state — drives the data-auth attribute that controls
   // sign-in button visibility via CSS. While auth is loading, default to
@@ -69,24 +74,17 @@ export default function SplashLoader({
     !authLoading && signedIn ? "signed-in" : "signed-out";
 
   // Single dismiss path — idempotent.
+  //
+  // Dismissal hands off directly to <PostLoginTransition>, whose
+  // initial pose (black viewport + centered "Let your story" tagline
+  // + Unfold wordmark below) mirrors the splash's end frame. Because
+  // the poses are visually identical, we DON'T fade the splash out;
+  // a fade would expose the body background between the two surfaces
+  // and flash (especially in light mode). Instead we drop the splash
+  // instantly and let the transition component take over.
   async function dismiss() {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
-    setDismissing(true);
-    const el = rootRef.current;
-    await new Promise<void>((resolve) => {
-      if (!el) {
-        setTimeout(resolve, 450);
-        return;
-      }
-      const handle = () => {
-        el.removeEventListener("transitionend", handle);
-        resolve();
-      };
-      el.addEventListener("transitionend", handle);
-      // Safety fallback in case transitionend doesn't fire.
-      setTimeout(resolve, 500);
-    });
     onDismiss();
   }
 
@@ -102,6 +100,19 @@ export default function SplashLoader({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState]);
+
+  // Skip Intro tap handler. Flipping `skipped` fast-forwards the CSS
+  // animations to their final frame (tagline + wordmark at opacity 1;
+  // SVG stage at opacity 0; the sign-in button becomes visible in the
+  // Skip CTA's exact spot). If the viewer is already signed in, skip
+  // straight past the end-state into the app instead of pausing there.
+  const handleSkip = () => {
+    if (skipped || dismissedRef.current) return;
+    setSkipped(true);
+    if (authState === "signed-in") {
+      void dismiss();
+    }
+  };
 
   async function handleSignIn() {
     // supabase.auth.signInWithOAuth({ provider: "google" }) redirects
@@ -123,6 +134,7 @@ export default function SplashLoader({
       ref={rootRef}
       data-splash-root
       data-auth={authState}
+      data-skipped={skipped ? "true" : "false"}
       className={dismissing ? "splash-dismissed" : ""}
       style={{
         position: "fixed",
@@ -155,6 +167,21 @@ export default function SplashLoader({
           <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
         </svg>
         <span>Sign in with Google</span>
+      </button>
+
+      {/* Skip Intro — small text CTA pinned at the bottom of the
+          loader. Tapping fast-forwards to the final frame: SVG stage
+          hides, tagline + wordmark snap to full opacity, and for
+          signed-out viewers the Google button instantly occupies the
+          Skip CTA's spot (same bottom: 48px anchor). Hidden once
+          `skipped` flips via the [data-skipped] attribute on the root. */}
+      <button
+        type="button"
+        className="splash-skip-btn"
+        onClick={handleSkip}
+        aria-label="Skip intro"
+      >
+        Skip Intro
       </button>
 
       {/* Vignette overlay — loaded from /public/vignette.svg so the
@@ -480,6 +507,63 @@ export default function SplashLoader({
         /* Auth-state hook — hide button when already signed in. */
         [data-splash-root][data-auth="signed-in"] .signin-btn {
           display: none !important;
+        }
+
+        /* Skip Intro — small uppercase text CTA at the bottom of the
+           splash. Fades in alongside the first unfold step (0.6s) so
+           it's reachable throughout the animation, and disappears the
+           moment the user taps it (the Google button then slides into
+           its spot via [data-skipped="true"] overrides below). */
+        [data-splash-root] .splash-skip-btn {
+          position: absolute;
+          bottom: 48px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: none;
+          border: none;
+          color: rgba(255, 255, 255, 0.55);
+          font-family: 'Lato', sans-serif;
+          font-weight: 500;
+          font-size: 11px;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          padding: 12px 18px;
+          cursor: pointer;
+          opacity: 0;
+          z-index: 7;
+          animation: unfoldSplashLogoFadeIn 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) 0.6s forwards;
+        }
+        [data-splash-root] .splash-skip-btn:hover,
+        [data-splash-root] .splash-skip-btn:active {
+          color: #ffffff;
+        }
+        /* Hide Skip once it's been tapped — the Google button (or
+           dismiss) takes over. Also hide once the Google button is
+           mid-fade so the two CTAs don't overlap at the same anchor. */
+        [data-splash-root][data-skipped="true"] .splash-skip-btn,
+        [data-splash-root][data-auth="signed-in"] .splash-skip-btn {
+          display: none !important;
+        }
+
+        /* ===== Skip-to-end-state overrides ===========================
+           When the user taps Skip Intro we collapse every running
+           animation to its final frame. The SVG stage + vignette hide
+           instantly; tagline, wordmark, and (for signed-out) the
+           Google button snap to opacity 1. No transition — this is a
+           deliberate cut, not a second animation. */
+        [data-splash-root][data-skipped="true"] .stage,
+        [data-splash-root][data-skipped="true"] .vignette-overlay {
+          animation: none !important;
+          opacity: 0 !important;
+        }
+        [data-splash-root][data-skipped="true"] .unfold-tagline,
+        [data-splash-root][data-skipped="true"] .unfold-logo {
+          animation: none !important;
+          opacity: 1 !important;
+        }
+        [data-splash-root][data-skipped="true"][data-auth="signed-out"] .signin-btn {
+          animation: none !important;
+          opacity: 1 !important;
         }
 
         /* Dismiss transition — fades the whole splash over 400ms. */

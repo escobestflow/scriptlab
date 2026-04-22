@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { Studio } from "@/components/Studio";
 import SplashLoader from "@/components/SplashLoader";
+import PostLoginTransition from "@/components/PostLoginTransition";
 import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
 import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
@@ -75,6 +76,12 @@ export default function Page() {
   const [darkMode, setDarkMode] = useDarkModePref();
   const [recording, setRecording] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  // Post-login transition completion gate. We keep the cinematic
+  // transition mounted while projects are still loading OR while the
+  // transition's internal timeline is still running, whichever finishes
+  // last. That way a fast hydration doesn't cut the animation short,
+  // and a slow one doesn't land us on the gray bridge screen.
+  const [postLoginDone, setPostLoginDone] = useState(false);
   const [recordSheetOpen, setRecordSheetOpen] = useState(false);
   const [liveTranscript, setLiveTranscript] = useState("");
   const [editingMoment, setEditingMoment] = useState<Moment | null>(null);
@@ -345,12 +352,14 @@ export default function Page() {
     );
   }
 
-  if (!hydrated) {
-    return (
-      <div className="app" style={{ alignItems: "center", justifyContent: "center" }}>
-        <div className="caption">Loading your projects…</div>
-      </div>
-    );
+  // Replaces the old "Loading your projects…" gray bridge screen with a
+  // cinematic handoff from the splash-end pose into the home topbar.
+  // Kept mounted until BOTH projects are loaded AND the transition has
+  // played through, so neither a fast hydration (which would cut the
+  // animation short) nor a slow one (which would land the user on a
+  // gray screen) breaks the illusion.
+  if (!hydrated || !postLoginDone) {
+    return <PostLoginTransition onDone={() => setPostLoginDone(true)} />;
   }
 
   const studioProject = view.kind === "studio"
