@@ -368,16 +368,17 @@ html[data-theme="dark"] .topbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* +18px below the frame so the header/body/CTA/arrow stack sits
-     18px lower than before. */
-  margin: 0 0 42px;
+  /* +16px above the frame to push the whole carousel lower;
+     +18px below so the header/body/CTA/arrow stack keeps its
+     prior offset. */
+  margin: 16px 0 42px;
   user-select: none;
 }
 .ideas-carousel-viewport {
-  /* +16px wider than the original 258×194 source; height scaled
-     proportionately (194 × 274/258 ≈ 206). */
-  width: 274px;
-  height: 206px;
+  /* +26px wider than the original 258×194 source; height scaled
+     proportionately to preserve aspect (194 × 284/258 ≈ 214). */
+  width: 284px;
+  height: 214px;
   overflow: hidden;
   border-radius: 12px;
   touch-action: pan-y; /* allow vertical page scroll, capture horizontal */
