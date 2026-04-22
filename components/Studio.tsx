@@ -200,6 +200,11 @@ export function Studio({
   // Character sheet — a single sheet used for BOTH creation and editing.
   // null = closed. "new-char-draft" marker or an existing character id = open.
   const [charSheetCharId, setCharSheetCharId] = useState<string | null>(null);
+  // Tracks whether the current sheet session was opened via "New" (not
+  // "Edit"). Used by CharacterEditForm to suppress the Delete-character
+  // button — a not-yet-saved entity has nothing to delete. Reset to false
+  // whenever we open an existing character.
+  const [charSheetIsNew, setCharSheetIsNew] = useState<boolean>(false);
   // TV show episode drill-in
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
   // Update-Other-Layers tray: null = closed, otherwise the source layer driving the sync.
@@ -404,8 +409,12 @@ export function Studio({
   // ── Character sheet open/close ──
   // Creating a character = optimistically insert a blank record, open its sheet,
   // and discard on close if nothing was filled in. Editing = open by id.
-  const openExistingCharacterSheet = (id: string) => setCharSheetCharId(id);
+  const openExistingCharacterSheet = (id: string) => {
+    setCharSheetIsNew(false);
+    setCharSheetCharId(id);
+  };
   const openNewCharacterSheet = () => {
+    setCharSheetIsNew(true);
     const newChar: Character = {
       id: "ch_" + Math.random().toString(36).slice(2),
       name: "",
@@ -1294,6 +1303,7 @@ export function Studio({
                   <CharacterEditForm
                     character={activeChar}
                     story={story}
+                    isNew={charSheetIsNew}
                     onUpdate={(patch) => {
                       setStory(s => updateCharactersDraft(s, {
                         characters: getActiveCharactersDraft(s).characters.map(c =>
@@ -3623,11 +3633,17 @@ function CharacterEditForm({
   story,
   onUpdate,
   onRemove,
+  isNew = false,
 }: {
   character: Character;
   story: Story;
   onUpdate: (patch: Partial<Character>) => void;
   onRemove: () => void;
+  /** True when the sheet was opened via "New character" — hides the
+   *  Delete-character button because the entity hasn't been saved
+   *  yet. An unsaved blank character gets auto-discarded on sheet
+   *  close, so there is literally nothing to delete. */
+  isNew?: boolean;
 }) {
   const roles: { key: string; label: string }[] = [
     { key: "protagonist",   label: "Protagonist" },
@@ -3902,17 +3918,21 @@ function CharacterEditForm({
 
       {/* Delete sits at the very bottom of the scrollable form — user must
           scroll past every field to reach it. No top action, no Done button
-          (sheet Save is sticky in the footer). */}
-      <div style={{ marginTop: 24, display: "flex", justifyContent: "center" }}>
-        <Button
-          variant="secondary"
-          size="sm"
-          style={{ color: "var(--ink-mute)" }}
-          onClick={onRemove}
-        >
-          Delete character
-        </Button>
-      </div>
+          (sheet Save is sticky in the footer). Hidden in "New character"
+          mode: the entity isn't saved yet, so there's nothing to delete —
+          closing the sheet without filling anything auto-discards it. */}
+      {!isNew && (
+        <div style={{ marginTop: 24, display: "flex", justifyContent: "center" }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            style={{ color: "var(--ink-mute)" }}
+            onClick={onRemove}
+          >
+            Delete character
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

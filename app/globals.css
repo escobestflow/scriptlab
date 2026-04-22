@@ -3660,11 +3660,15 @@ body:has(.sheet.open) .layer-sticky-bar {
   transform: translateY(-100%);
   opacity: 0;
   pointer-events: none;
-  /* cubic-bezier(0.16, 1, 0.3, 1) ≈ expo.out — sharp takeoff, long gentle
-     settle. The premium-feel curve. Duration bumped to let the ease breathe. */
+  /* CLOSING transition (applied when `.open` is removed): the panel
+     starts sliding up immediately; opacity holds full-visible through
+     the slide and only fades out at the tail. Reads as a reverse of
+     the open sequence — the viewer sees the panel leave, not dissolve
+     in place. cubic-bezier(0.16, 1, 0.3, 1) ≈ expo.out for motion;
+     (0.22, 1, 0.36, 1) for the gentler opacity curve. */
   transition:
     transform 560ms cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 260ms cubic-bezier(0.22, 1, 0.36, 1) 320ms;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -3672,6 +3676,12 @@ body:has(.sheet.open) .layer-sticky-bar {
   transform: translateY(0);
   opacity: 1;
   pointer-events: auto;
+  /* OPENING transition — fade + slide share the same window (no delay)
+     so the panel feels immediately present. Overrides the closing
+     transition declared on `.menu-panel` above. */
+  transition:
+    transform 560ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .menu-panel-inner {
