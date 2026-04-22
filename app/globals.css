@@ -448,6 +448,9 @@ html[data-theme="dark"] .topbar {
   display: block;
   user-select: none;
   pointer-events: none;
+  /* Nudge 2px up; margin (not transform) so the bob keyframes
+     don't fight it. */
+  margin-top: -2px;
   animation: projects-empty-down-arrow-bob 1.3s ease-in-out infinite;
 }
 @keyframes projects-empty-down-arrow-bob {
