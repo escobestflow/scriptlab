@@ -368,12 +368,16 @@ html[data-theme="dark"] .topbar {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0 0 24px;
+  /* +18px below the frame so the header/body/CTA/arrow stack sits
+     18px lower than before. */
+  margin: 0 0 42px;
   user-select: none;
 }
 .ideas-carousel-viewport {
-  width: 258px;
-  height: 194px;
+  /* +16px wider than the original 258×194 source; height scaled
+     proportionately (194 × 274/258 ≈ 206). */
+  width: 274px;
+  height: 206px;
   overflow: hidden;
   border-radius: 12px;
   touch-action: pan-y; /* allow vertical page scroll, capture horizontal */
@@ -440,11 +444,11 @@ html[data-theme="dark"] .topbar {
   display: block;
   user-select: none;
   pointer-events: none;
-  animation: projects-empty-down-arrow-bob 1.6s ease-in-out infinite;
+  animation: projects-empty-down-arrow-bob 1.3s ease-in-out infinite;
 }
 @keyframes projects-empty-down-arrow-bob {
   0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(4px); }
+  50%      { transform: translateY(7px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .projects-empty-down-arrow { animation: none; }
