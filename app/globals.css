@@ -358,7 +358,7 @@ html[data-theme="dark"] .topbar {
   line-height: 1.55;
   color: var(--ink-mute);
   margin: 0 0 32px;
-  max-width: 320px;
+  max-width: 312px;
 }
 
 /* Ideas empty-state hero carousel. Fixed 258×194 frame (matches the
@@ -448,9 +448,9 @@ html[data-theme="dark"] .topbar {
   display: block;
   user-select: none;
   pointer-events: none;
-  /* Nudge 2px up; margin (not transform) so the bob keyframes
+  /* Nudge 4px up; margin (not transform) so the bob keyframes
      don't fight it. */
-  margin-top: -2px;
+  margin-top: -4px;
   animation: projects-empty-down-arrow-bob 1.3s ease-in-out infinite;
 }
 @keyframes projects-empty-down-arrow-bob {
