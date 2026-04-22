@@ -2081,6 +2081,8 @@ function EmptyLayerState({
   onAdd,
   onGenerate,
   generating,
+  generateLabel = "Create all",
+  generatingLabel = "Creating…",
 }: {
   icon: React.ReactNode;
   title: string;
@@ -2089,6 +2091,13 @@ function EmptyLayerState({
   onAdd: () => void;
   onGenerate: () => void;
   generating: boolean;
+  /** Primary-button label. Defaults to "Create all"; Story/Script
+   *  tabs pass "Write all" since their AI action produces prose
+   *  rather than inventing new entities from scratch. */
+  generateLabel?: string;
+  /** In-flight label shown while `generating` is true. Defaults
+   *  to "Creating…"; Story/Script pass "Writing…" to match. */
+  generatingLabel?: string;
 }) {
   return (
     <div className="empty-layer-state">
@@ -2117,7 +2126,7 @@ function EmptyLayerState({
           icon={<AISparkleIcon />}
           className="empty-state-ai-btn"
         >
-          {generating ? "Creating…" : "Create all"}
+          {generating ? generatingLabel : generateLabel}
         </Button>
       </div>
     </div>
@@ -2142,11 +2151,20 @@ function LayerStickyBar({
   onAdd,
   onGenerate,
   generating,
+  generateLabel = "Create all",
+  generatingLabel = "Creating…",
 }: {
   addLabel: string;
   onAdd: () => void;
   onGenerate: () => void;
   generating: boolean;
+  /** Primary-button label. Defaults to "Create all"; Story/Script
+   *  tabs pass "Write all" to better reflect the AI action
+   *  (writing beat/scene prose, not creating new entities). */
+  generateLabel?: string;
+  /** In-flight label — defaults to "Creating…"; Story/Script pass
+   *  "Writing…" to pair with "Write all". */
+  generatingLabel?: string;
 }) {
   const bar = (
     <div className="layer-sticky-bar">
@@ -2169,7 +2187,7 @@ function LayerStickyBar({
         className="empty-state-ai-btn"
         style={{ flex: 1 }}
       >
-        {generating ? "Creating…" : "Create all"}
+        {generating ? generatingLabel : generateLabel}
       </Button>
     </div>
   );
@@ -3687,6 +3705,8 @@ function StoryTab({
             onAdd={() => openBeatTray(0)}
             onGenerate={generateAllBeats}
             generating={genBusy}
+            generateLabel="Write all"
+            generatingLabel="Writing…"
           />
         )}
 
@@ -3937,6 +3957,8 @@ function StoryTab({
             onAdd={() => openBeatTray(beats.length)}
             onGenerate={generateAllBeats}
             generating={genBusy}
+            generateLabel="Write all"
+            generatingLabel="Writing…"
           />
         </>
       )}
@@ -4086,6 +4108,8 @@ function ScriptTab({
           onAdd={onAddScene}
           onGenerate={generateAllScript}
           generating={genBusy}
+          generateLabel="Write all"
+          generatingLabel="Writing…"
         />
       )}
 
@@ -4174,6 +4198,8 @@ function ScriptTab({
             onAdd={onAddScene}
             onGenerate={generateAllScript}
             generating={genBusy}
+            generateLabel="Write all"
+            generatingLabel="Writing…"
           />
         </>
       )}
