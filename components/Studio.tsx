@@ -802,104 +802,77 @@ export function Studio({
             <SectionTabs section={section} setSection={setSection} story={story} autosaveEnabled={autosaveEnabled} />
           </div>
 
-          {/* Project drafts dropdown menu */}
-          {draftsDropdownOpen && (
-            <>
-              <div className="drafts-dropdown-backdrop" onClick={() => setDraftsDropdownOpen(false)} />
-              <div className="drafts-dropdown-menu project-draft-menu">
-                {/* Mirrored header: the same project title + "Draft N ▾"
-                    trigger pair that lives in the sticky studio header,
-                    duplicated here so the dropdown visibly "belongs" to
-                    the CTA that opened it. Tapping the cloned trigger
-                    closes the menu (it's the toggle counterpart of the
-                    one above). The caret is shown in the open state
-                    because the menu is, by definition, open. */}
-                <div className="project-draft-menu-header">
-                  <div className="project-header-title">{story.title || "Untitled"}</div>
+        </div>
+
+        {/* Project-drafts bottom sheet. Replaces the old inline
+            dropdown menu: the trigger in the sticky header toggles
+            `draftsDropdownOpen`, which slides this sheet up from the
+            bottom. The draft list scrolls inside `.sheet-body`; the
+            New Draft / Duplicate Draft action pair is pinned to a
+            sticky footer so it stays reachable regardless of list
+            length. The sheet is always mounted so the CSS slide
+            transition can run both on open and close. */}
+        <div
+          className={`sheet-backdrop ${draftsDropdownOpen ? "open" : ""}`}
+          onClick={() => setDraftsDropdownOpen(false)}
+        />
+        <div className={`sheet draft-sheet ${draftsDropdownOpen ? "open" : ""}`}>
+          <div className="sheet-handle" />
+          <div className="draft-sheet-title">{story.title || "Untitled"}</div>
+          <div className="draft-sheet-subtitle">Project Drafts</div>
+          <div className="sheet-body">
+            {[...story.projectDrafts]
+              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+              .map(draft => {
+                const isActive = draft.id === story.activeProjectDraftId;
+                const date = new Date(draft.updatedAt);
+                const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                const timeStr = date
+                  .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+                  .replace(" ", "");
+                const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
+                const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
+                const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
+                const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
+                return (
                   <button
-                    className="drafts-dropdown-trigger"
-                    onClick={() => setDraftsDropdownOpen(false)}
+                    key={draft.id}
+                    className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                    onClick={() => handleLoadProjectDraft(draft.id)}
                   >
-                    <span>Draft {activeProjectDraft.number}</span>
-                    <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                        <span>Draft {draft.number}</span>
+                        <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
+                        Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
+                      </span>
+                    </div>
                   </button>
-                </div>
-                {/* Action row: New Draft (primary) + Duplicate Draft
-                    (secondary), side by side. Each takes equal width so
-                    the row spans the same content area as the draft list
-                    items below.
-                    - "New Draft" = createEmptyProjectDraft (fresh empty
-                      layer drafts across all four layers; preserves the
-                      project's title, format, and genres).
-                    - "Duplicate Draft" = duplicateActiveProjectDraft
-                      (deep-clone: new PD + fresh copies of all four
-                      layer drafts, so edits don't leak back). */}
-                <div className="project-draft-menu-actions">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleCreateNewProjectDraft}
-                    style={{ flex: 1 }}
-                  >
-                    New Draft
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleDuplicateProjectDraft}
-                    style={{ flex: 1 }}
-                  >
-                    Duplicate Draft
-                  </Button>
-                </div>
-                {/* Divider between the action row and the draft list.
-                    Pulled out as its own element (rather than a border
-                    on the actions row) so the entry animation can
-                    reveal it with its own timing — scaleX from center
-                    after both buttons have landed. */}
-                <div className="project-draft-menu-divider" aria-hidden="true" />
-                {[...story.projectDrafts]
-                  .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                  .map(draft => {
-                    const isActive = draft.id === story.activeProjectDraftId;
-                    const date = new Date(draft.updatedAt);
-                    const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                    // Timestamp in "11:47PM" form (no space between minutes and AM/PM).
-                    const timeStr = date
-                      .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
-                      .replace(" ", "");
-                    // Badge showing which layer drafts this project draft references
-                    const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
-                    const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
-                    const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
-                    const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
-                    return (
-                      <button
-                        key={draft.id}
-                        className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                        onClick={() => handleLoadProjectDraft(draft.id)}
-                      >
-                        {/* Two stacked rows: top row carries the draft name on
-                            the left and its date on the far right (baseline
-                            aligned). Bottom row spells out the full layer
-                            combination so the user sees "Concept 1 +
-                            Characters 1 + Story 1 + Script 1" instead of the
-                            cryptic C/Ch/S/Sc shorthand. */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                            <span>Draft {draft.number}</span>
-                            <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
-                          </div>
-                          <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
-                            Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-              </div>
-            </>
-          )}
+                );
+              })}
+          </div>
+          <div className="sheet-sticky-footer">
+            <div className="draft-sheet-actions">
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleCreateNewProjectDraft}
+                style={{ flex: 1 }}
+              >
+                New Draft
+              </Button>
+              <Button
+                variant="secondary"
+                size="lg"
+                onClick={handleDuplicateProjectDraft}
+                style={{ flex: 1 }}
+              >
+                Duplicate Draft
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Tab content */}
@@ -1431,53 +1404,56 @@ function LayerDraftPicker({
           Save {label} Draft {active.number}
         </button>
       )}
-      {open && (
-        <>
-          <div className="drafts-dropdown-backdrop" onClick={() => setOpen(false)} />
-          <div className="drafts-dropdown-menu layer-draft-menu">
-            {/* Same action-row pattern as the project-draft dropdown:
-                New Draft (primary, creates an empty draft) + Duplicate
-                Draft (secondary, clones the active draft forward). */}
-            <div className="layer-draft-menu-actions">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleCreate}
-                style={{ flex: 1 }}
+      {/* Layer-draft bottom sheet. Always mounted so the slide
+          transition runs on open AND close — toggled by `open`,
+          which also drives the trigger caret. Draft list scrolls
+          inside `.sheet-body`; the New Draft / Duplicate Draft
+          actions pin to a sticky footer so they never scroll off. */}
+      <div
+        className={`sheet-backdrop ${open ? "open" : ""}`}
+        onClick={() => setOpen(false)}
+      />
+      <div className={`sheet draft-sheet ${open ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="draft-sheet-title">{label} Drafts</div>
+        <div className="sheet-body">
+          {sorted.map((d: any) => {
+            const isActive = d.id === activeId;
+            const date = new Date(d.updatedAt);
+            const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            return (
+              <button
+                key={d.id}
+                className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                onClick={() => handleSwitch(d.id)}
               >
-                New Draft
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleDuplicate}
-                style={{ flex: 1 }}
-              >
-                Duplicate Draft
-              </Button>
-            </div>
-            {/* Divider between the action row and the draft list, as
-                its own element so the entry animation can reveal it
-                with its own timing. */}
-            <div className="layer-draft-menu-divider" aria-hidden="true" />
-            {sorted.map((d: any) => {
-              const isActive = d.id === activeId;
-              const date = new Date(d.updatedAt);
-              const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-              return (
-                <button
-                  key={d.id}
-                  className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                  onClick={() => handleSwitch(d.id)}
-                >
-                  <span>Draft {d.number}</span>
-                  <span className="drafts-dropdown-date">{dateStr}</span>
-                </button>
-              );
-            })}
+                <span>Draft {d.number}</span>
+                <span className="drafts-dropdown-date">{dateStr}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="sheet-sticky-footer">
+          <div className="draft-sheet-actions">
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={handleCreate}
+              style={{ flex: 1 }}
+            >
+              New Draft
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={handleDuplicate}
+              style={{ flex: 1 }}
+            >
+              Duplicate Draft
+            </Button>
           </div>
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

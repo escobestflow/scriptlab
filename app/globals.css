@@ -1155,6 +1155,54 @@ html[data-theme="dark"] .chip.selected {
   border-top: 1px solid var(--border);
 }
 
+/* ──────────────────────────────────────────────────────────────
+   Draft-selector sheet (.draft-sheet)
+   Used by both the project-draft sheet and the per-layer draft
+   sheet. Reuses every .sheet/.sheet-backdrop/.sheet-handle/
+   .sheet-body/.sheet-sticky-footer primitive above; the modifier
+   only tunes list spacing, adds the title row, and neutralises
+   the staggered fade-in that the old inline .drafts-dropdown-menu
+   relied on (inside a sheet the slide-up itself is the reveal,
+   so items should be visible immediately). */
+.draft-sheet .sheet-body {
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.draft-sheet-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 900;
+  font-size: 22px;
+  letter-spacing: -0.015em;
+  text-align: center;
+  padding: 6px 22px 2px;
+  color: var(--ink);
+}
+.draft-sheet-subtitle {
+  font-family: 'Lato', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--ink-mute);
+  padding: 0 22px 10px;
+}
+.draft-sheet-actions {
+  display: flex;
+  gap: 10px;
+}
+/* The .drafts-dropdown-item styles cascade in as before; we just
+   suppress the sequenced fade and give rows a bit more vertical
+   breathing room since taps inside a sheet are thumb-driven. */
+.draft-sheet .sheet-body .drafts-dropdown-item {
+  opacity: 1 !important;
+  animation: none !important;
+  padding: 14px 12px;
+  font-size: 14px;
+}
+
 /* ======= DRAFTS DROPDOWN ======= */
 
 .drafts-dropdown-trigger {
