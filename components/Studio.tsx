@@ -1350,6 +1350,7 @@ export function Studio({
       <ReadThroughSheet
         open={readThroughOpen}
         story={story}
+        setStory={setStory}
         onClose={() => setReadThroughOpen(false)}
       />
 
@@ -2094,6 +2095,46 @@ function LayerUpdateTray({
 // Each scene also gets its own per-scene SpeakButton so a reader can
 // spot-play a single scene without queueing the whole read-through.
 
+/** Pull `replacement` out of whatever the model returned. Handles:
+ *   - plain JSON body: `{"replacement":"..."}`
+ *   - JSON wrapped in ```json fences
+ *   - surrounding prose before/after the JSON object
+ *  Returns null if nothing usable is found. */
+function parseReplacement(raw: string): string | null {
+  if (!raw) return null;
+  const stripped = raw.replace(/```json\s*|\s*```/g, "").trim();
+  // Try a direct parse first — fastest path.
+  try {
+    const parsed = JSON.parse(stripped);
+    if (parsed && typeof parsed.replacement === "string") {
+      return parsed.replacement;
+    }
+  } catch {
+    /* fall through to regex extraction */
+  }
+  // Fallback: find the first { ... } that contains a replacement key.
+  const match = stripped.match(/\{[\s\S]*?"replacement"\s*:\s*"([\s\S]*?)"\s*[},]/);
+  if (match && match[1]) {
+    // Un-escape the captured JSON string payload.
+    try {
+      return JSON.parse(`"${match[1]}"`);
+    } catch {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+/** Replace the first occurrence of `needle` inside `haystack` with
+ *  `replacement`. Uses indexOf (not a regex) so the needle's special
+ *  characters stay literal. Returns haystack unchanged if not found. */
+function replaceFirst(haystack: string, needle: string, replacement: string): string {
+  if (!needle) return haystack;
+  const idx = haystack.indexOf(needle);
+  if (idx < 0) return haystack;
+  return haystack.slice(0, idx) + replacement + haystack.slice(idx + needle.length);
+}
+
 /** Single committed highlight range. Phase 1: purely UI state — we
  *  don't yet act on it. Phases 2/3 will surface the "Change with AI"
  *  CTA + composer + wire the AI rewrite. */
@@ -2108,10 +2149,12 @@ interface ReadThroughHighlight {
 function ReadThroughSheet({
   open,
   story,
+  setStory,
   onClose,
 }: {
   open: boolean;
   story: Story;
+  setStory: (u: (s: Story) => Story) => void;
   onClose: () => void;
 }) {
   const scriptDraft = getActiveScriptDraft(story);
@@ -2158,6 +2201,138 @@ function ReadThroughSheet({
       dragStateRef.current = null;
     }
   }, [open, highlightMode]);
+
+  // ── Composer (Phase 2) ─────────────────────────────────────────
+  // Opens when the user taps "Change with AI" on a committed
+  // highlight. Shows a small preview of the selected text and a
+  // one-line input for the AI prompt. Positioned fixed above the
+  // keyboard via visualViewport so the read-through sheet stays
+  // visible behind it.
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerInstruction, setComposerInstruction] = useState("");
+  const [composerBusy, setComposerBusy] = useState(false);
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
+  const composerInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Track the iOS soft-keyboard via visualViewport. The gap between
+  // the visual viewport bottom and the layout viewport bottom IS the
+  // keyboard height; we use it to pin the composer flush above it.
+  useEffect(() => {
+    if (!composerOpen) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const gap = window.innerHeight - (vv.height + vv.offsetTop);
+      setKeyboardBottomInset(Math.max(0, gap));
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, [composerOpen]);
+
+  // Reset composer state whenever we open or close it.
+  useEffect(() => {
+    if (composerOpen) {
+      setComposerInstruction("");
+      setComposerError(null);
+      // Defer focus a frame so iOS brings up the keyboard after the
+      // element is fully rendered.
+      const id = window.setTimeout(() => {
+        composerInputRef.current?.focus();
+      }, 60);
+      return () => window.clearTimeout(id);
+    } else {
+      setKeyboardBottomInset(0);
+    }
+  }, [composerOpen]);
+
+  async function submitComposer() {
+    if (!activeHighlight || composerBusy) return;
+    const instruction = composerInstruction.trim();
+    if (!instruction) return;
+    setComposerBusy(true);
+    setComposerError(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story,
+          action: {
+            type: "rewrite_highlighted_range",
+            payload: {
+              sceneId: activeHighlight.sceneId,
+              selectedText: activeHighlight.text,
+              instruction,
+            },
+          },
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`/api/generate ${res.status}: ${body || "(no body)"}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let fullText = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.type === "text") fullText += msg.value;
+          } catch {
+            /* ignore */
+          }
+        }
+      }
+      // Extract { "replacement": "..." } from the JSON body.
+      const replacement = parseReplacement(fullText);
+      if (!replacement) {
+        throw new Error("AI returned no replacement text.");
+      }
+      // Splice into the scene. We replace the FIRST occurrence of the
+      // selected text — in practice the highlighted text is unlikely
+      // to appear verbatim twice in one scene. If it does, the first
+      // match wins; users can re-run the highlighter on the second
+      // instance.
+      const sid = activeHighlight.sceneId;
+      const needle = activeHighlight.text;
+      setStory((s) => {
+        const draft = getActiveScriptDraft(s);
+        const scenes = draft.script.scenes.map((sc) =>
+          sc.id === sid
+            ? { ...sc, content: replaceFirst(sc.content, needle, replacement) }
+            : sc,
+        );
+        return updateScriptDraft(s, {
+          script: { ...draft.script, scenes },
+        });
+      });
+      // Close composer, clear the highlight, exit highlight mode —
+      // a clean landing so the user sees their change immediately.
+      setComposerOpen(false);
+      setActiveHighlight(null);
+      setHighlightMode(false);
+    } catch (e) {
+      setComposerError(
+        e instanceof Error ? e.message : "Something went wrong.",
+      );
+    } finally {
+      setComposerBusy(false);
+    }
+  }
 
   /** Map a viewport point to the nearest text caret. Handles both
    *  WebKit/Chrome (caretRangeFromPoint) and Firefox
@@ -2445,7 +2620,90 @@ function ReadThroughSheet({
             ))
           )}
         </div>
+        {/* Floating "Change with AI" CTA — appears only when a highlight
+            is committed and the composer isn't already open. Pinned to
+            the bottom of the sheet, centered. */}
+        {activeHighlight && !composerOpen && (
+          <button
+            type="button"
+            className="read-through-hl-cta"
+            onClick={() => setComposerOpen(true)}
+          >
+            Change with AI
+          </button>
+        )}
       </div>
+      {/* Composer overlay — a second surface above the sheet. Backdrop
+          is semi-transparent and ONLY closes the composer (not the
+          read-through sheet behind it). Positioned with bottom pinned
+          to the keyboard top via visualViewport. */}
+      {composerOpen && activeHighlight && (
+        <>
+          <div
+            className="read-through-composer-backdrop"
+            onClick={() => {
+              if (!composerBusy) setComposerOpen(false);
+            }}
+          />
+          <div
+            className="read-through-composer"
+            style={{ bottom: keyboardBottomInset }}
+          >
+            <div className="read-through-composer-preview">
+              <span className="read-through-composer-preview-label">Selected</span>
+              <span className="read-through-composer-preview-text">
+                {activeHighlight.text.length > 140
+                  ? activeHighlight.text.slice(0, 140).trimEnd() + "…"
+                  : activeHighlight.text}
+              </span>
+            </div>
+            <div className="read-through-composer-row">
+              <input
+                ref={composerInputRef}
+                type="text"
+                className="read-through-composer-input"
+                placeholder="What should change?"
+                value={composerInstruction}
+                onChange={(e) => setComposerInstruction(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitComposer();
+                  }
+                  if (e.key === "Escape") {
+                    if (!composerBusy) setComposerOpen(false);
+                  }
+                }}
+                disabled={composerBusy}
+                autoCapitalize="sentences"
+                autoCorrect="on"
+              />
+              <button
+                type="button"
+                className="read-through-composer-cancel"
+                onClick={() => setComposerOpen(false)}
+                disabled={composerBusy}
+                aria-label="Cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="read-through-composer-submit"
+                onClick={submitComposer}
+                disabled={composerBusy || !composerInstruction.trim()}
+              >
+                {composerBusy ? "…" : "Rewrite"}
+              </button>
+            </div>
+            {composerError && (
+              <div className="read-through-composer-error" role="alert">
+                {composerError}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 }

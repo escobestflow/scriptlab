@@ -384,6 +384,46 @@ Return STRICT JSON:
 No prose outside the JSON.`;
     }
 
+    case "rewrite_highlighted_range": {
+      // User highlighted a passage inside a single scene and typed an
+      // instruction. We ship the full scene content as context so the
+      // model understands the surrounding tone, but we only ask it to
+      // rewrite the quoted passage and return that as a drop-in
+      // replacement string.
+      const { sceneId, selectedText, instruction } = action.payload as {
+        sceneId: string;
+        selectedText: string;
+        instruction: string;
+      };
+      const sc = getActiveScriptDraft(story);
+      const scene = (sc?.script.scenes ?? []).find(s => s.id === sceneId);
+      if (!scene) return `Unknown scene.`;
+      const PASSAGE = selectedText;
+      return `Rewrite the quoted passage inside this scene per the user's instruction. Return only the rewritten passage — a drop-in replacement for the quoted text. Preserve the surrounding formatting conventions (dialogue "NAME: line" cues, action paragraphs, scene headings in ALL CAPS). Match the scene's voice and tone.
+${scene.heading ? `\nScene heading: ${scene.heading}` : ""}
+
+Full scene for context:
+"""
+${(scene.content || "").slice(0, 6000)}
+"""
+
+Passage to rewrite (quoted verbatim from the scene):
+"""
+${PASSAGE}
+"""
+
+User instruction: ${instruction}
+
+Return STRICT JSON:
+{ "replacement": string }
+
+Rules:
+- The "replacement" value is the rewritten passage ONLY — not the whole scene.
+- Do not add commentary, preamble, or framing.
+- Keep the replacement roughly the same length unless the instruction asks otherwise.
+- Preserve any dialogue cue format (ALL CAPS name + colon) if the passage contains one.`;
+    }
+
     case "import_summarize_scenes": {
       // Walk the active Script draft (which Step 1 just populated) and
       // ask for one beat per scene, in order. The client will zip these

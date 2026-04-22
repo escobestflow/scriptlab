@@ -83,7 +83,12 @@ export type ActionType =
   // per scene with an AI-written summary. Characters + Concept use the
   // existing sync_script_to_* actions as steps 3 and 4.
   | "import_extract_scenes"
-  | "import_summarize_scenes";
+  | "import_summarize_scenes"
+  // ── Read-through highlighter rewrite ──
+  // Rewrites a user-highlighted passage inside a scene's prose per a
+  // natural-language instruction. Returns JSON { "replacement": string }
+  // that the client splices back into scene.content.
+  | "rewrite_highlighted_range";
 
 export interface ActionRequest {
   type: ActionType;
@@ -104,6 +109,10 @@ export function modelForAction(type: ActionType): string {
     // and per-scene summarization over the full script is dense work.
     case "import_extract_scenes":
     case "import_summarize_scenes":
+    // Highlighter rewrite is short but craft-heavy — picks words that
+    // have to sit seamlessly inside surrounding prose. Sonnet handles
+    // the tonal continuity better than Haiku.
+    case "rewrite_highlighted_range":
       return "claude-sonnet-4-5"; // quality matters for prose
     case "generate_beats":
     case "swap_ingredient":
