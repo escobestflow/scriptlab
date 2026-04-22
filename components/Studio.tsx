@@ -2051,7 +2051,7 @@ function EmptyLayerState({
           icon={<AISparkleIcon />}
           className="empty-state-ai-btn"
         >
-          {generating ? "Creating…" : "Create everything for me"}
+          {generating ? "Creating…" : "Create all"}
         </Button>
       </div>
     </div>
@@ -2103,7 +2103,7 @@ function LayerStickyBar({
         className="empty-state-ai-btn"
         style={{ flex: 1 }}
       >
-        {generating ? "Creating…" : "Create everything"}
+        {generating ? "Creating…" : "Create all"}
       </Button>
     </div>
   );
