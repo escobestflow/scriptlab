@@ -35,7 +35,7 @@ import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
 import { useProfileCapture } from "@/lib/writerProfileStore";
 import type { ProfileExemplar } from "@/lib/writerProfile";
-import { Button, Input, Textarea, Selector } from "@/components/ui";
+import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
 
 type Section = "concept" | "characters" | "story" | "script";
@@ -2320,6 +2320,10 @@ function ConceptTab({
     <>
       <LayerBar layer="concept" label="Concept" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
+      <Tip id="concept-drafts-are-free">
+        Save as many Concept drafts as you want — experiment freely. Your active draft is what the rest of the app reads.
+      </Tip>
+
       {/* Format */}
       <AttrRow
         label="Format"
@@ -3001,13 +3005,23 @@ function CharactersTab({
       </Button>
 
       {d.characters.length === 0 && (
-        <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
-          <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No characters yet</div>
-          <div className="caption">
-            Create your first character to bring your story to life.
+        <>
+          <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>👤</div>
+            <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No characters yet</div>
+            <div className="caption">
+              Create your first character to bring your story to life.
+            </div>
           </div>
-        </div>
+          <Tip id="characters-save-drafts">
+            Tap the draft picker above to save multiple versions of your cast — you can switch between them anytime.
+          </Tip>
+        </>
+      )}
+      {d.characters.length > 0 && (
+        <Tip id="characters-distinct-voices">
+          Give each character a distinct voice and clear want — it&apos;s what makes dialogue feel alive on the page.
+        </Tip>
       )}
 
       {/* Character rows — tapping opens the unified character sheet. */}
@@ -3401,18 +3415,28 @@ function StoryTab({
 
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {beats.length === 0 && (
-          <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-            <div style={{ fontSize: 36, marginBottom: 8 }}>&#9670;</div>
-            <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No beats yet</div>
-            <div className="caption" style={{ marginBottom: 16 }}>
-              Start building your story structure — add your first beat.
+          <>
+            <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
+              <div style={{ fontSize: 36, marginBottom: 8 }}>&#9670;</div>
+              <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No beats yet</div>
+              <div className="caption" style={{ marginBottom: 16 }}>
+                Start building your story structure — add your first beat.
+              </div>
+              <Button variant="primary" size="lg"
+                onClick={() => openBeatTray(0)}
+                className="entity-create-btn">
+                + Add beat
+              </Button>
             </div>
-            <Button variant="primary" size="lg"
-              onClick={() => openBeatTray(0)}
-              className="entity-create-btn">
-              + Add beat
-            </Button>
-          </div>
+            <Tip id="story-beats-are-building-blocks">
+              Beats are the building blocks of your script — each one becomes a scene you can write in the Script tab.
+            </Tip>
+          </>
+        )}
+        {beats.length > 0 && (
+          <Tip id="story-drag-to-reorder">
+            Long-press any beat to drag and reorder — your scene list updates to match.
+          </Tip>
         )}
 
         {beats.map((beat, i) => {
@@ -3735,13 +3759,18 @@ function ScriptTab({
       )}
 
       {beats.length === 0 && (
-        <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
-          <div style={{ fontSize: 36, marginBottom: 8 }}>&#127916;</div>
-          <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No scenes yet</div>
-          <div className="caption">
-            Add beats in the <b>Story</b> tab first, then return here to write them into scenes.
+        <>
+          <div className="card" style={{ textAlign: "center", padding: "32px 20px" }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>&#127916;</div>
+            <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 6 }}>No scenes yet</div>
+            <div className="caption">
+              Add beats in the <b>Story</b> tab first, then return here to write them into scenes.
+            </div>
           </div>
-        </div>
+          <Tip id="script-beats-become-scenes">
+            Every beat in the Story tab becomes a scene here — the tighter your outline, the smoother the draft.
+          </Tip>
+        </>
       )}
 
       {beats.map((beat, i) => (

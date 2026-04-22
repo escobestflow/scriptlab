@@ -2985,6 +2985,104 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
   opacity: 1;
 }
 
+/* ──────────────────────────────────────────────────────────────
+   Tip cards — inline "did-you-know" style hints. Used to teach a
+   UI feature or best practice at the moment it's most relevant
+   (empty states, first-run prompts, etc.). Dismissible via the ×
+   in the top-right; dismissal persists via localStorage.
+   ────────────────────────────────────────────────────────────── */
+.tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 12px 0;
+  font-family: 'Lato', sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.tip-card-icon {
+  flex-shrink: 0;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.tip-card-text {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+.tip-card-dismiss {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink-mute);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  margin-top: -2px;
+  transition: background 180ms var(--ease);
+}
+.tip-card-dismiss:active { background: var(--border); }
+
+/* ──────────────────────────────────────────────────────────────
+   Swipe-to-delete — wraps a list item and reveals a red Delete
+   panel to the right when the user swipes left. Built for
+   touchscreens. The inner content translates with the finger;
+   the delete panel is an absolutely-positioned button behind.
+   ────────────────────────────────────────────────────────────── */
+.swipe-card {
+  position: relative;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  overflow: hidden;
+  /* The container background matches the delete-panel color so
+     that during the drag there is never a visible gap between
+     the translating content and the panel underneath. */
+  background: #d63333;
+}
+.swipe-card-content {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  will-change: transform;
+}
+.swipe-card-delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: #d63333;
+  color: #fff;
+  font-family: 'Lato', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.swipe-card-delete:active { background: #b82828; }
+
+/* When the inner content is wrapped by .swipe-card, any existing
+   bottom-margin on the child card collapses — the wrapper owns
+   vertical spacing. Also strip any border-radius from the child
+   since the wrapper clips it. */
+.swipe-card > .swipe-card-content > * {
+  margin-bottom: 0 !important;
+}
+
 /* Success toast */
 .toast {
   position: fixed;
@@ -3374,6 +3472,16 @@ html[data-theme="dark"] .entity-create-btn.ds-btn-primary:active {
    in dark mode). Flip the label to the page bg so the selected filter
    name is readable against that near-white chip. */
 html[data-theme="dark"] .filter-pill.active {
+  color: var(--bg);
+}
+
+/* Success toast ("Idea Added", "Project Created", email-send confirmation,
+   etc.) fills with var(--ink) as its pill background. In dark mode
+   --ink is near-white, so the default #fff label disappears into the
+   chip. Flip the label to the page bg so it reads as dark text on a
+   light pill — matches the same treatment used for primary buttons
+   and active filter pills in dark mode. */
+html[data-theme="dark"] .toast {
   color: var(--bg);
 }
 

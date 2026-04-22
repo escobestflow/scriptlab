@@ -9,3 +9,6 @@ export type { InputProps, TextareaProps, InputSize } from "./Input";
 
 export { Selector } from "./Selector";
 export type { SelectorProps } from "./Selector";
+
+export { Tip } from "./Tip";
+export type { TipProps } from "./Tip";

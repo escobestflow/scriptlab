@@ -14,7 +14,7 @@ import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib
 import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
 import { useAutosavePref, useDarkModePref } from "@/lib/prefs";
-import { Button, Input, Textarea, Selector } from "@/components/ui";
+import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 
 type View =
   | { kind: "main" }
@@ -510,6 +510,7 @@ export default function Page() {
               <MomentsTab
                 moments={moments}
                 onEdit={(m) => setEditingMoment(m)}
+                onDelete={(id) => deleteMoment(id)}
                 onNew={() => {
                   setNewIdeaText("");
                   setNewIdeaType("scene");
@@ -1437,13 +1438,167 @@ function ProjectsTab({
 
 const MOMENT_FILTERS = ["All", "Scene", "Dialogue", "Joke", "Memory", "Character", "Image", "Note", "Dream"] as const;
 
+/**
+ * Swipe-to-delete wrapper for a single list item.
+ *
+ * The inner content translates left under the user's finger; a red
+ * Delete panel sits behind it, revealed as the content moves away.
+ * After the finger lifts, the row either snaps back to 0 (if the
+ * user didn't drag past the threshold) or snaps open to fully reveal
+ * the panel (if they did). Tapping the content while it's open snaps
+ * it back — and the would-be tap is swallowed so the row doesn't
+ * also fire its underlying onClick (i.e., no accidental edit-sheet
+ * open while dismissing a swipe). Tapping the Delete panel calls
+ * onDelete and unmounts the wrapper.
+ *
+ * Gesture axis-lock: on the first few pixels of movement we decide
+ * whether the touch is primarily horizontal or vertical. Vertical
+ * wins → we release and let the page scroll. Horizontal wins → we
+ * hijack and drive the translation. This keeps the normal scroll
+ * gesture intact on top of the swipe gesture.
+ */
+function SwipeToDelete({
+  children,
+  onDelete,
+}: {
+  children: React.ReactNode;
+  onDelete: () => void;
+}) {
+  const REVEAL = 88;       // width of the red Delete panel (keep in sync with CSS)
+  const OPEN_THRESHOLD = 40; // px dragged past which we snap open instead of closed
+  const [offset, setOffset] = useState(0);
+  const [opened, setOpened] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const startOffset = useRef(0);
+  const axis = useRef<"none" | "x" | "y">("none");
+  const moved = useRef(false);
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    startX.current = t.clientX;
+    startY.current = t.clientY;
+    startOffset.current = offset;
+    axis.current = "none";
+    moved.current = false;
+    setDragging(true);
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (!dragging) return;
+    const t = e.touches[0];
+    const dx = t.clientX - startX.current;
+    const dy = t.clientY - startY.current;
+    // Axis-lock: the first ~6px of movement decides whether this
+    // gesture is a swipe (horizontal) or a scroll (vertical).
+    if (axis.current === "none") {
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+        axis.current = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+        if (axis.current === "y") {
+          // Let the page scroll; we're out of this gesture.
+          setDragging(false);
+          return;
+        }
+      }
+    }
+    if (axis.current !== "x") return;
+    if (Math.abs(dx) > 4) moved.current = true;
+    // Clamp to [-REVEAL, 0] — only left-swipe is meaningful.
+    const next = Math.max(-REVEAL, Math.min(0, startOffset.current + dx));
+    setOffset(next);
+  }
+  function onTouchEnd() {
+    if (!dragging) return;
+    setDragging(false);
+    if (offset < -OPEN_THRESHOLD) {
+      setOffset(-REVEAL);
+      setOpened(true);
+    } else {
+      setOffset(0);
+      setOpened(false);
+    }
+  }
+
+  // When the row is opened, tapping ANYWHERE outside it should snap
+  // it closed. We attach the listener one tick late so the tap that
+  // opened the row (which bubbled up by the time touchend fired)
+  // doesn't immediately re-close it on the same event loop pass.
+  useEffect(() => {
+    if (!opened) return;
+    const onDocClick = () => {
+      setOffset(0);
+      setOpened(false);
+    };
+    const timer = window.setTimeout(() => {
+      document.addEventListener("click", onDocClick);
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("click", onDocClick);
+    };
+  }, [opened]);
+
+  return (
+    <div
+      className="swipe-card"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchEnd}
+    >
+      <button
+        className="swipe-card-delete"
+        onClick={(e) => {
+          // Don't let this click bubble up to the content's onClick
+          // (which would open the edit sheet) or the document
+          // outside-click listener.
+          e.stopPropagation();
+          onDelete();
+        }}
+        type="button"
+        aria-label="Delete"
+      >
+        Delete
+      </button>
+      <div
+        className="swipe-card-content"
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: dragging
+            ? "none"
+            : "transform 220ms cubic-bezier(0.22, 1, 0.36, 1)",
+        }}
+        onClickCapture={(e) => {
+          // If the row has been opened or the user just swiped, the
+          // inner card's onClick is NOT what they want — they want to
+          // dismiss the swipe or interact with Delete. Swallow the
+          // click in the capture phase so the child handler never
+          // fires; snap closed.
+          if (moved.current || opened) {
+            e.preventDefault();
+            e.stopPropagation();
+            setOffset(0);
+            setOpened(false);
+            moved.current = false;
+          }
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function MomentsTab({
   moments,
   onEdit,
+  onDelete,
   onNew,
 }: {
   moments: Moment[];
   onEdit: (m: Moment) => void;
+  onDelete: (id: string) => void;
   onNew: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -1568,22 +1723,29 @@ function MomentsTab({
         </div>
       )}
 
+      {filtered.length > 0 && (
+        <Tip id="ideas-swipe-delete">
+          Swipe left on any idea to delete it.
+        </Tip>
+      )}
+
       {filtered.map(m => (
-        <div
-          key={m.id}
-          className="card moment-item"
-          onClick={() => onEdit(m)}
-          style={{ cursor: "pointer", marginBottom: 12 }}
-        >
-          <div className="moment-type">{m.type}</div>
-          <div className="moment-text">{m.text}</div>
-          {m.tags.length > 0 && (
-            <div className="moment-tags">
-              {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
-            </div>
-          )}
-          <div className="moment-time">{formatTime(m.createdAt)}</div>
-        </div>
+        <SwipeToDelete key={m.id} onDelete={() => onDelete(m.id)}>
+          <div
+            className="card moment-item"
+            onClick={() => onEdit(m)}
+            style={{ cursor: "pointer" }}
+          >
+            <div className="moment-type">{m.type}</div>
+            <div className="moment-text">{m.text}</div>
+            {m.tags.length > 0 && (
+              <div className="moment-tags">
+                {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
+              </div>
+            )}
+            <div className="moment-time">{formatTime(m.createdAt)}</div>
+          </div>
+        </SwipeToDelete>
       ))}
 
       {/* Convert-notes output sheet — only mounted while open, so nothing
