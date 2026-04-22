@@ -14,7 +14,7 @@ import PostLoginTransition from "@/components/PostLoginTransition";
 import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
 import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
-import { useAutosavePref, useDarkModePref } from "@/lib/prefs";
+import { useAutosavePref, useDarkModePref, useDraftPickerStylePref } from "@/lib/prefs";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 
 type View =
@@ -74,6 +74,16 @@ export default function Page() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [autosaveEnabled, setAutosaveEnabled] = useAutosavePref();
   const [darkMode, setDarkMode] = useDarkModePref();
+  // Draft-picker style pref — "sheet" (default) uses the portaled
+  // bottom-sheet for both project-drafts and layer-drafts dropdowns.
+  // "popup" uses the legacy inline-popup treatment for both. The
+  // toggle below (in the main nav menu) flips between the two and
+  // writes through useDraftPickerStylePref, whose write dispatches
+  // a custom event so every live hook instance — including Studio's
+  // and every LayerDraftPicker's — syncs immediately. Without that
+  // cross-instance sync, flipping here wouldn't reach the consumers.
+  const [draftPickerStyle, setDraftPickerStyle] = useDraftPickerStylePref();
+  const useDraftPopup = draftPickerStyle === "popup";
   const [recording, setRecording] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   // Post-login transition completion gate. We keep the cinematic
@@ -671,6 +681,41 @@ export default function Page() {
               onClick={(e) => {
                 e.stopPropagation();
                 setDarkMode(!darkMode);
+              }}
+            >
+              <span className="toggle-switch-knob" />
+            </button>
+          </div>
+
+          {/* Draft popups — switches both the project-drafts and the
+              layer-drafts picker between "popup" (inline dropdown
+              below the trigger) and "sheet" (portaled bottom-sheet).
+              ON = popup for both, OFF = sheet for both. Writes
+              through useDraftPickerStylePref, which broadcasts a
+              custom event on every write so every consumer of the
+              hook (Studio + each LayerDraftPicker) syncs together. */}
+          <div
+            className="menu-panel-utility"
+            style={{ ["--d" as any]: "245ms" }}
+            onClick={() => setDraftPickerStyle(useDraftPopup ? "sheet" : "popup")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setDraftPickerStyle(useDraftPopup ? "sheet" : "popup");
+              }
+            }}
+          >
+            <span className="label">Draft popups</span>
+            <button
+              type="button"
+              className={`toggle-switch toggle-switch-dark ${useDraftPopup ? "on" : ""}`}
+              aria-label="Toggle draft popups"
+              aria-pressed={useDraftPopup}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDraftPickerStyle(useDraftPopup ? "sheet" : "popup");
               }}
             >
               <span className="toggle-switch-knob" />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings, Reference,
@@ -174,12 +174,12 @@ export function Studio({
 
   // When the project-drafts popup opens in "popup" mode, measure the
   // sticky header's viewport position so the portaled menu can pin to
-  // it. Re-measured on every open (not continuously) — good enough
-  // because the popup closes on scroll/resize via its backdrop or an
-  // explicit interaction. If the user scrolls while it's open, the
-  // popup stays at its open-time y — acceptable tradeoff for
-  // simplicity vs. a RAF loop.
-  useEffect(() => {
+  // it. useLayoutEffect (not useEffect) so the measurement + state
+  // update run AFTER DOM commit but BEFORE paint — the popup never
+  // paints at its stale top: 0 default. Re-measured on every open,
+  // not continuously; the popup closes on scroll/resize via its
+  // backdrop or an explicit interaction anyway.
+  useLayoutEffect(() => {
     if (!draftsDropdownOpen || draftPickerStyle !== "popup") return;
     const h = headerRef.current;
     if (!h) return;
@@ -1597,10 +1597,13 @@ function LayerDraftPicker({
 
   // Measure trigger position when the popup opens so the portaled
   // menu can anchor just below the trigger (mirrors the original
-  // `top: calc(100% - 4px)` anchoring). Re-measured on every open —
-  // we don't track scroll/resize while open because the popup closes
-  // on backdrop click/scroll in practice.
-  useEffect(() => {
+  // `top: calc(100% - 4px)` anchoring). useLayoutEffect so the
+  // measurement + state update run before the browser paints the
+  // opening popup — prevents a visible flash at 0,0 between mount
+  // and measurement. Re-measured on every open; we don't track
+  // scroll/resize while open because the popup closes on backdrop
+  // click/scroll in practice.
+  useLayoutEffect(() => {
     if (!open || pickerStyle !== "popup") return;
     const t = triggerRef.current;
     if (!t) return;
@@ -4988,21 +4991,6 @@ function SettingsTab({
         >
           {uploadingCover ? "Uploading..." : "Upload image"}
         </Button>
-      </div>
-
-      {/* Preferences — currently just the draft-picker style toggle.
-          Sits between Cover and Project Drafts because it changes how
-          the Project Drafts picker below (and every layer-draft
-          picker) presents itself. */}
-      <div className="card">
-        <span className="eyebrow">Preferences</span>
-        <div className="draft-picker-style-pref" style={{ marginTop: 10, paddingTop: 0, borderTop: "none" }}>
-          <div className="draft-picker-style-pref-label">Draft picker style</div>
-          <div className="draft-picker-style-pref-caption">
-            Choose how the project and section draft dropdowns appear.
-          </div>
-          <DraftPickerStyleToggle />
-        </div>
       </div>
 
       {/* Project drafts */}
