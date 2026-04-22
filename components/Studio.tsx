@@ -2094,6 +2094,17 @@ function LayerUpdateTray({
 // Each scene also gets its own per-scene SpeakButton so a reader can
 // spot-play a single scene without queueing the whole read-through.
 
+/** Single committed highlight range. Phase 1: purely UI state — we
+ *  don't yet act on it. Phases 2/3 will surface the "Change with AI"
+ *  CTA + composer + wire the AI rewrite. */
+interface ReadThroughHighlight {
+  sceneId: string;
+  text: string;
+  /** Rects are in viewport coordinates; we translate to overlay-local
+   *  coords at render time so page scroll doesn't drift them. */
+  rects: Array<{ top: number; left: number; width: number; height: number }>;
+}
+
 function ReadThroughSheet({
   open,
   story,
@@ -2116,6 +2127,238 @@ function ReadThroughSheet({
     .map(s => [s.heading, s.content].filter(Boolean).join("\n\n"))
     .join("\n\n");
 
+  // ── Highlighter mode ────────────────────────────────────────────
+  // When on: native selection is disabled on the body, pointer events
+  // drive a custom Range whose rects we paint in yellow. Designed to
+  // feel like a physical marker — no blue selection handles, no copy
+  // menu, one drag = one highlight.
+  const [highlightMode, setHighlightMode] = useState(false);
+  const [activeHighlight, setActiveHighlight] =
+    useState<ReadThroughHighlight | null>(null);
+  // Live drag preview — separate from the committed `activeHighlight`
+  // so the visual follows the finger without repeatedly overwriting
+  // the saved range until pointerup.
+  const [dragRects, setDragRects] = useState<
+    ReadThroughHighlight["rects"] | null
+  >(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{
+    active: boolean;
+    anchorNode: Node;
+    anchorOffset: number;
+    sceneId: string;
+  } | null>(null);
+
+  // Clear any existing highlight when the sheet is closed or the user
+  // toggles highlight mode off.
+  useEffect(() => {
+    if (!open || !highlightMode) {
+      setActiveHighlight(null);
+      setDragRects(null);
+      dragStateRef.current = null;
+    }
+  }, [open, highlightMode]);
+
+  /** Map a viewport point to the nearest text caret. Handles both
+   *  WebKit/Chrome (caretRangeFromPoint) and Firefox
+   *  (caretPositionFromPoint). Returns null if the point isn't over
+   *  a text node. */
+  function caretAt(
+    x: number,
+    y: number,
+  ): { node: Node; offset: number } | null {
+    const doc = document as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      caretPositionFromPoint?: (
+        x: number,
+        y: number,
+      ) => { offsetNode: Node; offset: number } | null;
+    };
+    if (typeof doc.caretRangeFromPoint === "function") {
+      const r = doc.caretRangeFromPoint(x, y);
+      if (!r) return null;
+      return { node: r.startContainer, offset: r.startOffset };
+    }
+    if (typeof doc.caretPositionFromPoint === "function") {
+      const p = doc.caretPositionFromPoint(x, y);
+      if (!p) return null;
+      return { node: p.offsetNode, offset: p.offset };
+    }
+    return null;
+  }
+
+  /** Walk up the DOM until we find the scene container element (the
+   *  one bearing `data-scene-id`). Returns the id, or null if the
+   *  caret isn't inside any scene (e.g. on a gap between scenes). */
+  function sceneIdForNode(node: Node): string | null {
+    let el: Node | null = node;
+    while (el) {
+      if (el instanceof HTMLElement && el.dataset.sceneId) {
+        return el.dataset.sceneId;
+      }
+      el = el.parentNode;
+    }
+    return null;
+  }
+
+  /** Build a Range from the saved anchor → current caret, clamp it
+   *  to the anchor's scene, and return the rects. Returns null if the
+   *  current caret is outside the anchor scene or the range is empty. */
+  function measureRange(
+    anchorNode: Node,
+    anchorOffset: number,
+    focusNode: Node,
+    focusOffset: number,
+    anchorSceneId: string,
+  ): { range: Range; text: string; rects: DOMRect[] } | null {
+    const focusScene = sceneIdForNode(focusNode);
+    // If the focus drifted out of the anchor scene, clamp to the end
+    // of the anchor scene so the highlight never spans scenes.
+    let useNode = focusNode;
+    let useOffset = focusOffset;
+    if (focusScene !== anchorSceneId) {
+      const sceneEl = bodyRef.current?.querySelector<HTMLElement>(
+        `[data-scene-id="${anchorSceneId}"]`,
+      );
+      if (!sceneEl) return null;
+      // Walk to the last text node in the scene and clamp to its end.
+      const walker = document.createTreeWalker(sceneEl, NodeFilter.SHOW_TEXT);
+      let last: Text | null = null;
+      while (walker.nextNode()) last = walker.currentNode as Text;
+      if (!last) return null;
+      useNode = last;
+      useOffset = last.length;
+    }
+    const range = document.createRange();
+    try {
+      // Determine correct start/end based on document order.
+      const probe = document.createRange();
+      probe.setStart(anchorNode, anchorOffset);
+      probe.setEnd(anchorNode, anchorOffset);
+      const cmp = probe.compareBoundaryPoints(
+        Range.START_TO_START,
+        (() => {
+          const r = document.createRange();
+          r.setStart(useNode, useOffset);
+          r.setEnd(useNode, useOffset);
+          return r;
+        })(),
+      );
+      if (cmp <= 0) {
+        range.setStart(anchorNode, anchorOffset);
+        range.setEnd(useNode, useOffset);
+      } else {
+        range.setStart(useNode, useOffset);
+        range.setEnd(anchorNode, anchorOffset);
+      }
+    } catch {
+      return null;
+    }
+    const text = range.toString();
+    if (!text) return null;
+    const rects = Array.from(range.getClientRects());
+    return { range, text, rects };
+  }
+
+  /** Convert viewport-space rects to overlay-local rects by subtracting
+   *  the body container's bounding rect (overlay is positioned in
+   *  the body's coordinate space via `position: absolute`). */
+  function toLocalRects(rects: DOMRect[]): ReadThroughHighlight["rects"] {
+    const host = bodyRef.current;
+    if (!host) return [];
+    const base = host.getBoundingClientRect();
+    return rects.map((r) => ({
+      top: r.top - base.top + host.scrollTop,
+      left: r.left - base.left + host.scrollLeft,
+      width: r.width,
+      height: r.height,
+    }));
+  }
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!highlightMode) return;
+    // Ignore multi-touch (two-finger scroll stays the user's escape
+    // hatch) and non-primary mouse buttons.
+    if (e.pointerType === "touch" && !e.isPrimary) return;
+    const caret = caretAt(e.clientX, e.clientY);
+    if (!caret) return;
+    const sceneId = sceneIdForNode(caret.node);
+    if (!sceneId) return;
+    // Start fresh — wipe any prior highlight so a new drag overwrites
+    // the old one cleanly.
+    setActiveHighlight(null);
+    dragStateRef.current = {
+      active: true,
+      anchorNode: caret.node,
+      anchorOffset: caret.offset,
+      sceneId,
+    };
+    setDragRects([]);
+    // Capture so pointermove keeps firing even if the finger leaves
+    // the element we originally hit.
+    (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const ds = dragStateRef.current;
+    if (!ds || !ds.active) return;
+    const caret = caretAt(e.clientX, e.clientY);
+    if (!caret) return;
+    const m = measureRange(
+      ds.anchorNode,
+      ds.anchorOffset,
+      caret.node,
+      caret.offset,
+      ds.sceneId,
+    );
+    if (!m) return;
+    setDragRects(toLocalRects(m.rects));
+  }
+
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    const ds = dragStateRef.current;
+    if (!ds) return;
+    dragStateRef.current = null;
+    const caret = caretAt(e.clientX, e.clientY);
+    if (!caret) {
+      setDragRects(null);
+      return;
+    }
+    const m = measureRange(
+      ds.anchorNode,
+      ds.anchorOffset,
+      caret.node,
+      caret.offset,
+      ds.sceneId,
+    );
+    setDragRects(null);
+    if (!m) return;
+    const trimmed = m.text.trim();
+    // Ignore ghost-short highlights (accidental taps).
+    if (trimmed.length < 2) return;
+    setActiveHighlight({
+      sceneId: ds.sceneId,
+      text: m.text,
+      rects: toLocalRects(m.rects),
+    });
+  }
+
+  function onPointerCancel() {
+    dragStateRef.current = null;
+    setDragRects(null);
+  }
+
+  // Re-measure the committed highlight on scroll so the yellow layer
+  // stays pinned to its text. We can't rebuild the Range (we don't
+  // retain the DOM Range object), so we convert the cached viewport
+  // rects once on commit and rely on them being anchored in the
+  // scrollable container's coordinate space (top already includes
+  // scrollTop). Stored rects stay valid as long as the layout doesn't
+  // reflow — which, for this sheet, only happens on draft changes.
+  // No additional work needed here.
+
+  const rectsToShow = dragRects ?? activeHighlight?.rects ?? null;
+
   return (
     <>
       <div
@@ -2133,18 +2376,58 @@ function ReadThroughSheet({
             <div className="caption">
               {scenes.length} scene{scenes.length === 1 ? "" : "s"}
             </div>
-            <SpeakButton
-              mode="script"
-              size="md"
-              text={fullText}
-              characters={charactersDraft.characters}
-              projectType={story.projectType}
-              genres={conceptDraft.settings.genres}
-              title="Play the whole script"
-            />
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button
+                type="button"
+                className={`read-through-hl-toggle ${highlightMode ? "active" : ""}`}
+                onClick={() => setHighlightMode((v) => !v)}
+                aria-pressed={highlightMode}
+                aria-label={highlightMode ? "Exit highlighter" : "Highlight text"}
+              >
+                <span className="read-through-hl-swatch" aria-hidden />
+                <span>{highlightMode ? "Done" : "Highlight"}</span>
+              </button>
+              <SpeakButton
+                mode="script"
+                size="md"
+                text={fullText}
+                characters={charactersDraft.characters}
+                projectType={story.projectType}
+                genres={conceptDraft.settings.genres}
+                title="Play the whole script"
+              />
+            </div>
           </div>
         )}
-        <div className="sheet-body read-through-body">
+        <div
+          ref={bodyRef}
+          className={`sheet-body read-through-body ${
+            highlightMode ? "highlighting" : ""
+          }`}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+        >
+          {/* Yellow highlight overlay — rendered first so z-index keeps
+              it behind the text via CSS (pointer-events: none on the
+              rects so drags continue to hit the text underneath). */}
+          {rectsToShow && rectsToShow.length > 0 && (
+            <div className="read-through-hl-layer" aria-hidden>
+              {rectsToShow.map((r, i) => (
+                <div
+                  key={i}
+                  className="read-through-hl-rect"
+                  style={{
+                    top: r.top,
+                    left: r.left,
+                    width: r.width,
+                    height: r.height,
+                  }}
+                />
+              ))}
+            </div>
+          )}
           {scenes.length === 0 ? (
             <div className="caption" style={{ textAlign: "center", padding: "40px 20px" }}>
               No scenes in this Script draft yet.
@@ -2187,7 +2470,7 @@ function ReadThroughScene({
   const speakText = [scene.heading, scene.content].filter(Boolean).join("\n\n");
 
   return (
-    <div className="read-through-scene">
+    <div className="read-through-scene" data-scene-id={scene.id}>
       <div className="read-through-scene-head">
         <div className="read-through-scene-heading">
           <span className="read-through-scene-number">{index + 1}.</span>

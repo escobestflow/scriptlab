@@ -4576,3 +4576,101 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   .read-through-body { padding: 14px 16px 28px; }
 }
 
+/* ──────────────────────────────────────────────────────────────
+   Read-through highlighter (Phase 1)
+   ──────────────────────────────────────────────────────────────
+   Toggle in the controls bar flips the body into "highlighting"
+   mode: native selection is suppressed (no blue selection, no
+   copy-menu, no long-press callout) and pointer events drive a
+   custom Range whose rects we paint in yellow under the text.
+   The DOM is never mutated — only the overlay layer changes —
+   so the script layout is perfectly preserved.
+   ────────────────────────────────────────────────────────────── */
+
+.read-through-hl-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-secondary);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 160ms var(--ease), border-color 160ms var(--ease),
+    transform 120ms var(--ease);
+}
+.read-through-hl-toggle:active { transform: scale(0.97); }
+.read-through-hl-toggle.active {
+  background: #FFF4A8;
+  border-color: #E8D74A;
+  color: #3E3E3E;
+}
+.read-through-hl-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #FFEB3B;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12) inset;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .read-through-hl-toggle.active {
+  background: #FFEB3B;
+  border-color: #FFEB3B;
+  color: #1a1a1a;
+}
+
+/* When highlighting mode is on, the body needs to fully swallow
+   touch/long-press behaviors that would otherwise pop the native
+   selection UI on top of ours. */
+.read-through-body.highlighting {
+  position: relative;
+  cursor: text;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  /* Allow vertical pan-scroll with two fingers / scroll gestures
+     but prevent the browser from reinterpreting single-finger
+     drags as its own selection or scroll (we need them for the
+     custom drag). Users can still two-finger pan to scroll. */
+  touch-action: pan-y;
+}
+.read-through-body.highlighting ::selection {
+  background: transparent;
+}
+.read-through-body.highlighting .read-through-scene-heading,
+.read-through-body.highlighting .read-through-action,
+.read-through-body.highlighting .read-through-cue,
+.read-through-body.highlighting .read-through-line {
+  /* Tag the actual text elements so our caretRangeFromPoint calls
+     still resolve inside them. No cursor hijacking below this. */
+  cursor: text;
+}
+
+/* Overlay layer — positioned inside the scrollable body so its
+   top/left coords are in body-scroll coordinate space. */
+.read-through-hl-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.read-through-hl-rect {
+  position: absolute;
+  /* Classic highlighter yellow. Slight rounding + subtle top-left
+     gradient mimics the wet-edge look of a marker stroke. */
+  background: rgba(255, 228, 66, 0.62);
+  border-radius: 2px;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+[data-theme="dark"] .read-through-hl-rect {
+  background: rgba(255, 228, 66, 0.35);
+  mix-blend-mode: screen;
+}
+
