@@ -1283,12 +1283,18 @@ html[data-theme="dark"] .chip.selected {
    row can fit "Concept N + Characters N + Story N + Script N" on one
    line without ellipsizing. Scoped via the extra .project-draft-menu
    class on the project dropdown, so layer-draft menus keep the
-   original compact width. Also drops below the trigger by 20px so
-   the menu sits clearly off the CTA instead of nuzzling into it. */
+   original compact width.
+   `top: 0` pins the menu to the top of the sticky studio-header
+   container so it visually "takes over" the title + draft-trigger
+   area — the menu's own cloned header (title + Draft N ▾) replaces
+   them in place. The previous `calc(100% - 117px)` value assumed a
+   taller sticky header and resolved to a negative offset with the
+   current layout, which pushed the menu above the viewport and
+   behind the top nav (making the popup look broken). */
 .drafts-dropdown-menu.project-draft-menu {
   min-width: 258px;
   max-width: 338px;
-  top: calc(100% - 117px);
+  top: 0;
   /* Base .drafts-dropdown-menu has padding: 6px; extra bottom space
      so the last draft item doesn't sit flush against the menu edge. */
   padding-bottom: 32px;

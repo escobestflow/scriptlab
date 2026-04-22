@@ -1602,7 +1602,14 @@ function LayerDraftPicker({
         <span className="layer-draft-label">{label} Draft {active.number}</span>
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
-      {!autosaveEnabled && isDirty && (
+      {/* Save-draft button rendering rule: only show when autosave is
+          TOGGLED ON in the main menu AND the active draft has local
+          edits. Counterintuitive vs. typical autosave UX (where a
+          manual Save appears when autosave is OFF), but matches the
+          explicit product ask — the button is meant as an optional
+          "commit this draft now" action when autosave is the chosen
+          mode, and stays hidden when autosave is off. */}
+      {autosaveEnabled && isDirty && (
         <button className="draft-save-btn" onClick={handleSave} aria-label={`Save ${label} Draft ${active.number}`}>
           Save {label} Draft {active.number}
         </button>
