@@ -1300,12 +1300,21 @@ html[data-theme="dark"] .chip.selected {
    current layout, which pushed the menu above the viewport and
    behind the top nav (making the popup look broken). */
 .drafts-dropdown-menu.project-draft-menu {
-  min-width: 258px;
-  max-width: 338px;
+  /* +40px width (258→298 min, 338→378 max) to accommodate the added
+     20px of left inside padding below while keeping the right-edge
+     whitespace balanced. The container grows on both edges (effective
+     left-padding delta = +20, right-padding delta = +20) so the draft
+     rows stay visually centered inside the menu. */
+  min-width: 298px;
+  max-width: 378px;
   top: 0;
-  /* Base .drafts-dropdown-menu has padding: 6px; extra bottom space
-     so the last draft item doesn't sit flush against the menu edge. */
-  padding-bottom: 32px;
+  /* Base .drafts-dropdown-menu has padding: 6px all around; override
+     to add 20px of inside padding on the left (6 + 20 = 26px) per
+     design direction. Right padding matches (26px) so the interior
+     reads as centered and the extra 40px of container width is split
+     evenly between the two sides. Extra bottom padding keeps the last
+     draft item from sitting flush against the menu edge. */
+  padding: 6px 26px 32px 26px;
 
   /* ── Entry animation: sequenced reveal, fades only ─────────────
      The surface itself fades in (opacity only — no translate, no

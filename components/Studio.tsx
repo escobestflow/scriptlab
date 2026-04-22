@@ -1608,9 +1608,13 @@ function LayerDraftPicker({
     const t = triggerRef.current;
     if (!t) return;
     const rect = t.getBoundingClientRect();
+    // Anchor the popup's LEFT edge to the trigger's left edge (not
+    // centered below it). Per product direction — the layer draft
+    // popup should read as a dropdown that hangs straight down from
+    // its trigger, rather than a menu that fans out symmetrically.
     setPopupPos({
       top: rect.bottom - 4,
-      left: rect.left + rect.width / 2,
+      left: rect.left,
     });
   }, [open, pickerStyle]);
 
@@ -1695,7 +1699,9 @@ function LayerDraftPicker({
               position: "fixed",
               top: popupPos.top,
               left: popupPos.left,
-              transform: "translateX(-50%)",
+              /* No translateX — popup's left edge sits on the
+                 trigger's left edge per the left-aligned anchoring
+                 set in the layout effect above. */
             }}
           >
             <div className="layer-draft-menu-actions">
@@ -1721,6 +1727,12 @@ function LayerDraftPicker({
               const isActive = d.id === activeId;
               const date = new Date(d.updatedAt);
               const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+              // Time rendered the same way as the project-draft popup
+              // (e.g. "3:45pm") — the " · " separator joins them into
+              // one "Mon D · h:MMam" string for parity with that menu.
+              const timeStr = date
+                .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+                .replace(" ", "");
               return (
                 <button
                   key={d.id}
@@ -1728,7 +1740,7 @@ function LayerDraftPicker({
                   onClick={() => handleSwitch(d.id)}
                 >
                   <span>Draft {d.number}</span>
-                  <span className="drafts-dropdown-date">{dateStr}</span>
+                  <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
                 </button>
               );
             })}
