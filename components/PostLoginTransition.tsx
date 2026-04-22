@@ -90,12 +90,12 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
         .post-login-transition.phase-done .post-login-bg {
           /* Mirrors the real .topbar's outer box on the dark home
              header: safe-area-top + 14px padding + 18.5px logo + 14px
-             padding + 21px (measured shortfall vs the live topbar on
+             padding + 25px (measured shortfall vs the live topbar on
              device — the live bar includes internal button/chrome
              padding that the simple safe-area+logo formula misses).
              When this value matches the real topbar, the unmount is
              visually seamless. */
-          height: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px + 14px + 21px);
+          height: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px + 14px + 25px);
         }
 
         /* Tagline — same pose, font, and typography as the splash's
@@ -131,23 +131,32 @@ export default function PostLoginTransition({ onDone }: PostLoginTransitionProps
           top: calc(50% + 12px);
           left: 50%;
           width: 150px;
-          height: auto;
+          /* Explicit aspect-preserving height (150 × 18.5 / 86 ≈ 32.27px)
+             so the height property can interpolate smoothly into the
+             shrink-state height — `height: auto` can't animate. */
+          height: calc(150px * 18.5 / 86);
           transform: translate(-50%, -50%);
           filter: invert(1);
           transition:
             top 800ms cubic-bezier(0.22, 1, 0.36, 1),
-            width 800ms cubic-bezier(0.22, 1, 0.36, 1);
+            width 800ms cubic-bezier(0.22, 1, 0.36, 1),
+            height 800ms cubic-bezier(0.22, 1, 0.36, 1);
         }
         .post-login-transition.phase-shrink .post-login-logo,
         .post-login-transition.phase-done .post-login-logo {
           /* Match .brand-logo-img inside .topbar-center: vertically
              centered within the topbar padding, 82px wide. Shifted
-             10px lower than the pure-math center so it lands where
+             7px lower than the pure-math center so it lands where
              the live topbar actually renders the wordmark (the live
              topbar has additional internal chrome pushing the logo
-             down a touch from the geometric midpoint). */
-          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 10px);
+             down a touch from the geometric midpoint).
+             Height is the aspect-preserving value for 82px width
+             (≈17.64px) +1px — per-design tweak to match the live
+             wordmark's rendered height on device (SVG gets stretched
+             slightly taller than its intrinsic aspect). */
+          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 7px);
           width: 82px;
+          height: calc(82px * 18.5 / 86 + 1px);
         }
 
         /* Hamburger — fixed at the topbar's left slot, hidden at start,
