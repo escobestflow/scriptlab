@@ -358,7 +358,7 @@ html[data-theme="dark"] .topbar {
   line-height: 1.55;
   color: var(--ink-mute);
   margin: 0 0 32px;
-  max-width: 308px;
+  max-width: 304px;
 }
 
 /* Ideas empty-state hero carousel. Fixed 258×194 frame (matches the

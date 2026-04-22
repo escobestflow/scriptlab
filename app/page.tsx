@@ -1850,7 +1850,14 @@ function MomentsTab({
         <IdeasCarousel />
         <h1 className="projects-empty-title">Start with a moment</h1>
         <p className="projects-empty-sub">
-          Record ideas, memories, dreams, conversations, or unforgettable moments and let AI turn them into scenes and stories.
+          {/* Explicit line breaks guarantee the intended three-line
+              layout regardless of viewport / font-metric drift:
+                1. Record ideas, memories, dreams, conversations,
+                2. or unforgettable moments and let AI turn them
+                3. into scenes and stories. */}
+          Record ideas, memories, dreams, conversations,<br />
+          or unforgettable moments and let AI turn them<br />
+          into scenes and stories.
         </p>
         <button
           type="button"
