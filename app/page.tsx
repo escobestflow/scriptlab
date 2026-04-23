@@ -6,7 +6,9 @@ import { Moment } from "@/lib/sampleData";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
+  loadPartnerProjectData,
 } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
 import {
   listMyPendingInvites,
   acceptInvite,
@@ -229,6 +231,67 @@ export default function Page() {
     if (!ok) { alert("Couldn't decline the invite. Please try again."); return; }
     await reloadPendingInvites();
   }, [reloadPendingInvites]);
+
+  // ── Phase 2 collab: partner-side story hydration ──────────────────
+  // For any project where my row carries a collaboratorUserId, we
+  // separately load the partner's own row (their distinct Story,
+  // identified by the same projectId but a different user_id). The
+  // partner's Story powers the second "Partner's drafts" dropdown that
+  // appears next to the user's picker on every layer bar inside Studio.
+  //
+  // Keyed by projectId so entering/leaving Studio is fast on projects
+  // we've already warmed. Stale entries are harmless — we refresh on
+  // every Studio entry and on realtime notifications below.
+  const [partnerStories, setPartnerStories] = useState<Record<string, Story>>({});
+
+  const refreshPartnerStory = useCallback(async (projectId: string, partnerUserId: string) => {
+    const partner = await loadPartnerProjectData(projectId, partnerUserId);
+    if (!partner) return;
+    setPartnerStories(prev => ({ ...prev, [projectId]: partner }));
+  }, []);
+
+  // When entering a studio view for a shared project, hydrate partner
+  // data immediately. Also subscribe to realtime changes on the partner's
+  // row so we reflect their saves without a full reload. Channel is torn
+  // down on project-switch or when the studio closes.
+  const studioProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const v = view;
+    if (v.kind !== "studio") { studioProjectIdRef.current = null; return; }
+    const proj = projects.find(p => p.id === v.projectId);
+    if (!proj || !proj.collaboratorUserId) {
+      studioProjectIdRef.current = v.projectId;
+      return;
+    }
+    studioProjectIdRef.current = v.projectId;
+    const partnerId = proj.collaboratorUserId;
+    // Initial load (and re-load on re-entry so we see any offline edits).
+    refreshPartnerStory(v.projectId, partnerId);
+    // Realtime: listen for any UPDATE/INSERT on the partner's row.
+    // The `filter` narrows the stream server-side so we don't get every
+    // projects row change. Supabase realtime's filter string uses
+    // PostgREST-style syntax on the payload column names.
+    const channel = supabase
+      .channel(`partner-project-${v.projectId}-${partnerId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "projects",
+          filter: `id=eq.${v.projectId}`,
+        },
+        (payload: any) => {
+          // Only refresh when the event is actually the partner's row.
+          const row = payload.new ?? payload.old;
+          if (row?.user_id === partnerId) {
+            refreshPartnerStory(v.projectId, partnerId);
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [view, projects, refreshPartnerStory]);
 
   // Debounced save: when projects change, save to DB after 1s of inactivity
   const saveProjectsDebounced = useCallback((ps: Story[]) => {
@@ -556,6 +619,11 @@ export default function Page() {
           autosaveEnabled={autosaveEnabled}
           onEmailProject={() => openEmailSheet(studioProject)}
           emailProjectBusy={emailBusy}
+          partnerStory={
+            studioProject.collaboratorUserId
+              ? partnerStories[studioProject.id]
+              : undefined
+          }
         />
       );
     }

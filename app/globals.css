@@ -4362,6 +4362,109 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   }
 }
 
+/* ── Partner draft picker (Phase 2 collab) ── */
+/* Sits next to the user's own LayerDraftPicker inside .layer-bar when
+   the project is shared. Visually distinct from the primary picker via
+   a leading "P" avatar chip and a slightly faded label weight so the
+   user's own draft picker keeps the dominant read. Clicking opens a
+   bottom sheet listing the partner's drafts; tapping one opens a
+   second preview sheet with a "Copy to my side" CTA. */
+.partner-draft-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Lato', -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  opacity: 0.75;
+  transition: opacity 140ms var(--ease);
+}
+.partner-draft-trigger:active { opacity: 0.4; }
+.partner-draft-trigger .drafts-caret {
+  width: 9px; height: 6px;
+  margin-left: 2px;
+  opacity: 0.55;
+}
+.partner-avatar-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--paper, #fff);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  flex: 0 0 auto;
+}
+html[data-theme="dark"] .partner-avatar-chip {
+  background: var(--paper, #fff);
+  color: var(--ink);
+}
+.partner-draft-label {
+  white-space: nowrap;
+}
+
+/* Partner-draft preview sheet. Reuses .sheet + .sheet-backdrop so
+   stacking/open transition matches the existing draft-sheet; the
+   sticky footer holds the "Copy to my side" CTA. */
+.partner-preview-sheet .sheet-body {
+  padding: 8px 22px 24px;
+}
+.partner-preview-body {
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.partner-preview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.partner-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.partner-preview-section:last-child {
+  border-bottom: none;
+}
+html[data-theme="dark"] .partner-preview-section {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.partner-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+.partner-preview-text {
+  font-size: 15px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+/* Narrow screens: trim the partner label so dual pickers fit. */
+@media (max-width: 400px) {
+  .partner-draft-label {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 /* ── Update-Other-Layers tray ── */
 .layer-update-sheet .sheet-body {
   padding: 0 22px 24px;

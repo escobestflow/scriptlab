@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, useLayoutEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings, Reference,
@@ -17,6 +17,7 @@ import {
   getLayerSyncState, markLayerSynced,
   isLayerDraftEmpty,
   applySyncResult,
+  copyPartnerLayerDraft,
 } from "@/lib/story";
 import {
   syncLayer,
@@ -50,6 +51,18 @@ import {
 
 type Section = "concept" | "characters" | "story" | "script";
 
+// ── Partner Story Context ───────────────────────────────────────────
+// Phase 2 collaboration. When this project is shared, the parent
+// (app/page.tsx) loads the partner's own row as a separate Story and
+// passes it via the `partnerStory` prop. We surface it through context
+// rather than prop-drilling through every tab, because only the
+// LayerBar / PartnerDraftPicker consume it — intermediate tab
+// components don't need to know partner exists.
+const PartnerStoryContext = createContext<Story | undefined>(undefined);
+function usePartnerStory(): Story | undefined {
+  return useContext(PartnerStoryContext);
+}
+
 export function Studio({
   story,
   setStory,
@@ -63,6 +76,7 @@ export function Studio({
   autosaveEnabled = true,
   onEmailProject,
   emailProjectBusy = false,
+  partnerStory,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -85,6 +99,11 @@ export function Studio({
    *  invokes the callback and shows a pulsing state via `busy`. */
   onEmailProject?: () => void;
   emailProjectBusy?: boolean;
+  /** Phase 2 collaboration. The partner's own Story for the same
+   *  project id (loaded via loadPartnerProjectData in app/page.tsx).
+   *  Undefined for solo projects; drives every collab affordance in
+   *  the layer bar. */
+  partnerStory?: Story;
 }) {
   const [section, setSection] = useState<Section>("concept");
   // Writer-profile capture API — used to attach the profile to every AI
@@ -821,7 +840,7 @@ export function Studio({
   // Scroll values are driven directly via refs in handleScroll — no state re-renders
 
   return (
-    <>
+    <PartnerStoryContext.Provider value={partnerStory}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
         <button className="project-header-btn" onClick={handleBack} aria-label="Back">
@@ -1438,7 +1457,7 @@ export function Studio({
 
       {/* Project-created toast (same pattern as Idea Added on main page) */}
       <div className={`toast ${showSuccess ? "show" : ""}`}>Project Created</div>
-    </>
+    </PartnerStoryContext.Provider>
   );
 }
 
@@ -1914,6 +1933,7 @@ function LayerBar({
   onOpenReadThrough?: () => void;
 }) {
   const hasSource = !isLayerDraftEmpty(story, layer);
+  const partnerStory = usePartnerStory();
   return (
     <div className="layer-bar">
       <LayerDraftPicker
@@ -1923,6 +1943,15 @@ function LayerBar({
         setStory={setStory}
         autosaveEnabled={autosaveEnabled}
       />
+      {partnerStory && (
+        <PartnerDraftPicker
+          layer={layer}
+          label={label}
+          myStory={story}
+          setStory={setStory}
+          partnerStory={partnerStory}
+        />
+      )}
       {hasSource && onOpenReadThrough && (
         <button
           className="layer-read-trigger"
@@ -1949,6 +1978,305 @@ function LayerBar({
           <img src="/caret-sm.svg" alt="" className="drafts-caret" />
         </button>
       )}
+    </div>
+  );
+}
+
+/* ============================================ */
+/* ========== PARTNER DRAFT PICKER ============= */
+/* ============================================ */
+//
+// Phase 2 collab. Read-only dropdown of the partner's drafts for a
+// given layer. Tap a draft to preview its content in a bottom sheet.
+// Preview sheet has a "Copy to my side" CTA that clones the partner's
+// draft into a new draft in the viewer's own pool (and activates it).
+//
+// Mounted alongside the user's own LayerDraftPicker inside LayerBar
+// when PartnerStoryContext provides a partnerStory. Hidden entirely
+// for solo projects (context value is undefined).
+
+type AnyLayerDraft =
+  | ConceptLayerDraft
+  | CharactersLayerDraft
+  | StoryLayerDraft
+  | ScriptLayerDraft;
+
+function getLayerPool(s: Story, layer: LayerKey): AnyLayerDraft[] {
+  return (
+    layer === "concept"    ? s.conceptDrafts :
+    layer === "characters" ? s.charactersDrafts :
+    layer === "story"      ? s.storyDrafts :
+                             s.scriptDrafts
+  );
+}
+
+function PartnerDraftPicker({
+  layer,
+  label,
+  myStory,
+  setStory,
+  partnerStory,
+}: {
+  layer: LayerKey;
+  label: string;
+  myStory: Story;
+  setStory: (u: (s: Story) => Story) => void;
+  partnerStory: Story;
+}) {
+  const [open, setOpen] = useState(false);
+  const [previewDraft, setPreviewDraft] = useState<AnyLayerDraft | null>(null);
+
+  const pool = getLayerPool(partnerStory, layer);
+  const sorted = [...pool].sort((a, b) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  // Dropdown broadcast/receive — joins the same mutual-exclusion bus
+  // as the user's own LayerDraftPicker so only one list is open at a
+  // time. Tag is layer-scoped with a "partner:" prefix so opening the
+  // partner's concept picker doesn't close the user's concept picker
+  // (we intentionally keep both independently toggleable within a
+  // single layer bar? Actually no — same mutual exclusion is cleaner.
+  // Use a distinct tag per picker).
+  const busTag = `partner:${layer}`;
+  useEffect(() => {
+    if (open) {
+      window.dispatchEvent(
+        new CustomEvent("draft-dropdown:open", { detail: busTag }),
+      );
+    }
+    const onOther = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail !== busTag) setOpen(false);
+    };
+    window.addEventListener("draft-dropdown:open", onOther);
+    return () => window.removeEventListener("draft-dropdown:open", onOther);
+  }, [open, busTag]);
+
+  function handleCopyToMine(draft: AnyLayerDraft) {
+    setStory(s => copyPartnerLayerDraft(s, draft, layer));
+    setPreviewDraft(null);
+    setOpen(false);
+  }
+
+  const partnerCount = pool.length;
+
+  return (
+    <>
+      <button
+        className="partner-draft-trigger"
+        onClick={() => setOpen(v => !v)}
+        aria-label={`Partner's ${label} drafts`}
+        title={`Partner's ${label} drafts`}
+      >
+        <span className="partner-avatar-chip" aria-hidden="true">P</span>
+        <span className="partner-draft-label">
+          Partner ({partnerCount})
+        </span>
+        <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
+      </button>
+
+      {typeof document !== "undefined" && createPortal(
+        <>
+          <div
+            className={`sheet-backdrop ${open ? "open" : ""}`}
+            onClick={() => setOpen(false)}
+          />
+          <div className={`sheet draft-sheet ${open ? "open" : ""}`}>
+            <div className="sheet-handle" />
+            <div className="draft-sheet-title">Partner's {label} Drafts</div>
+            <div className="sheet-body">
+              {sorted.length === 0 && (
+                <div className="caption" style={{ padding: "16px 4px" }}>
+                  Your partner hasn't created any {label.toLowerCase()} drafts yet.
+                </div>
+              )}
+              {sorted.map(d => {
+                const date = new Date(d.updatedAt);
+                const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                return (
+                  <button
+                    key={d.id}
+                    className="drafts-dropdown-item"
+                    onClick={() => setPreviewDraft(d)}
+                  >
+                    <span>Draft {d.number}</span>
+                    <span className="drafts-dropdown-date">{dateStr}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>,
+        document.body,
+      )}
+
+      <PartnerDraftPreviewSheet
+        draft={previewDraft}
+        layer={layer}
+        label={label}
+        onClose={() => setPreviewDraft(null)}
+        onCopyToMine={handleCopyToMine}
+      />
+    </>
+  );
+}
+
+// ── Partner draft preview sheet ──
+// Bottom sheet that shows a compact read-only view of the partner's
+// selected draft, with a primary "Copy to my side" CTA at the bottom.
+// Renders layer-specific content: logline/summary/tone/themes for
+// Concept, character list for Characters, beats for Story, scene
+// headings for Script. Editing is not possible here — to work on
+// the content, the user taps "Copy to my side" which clones it into
+// their own pool as an editable new draft.
+
+function PartnerDraftPreviewSheet({
+  draft,
+  layer,
+  label,
+  onClose,
+  onCopyToMine,
+}: {
+  draft: AnyLayerDraft | null;
+  layer: LayerKey;
+  label: string;
+  onClose: () => void;
+  onCopyToMine: (draft: AnyLayerDraft) => void;
+}) {
+  const open = !!draft;
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <>
+      <div
+        className={`sheet-backdrop ${open ? "open" : ""}`}
+        onClick={onClose}
+      />
+      <div className={`sheet partner-preview-sheet ${open ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="draft-sheet-title">
+          Partner's {label} Draft {draft?.number ?? ""}
+        </div>
+        <div className="sheet-body partner-preview-body">
+          {draft && <PartnerDraftPreviewContent draft={draft} layer={layer} />}
+        </div>
+        <div className="sheet-sticky-footer">
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            onClick={() => { if (draft) onCopyToMine(draft); }}
+          >
+            Copy to my side
+          </Button>
+        </div>
+      </div>
+    </>,
+    document.body,
+  );
+}
+
+function PartnerDraftPreviewContent({
+  draft,
+  layer,
+}: {
+  draft: AnyLayerDraft;
+  layer: LayerKey;
+}) {
+  if (layer === "concept") {
+    const d = draft as ConceptLayerDraft;
+    return (
+      <div className="partner-preview-content">
+        {d.logline && (
+          <div className="partner-preview-section">
+            <div className="partner-preview-label">Logline</div>
+            <div className="partner-preview-text">{d.logline}</div>
+          </div>
+        )}
+        {d.concept.summary && (
+          <div className="partner-preview-section">
+            <div className="partner-preview-label">Summary</div>
+            <div className="partner-preview-text">{d.concept.summary}</div>
+          </div>
+        )}
+        {d.concept.tone && (
+          <div className="partner-preview-section">
+            <div className="partner-preview-label">Tone</div>
+            <div className="partner-preview-text">{d.concept.tone}</div>
+          </div>
+        )}
+        {d.concept.themes.length > 0 && (
+          <div className="partner-preview-section">
+            <div className="partner-preview-label">Themes</div>
+            <div className="partner-preview-text">{d.concept.themes.join(", ")}</div>
+          </div>
+        )}
+        {d.settings.genres.length > 0 && (
+          <div className="partner-preview-section">
+            <div className="partner-preview-label">Genres</div>
+            <div className="partner-preview-text">{d.settings.genres.join(", ")}</div>
+          </div>
+        )}
+        {!d.logline && !d.concept.summary && !d.concept.tone && d.concept.themes.length === 0 && (
+          <div className="caption">This draft is empty.</div>
+        )}
+      </div>
+    );
+  }
+  if (layer === "characters") {
+    const d = draft as CharactersLayerDraft;
+    if (d.characters.length === 0) {
+      return <div className="caption">No characters in this draft yet.</div>;
+    }
+    return (
+      <div className="partner-preview-content">
+        {d.characters.map(c => (
+          <div key={c.id} className="partner-preview-section">
+            <div className="partner-preview-label">{c.name || "Unnamed"}</div>
+            {c.archetype && <div className="partner-preview-text"><em>{c.archetype}</em></div>}
+            {c.want && <div className="partner-preview-text"><strong>Want:</strong> {c.want}</div>}
+            {c.need && <div className="partner-preview-text"><strong>Need:</strong> {c.need}</div>}
+            {c.backstory && <div className="partner-preview-text">{c.backstory}</div>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (layer === "story") {
+    const d = draft as StoryLayerDraft;
+    if (d.beats.length === 0 && (!d.episodes || d.episodes.length === 0)) {
+      return <div className="caption">No beats in this draft yet.</div>;
+    }
+    return (
+      <div className="partner-preview-content">
+        {d.beats.map((b: any, i: number) => (
+          <div key={i} className="partner-preview-section">
+            <div className="partner-preview-label">
+              {b.title || `Beat ${i + 1}`}
+            </div>
+            {b.summary && <div className="partner-preview-text">{b.summary}</div>}
+          </div>
+        ))}
+      </div>
+    );
+  }
+  // script
+  const d = draft as ScriptLayerDraft;
+  if (d.script.scenes.length === 0) {
+    return <div className="caption">No scenes in this draft yet.</div>;
+  }
+  return (
+    <div className="partner-preview-content">
+      {d.script.scenes.map((s: any, i: number) => (
+        <div key={s.id ?? i} className="partner-preview-section">
+          <div className="partner-preview-label">{s.heading || `Scene ${i + 1}`}</div>
+          {s.content && (
+            <div className="partner-preview-text" style={{ whiteSpace: "pre-wrap" }}>
+              {s.content.length > 400 ? s.content.slice(0, 400) + "…" : s.content}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

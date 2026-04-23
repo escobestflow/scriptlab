@@ -624,6 +624,126 @@ export function createNewLayerDraft(story: Story, layer: LayerKey): Story {
   }
 }
 
+// ── Copy partner's layer draft to mine ──
+//
+// Phase 2 collaboration: the user taps a partner's draft in the
+// partner-side dropdown and hits "Copy to my side." This clones that
+// draft's content into the current user's own pool under a fresh id,
+// bumps the draft number, and points the active project draft's
+// corresponding slot at it. Semantically equivalent to createNewLayerDraft
+// (duplicate the active one forward) except the source is the partner's
+// draft rather than the user's own active draft.
+//
+// For Concept, `story.title` / `story.projectType` on the user's side
+// are left alone — those are project-identity fields set at creation;
+// the partner's logline / settings / concept are what gets pulled in.
+
+export function copyPartnerLayerDraft(
+  myStory: Story,
+  partnerDraft: ConceptLayerDraft | CharactersLayerDraft | StoryLayerDraft | ScriptLayerDraft,
+  layer: LayerKey,
+): Story {
+  const now = new Date().toISOString();
+  switch (layer) {
+    case "concept": {
+      const src = partnerDraft as ConceptLayerDraft;
+      const draft: ConceptLayerDraft = {
+        id: genId("cd"),
+        number: nextDraftNumber(myStory.conceptDrafts),
+        createdAt: now,
+        updatedAt: now,
+        savedAt: now,
+        logline: src.logline,
+        settings: src.settings,
+        concept: src.concept,
+      };
+      return {
+        ...myStory,
+        conceptDrafts: [...myStory.conceptDrafts, draft],
+        counters: { ...myStory.counters, concept: Math.max(myStory.counters.concept, draft.number) },
+        projectDrafts: myStory.projectDrafts.map(pd =>
+          pd.id === myStory.activeProjectDraftId
+            ? { ...pd, conceptDraftId: draft.id, conceptSyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+    case "characters": {
+      const src = partnerDraft as CharactersLayerDraft;
+      const draft: CharactersLayerDraft = {
+        id: genId("chd"),
+        number: nextDraftNumber(myStory.charactersDrafts),
+        createdAt: now,
+        updatedAt: now,
+        savedAt: now,
+        characters: src.characters.map(c => ({ ...c })),
+      };
+      return {
+        ...myStory,
+        charactersDrafts: [...myStory.charactersDrafts, draft],
+        counters: { ...myStory.counters, characters: Math.max(myStory.counters.characters, draft.number) },
+        projectDrafts: myStory.projectDrafts.map(pd =>
+          pd.id === myStory.activeProjectDraftId
+            ? { ...pd, charactersDraftId: draft.id, charactersSyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+    case "story": {
+      const src = partnerDraft as StoryLayerDraft;
+      const draft: StoryLayerDraft = {
+        id: genId("sd"),
+        number: nextDraftNumber(myStory.storyDrafts),
+        createdAt: now,
+        updatedAt: now,
+        savedAt: now,
+        beats: src.beats.map(b => ({ ...b })),
+        episodes: src.episodes ? src.episodes.map(e => ({ ...e })) : undefined,
+        ingredients: [...src.ingredients],
+        snippets: [...src.snippets],
+      };
+      return {
+        ...myStory,
+        storyDrafts: [...myStory.storyDrafts, draft],
+        counters: { ...myStory.counters, story: Math.max(myStory.counters.story, draft.number) },
+        projectDrafts: myStory.projectDrafts.map(pd =>
+          pd.id === myStory.activeProjectDraftId
+            ? { ...pd, storyDraftId: draft.id, storySyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+    case "script": {
+      const src = partnerDraft as ScriptLayerDraft;
+      const draft: ScriptLayerDraft = {
+        id: genId("scd"),
+        number: nextDraftNumber(myStory.scriptDrafts),
+        createdAt: now,
+        updatedAt: now,
+        savedAt: now,
+        script: {
+          ...src.script,
+          scenes: src.script.scenes.map(s => ({ ...s })),
+        },
+      };
+      return {
+        ...myStory,
+        scriptDrafts: [...myStory.scriptDrafts, draft],
+        counters: { ...myStory.counters, script: Math.max(myStory.counters.script, draft.number) },
+        projectDrafts: myStory.projectDrafts.map(pd =>
+          pd.id === myStory.activeProjectDraftId
+            ? { ...pd, scriptDraftId: draft.id, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+  }
+}
+
 // ── Save layer draft ──
 // Mark the active layer draft as "saved" — advances savedAt to updatedAt.
 // No new draft is created; this just clears the dirty state.

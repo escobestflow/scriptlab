@@ -337,6 +337,41 @@ export async function loadProjectsFromDB(userId: string): Promise<Story[]> {
   });
 }
 
+/**
+ * Load the partner's row for a shared project. Relies on the
+ * "Users can view own and shared projects" RLS policy which permits
+ * SELECT when auth.uid() matches EITHER user_id or collaborator_user_id.
+ *
+ * Returns a normalized Story annotated with `collaboratorUserId` (the
+ * partner's own reverse pointer — which should be the current user's
+ * id for any healthy pairing). Returns null when the partner row
+ * isn't found, isn't paired with us, or on any error.
+ */
+export async function loadPartnerProjectData(
+  projectId: string,
+  partnerUserId: string,
+): Promise<Story | null> {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, data, thumbnail, collaborator_user_id")
+    .eq("id", projectId)
+    .eq("user_id", partnerUserId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("loadPartnerProjectData error:", error);
+    return null;
+  }
+  if (!data) return null;
+
+  const story = normalizeStory({ ...data.data, id: data.id });
+  if (data.thumbnail) story.thumbnail = data.thumbnail;
+  if (data.collaborator_user_id) {
+    story.collaboratorUserId = data.collaborator_user_id;
+  }
+  return story;
+}
+
 export async function saveProjectToDB(userId: string, project: Story) {
   const { thumbnail, collaboratorUserId, ...rest } = project;
   const { error } = await supabase
