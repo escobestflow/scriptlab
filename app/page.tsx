@@ -868,7 +868,11 @@ export default function Page() {
               </>
             }
           />
-
+        </div>
+        {/* Sticky footer — Save Idea always visible above the keyboard
+            and any scrolled transcript content. The scrollable
+            .sheet-body above flexes and caps at this footer's top. */}
+        <div className="sheet-sticky-footer">
           <Button
             variant="primary"
             size="lg"
@@ -879,7 +883,6 @@ export default function Page() {
               saveDraftMoment(text, recordType, recordTags);
             }}
             disabled={!liveTranscript.trim()}
-            style={{ marginTop: 14 }}
           >
             Save Idea
           </Button>
