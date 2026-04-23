@@ -51,16 +51,33 @@ import {
 
 type Section = "concept" | "characters" | "story" | "script";
 
-// ── Partner Story Context ───────────────────────────────────────────
+// ── Partner Story / Identity Context ────────────────────────────────
 // Phase 2 collaboration. When this project is shared, the parent
 // (app/page.tsx) loads the partner's own row as a separate Story and
-// passes it via the `partnerStory` prop. We surface it through context
-// rather than prop-drilling through every tab, because only the
-// LayerBar / PartnerDraftPicker consume it — intermediate tab
-// components don't need to know partner exists.
-const PartnerStoryContext = createContext<Story | undefined>(undefined);
+// passes it via the `partnerStory` prop, plus their email for the
+// initials chip. We surface all of it through context rather than
+// prop-drilling through every tab — only the LayerBar /
+// PartnerDraftPicker / project-drafts picker consume it. Intermediate
+// tab components don't need to know the partner exists.
+interface PartnerIdentity {
+  partnerStory?: Story;
+  partnerEmail?: string;
+  myEmail?: string;
+}
+const PartnerStoryContext = createContext<PartnerIdentity>({});
 function usePartnerStory(): Story | undefined {
+  return useContext(PartnerStoryContext).partnerStory;
+}
+function usePartnerIdentity(): PartnerIdentity {
   return useContext(PartnerStoryContext);
+}
+
+/** One-character initial derived from an email / display name, rendered
+ *  uppercase. Falls back to "?" when nothing usable is available. */
+function initialFor(email?: string | null): string {
+  if (!email) return "?";
+  const ch = email.trim().charAt(0);
+  return ch ? ch.toUpperCase() : "?";
 }
 
 export function Studio({
@@ -77,6 +94,7 @@ export function Studio({
   onEmailProject,
   emailProjectBusy = false,
   partnerStory,
+  partnerEmail,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -104,8 +122,17 @@ export function Studio({
    *  Undefined for solo projects; drives every collab affordance in
    *  the layer bar. */
   partnerStory?: Story;
+  /** Partner's email, used for the initials chip on every partner-side
+   *  draft picker. Undefined for solo projects or when the RPC hasn't
+   *  resolved yet — we fall back to "?" in that case. */
+  partnerEmail?: string;
 }) {
   const [section, setSection] = useState<Section>("concept");
+  // Current user's email for the initials chip on the user's own side
+  // of the dual pickers. useAuth gives us the live session; when the
+  // session isn't hydrated yet we just render "?" until it is.
+  const { user: authedUser } = useAuth();
+  const myEmail = authedUser?.email ?? undefined;
   // Writer-profile capture API — used to attach the profile to every AI
   // request and to pass profile-awareness down to tab components.
   const { profile } = useProfileCapture();
@@ -840,7 +867,7 @@ export function Studio({
   // Scroll values are driven directly via refs in handleScroll — no state re-renders
 
   return (
-    <PartnerStoryContext.Provider value={partnerStory}>
+    <PartnerStoryContext.Provider value={{ partnerStory, partnerEmail, myEmail }}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
         <button className="project-header-btn" onClick={handleBack} aria-label="Back">
@@ -914,14 +941,32 @@ export function Studio({
             {story.title || "Untitled"}
           </button>
 
-          {/* Project drafts dropdown trigger */}
-          <button
-            className="drafts-dropdown-trigger"
-            onClick={() => setDraftsDropdownOpen(v => !v)}
-          >
-            <span>Draft {activeProjectDraft.number}</span>
-            <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
-          </button>
+          {/* Project drafts dropdown trigger.
+              Phase 2 collab: wrapped in a flex row so the partner's
+              project-draft trigger can sit right next to it, each
+              with its own initials chip. Solo projects render a
+              single trigger unchanged (the row is still present but
+              with only one child — no visual difference). */}
+          <div className="project-drafts-row">
+            <button
+              className="drafts-dropdown-trigger"
+              onClick={() => setDraftsDropdownOpen(v => !v)}
+            >
+              {partnerStory && (
+                <span className="partner-avatar-chip partner-avatar-chip--mine" aria-hidden="true">
+                  {initialFor(myEmail)}
+                </span>
+              )}
+              <span>Draft {activeProjectDraft.number}</span>
+              <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+            </button>
+            {partnerStory && (
+              <PartnerProjectDraftTrigger
+                partnerStory={partnerStory}
+                partnerEmail={partnerEmail}
+              />
+            )}
+          </div>
 
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
@@ -1705,6 +1750,12 @@ function LayerDraftPicker({
     setStory(s => saveLayerDraft(s, layer));
   };
 
+  // Phase 2 collab: when the project is shared, the user's trigger
+  // also carries an initials chip so the two pickers side-by-side
+  // can be read at a glance. Solo projects render unchanged (no chip).
+  const { partnerStory, myEmail } = usePartnerIdentity();
+  const showChip = !!partnerStory;
+
   return (
     <div className="layer-draft-picker">
       <button
@@ -1712,6 +1763,11 @@ function LayerDraftPicker({
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
       >
+        {showChip && (
+          <span className="partner-avatar-chip partner-avatar-chip--mine" aria-hidden="true">
+            {initialFor(myEmail)}
+          </span>
+        )}
         <span className="layer-draft-label">{label} Draft {active.number}</span>
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
@@ -2059,20 +2115,36 @@ function PartnerDraftPicker({
     setOpen(false);
   }
 
-  const partnerCount = pool.length;
+  // Mirror the user's trigger: "{Label} Draft {N}" where N is the
+  // partner's ACTIVE draft number for this layer (i.e., the one they'd
+  // be viewing on their own screen). Falls back to the most-recently
+  // -updated draft's number if the partner's active project draft
+  // references a missing layer id.
+  const partnerPd = partnerStory.projectDrafts.find(
+    pd => pd.id === partnerStory.activeProjectDraftId,
+  ) ?? partnerStory.projectDrafts[0];
+  const partnerActiveId = partnerPd ? (
+    layer === "concept"    ? partnerPd.conceptDraftId :
+    layer === "characters" ? partnerPd.charactersDraftId :
+    layer === "story"      ? partnerPd.storyDraftId :
+                             partnerPd.scriptDraftId
+  ) : undefined;
+  const partnerActive = pool.find(d => d.id === partnerActiveId) ?? sorted[0];
+  const activeNumber = partnerActive?.number ?? 1;
+  const { partnerEmail } = usePartnerIdentity();
 
   return (
     <>
       <button
-        className="partner-draft-trigger"
+        className="layer-draft-trigger partner-draft-trigger"
         onClick={() => setOpen(v => !v)}
         aria-label={`Partner's ${label} drafts`}
         title={`Partner's ${label} drafts`}
       >
-        <span className="partner-avatar-chip" aria-hidden="true">P</span>
-        <span className="partner-draft-label">
-          Partner ({partnerCount})
+        <span className="partner-avatar-chip" aria-hidden="true">
+          {initialFor(partnerEmail)}
         </span>
+        <span className="layer-draft-label">{label} Draft {activeNumber}</span>
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
 
@@ -2173,6 +2245,104 @@ function PartnerDraftPreviewSheet({
       </div>
     </>,
     document.body,
+  );
+}
+
+/* ============================================ */
+/* ====== PARTNER PROJECT DRAFT TRIGGER ======== */
+/* ============================================ */
+//
+// Mirror of the user's project-drafts trigger, shown under the
+// project title when the project is shared. Displays the partner's
+// ACTIVE project-draft number (i.e., the one they'd be viewing on
+// their own screen). Tapping opens a read-only sheet listing all
+// their project drafts — no switch/new/duplicate actions, since a
+// project draft is just a combination of layer-draft IDs from the
+// partner's pool and switching to it here would be meaningless
+// (those IDs don't exist in the user's own pool).
+
+function PartnerProjectDraftTrigger({
+  partnerStory,
+  partnerEmail,
+}: {
+  partnerStory: Story;
+  partnerEmail?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const activePD = partnerStory.projectDrafts.find(
+    pd => pd.id === partnerStory.activeProjectDraftId,
+  ) ?? partnerStory.projectDrafts[0];
+  const sorted = [...partnerStory.projectDrafts].sort((a, b) =>
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+
+  // Join the mutual-exclusion bus with a partner-scoped tag.
+  const busTag = "partner:project";
+  useEffect(() => {
+    if (open) {
+      window.dispatchEvent(
+        new CustomEvent("draft-dropdown:open", { detail: busTag }),
+      );
+    }
+    const onOther = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (detail !== busTag) setOpen(false);
+    };
+    window.addEventListener("draft-dropdown:open", onOther);
+    return () => window.removeEventListener("draft-dropdown:open", onOther);
+  }, [open, busTag]);
+
+  return (
+    <>
+      <button
+        className="drafts-dropdown-trigger"
+        onClick={() => setOpen(v => !v)}
+        aria-label="Partner's project drafts"
+        title="Partner's project drafts"
+      >
+        <span className="partner-avatar-chip" aria-hidden="true">
+          {initialFor(partnerEmail)}
+        </span>
+        <span>Draft {activePD?.number ?? 1}</span>
+        <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
+      </button>
+
+      {typeof document !== "undefined" && createPortal(
+        <>
+          <div
+            className={`sheet-backdrop ${open ? "open" : ""}`}
+            onClick={() => setOpen(false)}
+          />
+          <div className={`sheet draft-sheet ${open ? "open" : ""}`}>
+            <div className="sheet-handle" />
+            <div className="draft-sheet-title">Partner's Project Drafts</div>
+            <div className="sheet-body">
+              {sorted.length === 0 && (
+                <div className="caption" style={{ padding: "16px 4px" }}>
+                  Your partner hasn't created any project drafts yet.
+                </div>
+              )}
+              {sorted.map(pd => {
+                const isActive = pd.id === partnerStory.activeProjectDraftId;
+                const date = new Date(pd.updatedAt);
+                const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                return (
+                  <div
+                    key={pd.id}
+                    className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                    style={{ cursor: "default" }}
+                  >
+                    <span>Project Draft {pd.number}</span>
+                    <span className="drafts-dropdown-date">{dateStr}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>,
+        document.body,
+      )}
+    </>
   );
 }
 

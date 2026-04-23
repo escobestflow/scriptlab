@@ -1406,6 +1406,30 @@ html[data-theme="dark"] .chip.selected {
   font-weight: 700;
   color: #7D7E7E;
 }
+/* Phase 2 collab wrapper: paints the user's + partner's project-draft
+   triggers side-by-side under the title. Solo projects have a single
+   child and render identically to before (flex row collapses to one
+   item, margin-top -13px pulls it up into the title). */
+.project-drafts-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  /* Preserve the tight spacing under the title that the bare
+     .drafts-dropdown-trigger used to create with its own -13px pull.
+     Now that the trigger lives inside a wrapper, the wrapper owns
+     the pull so both solo + collab layouts render identically. */
+  margin-top: -13px;
+}
+.project-drafts-row .drafts-dropdown-trigger {
+  margin-top: 0;
+}
+.project-drafts-row .partner-avatar-chip {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  margin-right: 4px;
+}
 .drafts-caret {
   width: 10px;
   height: 6px;
@@ -4364,40 +4388,17 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
 
 /* ── Partner draft picker (Phase 2 collab) ── */
 /* Sits next to the user's own LayerDraftPicker inside .layer-bar when
-   the project is shared. Visually distinct from the primary picker via
-   a leading "P" avatar chip and a slightly faded label weight so the
-   user's own draft picker keeps the dominant read. Clicking opens a
-   bottom sheet listing the partner's drafts; tapping one opens a
-   second preview sheet with a "Copy to my side" CTA. */
-.partner-draft-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px 6px 4px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-family: 'Lato', -apple-system, system-ui, sans-serif;
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: -0.015em;
-  color: var(--ink);
-  opacity: 0.75;
-  transition: opacity 140ms var(--ease);
-}
-.partner-draft-trigger:active { opacity: 0.4; }
-.partner-draft-trigger .drafts-caret {
-  width: 9px; height: 6px;
-  margin-left: 2px;
-  opacity: 0.55;
-}
+   the project is shared. The trigger reuses .layer-draft-trigger
+   styling so the two sides read visually identical — the only
+   differentiator is the leading initials chip. Tapping opens a sheet
+   listing the partner's drafts; selecting one opens a read-only
+   preview sheet with a "Copy to my side" CTA. */
 .partner-avatar-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background: var(--ink);
   color: var(--paper, #fff);
@@ -4406,13 +4407,32 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   line-height: 1;
   letter-spacing: 0;
   flex: 0 0 auto;
+  margin-right: 2px;
 }
 html[data-theme="dark"] .partner-avatar-chip {
   background: var(--paper, #fff);
   color: var(--ink);
 }
-.partner-draft-label {
-  white-space: nowrap;
+/* The user's own side uses a lighter / inverted chip so the two sides
+   can be told apart at a glance — same shape + size, contrasting fill. */
+.partner-avatar-chip--mine {
+  background: transparent;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+}
+html[data-theme="dark"] .partner-avatar-chip--mine {
+  background: transparent;
+  color: var(--paper, #fff);
+  border-color: var(--paper, #fff);
+}
+/* Scope the user's own LayerDraftPicker trigger so it leaves room for
+   the chip without shifting letter-spacing — the whole trigger stays
+   aligned to the draft-bar baseline. */
+.layer-draft-trigger .partner-avatar-chip {
+  margin-right: 6px;
+}
+.partner-draft-trigger .partner-avatar-chip {
+  margin-right: 6px;
 }
 
 /* Partner-draft preview sheet. Reuses .sheet + .sheet-backdrop so

@@ -212,3 +212,23 @@ export function buildInviteUrl(token: string): string {
   if (typeof window === "undefined") return `/accept-invite/${token}`;
   return `${window.location.origin}/accept-invite/${token}`;
 }
+
+/**
+ * Get the partner's email for a shared project. Drives the initials
+ * chip next to every draft picker on the partner's side. Returns null
+ * when the project isn't shared or the RPC can't resolve the partner.
+ *
+ * Backed by the get_partner_email SECURITY DEFINER RPC so we don't
+ * need to expose auth.users to client SELECTs.
+ */
+export async function getPartnerEmail(projectId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc("get_partner_email", {
+    project_id: projectId,
+  });
+  if (error) {
+    console.error("get_partner_email RPC error:", error);
+    return null;
+  }
+  if (typeof data === "string" && data.length > 0) return data;
+  return null;
+}

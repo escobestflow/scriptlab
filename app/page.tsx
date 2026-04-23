@@ -13,6 +13,7 @@ import {
   listMyPendingInvites,
   acceptInvite,
   declineInvite,
+  getPartnerEmail,
   type PendingInvite,
 } from "@/lib/invites";
 import { useAuth } from "@/lib/auth";
@@ -243,11 +244,22 @@ export default function Page() {
   // we've already warmed. Stale entries are harmless — we refresh on
   // every Studio entry and on realtime notifications below.
   const [partnerStories, setPartnerStories] = useState<Record<string, Story>>({});
+  // Partner email, per project — drives the initials chip rendered on
+  // every partner-side draft picker. Resolved via the
+  // get_partner_email SECURITY DEFINER RPC because auth.users is not
+  // directly queryable from the client.
+  const [partnerEmails, setPartnerEmails] = useState<Record<string, string>>({});
 
   const refreshPartnerStory = useCallback(async (projectId: string, partnerUserId: string) => {
     const partner = await loadPartnerProjectData(projectId, partnerUserId);
     if (!partner) return;
     setPartnerStories(prev => ({ ...prev, [projectId]: partner }));
+  }, []);
+
+  const refreshPartnerEmail = useCallback(async (projectId: string) => {
+    const email = await getPartnerEmail(projectId);
+    if (!email) return;
+    setPartnerEmails(prev => ({ ...prev, [projectId]: email }));
   }, []);
 
   // When entering a studio view for a shared project, hydrate partner
@@ -267,6 +279,11 @@ export default function Page() {
     const partnerId = proj.collaboratorUserId;
     // Initial load (and re-load on re-entry so we see any offline edits).
     refreshPartnerStory(v.projectId, partnerId);
+    // Fetch the partner's email once per studio entry so the initial
+    // chip has something to render. Cheap, idempotent, and cached.
+    if (!partnerEmails[v.projectId]) {
+      refreshPartnerEmail(v.projectId);
+    }
     // Realtime: listen for any UPDATE/INSERT on the partner's row.
     // The `filter` narrows the stream server-side so we don't get every
     // projects row change. Supabase realtime's filter string uses
@@ -291,7 +308,7 @@ export default function Page() {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [view, projects, refreshPartnerStory]);
+  }, [view, projects, refreshPartnerStory, refreshPartnerEmail, partnerEmails]);
 
   // Debounced save: when projects change, save to DB after 1s of inactivity
   const saveProjectsDebounced = useCallback((ps: Story[]) => {
@@ -622,6 +639,11 @@ export default function Page() {
           partnerStory={
             studioProject.collaboratorUserId
               ? partnerStories[studioProject.id]
+              : undefined
+          }
+          partnerEmail={
+            studioProject.collaboratorUserId
+              ? partnerEmails[studioProject.id]
               : undefined
           }
         />
