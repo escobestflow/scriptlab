@@ -2185,11 +2185,15 @@ function ReadThroughSheet({
     ReadThroughHighlight["rects"] | null
   >(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  // Anchor may be null initially — if the user's finger lands between
+  // glyphs or in a margin, we still start a drag and latch the anchor
+  // on the first pointermove that finds a caret. This prevents the
+  // "I tapped and nothing happened" dead-zone feeling.
   const dragStateRef = useRef<{
     active: boolean;
-    anchorNode: Node;
+    anchorNode: Node | null;
     anchorOffset: number;
-    sceneId: string;
+    sceneId: string | null;
   } | null>(null);
 
   // Clear any existing highlight when the sheet is closed or the user
@@ -2450,35 +2454,63 @@ function ReadThroughSheet({
     }));
   }
 
+  /** Widen the caret search. If the exact point misses (between lines,
+   *  in padding, on a margin), probe a small spiral of offsets to find
+   *  the nearest text caret. This kills the dead-zone feeling where a
+   *  finger tap near a word does nothing. */
+  function caretNear(x: number, y: number): { node: Node; offset: number } | null {
+    const direct = caretAt(x, y);
+    if (direct && direct.node.nodeType === Node.TEXT_NODE) return direct;
+    // Probe horizontally first (same line), then widen vertically.
+    const offsets: Array<[number, number]> = [
+      [0, 0], [-6, 0], [6, 0], [-12, 0], [12, 0],
+      [0, -8], [0, 8], [-10, -8], [10, -8], [-10, 8], [10, 8],
+      [0, -16], [0, 16], [-18, 0], [18, 0],
+    ];
+    for (const [dx, dy] of offsets) {
+      const c = caretAt(x + dx, y + dy);
+      if (c && c.node.nodeType === Node.TEXT_NODE) return c;
+    }
+    return direct; // fall back to whatever we got (or null)
+  }
+
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (!highlightMode) return;
     // Ignore multi-touch (two-finger scroll stays the user's escape
     // hatch) and non-primary mouse buttons.
     if (e.pointerType === "touch" && !e.isPrimary) return;
-    const caret = caretAt(e.clientX, e.clientY);
-    if (!caret) return;
-    const sceneId = sceneIdForNode(caret.node);
-    if (!sceneId) return;
-    // Start fresh — wipe any prior highlight so a new drag overwrites
-    // the old one cleanly.
+    // Prevent the browser from starting its own selection/scroll.
+    e.preventDefault();
+    const caret = caretNear(e.clientX, e.clientY);
+    const sceneId = caret ? sceneIdForNode(caret.node) : null;
+    // Start a drag no matter what — if the finger landed on whitespace,
+    // the anchor latches on the first pointermove that finds a caret.
     setActiveHighlight(null);
     dragStateRef.current = {
       active: true,
-      anchorNode: caret.node,
-      anchorOffset: caret.offset,
+      anchorNode: caret?.node ?? null,
+      anchorOffset: caret?.offset ?? 0,
       sceneId,
     };
     setDragRects([]);
-    // Capture so pointermove keeps firing even if the finger leaves
-    // the element we originally hit.
     (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const ds = dragStateRef.current;
     if (!ds || !ds.active) return;
-    const caret = caretAt(e.clientX, e.clientY);
+    e.preventDefault();
+    const caret = caretNear(e.clientX, e.clientY);
     if (!caret) return;
+    // Latch the anchor on first caret hit if it wasn't set on down.
+    if (!ds.anchorNode) {
+      const sid = sceneIdForNode(caret.node);
+      if (!sid) return;
+      ds.anchorNode = caret.node;
+      ds.anchorOffset = caret.offset;
+      ds.sceneId = sid;
+    }
+    if (!ds.sceneId) return;
     const m = measureRange(
       ds.anchorNode,
       ds.anchorOffset,
@@ -2494,7 +2526,11 @@ function ReadThroughSheet({
     const ds = dragStateRef.current;
     if (!ds) return;
     dragStateRef.current = null;
-    const caret = caretAt(e.clientX, e.clientY);
+    if (!ds.anchorNode || !ds.sceneId) {
+      setDragRects(null);
+      return;
+    }
+    const caret = caretNear(e.clientX, e.clientY);
     if (!caret) {
       setDragRects(null);
       return;
@@ -2549,7 +2585,9 @@ function ReadThroughSheet({
         {scenes.length > 0 && (
           <div className="read-through-controls">
             <div className="caption">
-              {scenes.length} scene{scenes.length === 1 ? "" : "s"}
+              {highlightMode
+                ? "Drag over any passage to highlight it"
+                : `${scenes.length} scene${scenes.length === 1 ? "" : "s"}`}
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <button

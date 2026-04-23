@@ -4634,11 +4634,12 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-  /* Allow vertical pan-scroll with two fingers / scroll gestures
-     but prevent the browser from reinterpreting single-finger
-     drags as its own selection or scroll (we need them for the
-     custom drag). Users can still two-finger pan to scroll. */
-  touch-action: pan-y;
+  /* Claim every touch for our handlers — pan-y would let iOS Safari
+     steal any drag with a vertical component for scrolling, which
+     kills the highlighter on a line wrap. Users exit highlight mode
+     (tap "Done") to scroll again. */
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 .read-through-body.highlighting ::selection {
   background: transparent;
