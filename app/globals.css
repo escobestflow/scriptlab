@@ -1352,11 +1352,15 @@ html[data-theme="dark"] .chip.selected {
   flex-direction: column;
   gap: 2px;
 }
+/* Matches `.project-header-title` — the title the user sees at the
+   top of the studio. Playfair Display felt too "book cover" for a
+   utility dropdown; mirroring the header typography keeps the draft
+   sheet feeling like an extension of the same surface. */
 .draft-sheet-title {
-  font-family: 'Playfair Display', serif;
-  font-weight: 900;
-  font-size: 22px;
-  letter-spacing: -0.015em;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.01em;
   text-align: center;
   padding: 6px 22px 2px;
   color: var(--ink);
