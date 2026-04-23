@@ -2371,6 +2371,16 @@ function ReadThroughSheet({
   // rects and render them as our yellow overlay. On iOS this means the
   // gesture is exactly the native "long-press then drag" — the most
   // reliable selection gesture the OS knows how to do.
+  //
+  // After the user's selection has been stable for a short debounce
+  // window, we clear the native Selection entirely. The yellow rects
+  // stay (they're just React state) but iOS has nothing left to paint
+  // blue on top of — this side-steps the iOS-specific quirks around
+  // `::selection { background: transparent }` not being respected in
+  // every case. Refs coordinate so our own clear doesn't re-enter
+  // the handler and wipe activeHighlight.
+  const commitTimerRef = useRef<number | null>(null);
+  const weClearedSelectionRef = useRef(false);
   useEffect(() => {
     if (!highlightMode) {
       // Leaving highlight mode clears everything and also drops any
@@ -2378,6 +2388,10 @@ function ReadThroughSheet({
       setActiveHighlight(null);
       setDragRects(null);
       window.getSelection?.()?.removeAllRanges?.();
+      if (commitTimerRef.current != null) {
+        window.clearTimeout(commitTimerRef.current);
+        commitTimerRef.current = null;
+      }
       return;
     }
     const el = bodyRef.current;
@@ -2386,15 +2400,19 @@ function ReadThroughSheet({
     const onSelChange = () => {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-        // Selection cleared — user tapped elsewhere. Clear drag
-        // rects, and clear activeHighlight UNLESS the composer is
-        // open. Opening the composer and focusing its input causes
-        // iOS to collapse the body selection; if we wiped
-        // activeHighlight here, the composer (gated on both
-        // composerOpen && activeHighlight) would immediately
-        // unmount — the "bottom sheet closes when I start typing"
-        // bug. We read composerOpen via a ref to avoid making the
-        // listener itself re-subscribe on every composer state flip.
+        // If WE cleared the selection (to suppress the iOS blue),
+        // this collapse is our own doing — drop the flag and
+        // bail without touching activeHighlight or dragRects.
+        if (weClearedSelectionRef.current) {
+          weClearedSelectionRef.current = false;
+          return;
+        }
+        // Otherwise: user tapped elsewhere. Clear drag rects, and
+        // clear activeHighlight UNLESS the composer is open. Focusing
+        // the composer input collapses the body selection; wiping
+        // activeHighlight there would unmount the composer (gated
+        // on composerOpen && activeHighlight). Read composerOpen via
+        // a ref so this listener doesn't re-subscribe on each flip.
         setDragRects(null);
         if (!composerOpenRef.current) {
           setActiveHighlight(null);
@@ -2448,11 +2466,32 @@ function ReadThroughSheet({
         text,
         rects: localRects,
       });
+      // Debounced "commit": after the selection has been stable for
+      // ~350ms (i.e. the user's finger is up), remove the native
+      // Selection so the blue highlight disappears. The yellow rects
+      // we just set above are independent React state and stay put.
+      // On iOS this is the only reliable way to guarantee no blue —
+      // some versions silently ignore `::selection { background:
+      // transparent }`, so we nuke the selection altogether.
+      if (commitTimerRef.current != null) {
+        window.clearTimeout(commitTimerRef.current);
+      }
+      commitTimerRef.current = window.setTimeout(() => {
+        commitTimerRef.current = null;
+        const s = window.getSelection();
+        if (!s || s.isCollapsed) return;
+        weClearedSelectionRef.current = true;
+        s.removeAllRanges();
+      }, 350);
     };
 
     document.addEventListener("selectionchange", onSelChange);
     return () => {
       document.removeEventListener("selectionchange", onSelChange);
+      if (commitTimerRef.current != null) {
+        window.clearTimeout(commitTimerRef.current);
+        commitTimerRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightMode]);
