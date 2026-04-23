@@ -12,7 +12,6 @@
 // additive — nothing in the existing load/save path references it.
 
 import { supabase } from "./supabase";
-import { newBlankProject } from "./storage";
 
 function randomToken(): string {
   // 32 hex chars. Unguessable for our scale; short enough to fit in
@@ -100,89 +99,45 @@ export type AcceptError =
   | "write-failed";
 
 /**
- * Accept an invite as the signed-in user. Returns the acceptance
- * details on success, or an AcceptError enum identifying what went
- * wrong. The caller (the accept-invite page) translates these into
- * human-readable messages.
+ * Accept an invite as the signed-in user. Delegates to the server-
+ * side `accept_invite` SQL RPC because RLS prevents the invitee
+ * from reading the creator's project row (they are not yet the
+ * collaborator). The RPC runs SECURITY DEFINER, which lets it read
+ * + write across both users' rows while still enforcing the
+ * invite/ownership rules internally.
+ *
+ * Return shape matches the original client-side implementation so
+ * the caller (the /accept-invite page) does not need to change.
  */
 export async function acceptInvite(
   token: string,
-  accepterUserId: string,
+  _accepterUserId: string,
 ): Promise<AcceptResult | AcceptError> {
-  // 1. Look up the invite.
-  const { data: inv, error: invErr } = await supabase
-    .from("project_invites")
-    .select("*")
-    .eq("token", token)
-    .maybeSingle();
-  if (invErr || !inv) return "not-found";
-  if (inv.accepted_at) return "already-used";
-  if (inv.creator_user_id === accepterUserId) return "self-accept";
-
-  // 2. Fetch the creator's project row so we can (a) check that the
-  //    project isn't already paired with someone else, and (b) copy
-  //    title/projectType/thumbnail into the invitee's shell row so
-  //    the dashboard card renders with the creator's cover image.
-  const { data: creatorRow, error: rowErr } = await supabase
-    .from("projects")
-    .select("id, data, thumbnail, collaborator_user_id")
-    .eq("id", inv.project_id)
-    .eq("user_id", inv.creator_user_id)
-    .maybeSingle();
-  if (rowErr || !creatorRow) return "project-missing";
-  if (
-    creatorRow.collaborator_user_id &&
-    creatorRow.collaborator_user_id !== accepterUserId
-  ) {
-    return "project-full";
-  }
-
-  // 3. Mark the creator's row as shared with the accepter.
-  const updCreator = await supabase
-    .from("projects")
-    .update({ collaborator_user_id: accepterUserId })
-    .eq("id", inv.project_id)
-    .eq("user_id", inv.creator_user_id);
-  if (updCreator.error) {
-    console.error("Set creator collab error:", updCreator.error);
+  const { data, error } = await supabase.rpc("accept_invite", {
+    invite_token: token,
+  });
+  if (error) {
+    console.error("accept_invite RPC error:", error);
     return "write-failed";
   }
+  if (!data) return "write-failed";
 
-  // 4. Seed the invitee's own project row. We use a fresh blank
-  //    Story, but override the `id` to the shared project id so both
-  //    sides reference the same project. Title / projectType /
-  //    thumbnail are copied forward so the dashboard card looks
-  //    correct even before the invitee opens the project.
-  const creatorData = (creatorRow.data ?? {}) as any;
-  const shell = newBlankProject();
-  const shellStory = {
-    ...shell,
-    id: inv.project_id,
-    title: creatorData.title || shell.title,
-    projectType: creatorData.projectType || shell.projectType,
-  };
-  const upsertInvitee = await supabase
-    .from("projects")
-    .upsert({
-      id: inv.project_id,
-      user_id: accepterUserId,
-      data: shellStory,
-      thumbnail: creatorRow.thumbnail ?? null,
-      collaborator_user_id: inv.creator_user_id,
-      updated_at: new Date().toISOString(),
-    });
-  if (upsertInvitee.error) {
-    console.error("Seed invitee row error:", upsertInvitee.error);
+  // The RPC returns either { projectId, creatorUserId } on success
+  // or { error: <AcceptError> } on a handled failure.
+  const obj = data as Record<string, any>;
+  if (obj.error) {
+    const err = obj.error as string;
+    const known: AcceptError[] = [
+      "not-found", "already-used", "self-accept",
+      "project-full", "project-missing", "write-failed",
+    ];
+    if (known.includes(err as AcceptError)) return err as AcceptError;
     return "write-failed";
   }
-
-  // 5. Mark the invite consumed.
-  await supabase
-    .from("project_invites")
-    .update({ accepted_at: new Date().toISOString(), accepted_by: accepterUserId })
-    .eq("token", token);
-
-  return { projectId: inv.project_id, creatorUserId: inv.creator_user_id };
+  if (obj.projectId && obj.creatorUserId) {
+    return { projectId: obj.projectId, creatorUserId: obj.creatorUserId };
+  }
+  return "write-failed";
 }
 
 /**
