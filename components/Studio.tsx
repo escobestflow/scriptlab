@@ -2474,90 +2474,122 @@ function ReadThroughSheet({
     return direct; // fall back to whatever we got (or null)
   }
 
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    if (!highlightMode) return;
-    // Ignore multi-touch (two-finger scroll stays the user's escape
-    // hatch) and non-primary mouse buttons.
-    if (e.pointerType === "touch" && !e.isPrimary) return;
-    // Prevent the browser from starting its own selection/scroll.
-    e.preventDefault();
-    const caret = caretNear(e.clientX, e.clientY);
-    const sceneId = caret ? sceneIdForNode(caret.node) : null;
-    // Start a drag no matter what — if the finger landed on whitespace,
-    // the anchor latches on the first pointermove that finds a caret.
-    setActiveHighlight(null);
-    dragStateRef.current = {
-      active: true,
-      anchorNode: caret?.node ?? null,
-      anchorOffset: caret?.offset ?? 0,
-      sceneId,
+  // Native pointer listeners — attached via useEffect below. React's
+  // synthetic pointer events are passive on iOS Safari, so
+  // `preventDefault()` silently no-ops and the browser reclaims the
+  // gesture for its own use. Native listeners with `passive: false`
+  // give us the authority we need.
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el || !highlightMode) return;
+
+    const handleDown = (e: PointerEvent) => {
+      if (e.pointerType === "touch" && !e.isPrimary) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      e.preventDefault();
+      const caret = caretNear(e.clientX, e.clientY);
+      const sceneId = caret ? sceneIdForNode(caret.node) : null;
+      setActiveHighlight(null);
+      dragStateRef.current = {
+        active: true,
+        anchorNode: caret?.node ?? null,
+        anchorOffset: caret?.offset ?? 0,
+        sceneId,
+      };
+      setDragRects([]);
+      try {
+        el.setPointerCapture?.(e.pointerId);
+      } catch {
+        /* ignore — some browsers throw if the pointer isn't active */
+      }
     };
-    setDragRects([]);
-    (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
-  }
 
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    const ds = dragStateRef.current;
-    if (!ds || !ds.active) return;
-    e.preventDefault();
-    const caret = caretNear(e.clientX, e.clientY);
-    if (!caret) return;
-    // Latch the anchor on first caret hit if it wasn't set on down.
-    if (!ds.anchorNode) {
-      const sid = sceneIdForNode(caret.node);
-      if (!sid) return;
-      ds.anchorNode = caret.node;
-      ds.anchorOffset = caret.offset;
-      ds.sceneId = sid;
-    }
-    if (!ds.sceneId) return;
-    const m = measureRange(
-      ds.anchorNode,
-      ds.anchorOffset,
-      caret.node,
-      caret.offset,
-      ds.sceneId,
-    );
-    if (!m) return;
-    setDragRects(toLocalRects(m.rects));
-  }
+    const handleMove = (e: PointerEvent) => {
+      const ds = dragStateRef.current;
+      if (!ds || !ds.active) return;
+      e.preventDefault();
+      const caret = caretNear(e.clientX, e.clientY);
+      if (!caret) return;
+      if (!ds.anchorNode) {
+        const sid = sceneIdForNode(caret.node);
+        if (!sid) return;
+        ds.anchorNode = caret.node;
+        ds.anchorOffset = caret.offset;
+        ds.sceneId = sid;
+      }
+      if (!ds.sceneId) return;
+      const m = measureRange(
+        ds.anchorNode,
+        ds.anchorOffset,
+        caret.node,
+        caret.offset,
+        ds.sceneId,
+      );
+      if (!m) return;
+      setDragRects(toLocalRects(m.rects));
+    };
 
-  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    const ds = dragStateRef.current;
-    if (!ds) return;
-    dragStateRef.current = null;
-    if (!ds.anchorNode || !ds.sceneId) {
+    const handleUp = (e: PointerEvent) => {
+      const ds = dragStateRef.current;
+      if (!ds) return;
+      dragStateRef.current = null;
+      if (!ds.anchorNode || !ds.sceneId) {
+        setDragRects(null);
+        return;
+      }
+      const caret = caretNear(e.clientX, e.clientY);
+      if (!caret) {
+        setDragRects(null);
+        return;
+      }
+      const m = measureRange(
+        ds.anchorNode,
+        ds.anchorOffset,
+        caret.node,
+        caret.offset,
+        ds.sceneId,
+      );
       setDragRects(null);
-      return;
-    }
-    const caret = caretNear(e.clientX, e.clientY);
-    if (!caret) {
-      setDragRects(null);
-      return;
-    }
-    const m = measureRange(
-      ds.anchorNode,
-      ds.anchorOffset,
-      caret.node,
-      caret.offset,
-      ds.sceneId,
-    );
-    setDragRects(null);
-    if (!m) return;
-    const trimmed = m.text.trim();
-    // Ignore ghost-short highlights (accidental taps).
-    if (trimmed.length < 2) return;
-    setActiveHighlight({
-      sceneId: ds.sceneId,
-      text: m.text,
-      rects: toLocalRects(m.rects),
-    });
-  }
+      if (!m) return;
+      const trimmed = m.text.trim();
+      if (trimmed.length < 2) return;
+      setActiveHighlight({
+        sceneId: ds.sceneId,
+        text: m.text,
+        rects: toLocalRects(m.rects),
+      });
+    };
 
-  function onPointerCancel() {
-    dragStateRef.current = null;
-    setDragRects(null);
-  }
+    const handleCancel = () => {
+      dragStateRef.current = null;
+      setDragRects(null);
+    };
+
+    // Suppress native touch behaviors (selection, callout, scroll) by
+    // intercepting touch events too. touchstart must be non-passive so
+    // preventDefault actually blocks the default gesture pipeline.
+    const swallowTouch = (e: TouchEvent) => {
+      if (!highlightMode) return;
+      e.preventDefault();
+    };
+
+    el.addEventListener("pointerdown", handleDown, { passive: false });
+    el.addEventListener("pointermove", handleMove, { passive: false });
+    el.addEventListener("pointerup", handleUp);
+    el.addEventListener("pointercancel", handleCancel);
+    el.addEventListener("touchstart", swallowTouch, { passive: false });
+    el.addEventListener("touchmove", swallowTouch, { passive: false });
+
+    return () => {
+      el.removeEventListener("pointerdown", handleDown);
+      el.removeEventListener("pointermove", handleMove);
+      el.removeEventListener("pointerup", handleUp);
+      el.removeEventListener("pointercancel", handleCancel);
+      el.removeEventListener("touchstart", swallowTouch);
+      el.removeEventListener("touchmove", swallowTouch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightMode]);
 
   // Re-measure the committed highlight on scroll so the yellow layer
   // stays pinned to its text. We can't rebuild the Range (we don't
@@ -2617,10 +2649,6 @@ function ReadThroughSheet({
           className={`sheet-body read-through-body ${
             highlightMode ? "highlighting" : ""
           }`}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
         >
           {/* Yellow highlight overlay — rendered first so z-index keeps
               it behind the text via CSS (pointer-events: none on the

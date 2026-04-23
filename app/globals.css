@@ -4634,11 +4634,13 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  -webkit-user-drag: none;
   /* Claim every touch for our handlers — pan-y would let iOS Safari
      steal any drag with a vertical component for scrolling, which
      kills the highlighter on a line wrap. Users exit highlight mode
-     (tap "Done") to scroll again. */
-  touch-action: none;
+     (tap "Done") to scroll again. `!important` defeats any UA or
+     inherited touch-action that might re-enable scroll. */
+  touch-action: none !important;
   overscroll-behavior: contain;
 }
 .read-through-body.highlighting ::selection {
@@ -4654,25 +4656,31 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
 }
 
 /* Overlay layer — positioned inside the scrollable body so its
-   top/left coords are in body-scroll coordinate space. */
+   top/left coords are in body-scroll coordinate space. Sits ABOVE
+   the text (z-index: 2) so the yellow actually renders on top of
+   the words. Semi-transparent fill means text shows through without
+   needing mix-blend-mode, which was unreliable because the overlay's
+   own stacking context isolated it from the text backdrop. */
 .read-through-hl-layer {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 .read-through-hl-rect {
   position: absolute;
-  /* Classic highlighter yellow. Slight rounding + subtle top-left
-     gradient mimics the wet-edge look of a marker stroke. */
-  background: rgba(255, 228, 66, 0.62);
+  /* Classic highlighter yellow. Solid semi-transparent fill renders
+     consistently across browsers, iOS, and stacking contexts. */
+  background: rgba(255, 220, 0, 0.45);
   border-radius: 2px;
-  mix-blend-mode: multiply;
   pointer-events: none;
+  /* Slight padding feel via box-shadow inset so short highlights
+     don't look pinched. */
+  box-shadow: inset 0 0 0 0.5px rgba(210, 170, 0, 0.15);
 }
 [data-theme="dark"] .read-through-hl-rect {
-  background: rgba(255, 228, 66, 0.35);
-  mix-blend-mode: screen;
+  background: rgba(255, 220, 0, 0.32);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 220, 0, 0.15);
 }
 
 /* ── Phase 2: "Change with AI" CTA + composer overlay ───────────── */
