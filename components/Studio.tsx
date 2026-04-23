@@ -2565,28 +2565,22 @@ function ReadThroughSheet({
       setDragRects(null);
     };
 
-    // Suppress native touch behaviors (selection, callout, scroll) by
-    // intercepting touch events too. touchstart must be non-passive so
-    // preventDefault actually blocks the default gesture pipeline.
-    const swallowTouch = (e: TouchEvent) => {
-      if (!highlightMode) return;
-      e.preventDefault();
-    };
-
+    // IMPORTANT: do NOT preventDefault touchstart/touchmove here. On
+    // iOS Safari, cancelling touch events suppresses the pointer-event
+    // pipeline entirely (no pointerdown is synthesized). `touch-action:
+    // none` on the element is enough to disable browser gestures like
+    // scroll and double-tap zoom; pointer events will still fire from
+    // touches and we handle all selection logic through them.
     el.addEventListener("pointerdown", handleDown, { passive: false });
     el.addEventListener("pointermove", handleMove, { passive: false });
     el.addEventListener("pointerup", handleUp);
     el.addEventListener("pointercancel", handleCancel);
-    el.addEventListener("touchstart", swallowTouch, { passive: false });
-    el.addEventListener("touchmove", swallowTouch, { passive: false });
 
     return () => {
       el.removeEventListener("pointerdown", handleDown);
       el.removeEventListener("pointermove", handleMove);
       el.removeEventListener("pointerup", handleUp);
       el.removeEventListener("pointercancel", handleCancel);
-      el.removeEventListener("touchstart", swallowTouch);
-      el.removeEventListener("touchmove", swallowTouch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightMode]);
