@@ -26,6 +26,7 @@ const ERROR_COPY: Record<AcceptError, string> = {
   "self-accept":     "This is your own invite — send it to someone else to collaborate.",
   "project-full":    "This project already has a collaborator. Only two people can work on the same project.",
   "project-missing": "The project for this invite no longer exists.",
+  "email-mismatch":  "This invite was sent to a different email. Sign in with the address the project owner invited.",
   "write-failed":    "Something went wrong setting up the collaboration. Try again in a moment.",
 };
 

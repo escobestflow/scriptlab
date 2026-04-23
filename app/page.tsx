@@ -7,6 +7,12 @@ import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
 } from "@/lib/storage";
+import {
+  listMyPendingInvites,
+  acceptInvite,
+  declineInvite,
+  type PendingInvite,
+} from "@/lib/invites";
 import { useAuth } from "@/lib/auth";
 import { Studio } from "@/components/Studio";
 import SplashLoader from "@/components/SplashLoader";
@@ -182,6 +188,47 @@ export default function Page() {
       setHydrated(true);
     })();
   }, [user]);
+
+  // Pending collaboration invites addressed to this user's email.
+  // Rendered on the dashboard above the project list with Accept /
+  // Decline buttons. Nothing shows for single-user accounts with no
+  // invites — the section is fully hidden when the list is empty.
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const reloadPendingInvites = useCallback(async () => {
+    if (!user) { setPendingInvites([]); return; }
+    const list = await listMyPendingInvites();
+    setPendingInvites(list);
+  }, [user]);
+  useEffect(() => { reloadPendingInvites(); }, [reloadPendingInvites]);
+
+  const handleAcceptInvite = useCallback(async (token: string) => {
+    if (!user) return;
+    const res = await acceptInvite(token, user.id);
+    if (typeof res === "string") {
+      alert(
+        res === "email-mismatch"
+          ? "This invite was sent to a different email."
+          : res === "project-full"
+          ? "This project already has a collaborator."
+          : res === "already-used"
+          ? "This invite has already been used."
+          : "Couldn't accept the invite. Please try again."
+      );
+      return;
+    }
+    // Reload both the project list (so the shared project appears)
+    // and the pending-invites list (so the card goes away).
+    const fresh = await loadProjectsFromDB(user.id);
+    setProjects(fresh);
+    await reloadPendingInvites();
+  }, [user, reloadPendingInvites]);
+
+  const handleDeclineInvite = useCallback(async (token: string) => {
+    if (!confirm("Decline this invite?")) return;
+    const ok = await declineInvite(token);
+    if (!ok) { alert("Couldn't decline the invite. Please try again."); return; }
+    await reloadPendingInvites();
+  }, [reloadPendingInvites]);
 
   // Debounced save: when projects change, save to DB after 1s of inactivity
   const saveProjectsDebounced = useCallback((ps: Story[]) => {
@@ -539,6 +586,9 @@ export default function Page() {
                 projects={projects}
                 onOpen={(id) => setView({ kind: "studio", projectId: id })}
                 onNew={openCreateModal}
+                pendingInvites={pendingInvites}
+                onAcceptInvite={handleAcceptInvite}
+                onDeclineInvite={handleDeclineInvite}
               />
             )}
             {mainTab === "moments" && (
@@ -1447,15 +1497,21 @@ function EmptyPosterStack() {
 
 function ProjectsTab({
   projects, onOpen, onNew,
+  pendingInvites, onAcceptInvite, onDeclineInvite,
 }: {
   projects: Story[];
   onOpen: (id: string) => void;
   onNew: () => void;
+  pendingInvites: PendingInvite[];
+  onAcceptInvite: (token: string) => void;
+  onDeclineInvite: (token: string) => void;
 }) {
-  // First-run empty state — shown until the user has created their very
-  // first project. Swaps back to the standard header + list layout as
-  // soon as `projects` has at least one entry.
-  if (projects.length === 0) {
+  const hasInvites = pendingInvites.length > 0;
+
+  // First-run empty state — only when there are also no pending
+  // invites. A brand-new user whose first interaction is an invite
+  // should land on that invite card, not on "Get started".
+  if (projects.length === 0 && !hasInvites) {
     return (
       <div className="projects-empty">
         <EmptyPosterStack />
@@ -1472,7 +1528,59 @@ function ProjectsTab({
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 }}>
+      {hasInvites && (
+        <div style={{ marginTop: 40, marginBottom: 20 }}>
+          <div className="display" style={{ marginBottom: 14 }}>Invitations</div>
+          {pendingInvites.map(inv => (
+            <div
+              key={inv.token}
+              className="project-card"
+              style={{
+                textAlign: "left",
+                cursor: "default",
+                width: "100%",
+                marginBottom: 12,
+              }}
+            >
+              <div className="project-cover">
+                {inv.projectThumbnail ? (
+                  <img src={inv.projectThumbnail} alt="" className="project-cover-img" />
+                ) : (
+                  <span className="project-cover-initial">
+                    {inv.projectTitle ? inv.projectTitle.charAt(0).toUpperCase() : "?"}
+                  </span>
+                )}
+              </div>
+              <div className="project-body">
+                <div className="project-title">{inv.projectTitle || "Untitled"}</div>
+                <div className="project-summary" style={{ marginBottom: 10 }}>
+                  {inv.creatorEmail
+                    ? `${inv.creatorEmail} invited you to collaborate`
+                    : "You've been invited to collaborate"}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => onAcceptInvite(inv.token)}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onDeclineInvite(inv.token)}
+                  >
+                    Decline
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: hasInvites ? 10 : 40 }}>
         <div className="display">Projects</div>
         <Button
           variant="secondary"
@@ -1484,6 +1592,12 @@ function ProjectsTab({
           New Project
         </Button>
       </div>
+
+      {projects.length === 0 && (
+        <div className="caption" style={{ opacity: 0.6, marginBottom: 20 }}>
+          No projects yet. Tap New Project to start one.
+        </div>
+      )}
 
       {projects.map(p => {
         const c = getActiveConceptDraft(p);

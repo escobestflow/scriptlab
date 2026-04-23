@@ -5767,12 +5767,9 @@ function CollaboratorsCard({ story }: { story: Story }) {
   const { user } = useAuth();
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loadingInvites, setLoadingInvites] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [email, setEmail] = useState("");
 
-  // Load this user's pending invites for the current project so they
-  // can re-share or revoke. We only show creator-side invites — the
-  // invitee's view is the accept-invite page, not this card.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
@@ -5785,49 +5782,36 @@ function CollaboratorsCard({ story }: { story: Story }) {
     return () => { cancelled = true; };
   }, [user, story.id]);
 
-  async function handleCreate() {
+  async function handleSend() {
     if (!user) return;
-    setCreating(true);
-    const inv = await createInvite(story.id, user.id);
-    setCreating(false);
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    // Light-touch email validation — we're not gatekeeping the UI on
+    // strict RFC parsing, just catching obvious typos. The RPC will
+    // still reject mismatches at accept time.
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmed)) {
+      alert("That doesn't look like a valid email address.");
+      return;
+    }
+    if (user.email && trimmed.toLowerCase() === user.email.toLowerCase()) {
+      alert("You can't invite yourself.");
+      return;
+    }
+    setSending(true);
+    const inv = await createInvite(story.id, user.id, trimmed);
+    setSending(false);
     if (!inv) {
-      alert("Couldn't create invite. Check your connection and try again.");
+      alert("Couldn't send the invite. Check your connection and try again.");
       return;
     }
     setInvites(prev => [inv, ...prev]);
-    // Auto-copy the freshly-minted link so the user can paste it
-    // straight into Messages/whatever without a second tap.
-    const url = buildInviteUrl(inv.token);
-    try {
-      if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(url);
-      setCopiedToken(inv.token);
-      setTimeout(() => setCopiedToken(t => t === inv.token ? null : t), 1800);
-    } catch {
-      // Clipboard may be blocked on some browsers; the user can tap
-      // "Copy link" on the row, which also falls through.
-    }
+    setEmail("");
   }
 
   async function handleRevoke(token: string) {
-    if (!confirm("Revoke this invite link? Anyone with the link won't be able to use it.")) return;
+    if (!confirm("Revoke this invite? The invitee won't be able to accept it.")) return;
     await revokeInvite(token);
     setInvites(prev => prev.filter(i => i.token !== token));
-  }
-
-  async function handleCopy(token: string) {
-    const url = buildInviteUrl(token);
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(url);
-        setCopiedToken(token);
-        setTimeout(() => setCopiedToken(t => t === token ? null : t), 1800);
-      } else {
-        // Crude fallback so the user always gets the URL somehow.
-        prompt("Copy this invite link:", url);
-      }
-    } catch {
-      prompt("Copy this invite link:", url);
-    }
   }
 
   const hasCollaborator = !!story.collaboratorUserId;
@@ -5838,7 +5822,7 @@ function CollaboratorsCard({ story }: { story: Story }) {
       <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
         {hasCollaborator
           ? "This project is shared with one collaborator. Each of you has your own drafts."
-          : "Invite one person to work on this project with you. Each collaborator keeps their own drafts; you can duplicate theirs into your own."}
+          : "Invite one person by email. Once they sign in, the invite appears on their dashboard to accept."}
       </div>
 
       {hasCollaborator ? (
@@ -5869,15 +5853,32 @@ function CollaboratorsCard({ story }: { story: Story }) {
           </div>
         </div>
       ) : (
-        <Button
-          variant="primary"
-          size="lg"
-          block
-          onClick={handleCreate}
-          disabled={creating || !user}
-        >
-          {creating ? "Creating invite…" : "Invite a collaborator"}
-        </Button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="email"
+            inputMode="email"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="collaborator@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && !sending) handleSend();
+            }}
+            className="attr-text-input"
+            style={{ flex: 1 }}
+            disabled={sending}
+          />
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleSend}
+            disabled={sending || !user || !email.trim()}
+          >
+            {sending ? "Sending…" : "Send"}
+          </Button>
+        </div>
       )}
 
       {invites.length > 0 && (
@@ -5905,29 +5906,20 @@ function CollaboratorsCard({ story }: { story: Story }) {
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
-                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-                  fontSize: 12,
-                  opacity: 0.75,
                 }}
-                title={buildInviteUrl(inv.token)}
+                title={inv.inviteeEmail ?? buildInviteUrl(inv.token)}
               >
-                {buildInviteUrl(inv.token)}
+                {inv.inviteeEmail ? (
+                  <>
+                    <span style={{ fontWeight: 500 }}>{inv.inviteeEmail}</span>
+                    <span style={{ opacity: 0.55, marginLeft: 8, fontSize: 12 }}>waiting</span>
+                  </>
+                ) : (
+                  <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12, opacity: 0.75 }}>
+                    {buildInviteUrl(inv.token)}
+                  </span>
+                )}
               </div>
-              <button
-                onClick={() => handleCopy(inv.token)}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--ink, #111)",
-                  background: "transparent",
-                  color: "var(--ink, #111)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {copiedToken === inv.token ? "Copied" : "Copy"}
-              </button>
               <button
                 onClick={() => handleRevoke(inv.token)}
                 style={{
