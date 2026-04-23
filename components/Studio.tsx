@@ -2207,6 +2207,13 @@ function ReadThroughSheet({
   const [composerError, setComposerError] = useState<string | null>(null);
   const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
+  // Mirror of composerOpen, read inside the selectionchange listener
+  // so we know to preserve activeHighlight when iOS collapses the
+  // body selection on focus move to the composer input.
+  const composerOpenRef = useRef(false);
+  useEffect(() => {
+    composerOpenRef.current = composerOpen;
+  }, [composerOpen]);
 
   // Track the iOS soft-keyboard via visualViewport. The gap between
   // the visual viewport bottom and the layout viewport bottom IS the
@@ -2379,13 +2386,19 @@ function ReadThroughSheet({
     const onSelChange = () => {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-        // Selection cleared — user tapped elsewhere. Clear both
-        // rects and the active highlight so the CTA disappears.
-        // (The CTA button suppresses selection-collapse on its own
-        // press via onMouseDown/onTouchStart preventDefault, so
-        // collapse here is always user-intentional.)
+        // Selection cleared — user tapped elsewhere. Clear drag
+        // rects, and clear activeHighlight UNLESS the composer is
+        // open. Opening the composer and focusing its input causes
+        // iOS to collapse the body selection; if we wiped
+        // activeHighlight here, the composer (gated on both
+        // composerOpen && activeHighlight) would immediately
+        // unmount — the "bottom sheet closes when I start typing"
+        // bug. We read composerOpen via a ref to avoid making the
+        // listener itself re-subscribe on every composer state flip.
         setDragRects(null);
-        setActiveHighlight(null);
+        if (!composerOpenRef.current) {
+          setActiveHighlight(null);
+        }
         return;
       }
       const anchor = sel.anchorNode;

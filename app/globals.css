@@ -4641,11 +4641,26 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   user-select: text;
   -webkit-touch-callout: none;
 }
-.read-through-body.highlighting ::selection {
-  background: transparent;
+/* Kill the native selection paint so only our yellow rects show.
+   Notes on why this is more fussy than it should be:
+   • The CSS Pseudo-Elements spec only guarantees a narrow set of
+     properties on `::selection` (background-color, color,
+     text-shadow). `background` shorthand is frequently ignored on
+     WebKit — we use `background-color` explicitly.
+   • Safari can match `::selection` against the body element itself
+     as well as its descendants, depending on the selection range,
+     so we declare both forms.
+   • `!important` defeats any UA default or inherited selection
+     color that would otherwise re-introduce the blue tint. */
+.read-through-body.highlighting ::selection,
+.read-through-body.highlighting::selection {
+  background-color: rgba(0, 0, 0, 0) !important;
+  color: inherit !important;
 }
-.read-through-body.highlighting ::-moz-selection {
-  background: transparent;
+.read-through-body.highlighting ::-moz-selection,
+.read-through-body.highlighting::-moz-selection {
+  background-color: rgba(0, 0, 0, 0) !important;
+  color: inherit !important;
 }
 .read-through-body.highlighting .read-through-scene-heading,
 .read-through-body.highlighting .read-through-action,
