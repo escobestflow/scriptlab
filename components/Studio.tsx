@@ -1968,6 +1968,24 @@ function DraftPickerStyleToggle() {
 // content (derived via isLayerDraftEmpty). An empty source has nothing
 // to derive from, so the button stays hidden rather than disabled.
 
+/* ── Collab indicator ──
+ * Two slightly-overlapping initial chips pinned to the right of the
+ * sticky layer-draft bar on any project that has a collaborator. The
+ * first chip is the current viewer's initial, the second is the
+ * partner's — both are derived from their email address (or display
+ * name, once we capture one) via `initialFor`. Renders nothing for
+ * solo projects so the bar stays identical to the non-collab case. */
+function CollabInitials() {
+  const { partnerStory, partnerEmail, myEmail } = usePartnerIdentity();
+  if (!partnerStory) return null;
+  return (
+    <div className="collab-initials-pair" aria-label="Collaborators">
+      <span className="collab-initial">{initialFor(myEmail)}</span>
+      <span className="collab-initial">{initialFor(partnerEmail)}</span>
+    </div>
+  );
+}
+
 function LayerBar({
   layer,
   label,
@@ -2019,6 +2037,8 @@ function LayerBar({
           <span>Read-through</span>
         </button>
       )}
+      <CollabInitials />
+
       {/* Update Other Layers trigger hidden for now — we may bring the
           cross-layer sync surface back later. Gated on `false` instead
           of deleted so the LayerUpdateTray, onOpenUpdateTray plumbing,
@@ -4611,7 +4631,7 @@ function CharactersTab({
 
       {!hasCharacters && (
         <EmptyLayerState
-          icon="👤"
+          icon={<img src="/character-icon.svg" width={41} height={44} alt="" />}
           title="No characters yet"
           caption="Create your first character to bring your story to life."
           addLabel="Add character"
@@ -5068,7 +5088,7 @@ function StoryTab({
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {!hasBeats && (
           <EmptyLayerState
-            icon={<>&#9670;</>}
+            icon={<img src="/story-icon.svg" width={49} height={41} alt="" />}
             title="No scenes yet"
             caption="Start building your story structure — add your first scene."
             addLabel="Add scene"
@@ -5479,7 +5499,7 @@ function ScriptTab({
         // of flow. "Write all" is hidden too — with zero beats there's
         // nothing to generate prose from.
         <EmptyLayerState
-          icon={<>&#127916;</>}
+          icon={<img src="/script-icon.svg" width={40} height={39} alt="" />}
           title="No scenes yet"
           caption="Sketch scenes in the Story tab, then return here to write them into prose."
         />

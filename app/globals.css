@@ -3369,8 +3369,14 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
 .empty-layer-icon {
   font-size: 38px;
   line-height: 1;
-  margin-bottom: 10px;
+  /* 16px breathing room between the icon and the title below.
+     Applies to the Characters / Story / Script empty states. */
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
 }
+.empty-layer-icon img { display: block; }
 .empty-layer-title {
   font-size: 16px;
   font-weight: 900;
@@ -4303,6 +4309,49 @@ html[data-theme="dark"] .ds-btn-secondary[style*="background"] { color: #000; }
   background-size: 100% 100%;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+/* ── Collab initials indicator ──
+   Two overlapping 18px circles pinned to the right end of the sticky
+   layer-draft bar on shared projects. Mine first, partner's second,
+   overlap by 4px (negative margin on the second chip). `margin-left:
+   auto` floats the pair to the right edge; the bar's existing 20px
+   right padding gives the 20px-from-screen-edge offset the spec asks
+   for. Hidden entirely on solo projects — the CollabInitials component
+   returns null when there's no partner. */
+.collab-initials-pair {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+.collab-initial {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #000;
+  background: rgba(255, 255, 255, 0.6);
+  font-family: 'Lato', sans-serif;
+  font-weight: 800;
+  font-size: 11pt;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Text sits optically centered in the small circle with no baseline
+     offset — Lato's metrics tend to hang a bit low at this size. */
+  padding-bottom: 1px;
+  box-sizing: border-box;
+}
+.collab-initial + .collab-initial {
+  margin-left: -4px;
+}
+html[data-theme="dark"] .collab-initial {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }
 /* Dark-mode override for the actual full-width sticky bar (the wrapper
    that paints the SVG gradient in light mode). The earlier override on
