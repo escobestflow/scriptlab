@@ -2185,16 +2185,6 @@ function ReadThroughSheet({
     ReadThroughHighlight["rects"] | null
   >(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
-  // Anchor may be null initially — if the user's finger lands between
-  // glyphs or in a margin, we still start a drag and latch the anchor
-  // on the first pointermove that finds a caret. This prevents the
-  // "I tapped and nothing happened" dead-zone feeling.
-  const dragStateRef = useRef<{
-    active: boolean;
-    anchorNode: Node | null;
-    anchorOffset: number;
-    sceneId: string | null;
-  } | null>(null);
 
   // Clear any existing highlight when the sheet is closed or the user
   // toggles highlight mode off.
@@ -2202,7 +2192,6 @@ function ReadThroughSheet({
     if (!open || !highlightMode) {
       setActiveHighlight(null);
       setDragRects(null);
-      dragStateRef.current = null;
     }
   }, [open, highlightMode]);
 
@@ -2338,34 +2327,6 @@ function ReadThroughSheet({
     }
   }
 
-  /** Map a viewport point to the nearest text caret. Handles both
-   *  WebKit/Chrome (caretRangeFromPoint) and Firefox
-   *  (caretPositionFromPoint). Returns null if the point isn't over
-   *  a text node. */
-  function caretAt(
-    x: number,
-    y: number,
-  ): { node: Node; offset: number } | null {
-    const doc = document as Document & {
-      caretRangeFromPoint?: (x: number, y: number) => Range | null;
-      caretPositionFromPoint?: (
-        x: number,
-        y: number,
-      ) => { offsetNode: Node; offset: number } | null;
-    };
-    if (typeof doc.caretRangeFromPoint === "function") {
-      const r = doc.caretRangeFromPoint(x, y);
-      if (!r) return null;
-      return { node: r.startContainer, offset: r.startOffset };
-    }
-    if (typeof doc.caretPositionFromPoint === "function") {
-      const p = doc.caretPositionFromPoint(x, y);
-      if (!p) return null;
-      return { node: p.offsetNode, offset: p.offset };
-    }
-    return null;
-  }
-
   /** Walk up the DOM until we find the scene container element (the
    *  one bearing `data-scene-id`). Returns the id, or null if the
    *  caret isn't inside any scene (e.g. on a gap between scenes). */
@@ -2378,65 +2339,6 @@ function ReadThroughSheet({
       el = el.parentNode;
     }
     return null;
-  }
-
-  /** Build a Range from the saved anchor → current caret, clamp it
-   *  to the anchor's scene, and return the rects. Returns null if the
-   *  current caret is outside the anchor scene or the range is empty. */
-  function measureRange(
-    anchorNode: Node,
-    anchorOffset: number,
-    focusNode: Node,
-    focusOffset: number,
-    anchorSceneId: string,
-  ): { range: Range; text: string; rects: DOMRect[] } | null {
-    const focusScene = sceneIdForNode(focusNode);
-    // If the focus drifted out of the anchor scene, clamp to the end
-    // of the anchor scene so the highlight never spans scenes.
-    let useNode = focusNode;
-    let useOffset = focusOffset;
-    if (focusScene !== anchorSceneId) {
-      const sceneEl = bodyRef.current?.querySelector<HTMLElement>(
-        `[data-scene-id="${anchorSceneId}"]`,
-      );
-      if (!sceneEl) return null;
-      // Walk to the last text node in the scene and clamp to its end.
-      const walker = document.createTreeWalker(sceneEl, NodeFilter.SHOW_TEXT);
-      let last: Text | null = null;
-      while (walker.nextNode()) last = walker.currentNode as Text;
-      if (!last) return null;
-      useNode = last;
-      useOffset = last.length;
-    }
-    const range = document.createRange();
-    try {
-      // Determine correct start/end based on document order.
-      const probe = document.createRange();
-      probe.setStart(anchorNode, anchorOffset);
-      probe.setEnd(anchorNode, anchorOffset);
-      const cmp = probe.compareBoundaryPoints(
-        Range.START_TO_START,
-        (() => {
-          const r = document.createRange();
-          r.setStart(useNode, useOffset);
-          r.setEnd(useNode, useOffset);
-          return r;
-        })(),
-      );
-      if (cmp <= 0) {
-        range.setStart(anchorNode, anchorOffset);
-        range.setEnd(useNode, useOffset);
-      } else {
-        range.setStart(useNode, useOffset);
-        range.setEnd(anchorNode, anchorOffset);
-      }
-    } catch {
-      return null;
-    }
-    const text = range.toString();
-    if (!text) return null;
-    const rects = Array.from(range.getClientRects());
-    return { range, text, rects };
   }
 
   /** Convert viewport-space rects to overlay-local rects by subtracting
@@ -2454,133 +2356,90 @@ function ReadThroughSheet({
     }));
   }
 
-  /** Widen the caret search. If the exact point misses (between lines,
-   *  in padding, on a margin), probe a small spiral of offsets to find
-   *  the nearest text caret. This kills the dead-zone feeling where a
-   *  finger tap near a word does nothing. */
-  function caretNear(x: number, y: number): { node: Node; offset: number } | null {
-    const direct = caretAt(x, y);
-    if (direct && direct.node.nodeType === Node.TEXT_NODE) return direct;
-    // Probe horizontally first (same line), then widen vertically.
-    const offsets: Array<[number, number]> = [
-      [0, 0], [-6, 0], [6, 0], [-12, 0], [12, 0],
-      [0, -8], [0, 8], [-10, -8], [10, -8], [-10, 8], [10, 8],
-      [0, -16], [0, 16], [-18, 0], [18, 0],
-    ];
-    for (const [dx, dy] of offsets) {
-      const c = caretAt(x + dx, y + dy);
-      if (c && c.node.nodeType === Node.TEXT_NODE) return c;
-    }
-    return direct; // fall back to whatever we got (or null)
-  }
-
-  // Native pointer listeners — attached via useEffect below. React's
-  // synthetic pointer events are passive on iOS Safari, so
-  // `preventDefault()` silently no-ops and the browser reclaims the
-  // gesture for its own use. Native listeners with `passive: false`
-  // give us the authority we need.
+  // Native-selection-driven highlighter. Instead of tracking pointers
+  // ourselves (which fights iOS Safari's touch gesture recogniser in
+  // subtle and hard-to-reproduce ways), we enable native text selection
+  // in CSS and simply observe `selectionchange`. Whenever the user has
+  // a non-empty selection inside our read-through body we compute its
+  // rects and render them as our yellow overlay. On iOS this means the
+  // gesture is exactly the native "long-press then drag" — the most
+  // reliable selection gesture the OS knows how to do.
   useEffect(() => {
-    const el = bodyRef.current;
-    if (!el || !highlightMode) return;
-
-    const handleDown = (e: PointerEvent) => {
-      if (e.pointerType === "touch" && !e.isPrimary) return;
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      e.preventDefault();
-      const caret = caretNear(e.clientX, e.clientY);
-      const sceneId = caret ? sceneIdForNode(caret.node) : null;
+    if (!highlightMode) {
+      // Leaving highlight mode clears everything and also drops any
+      // lingering native selection so the blue handles don't stick.
       setActiveHighlight(null);
-      dragStateRef.current = {
-        active: true,
-        anchorNode: caret?.node ?? null,
-        anchorOffset: caret?.offset ?? 0,
-        sceneId,
-      };
-      setDragRects([]);
-      try {
-        el.setPointerCapture?.(e.pointerId);
-      } catch {
-        /* ignore — some browsers throw if the pointer isn't active */
-      }
-    };
-
-    const handleMove = (e: PointerEvent) => {
-      const ds = dragStateRef.current;
-      if (!ds || !ds.active) return;
-      e.preventDefault();
-      const caret = caretNear(e.clientX, e.clientY);
-      if (!caret) return;
-      if (!ds.anchorNode) {
-        const sid = sceneIdForNode(caret.node);
-        if (!sid) return;
-        ds.anchorNode = caret.node;
-        ds.anchorOffset = caret.offset;
-        ds.sceneId = sid;
-      }
-      if (!ds.sceneId) return;
-      const m = measureRange(
-        ds.anchorNode,
-        ds.anchorOffset,
-        caret.node,
-        caret.offset,
-        ds.sceneId,
-      );
-      if (!m) return;
-      setDragRects(toLocalRects(m.rects));
-    };
-
-    const handleUp = (e: PointerEvent) => {
-      const ds = dragStateRef.current;
-      if (!ds) return;
-      dragStateRef.current = null;
-      if (!ds.anchorNode || !ds.sceneId) {
-        setDragRects(null);
-        return;
-      }
-      const caret = caretNear(e.clientX, e.clientY);
-      if (!caret) {
-        setDragRects(null);
-        return;
-      }
-      const m = measureRange(
-        ds.anchorNode,
-        ds.anchorOffset,
-        caret.node,
-        caret.offset,
-        ds.sceneId,
-      );
       setDragRects(null);
-      if (!m) return;
-      const trimmed = m.text.trim();
-      if (trimmed.length < 2) return;
+      window.getSelection?.()?.removeAllRanges?.();
+      return;
+    }
+    const el = bodyRef.current;
+    if (!el) return;
+
+    const onSelChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        // Selection cleared — user tapped elsewhere. Clear both
+        // rects and the active highlight so the CTA disappears.
+        // (The CTA button suppresses selection-collapse on its own
+        // press via onMouseDown/onTouchStart preventDefault, so
+        // collapse here is always user-intentional.)
+        setDragRects(null);
+        setActiveHighlight(null);
+        return;
+      }
+      const anchor = sel.anchorNode;
+      const focus = sel.focusNode;
+      if (!anchor || !focus) return;
+      // Scope: both endpoints must be inside our read-through body.
+      if (!el.contains(anchor) || !el.contains(focus)) return;
+      const anchorSceneId = sceneIdForNode(anchor);
+      if (!anchorSceneId) return;
+      const focusSceneId = sceneIdForNode(focus);
+
+      let useRange: Range;
+      if (focusSceneId === anchorSceneId) {
+        useRange = sel.getRangeAt(0).cloneRange();
+      } else {
+        // Cross-scene drag: clamp to the anchor's scene so one
+        // highlight never spans two scenes. Walk to the last text
+        // node inside the anchor's scene and end there.
+        const sceneEl = el.querySelector<HTMLElement>(
+          `[data-scene-id="${anchorSceneId}"]`,
+        );
+        if (!sceneEl) return;
+        const walker = document.createTreeWalker(
+          sceneEl,
+          NodeFilter.SHOW_TEXT,
+        );
+        let last: Text | null = null;
+        while (walker.nextNode()) last = walker.currentNode as Text;
+        if (!last) return;
+        useRange = document.createRange();
+        try {
+          useRange.setStart(anchor, sel.anchorOffset);
+          useRange.setEnd(last, last.length);
+        } catch {
+          return;
+        }
+      }
+      const text = useRange.toString();
+      if (text.trim().length < 2) {
+        setDragRects(null);
+        return;
+      }
+      const localRects = toLocalRects(Array.from(useRange.getClientRects()));
+      setDragRects(localRects);
       setActiveHighlight({
-        sceneId: ds.sceneId,
-        text: m.text,
-        rects: toLocalRects(m.rects),
+        sceneId: anchorSceneId,
+        text,
+        rects: localRects,
       });
     };
 
-    const handleCancel = () => {
-      dragStateRef.current = null;
-      setDragRects(null);
-    };
-
-    // IMPORTANT: do NOT preventDefault touchstart/touchmove here. On
-    // iOS Safari, cancelling touch events suppresses the pointer-event
-    // pipeline entirely (no pointerdown is synthesized). `touch-action:
-    // none` on the element is enough to disable browser gestures like
-    // scroll and double-tap zoom; pointer events will still fire from
-    // touches and we handle all selection logic through them.
-    el.addEventListener("pointerdown", handleDown, { passive: false });
-    el.addEventListener("pointermove", handleMove, { passive: false });
-    el.addEventListener("pointerup", handleUp);
-    el.addEventListener("pointercancel", handleCancel);
-
+    document.addEventListener("selectionchange", onSelChange);
     return () => {
-      el.removeEventListener("pointerdown", handleDown);
-      el.removeEventListener("pointermove", handleMove);
-      el.removeEventListener("pointerup", handleUp);
-      el.removeEventListener("pointercancel", handleCancel);
+      document.removeEventListener("selectionchange", onSelChange);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightMode]);
@@ -2687,6 +2546,12 @@ function ReadThroughSheet({
           <button
             type="button"
             className="read-through-hl-cta"
+            /* On iOS, tapping a button can steal focus from the
+               selection and collapse it. preventDefault on the
+               pressing event keeps the native selection (and our
+               `activeHighlight` state) intact until onClick fires. */
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
             onClick={() => setComposerOpen(true)}
           >
             Change with AI

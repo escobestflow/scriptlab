@@ -4625,25 +4625,26 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   color: #1a1a1a;
 }
 
-/* When highlighting mode is on, the body needs to fully swallow
-   touch/long-press behaviors that would otherwise pop the native
-   selection UI on top of ours. */
+/* When highlighting mode is on, enable NATIVE text selection. On
+   iOS Safari, the long-press-and-drag gesture is what users expect
+   and what the OS is optimised for — a hand-rolled pointer tracker
+   fights the browser's gesture recogniser and loses. We let the
+   browser own selection, observe `selectionchange`, and paint our
+   yellow rects on top. The native blue highlight is suppressed via
+   `::selection { background: transparent }` so only our yellow shows.
+   `-webkit-touch-callout: none` suppresses the iOS copy/lookup menu
+   so the only call to action is our "Change with AI" button. */
 .read-through-body.highlighting {
   position: relative;
   cursor: text;
-  -webkit-user-select: none;
-  user-select: none;
+  -webkit-user-select: text;
+  user-select: text;
   -webkit-touch-callout: none;
-  -webkit-user-drag: none;
-  /* Claim every touch for our handlers — pan-y would let iOS Safari
-     steal any drag with a vertical component for scrolling, which
-     kills the highlighter on a line wrap. Users exit highlight mode
-     (tap "Done") to scroll again. `!important` defeats any UA or
-     inherited touch-action that might re-enable scroll. */
-  touch-action: none !important;
-  overscroll-behavior: contain;
 }
 .read-through-body.highlighting ::selection {
+  background: transparent;
+}
+.read-through-body.highlighting ::-moz-selection {
   background: transparent;
 }
 .read-through-body.highlighting .read-through-scene-heading,
