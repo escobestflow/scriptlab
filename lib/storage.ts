@@ -314,9 +314,14 @@ function normalizeStory(s: any): Story {
 // ── Supabase CRUD ──
 
 export async function loadProjectsFromDB(userId: string): Promise<Story[]> {
+  // `collaborator_user_id` is nullable. On single-user projects it's
+  // NULL and we never attach the optional field to the Story. On
+  // shared projects we expose it as Story.collaboratorUserId so the
+  // UI can light up collab affordances (Phase 2). Nothing else about
+  // the existing load path changes.
   const { data, error } = await supabase
     .from("projects")
-    .select("id, data, thumbnail")
+    .select("id, data, thumbnail, collaborator_user_id")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
 
@@ -325,12 +330,15 @@ export async function loadProjectsFromDB(userId: string): Promise<Story[]> {
   return data.map(row => {
     const story = normalizeStory({ ...row.data, id: row.id });
     if (row.thumbnail) story.thumbnail = row.thumbnail;
+    if (row.collaborator_user_id) {
+      story.collaboratorUserId = row.collaborator_user_id;
+    }
     return story;
   });
 }
 
 export async function saveProjectToDB(userId: string, project: Story) {
-  const { thumbnail, ...rest } = project;
+  const { thumbnail, collaboratorUserId, ...rest } = project;
   const { error } = await supabase
     .from("projects")
     .upsert({
@@ -338,12 +346,32 @@ export async function saveProjectToDB(userId: string, project: Story) {
       user_id: userId,
       data: rest,
       thumbnail: thumbnail ?? null,
+      // Preserves the collaborator pairing on every save. When unset
+      // (single-user) we write NULL, which matches the column default.
+      collaborator_user_id: collaboratorUserId ?? null,
       updated_at: new Date().toISOString(),
     });
   if (error) console.error("Save project error:", error);
 }
 
-export async function deleteProjectFromDB(projectId: string) {
+/**
+ * Delete THIS user's copy of the project. For shared projects the
+ * partner's row is untouched — their copy survives independently
+ * (the "soft divorce" model). For single-user projects this is the
+ * only row and behaves exactly like before.
+ *
+ * `userId` is required for the collab case; the legacy-signature call
+ * (no userId) is preserved as an escape hatch during the migration.
+ */
+export async function deleteProjectFromDB(projectId: string, userId?: string) {
+  if (userId) {
+    await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId)
+      .eq("user_id", userId);
+    return;
+  }
   await supabase.from("projects").delete().eq("id", projectId);
 }
 

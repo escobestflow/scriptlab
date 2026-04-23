@@ -240,6 +240,15 @@ export interface Story {
     project: number;
   };
   updatedAt: string;
+  /**
+   * When set, this project is shared with another user and the value
+   * is their auth.users.id. The partner's own row (a separate DB
+   * row sharing this project id) carries the reverse pointer back
+   * to us. For single-user projects this is undefined — the whole
+   * collaboration UI tree is gated on this field being truthy, so
+   * solo projects get zero visual or behavioral difference.
+   */
+  collaboratorUserId?: string;
 }
 
 export type LayerKey = "concept" | "characters" | "story" | "script";

@@ -39,6 +39,14 @@ import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
 import { useDraftPickerStylePref, type DraftPickerStyle } from "@/lib/prefs";
+import { useAuth } from "@/lib/auth";
+import {
+  createInvite,
+  listInvitesForProject,
+  revokeInvite,
+  buildInviteUrl,
+  type Invite,
+} from "@/lib/invites";
 
 type Section = "concept" | "characters" | "story" | "script";
 
@@ -5721,6 +5729,13 @@ function SettingsTab({
         </div>
       )}
 
+      {/* Collaborators — invite one other person to work on this
+          project. This whole card is additive: it has no effect on
+          projects that stay single-user. The invite machinery creates
+          a shareable link; the invitee signs in and visits the link
+          to join. A project can have at most one collaborator. */}
+      <CollaboratorsCard story={story} />
+
       {/* Danger zone: delete project */}
       <div className="card" style={{ marginTop: 20 }}>
         <span className="eyebrow">Danger Zone</span>
@@ -5735,6 +5750,208 @@ function SettingsTab({
         </button>
       </div>
     </>
+  );
+}
+
+/* ============================================ */
+/* ========= COLLABORATORS CARD =============== */
+/* ============================================ */
+// Renders inside SettingsTab. Two states:
+//  - Not shared yet: button to generate an invite link.
+//  - Shared (story.collaboratorUserId set): shows "Collaborator: <id>"
+//    (Phase 2 will resolve to email/avatar) and a Remove button.
+// Pending invites (created but not yet accepted) are listed with a
+// copy-link button and a revoke button.
+
+function CollaboratorsCard({ story }: { story: Story }) {
+  const { user } = useAuth();
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+  // Load this user's pending invites for the current project so they
+  // can re-share or revoke. We only show creator-side invites — the
+  // invitee's view is the accept-invite page, not this card.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    setLoadingInvites(true);
+    listInvitesForProject(story.id, user.id).then(list => {
+      if (cancelled) return;
+      setInvites(list.filter(i => !i.acceptedAt));
+      setLoadingInvites(false);
+    });
+    return () => { cancelled = true; };
+  }, [user, story.id]);
+
+  async function handleCreate() {
+    if (!user) return;
+    setCreating(true);
+    const inv = await createInvite(story.id, user.id);
+    setCreating(false);
+    if (!inv) {
+      alert("Couldn't create invite. Check your connection and try again.");
+      return;
+    }
+    setInvites(prev => [inv, ...prev]);
+    // Auto-copy the freshly-minted link so the user can paste it
+    // straight into Messages/whatever without a second tap.
+    const url = buildInviteUrl(inv.token);
+    try {
+      if (navigator?.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      setCopiedToken(inv.token);
+      setTimeout(() => setCopiedToken(t => t === inv.token ? null : t), 1800);
+    } catch {
+      // Clipboard may be blocked on some browsers; the user can tap
+      // "Copy link" on the row, which also falls through.
+    }
+  }
+
+  async function handleRevoke(token: string) {
+    if (!confirm("Revoke this invite link? Anyone with the link won't be able to use it.")) return;
+    await revokeInvite(token);
+    setInvites(prev => prev.filter(i => i.token !== token));
+  }
+
+  async function handleCopy(token: string) {
+    const url = buildInviteUrl(token);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setCopiedToken(token);
+        setTimeout(() => setCopiedToken(t => t === token ? null : t), 1800);
+      } else {
+        // Crude fallback so the user always gets the URL somehow.
+        prompt("Copy this invite link:", url);
+      }
+    } catch {
+      prompt("Copy this invite link:", url);
+    }
+  }
+
+  const hasCollaborator = !!story.collaboratorUserId;
+
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <span className="eyebrow">Collaborators</span>
+      <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
+        {hasCollaborator
+          ? "This project is shared with one collaborator. Each of you has your own drafts."
+          : "Invite one person to work on this project with you. Each collaborator keeps their own drafts; you can duplicate theirs into your own."}
+      </div>
+
+      {hasCollaborator ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "10px 12px",
+            border: "1px solid var(--hairline, rgba(0,0,0,0.1))",
+            borderRadius: 10,
+            marginBottom: 8,
+          }}
+        >
+          <div
+            aria-hidden="true"
+            style={{
+              width: 24, height: 24, borderRadius: 12,
+              background: "var(--ink, #111)", color: "var(--paper, #fff)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, fontWeight: 700, flexShrink: 0,
+            }}
+          >
+            ?
+          </div>
+          <div style={{ flex: 1, fontSize: 14, fontWeight: 500 }}>
+            Collaborator connected
+          </div>
+        </div>
+      ) : (
+        <Button
+          variant="primary"
+          size="lg"
+          block
+          onClick={handleCreate}
+          disabled={creating || !user}
+        >
+          {creating ? "Creating invite…" : "Invite a collaborator"}
+        </Button>
+      )}
+
+      {invites.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div className="caption" style={{ marginBottom: 8, opacity: 0.7 }}>
+            Pending invites
+          </div>
+          {invites.map(inv => (
+            <div
+              key={inv.token}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 10px",
+                border: "1px solid var(--hairline, rgba(0,0,0,0.1))",
+                borderRadius: 10,
+                marginBottom: 6,
+                fontSize: 13,
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                  fontSize: 12,
+                  opacity: 0.75,
+                }}
+                title={buildInviteUrl(inv.token)}
+              >
+                {buildInviteUrl(inv.token)}
+              </div>
+              <button
+                onClick={() => handleCopy(inv.token)}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  border: "1px solid var(--ink, #111)",
+                  background: "transparent",
+                  color: "var(--ink, #111)",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {copiedToken === inv.token ? "Copied" : "Copy"}
+              </button>
+              <button
+                onClick={() => handleRevoke(inv.token)}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  border: "none",
+                  background: "transparent",
+                  color: "var(--ink, #111)",
+                  fontSize: 12,
+                  opacity: 0.65,
+                  cursor: "pointer",
+                }}
+              >
+                Revoke
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loadingInvites && invites.length === 0 && (
+        <div className="caption" style={{ marginTop: 10, opacity: 0.6 }}>Loading invites…</div>
+      )}
+    </div>
   );
 }
 

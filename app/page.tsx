@@ -500,7 +500,10 @@ export default function Page() {
           onDeleteProject={() => {
             const id = studioProject.id;
             setProjects(ps => ps.filter(p => p.id !== id));
-            deleteProjectFromDB(id);
+            // Pass user.id so we delete only THIS user's row. On
+            // shared projects the partner's copy is untouched.
+            if (user) deleteProjectFromDB(id, user.id);
+            else deleteProjectFromDB(id);
             setView({ kind: "main" });
           }}
           autosaveEnabled={autosaveEnabled}
