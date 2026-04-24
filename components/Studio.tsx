@@ -4284,7 +4284,9 @@ function AttrRow({
       >
         <span className="attr-label">
           {label}
-          {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+          {/* AI wand hidden in readOnly (partner-preview) rows —
+              there's nothing to generate into someone else's draft. */}
+          {ai && !readOnly && <AIWandButton onClick={ai} loading={!!aiLoading} />}
           {copyAction && (
             <button
               type="button"
@@ -4690,7 +4692,10 @@ function TextAttrRow({
         >
           <span className="attr-label">
             {label}
-            {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+            {/* AI wand + history pager hide in readOnly (partner-
+                preview) mode — neither action makes sense against a
+                draft the viewer can't write to. */}
+            {ai && !readOnly && <AIWandButton onClick={ai} loading={!!aiLoading} />}
             {copyBtn}
             {speak}
             {dot && <span className="sync-dot attr-dot" />}
@@ -4698,7 +4703,7 @@ function TextAttrRow({
           <div className="attr-values">
             <span className="attr-placeholder">{readOnly ? "None added" : placeholder}</span>
           </div>
-          {pager}
+          {!readOnly && pager}
           {!readOnly && (
             <svg className="attr-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <polyline points="6 9 12 15 18 9"/>
@@ -4716,11 +4721,12 @@ function TextAttrRow({
       <div className="attr-row-header attr-row-header-static">
         <span className="attr-label">
           {label}
-          {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+          {/* Same readOnly rule as the collapsed branch above. */}
+          {ai && !readOnly && <AIWandButton onClick={ai} loading={!!aiLoading} />}
           {copyBtn}
           {dot && <span className="sync-dot attr-dot" />}
         </span>
-        {pager}
+        {!readOnly && pager}
       </div>
       <div className="attr-row-body">
         {multiline ? (
