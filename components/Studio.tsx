@@ -941,32 +941,17 @@ export function Studio({
             {story.title || "Untitled"}
           </button>
 
-          {/* Project drafts dropdown trigger.
-              Phase 2 collab: wrapped in a flex row so the partner's
-              project-draft trigger can sit right next to it, each
-              with its own initials chip. Solo projects render a
-              single trigger unchanged (the row is still present but
-              with only one child — no visual difference). */}
-          <div className="project-drafts-row">
-            <button
-              className="drafts-dropdown-trigger"
-              onClick={() => setDraftsDropdownOpen(v => !v)}
-            >
-              {partnerStory && (
-                <span className="partner-avatar-chip partner-avatar-chip--mine" aria-hidden="true">
-                  {initialFor(myEmail)}
-                </span>
-              )}
-              <span>Draft {activeProjectDraft.number}</span>
-              <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
-            </button>
-            {partnerStory && (
-              <PartnerProjectDraftTrigger
-                partnerStory={partnerStory}
-                partnerEmail={partnerEmail}
-              />
-            )}
-          </div>
+          {/* Project drafts dropdown trigger. Identical on solo and
+              shared projects — collaboration is signaled by the
+              overlapping-initials pair on the layer bar, not by
+              duplicating the dropdown. */}
+          <button
+            className="drafts-dropdown-trigger"
+            onClick={() => setDraftsDropdownOpen(v => !v)}
+          >
+            <span>Draft {activeProjectDraft.number}</span>
+            <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+          </button>
 
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
@@ -1750,11 +1735,9 @@ function LayerDraftPicker({
     setStory(s => saveLayerDraft(s, layer));
   };
 
-  // Phase 2 collab: when the project is shared, the user's trigger
-  // also carries an initials chip so the two pickers side-by-side
-  // can be read at a glance. Solo projects render unchanged (no chip).
-  const { partnerStory, myEmail } = usePartnerIdentity();
-  const showChip = !!partnerStory;
+  // Collaboration indicator lives on the layer bar (CollabInitials),
+  // not inside the draft trigger itself — the picker looks identical
+  // on solo and shared projects.
 
   return (
     <div className="layer-draft-picker">
@@ -1763,11 +1746,6 @@ function LayerDraftPicker({
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
       >
-        {showChip && (
-          <span className="partner-avatar-chip partner-avatar-chip--mine" aria-hidden="true">
-            {initialFor(myEmail)}
-          </span>
-        )}
         <span className="layer-draft-label">{label} Draft {active.number}</span>
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
@@ -2007,7 +1985,6 @@ function LayerBar({
   onOpenReadThrough?: () => void;
 }) {
   const hasSource = !isLayerDraftEmpty(story, layer);
-  const partnerStory = usePartnerStory();
   return (
     <div className="layer-bar">
       <LayerDraftPicker
@@ -2017,15 +1994,6 @@ function LayerBar({
         setStory={setStory}
         autosaveEnabled={autosaveEnabled}
       />
-      {partnerStory && (
-        <PartnerDraftPicker
-          layer={layer}
-          label={label}
-          myStory={story}
-          setStory={setStory}
-          partnerStory={partnerStory}
-        />
-      )}
       {hasSource && onOpenReadThrough && (
         <button
           className="layer-read-trigger"
