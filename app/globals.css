@@ -5171,11 +5171,33 @@ html[data-theme="dark"] .partner-preview-section {
   font-size: 11pt;
 }
 .drafts-whose-label {
-  flex: 1 1 auto;
   font-family: 'Lato', sans-serif;
   font-weight: 600;
   font-size: 15px;
   color: var(--ink);
+  display: block;
+}
+/* Column wrapper stacking the bold label over the associated email
+   subtitle. Gives each picker row a two-line identity treatment so
+   the user can see which account each draft stack belongs to. */
+.drafts-whose-text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.drafts-whose-email {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+html[data-theme="dark"] .drafts-whose-email {
+  color: rgba(255, 255, 255, 0.55);
 }
 html[data-theme="dark"] .drafts-whose-row {
   border-bottom-color: rgba(255, 255, 255, 0.08);

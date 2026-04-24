@@ -217,23 +217,14 @@ export function Studio({
   // initials tap doesn't depend on this load — it just reads the
   // latest cached value and opens.
   useEffect(() => {
-    let cancelled = false;
-    if (!isCollabProject) {
-      setNameCaptureChecked(true);
-      return;
-    }
-    setNameCaptureChecked(false);
-    loadMyProfile().then(p => {
-      if (cancelled) return;
-      const name = p?.displayName ?? null;
-      setMyDisplayName(name);
-      setNameCaptureChecked(true);
-      if (!name || !name.trim()) {
-        setNameModalMode("first-time");
-        setNameModalOpen(true);
-      }
-    });
-    return () => { cancelled = true; };
+    // Name-capture modal is currently disabled — we fall back to using
+    // the first letter of each user's email for the initials chip,
+    // which is available for free (no write needed). The NameCaptureModal
+    // component + profiles load/save code are kept in place so we can
+    // flip this back on later if we want named initials again. For now:
+    // mark the check complete, never auto-open, never load profile.
+    setNameCaptureChecked(true);
+    setMyDisplayName(null);
   }, [isCollabProject, authedUser?.id]);
 
   function openNameCaptureForEdit() {
@@ -1012,7 +1003,10 @@ export function Studio({
       // projectMembers hasn't resolved) can still show a letter
       // derived from the captured name rather than the email.
       myDisplayName,
-      onOpenNameCapture: isCollabProject ? openNameCaptureForEdit : undefined,
+      // Name-capture edit is currently disabled (see useEffect above).
+      // Keeping the handler defined but not wired so the chip is a
+      // pure display element for now.
+      onOpenNameCapture: undefined,
     }}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
@@ -1235,16 +1229,12 @@ export function Studio({
                 // the same overlapping-initials chip so the visual
                 // language reads as one feature.
                 if (isCollab && projectDraftsSide === null) {
-                  const creatorEmail = projectMembers?.creator.email ?? null;
-                  const inviteeEmail = projectMembers?.invitee.email ?? null;
-                  const creatorName = projectMembers?.creator.displayName ?? null;
-                  const inviteeName = projectMembers?.invitee.displayName ?? null;
-                  const iAmCreator =
-                    !!(creatorEmail && myEmail && creatorEmail === myEmail);
+                  // Labels are now email-primary: "My drafts" / "Partner's
+                  // drafts" on top, the associated email underneath. The
+                  // name-capture modal is currently disabled so we no
+                  // longer use displayName anywhere in this sheet.
                   const mineEmail = myEmail ?? null;
-                  const mineName = iAmCreator ? creatorName : inviteeName;
                   const theirEmail = partnerEmail ?? null;
-                  const theirName = iAmCreator ? inviteeName : creatorName;
                   return (
                     <>
                       <div className="draft-sheet-title">{story.title || "Untitled"}</div>
@@ -1258,10 +1248,15 @@ export function Studio({
                         >
                           <span className="drafts-whose-chip">
                             <span className="collab-initial">
-                              {initialForMember(mineName, mineEmail)}
+                              {initialForMember(null, mineEmail)}
                             </span>
                           </span>
-                          <span className="drafts-whose-label">My drafts</span>
+                          <span className="drafts-whose-text">
+                            <span className="drafts-whose-label">My drafts</span>
+                            {mineEmail && (
+                              <span className="drafts-whose-email">{mineEmail}</span>
+                            )}
+                          </span>
                         </button>
                         <button
                           className="drafts-whose-row"
@@ -1269,15 +1264,14 @@ export function Studio({
                         >
                           <span className="drafts-whose-chip">
                             <span className="collab-initial">
-                              {initialForMember(theirName, theirEmail)}
+                              {initialForMember(null, theirEmail)}
                             </span>
                           </span>
-                          <span className="drafts-whose-label">
-                            {theirName?.trim()
-                              ? `${theirName.trim()}'s drafts`
-                              : theirEmail
-                                ? `${theirEmail}'s drafts`
-                                : "Partner's drafts"}
+                          <span className="drafts-whose-text">
+                            <span className="drafts-whose-label">Partner's drafts</span>
+                            {theirEmail && (
+                              <span className="drafts-whose-email">{theirEmail}</span>
+                            )}
                           </span>
                         </button>
                       </div>
@@ -2174,21 +2168,12 @@ function LayerDraftPicker({
               // each with the same overlapping-initials treatment as
               // the layer bar so the visual language is consistent.
               if (isCollab && side === null) {
-                const iAmCreator =
-                  !!(creatorEmail && myEmail && creatorEmail === myEmail);
-                // Figure out which side maps to "me" vs "partner" so
-                // the picker rows label themselves correctly regardless
-                // of which user is viewing. Fall back to viewer-local
-                // ordering if projectMembers hasn't resolved.
-                const mineIsCreator = iAmCreator;
+                // Label rows by email only — name-capture UI is turned
+                // off so we lean on the email + first-letter initial
+                // for identity. Each row stacks a bold label over the
+                // associated email as a subtitle for clarity.
                 const mineEmail = myEmail ?? null;
-                const mineName = mineIsCreator
-                  ? creatorDisplayName
-                  : inviteeDisplayName;
                 const theirEmail = partnerEmail ?? null;
-                const theirName = mineIsCreator
-                  ? inviteeDisplayName
-                  : creatorDisplayName;
                 return (
                   <>
                     <div className="draft-sheet-title">{label} Drafts</div>
@@ -2202,11 +2187,16 @@ function LayerDraftPicker({
                       >
                         <span className="drafts-whose-chip">
                           <span className="collab-initial">
-                            {initialForMember(mineName, mineEmail)}
+                            {initialForMember(null, mineEmail)}
                           </span>
                         </span>
-                        <span className="drafts-whose-label">
-                          My drafts
+                        <span className="drafts-whose-text">
+                          <span className="drafts-whose-label">My drafts</span>
+                          {mineEmail && (
+                            <span className="drafts-whose-email">
+                              {mineEmail}
+                            </span>
+                          )}
                         </span>
                       </button>
                       <button
@@ -2215,15 +2205,18 @@ function LayerDraftPicker({
                       >
                         <span className="drafts-whose-chip">
                           <span className="collab-initial">
-                            {initialForMember(theirName, theirEmail)}
+                            {initialForMember(null, theirEmail)}
                           </span>
                         </span>
-                        <span className="drafts-whose-label">
-                          {theirName?.trim()
-                            ? `${theirName.trim()}'s drafts`
-                            : theirEmail
-                              ? `${theirEmail}'s drafts`
-                              : "Partner's drafts"}
+                        <span className="drafts-whose-text">
+                          <span className="drafts-whose-label">
+                            Partner's drafts
+                          </span>
+                          {theirEmail && (
+                            <span className="drafts-whose-email">
+                              {theirEmail}
+                            </span>
+                          )}
                         </span>
                       </button>
                     </div>
