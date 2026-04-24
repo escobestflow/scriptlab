@@ -5444,6 +5444,25 @@ html[data-theme="dark"] .partner-copy-field-btn {
 html[data-theme="dark"] .partner-copy-field-btn:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+/* Partner-preview empty-state notice for the Concept tab.
+   Surfaces when the partner's active concept draft has nothing past
+   the required title + genres. Quiet italic caption; sits between the
+   layer bar and the first attribute row. */
+.partner-preview-empty-notice {
+  margin: 12px 0 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--ink-mute);
+  font-family: 'Lato', sans-serif;
+  font-size: 12px;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+html[data-theme="dark"] .partner-preview-empty-notice {
+  background: rgba(255, 255, 255, 0.05);
+}
 /* Don't let focus ring show through on any focusable child, since
    nothing inside the locked wrapper can actually receive input. */
 .partner-preview-locked :focus,

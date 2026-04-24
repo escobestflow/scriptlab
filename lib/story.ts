@@ -58,11 +58,29 @@ export interface CharacterRelationship {
   description: string;
 }
 
+/** Character gender.
+ *
+ *  The UI exposes four canonical buckets plus free-text override. We
+ *  keep the stored type as `string` so users who fill in something
+ *  outside the canonical set (e.g. "genderfluid", a custom label for
+ *  a non-human character) aren't forced through a dropdown. Empty
+ *  string / undefined means "not yet set" — the sheet-close handler
+ *  kicks off an AI name-based detection in that case.
+ *
+ *  Canonical tokens the UI offers directly:
+ *    "male" | "female" | "nonbinary" | "unspecified"
+ */
+export type CharacterGender = string;
+
 export interface Character {
   id: string;
   name: string;
   role: string;
   archetype: string;
+  /** Optional — new field. Stored as free-text; see `CharacterGender`.
+   *  Populated either by direct user selection, or by AI auto-detect
+   *  on sheet-close when the user didn't set it explicitly. */
+  gender?: CharacterGender;
   backstory: string;
   motivations: string;
   flaws: string;

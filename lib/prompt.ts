@@ -62,6 +62,10 @@ export type ActionType =
   | "generate_character_voice"
   | "generate_character_arc"
   | "generate_character_notes"
+  // Name-based gender auto-detection. Fires from CharacterEditForm
+  // on sheet-close when the user didn't pick a gender. Returns a
+  // single canonical token; see CharacterGender in lib/story.ts.
+  | "detect_character_gender"
   // ── Cross-layer sync (Update Other Layers) ──
   // 12 combinations: from each of the 4 layers, derive any of the other 3.
   // Each returns strict JSON matching the target layer's schema.
@@ -137,6 +141,7 @@ export function modelForAction(type: ActionType): string {
     case "generate_character_voice":
     case "generate_character_arc":
     case "generate_character_notes":
+    case "detect_character_gender":
     default:
       return "claude-haiku-4-5"; // fast + cheap for structure work
   }

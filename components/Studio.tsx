@@ -639,6 +639,15 @@ export function Studio({
   const closeCharacterSheet = () => {
     const id = charSheetCharId;
     if (!id) return;
+    // Capture the character pre-close so we know whether we need to
+    // kick off gender auto-detection. Reading from the live `story`
+    // ref rather than inside the setStory updater is fine: auto-detect
+    // is fire-and-forget, and the result patches back in via setStory
+    // when it returns (or never, on error — the character is kept
+    // without a gender, which is legal).
+    const currentChars = getActiveCharactersDraft(story).characters;
+    const pre = currentChars.find(c => c.id === id);
+
     // Auto-discard a blank character (no name + no details filled in).
     setStory(s => {
       const chars = getActiveCharactersDraft(s).characters;
@@ -654,7 +663,77 @@ export function Studio({
       });
     });
     setCharSheetCharId(null);
+
+    // Gender auto-detect: fire-and-forget when the user left gender
+    // unset AND the character has a name to go on AND it isn't about
+    // to be auto-discarded. Swallow all errors — detection is a
+    // convenience, not a correctness requirement. The result patches
+    // back into the character via setStory if it arrives before the
+    // user has edited the field themselves.
+    const needsDetect =
+      pre &&
+      pre.name.trim().length > 0 &&
+      !(pre.gender && pre.gender.trim().length > 0);
+    if (needsDetect) {
+      detectCharacterGender(pre.id).catch(err => {
+        console.warn("Gender auto-detect skipped:", err);
+      });
+    }
   };
+
+  // Call /api/generate with detect_character_gender and patch the
+  // result into Character.gender. Guarded so a slow/failed detection
+  // never overwrites a value the user typed in meanwhile.
+  async function detectCharacterGender(characterId: string): Promise<void> {
+    const action: ActionRequest = {
+      type: "detect_character_gender",
+      payload: { characterId },
+    };
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ story, action, profile: null }),
+    });
+    if (!res.ok || !res.body) return;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    let fullText = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.type === "text") fullText += msg.value;
+        } catch {
+          /* ignore malformed line */
+        }
+      }
+    }
+    const match = fullText.match(/\{[\s\S]*\}/);
+    if (!match) return;
+    let parsed: any;
+    try { parsed = JSON.parse(match[0]); } catch { return; }
+    const gender = typeof parsed?.gender === "string" ? parsed.gender.trim() : "";
+    if (!gender) return;
+    setStory(s => {
+      const chars = getActiveCharactersDraft(s).characters;
+      const ch = chars.find(c => c.id === characterId);
+      // Don't overwrite if the user (or another code path) set
+      // gender in the meantime. Only fill in when it's still blank.
+      if (!ch || (ch.gender && ch.gender.trim().length > 0)) return s;
+      return updateCharactersDraft(s, {
+        characters: chars.map(c =>
+          c.id === characterId ? { ...c, gender } : c
+        ),
+      });
+    });
+  }
 
   // Script-import pipeline — 4 explicit sequential steps.
   //
@@ -4171,6 +4250,7 @@ function AttrRow({
   ai,
   aiLoading,
   copyAction,
+  readOnly,
 }: {
   label: string;
   values?: string[];
@@ -4185,11 +4265,23 @@ function AttrRow({
    *  partner-preview mode to cherry-pick individual fields from the
    *  partner's concept draft into the user's own active draft. */
   copyAction?: () => void;
+  /** Read-only preview rendering (partner-preview mode). When the row
+   *  has no values, shows "None added" instead of the placeholder and
+   *  hides the caret — there's nothing to expand into. Rows that DO
+   *  have values still render normally so the user can see partner's
+   *  content; the surrounding `.partner-preview-locked` wrapper stops
+   *  clicks from actually toggling anything. */
+  readOnly?: boolean;
 }) {
   const hasValues = values && values.length > 0;
+  const suppressControls = readOnly && !hasValues;
   return (
     <div className="attr-row">
-      <button className="attr-row-header" onClick={onToggle}>
+      <button
+        className="attr-row-header"
+        onClick={onToggle}
+        disabled={suppressControls}
+      >
         <span className="attr-label">
           {label}
           {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
@@ -4209,12 +4301,14 @@ function AttrRow({
         <div className="attr-values">
           {hasValues
             ? values.map(v => <span key={v} className="attr-pill">{v}</span>)
-            : <span className="attr-placeholder">{placeholder || "Not set"}</span>
+            : <span className="attr-placeholder">{readOnly ? "None added" : (placeholder || "Not set")}</span>
           }
         </div>
-        <svg className={`attr-caret ${expanded ? "open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
+        {!suppressControls && (
+          <svg className={`attr-caret ${expanded ? "open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        )}
       </button>
       {expanded && (
         <div className="attr-row-body">
@@ -4536,6 +4630,7 @@ function TextAttrRow({
   pager,
   speak,
   copyAction,
+  readOnly,
 }: {
   label: string;
   value: string;
@@ -4550,6 +4645,11 @@ function TextAttrRow({
   speak?: React.ReactNode;
   /** Same as AttrRow.copyAction — partner-preview per-field copy. */
   copyAction?: () => void;
+  /** Partner-preview rendering. When the field is empty, shows
+   *  "None added" instead of the placeholder and hides the caret, and
+   *  the collapsed header is no longer clickable. Rows with content
+   *  render normally. */
+  readOnly?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -4577,9 +4677,17 @@ function TextAttrRow({
   ) : null;
 
   if (!isOpen) {
+    // Collapsed branch only renders when the field is empty AND not
+    // focused. In partner-preview (readOnly), the header becomes
+    // non-interactive and shows "None added" — the caret is hidden
+    // because there's nothing the user can do to expand the row.
     return (
       <div className="attr-row">
-        <button className="attr-row-header" onClick={() => setFocused(true)}>
+        <button
+          className="attr-row-header"
+          onClick={() => { if (!readOnly) setFocused(true); }}
+          disabled={readOnly}
+        >
           <span className="attr-label">
             {label}
             {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
@@ -4588,12 +4696,14 @@ function TextAttrRow({
             {dot && <span className="sync-dot attr-dot" />}
           </span>
           <div className="attr-values">
-            <span className="attr-placeholder">{placeholder}</span>
+            <span className="attr-placeholder">{readOnly ? "None added" : placeholder}</span>
           </div>
           {pager}
-          <svg className="attr-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
+          {!readOnly && (
+            <svg className="attr-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          )}
         </button>
       </div>
     );
@@ -4848,13 +4958,44 @@ function ConceptTab({
 
   const formatLabel = story.projectType === "tv-show" ? "TV Show" : story.projectType === "short" ? "Short Film" : "Feature Film";
 
+  // Partner-preview empty-state detection.
+  //
+  // Title + genres are always set (required at project creation), so
+  // "empty" here means the partner hasn't filled in any of the
+  // downstream concept fields yet. When all of these are blank we
+  // surface a small "nothing added" notice at the top of the tab so
+  // the user isn't confused by a sea of "None added" rows.
+  const partnerConceptEmpty =
+    isPartnerPreviewing &&
+    !d.logline.trim() &&
+    !d.concept.summary.trim() &&
+    !d.concept.tone.trim() &&
+    d.concept.themes.length === 0 &&
+    d.settings.endingTypes.length === 0 &&
+    d.settings.references.length === 0 &&
+    d.settings.writerStyles.length === 0 &&
+    d.settings.subGenres.length === 0 &&
+    !d.settings.framework;
+
   return (
     <>
       <LayerBar layer="concept" label="Concept" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
-      <Tip id="concept-drafts-are-free">
-        Save as many Concept drafts as you want — experiment freely. Your active draft is what the rest of the app reads.
-      </Tip>
+      {/* Partner-preview empty-state notice — appears when the partner
+          hasn't filled any of the optional concept fields. The required
+          title + genres still render below; this is context so the user
+          understands why every other row says "None added". */}
+      {partnerConceptEmpty && (
+        <div className="partner-preview-empty-notice">
+          Your partner hasn't added anything else to this draft yet.
+        </div>
+      )}
+
+      {!isPartnerPreviewing && (
+        <Tip id="concept-drafts-are-free">
+          Save as many Concept drafts as you want — experiment freely. Your active draft is what the rest of the app reads.
+        </Tip>
+      )}
 
       {/* Format */}
       <AttrRow
@@ -4864,6 +5005,7 @@ function ConceptTab({
         onToggle={() => toggle("format")}
         dot={!autosaveEnabled && isConceptFieldDirty(story, "projectType")}
         copyAction={previewCopy("projectType")}
+        readOnly={isPartnerPreviewing}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -4898,6 +5040,7 @@ function ConceptTab({
         ai={() => generateConcept("title")}
         aiLoading={aiBusy === "title"}
         copyAction={previewCopy("title")}
+        readOnly={isPartnerPreviewing}
         pager={
           <HistoryPager
             history={titleHistory.history}
@@ -4925,6 +5068,7 @@ function ConceptTab({
         onToggle={() => toggle("genre")}
         dot={!autosaveEnabled && isConceptFieldDirty(story, "genres")}
         copyAction={previewCopy("genres")}
+        readOnly={isPartnerPreviewing}
       >
         <div className="chip-row">
           {(["thriller","drama","comedy","sci-fi","horror","romance","action","mystery"] as const).map(g => (
@@ -4968,6 +5112,7 @@ function ConceptTab({
             placeholder={d.settings.genres.length === 0 ? "Select a genre first" : "Select sub-genres"}
             expanded={openAttr === "subgenre"}
             onToggle={() => toggle("subgenre")}
+            readOnly={isPartnerPreviewing}
           >
             {d.settings.genres.length === 0 ? (
               <div className="caption" style={{ padding: "4px 0" }}>
@@ -5015,6 +5160,7 @@ function ConceptTab({
         expanded={openAttr === "references"}
         onToggle={() => toggle("references")}
         copyAction={previewCopy("references")}
+        readOnly={isPartnerPreviewing}
       >
         <div className="reference-list">
           {d.settings.references.map(ref => (
@@ -5096,19 +5242,24 @@ function ConceptTab({
               ? d.settings.writerStyles.map(w => (
                   <span key={w} className="attr-pill">{w.toUpperCase()}</span>
                 ))
-              : <span className="attr-placeholder">Pick writers you want to echo</span>}
+              : <span className="attr-placeholder">{isPartnerPreviewing ? "None added" : "Pick writers you want to echo"}</span>}
           </div>
         </div>
-        <div className="attr-row-body" style={{ paddingTop: 16 }}>
-          <Button
-            variant="secondary"
-            size="lg"
-            block
-            onClick={() => { setWriterFilter(""); setWriterSheetOpen(true); }}
-          >
-            {d.settings.writerStyles.length > 0 ? "Edit writers" : "Select writers"}
-          </Button>
-        </div>
+        {/* Hide the Select/Edit button when previewing the partner's
+            concept draft — this row is read-only there, and the button
+            would expose a sheet the user can't meaningfully act on. */}
+        {!isPartnerPreviewing && (
+          <div className="attr-row-body" style={{ paddingTop: 16 }}>
+            <Button
+              variant="secondary"
+              size="lg"
+              block
+              onClick={() => { setWriterFilter(""); setWriterSheetOpen(true); }}
+            >
+              {d.settings.writerStyles.length > 0 ? "Edit writers" : "Select writers"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Logline */}
@@ -5122,6 +5273,7 @@ function ConceptTab({
         ai={() => generateConcept("logline")}
         aiLoading={aiBusy === "logline"}
         copyAction={previewCopy("logline")}
+        readOnly={isPartnerPreviewing}
         speak={
           d.logline?.trim() ? (
             <SpeakButton
@@ -5160,6 +5312,7 @@ function ConceptTab({
         ai={() => generateConcept("summary")}
         aiLoading={aiBusy === "summary"}
         copyAction={previewCopy("summary")}
+        readOnly={isPartnerPreviewing}
         pager={
           <HistoryPager
             history={summaryHistory.history}
@@ -5189,6 +5342,7 @@ function ConceptTab({
         ai={() => generateConcept("tone")}
         aiLoading={aiBusy === "tone"}
         copyAction={previewCopy("tone")}
+        readOnly={isPartnerPreviewing}
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {TONE_PRESETS.map(t => (
@@ -5246,6 +5400,7 @@ function ConceptTab({
         ai={() => generateConcept("themes")}
         aiLoading={aiBusy === "themes"}
         copyAction={previewCopy("themes")}
+        readOnly={isPartnerPreviewing}
       >
         {d.concept.themes.length > 0 && (
           <div className="chip-row" style={{ marginBottom: 10 }}>
@@ -5308,6 +5463,7 @@ function ConceptTab({
         placeholder="Pick a structure"
         expanded={openAttr === "structure"}
         onToggle={() => toggle("structure")}
+        readOnly={isPartnerPreviewing}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -5362,6 +5518,7 @@ function ConceptTab({
         ai={() => generateConcept("ending")}
         aiLoading={aiBusy === "ending"}
         copyAction={previewCopy("endingTypes")}
+        readOnly={isPartnerPreviewing}
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
@@ -5805,6 +5962,43 @@ function CharacterEditForm({
         aiBusy={aiBusy === "name"}
         pager={pagerFor("name")}
       />
+
+      {/* Gender — chip selector. Four canonical buckets plus custom
+          free-text (for genderfluid, agender, non-human characters,
+          etc.). Optional: if the user leaves this blank, the sheet-
+          close handler in Studio kicks off a name-based AI detection
+          and fills it in. */}
+      <div className="eyebrow" style={{ marginTop: 4 }}>Gender</div>
+      <div className="chip-row">
+        {([
+          { key: "male",        label: "Male" },
+          { key: "female",      label: "Female" },
+          { key: "nonbinary",   label: "Non-binary" },
+          { key: "unspecified", label: "Unspecified" },
+        ] as const).map(g => (
+          <Selector
+            key={g.key}
+            selected={ch.gender === g.key}
+            onClick={() => onUpdate({ gender: ch.gender === g.key ? "" : g.key })}
+          >
+            {g.label}
+          </Selector>
+        ))}
+        {/* Custom chip — when gender is set to something outside the
+            canonical four, it renders here as a selected chip showing
+            the actual value; tapping it clears the field (back to
+            "not set"). Gives users a non-destructive way to see and
+            remove a free-text value without a separate input field
+            at this layout tier. */}
+        {ch.gender && !["male","female","nonbinary","unspecified"].includes(ch.gender) && (
+          <Selector
+            selected
+            onClick={() => onUpdate({ gender: "" })}
+          >
+            {ch.gender} &#10005;
+          </Selector>
+        )}
+      </div>
 
       {/* Role — chip selector matching Concept tab (Genre, etc). */}
       <div className="eyebrow" style={{ marginTop: 4 }}>Role</div>
@@ -6392,9 +6586,26 @@ function ScriptTab({
     setStory(s => markLayerSynced(s, "script"));
   }
 
-  // "Create everything for me" — picks the most upstream populated
-  // source so the button works whether the user has no layers filled,
-  // just Concept, or Concept + Characters + Story.
+  // "Write all scenes with AI" — generates prose for every unwritten
+  // beat one at a time.
+  //
+  // Previously this fired a single `sync_story_to_script` action asking
+  // the model for ALL scenes in one JSON payload. With 14–22 scenes at
+  // 100–400 words each, the response routinely blew past the 8192-token
+  // ceiling in /api/generate, truncated mid-JSON, and `extractJson`
+  // threw. Individual scene generation always worked because each call
+  // stays well under the cap — so the fix is to reuse that per-beat
+  // flow in a loop.
+  //
+  // Rules:
+  //   - Skip beats that already have prose (status === "written" with
+  //     non-empty sceneContent). This preserves user-edited scenes
+  //     and lets the button act as a "fill the rest" action if the
+  //     user partially wrote the script by hand.
+  //   - On any failure, surface the error naming which scene failed
+  //     and stop the loop. Scenes already written this run are kept.
+  //   - Re-reads `story` via an updater snapshot every iteration so
+  //     the contextBuilder sees prior scenes on disk (cohesion).
   const { profile } = useProfileCapture();
   const [genBusy, setGenBusy] = useState(false);
   async function generateAllScript() {
@@ -6402,13 +6613,95 @@ function ScriptTab({
     setGenBusy(true);
     try {
       await runGenerateAll(async () => {
-        const source: LayerKey = !isLayerDraftEmpty(story, "story")
-          ? "story"
-          : !isLayerDraftEmpty(story, "characters")
-          ? "characters"
-          : "concept";
-        const next = await syncLayer(story, source, "script", profile);
-        setStory(() => next);
+        // Snapshot beats at start — beat ids are stable so we can
+        // match back through story even if the beats array shape
+        // changes during the loop.
+        const beatsSnapshot = beats.map((b, i) => ({
+          id: b.id,
+          index: i,
+          needsWriting:
+            b.status !== "written" || !b.sceneContent?.trim(),
+        }));
+
+        for (const entry of beatsSnapshot) {
+          if (!entry.needsWriting) continue;
+
+          // Read the latest story out of React state so the scene
+          // generator sees prior-iteration writes in its prompt.
+          let currentStory: Story = story;
+          setStory(s => { currentStory = s; return s; });
+
+          const action: ActionRequest = {
+            type: "generate_scene",
+            payload: { beatIndex: entry.index },
+          };
+
+          const res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ story: currentStory, action, profile }),
+          });
+          if (!res.ok || !res.body) {
+            const body = await res.text().catch(() => "");
+            throw new Error(
+              `Scene ${entry.index + 1} failed: ${res.status} ${body || "(no body)"}`,
+            );
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          let fullText = "";
+          let streamError: string | null = null;
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const msg = JSON.parse(line);
+                if (msg.type === "text") fullText += msg.value;
+                else if (msg.type === "error") streamError = msg.value;
+              } catch {
+                /* ignore malformed line */
+              }
+            }
+          }
+          if (streamError && !fullText) {
+            throw new Error(`Scene ${entry.index + 1} failed: ${streamError}`);
+          }
+          if (!fullText.trim()) {
+            throw new Error(`Scene ${entry.index + 1} returned no text.`);
+          }
+
+          // Persist this scene's prose onto the matching beat by id.
+          // Mirrors the setBeats path used by run() for single-scene
+          // generation, but matches by id rather than array index so
+          // it's robust to re-ordering between iterations.
+          const sceneText = fullText;
+          const beatId = entry.id;
+          setStory(s => {
+            const sl = getActiveStoryLayerDraft(s);
+            if (!sl) return s;
+            const writeInto = (arr: Beat[]): Beat[] => arr.map(b =>
+              b.id === beatId
+                ? { ...b, status: "written" as const, sceneContent: sceneText }
+                : b
+            );
+            if (s.projectType === "tv-show") {
+              return updateStoryLayerDraft(s, {
+                episodes: (sl.episodes ?? []).map(ep => ({
+                  ...ep,
+                  beats: writeInto(ep.beats),
+                })),
+              });
+            }
+            return updateStoryLayerDraft(s, { beats: writeInto(sl.beats) });
+          });
+        }
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

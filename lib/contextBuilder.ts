@@ -318,6 +318,29 @@ Use the full project bible above (format, genre, logline, summary, tone, themes,
 Return STRICT JSON: { "${spec.returnKey}": ${spec.returnType} }`;
     }
 
+    // Lightweight name → gender classifier. Called on sheet-close when
+    // the user didn't pick a gender themselves; the answer populates
+    // Character.gender. One canonical token only; model must not offer
+    // prose or caveats.
+    case "detect_character_gender": {
+      const ch = getActiveCharactersDraft(story);
+      const charId = action.payload?.characterId;
+      const target = ch.characters.find(c => c.id === charId);
+      if (!target) return `Unknown character.`;
+      const name = (target.name || "").trim();
+      if (!name) return `No name provided.`;
+      return `Classify the most likely gender of a character named "${name}" from English-language film and television.
+
+Return STRICT JSON with exactly one of four tokens:
+{ "gender": "male" | "female" | "nonbinary" | "unspecified" }
+
+Rules:
+- Use "unspecified" when the name is strongly ambiguous (e.g. "Alex", "Sam", "Jordan") or when you cannot make a confident call.
+- Use "nonbinary" only when the name itself signals a deliberately non-gendered choice (rare).
+- Do not infer from story context — the answer should follow from the name alone.
+- Output nothing except the JSON object above.`;
+    }
+
     // ── Cross-layer sync (Update Other Layers) ──
     // The storyBible above already contains the current active drafts of
     // every layer; these prompts just tell the model which to treat as
