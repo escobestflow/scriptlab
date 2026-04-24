@@ -18,6 +18,7 @@ import {
   isLayerDraftEmpty,
   applySyncResult,
   copyPartnerLayerDraft,
+  copyPartnerProjectDraft,
 } from "@/lib/story";
 import {
   syncLayer,
@@ -1247,7 +1248,9 @@ export function Studio({
                   return (
                     <>
                       <div className="draft-sheet-title">{story.title || "Untitled"}</div>
-                      <div className="draft-sheet-subtitle">Whose drafts?</div>
+                      <div className="draft-sheet-subtitle">
+                        Whose drafts do you want to see?
+                      </div>
                       <div className="sheet-body">
                         <button
                           className="drafts-whose-row"
@@ -1293,18 +1296,8 @@ export function Studio({
                 );
                 return (
                   <>
-                    <div className="draft-sheet-title" style={{ position: "relative" }}>
+                    <div className="draft-sheet-title">
                       {story.title || "Untitled"}
-                      {isCollab && (
-                        <button
-                          type="button"
-                          className="drafts-whose-back"
-                          onClick={() => setProjectDraftsSide(null)}
-                          aria-label="Back to user picker"
-                        >
-                          ← Whose
-                        </button>
-                      )}
                     </div>
                     <div className="draft-sheet-subtitle">
                       {showingPartner
@@ -1347,21 +1340,25 @@ export function Studio({
                           <button
                             key={draft.id}
                             className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                            // Partner project drafts are read-only for
-                            // now — there's no single-call copy helper
-                            // analogous to copyPartnerLayerDraft for
-                            // project drafts. Tapping is a no-op so
-                            // the sheet still feels interactive.
-                            onClick={
-                              showingPartner
-                                ? undefined
-                                : () => handleLoadProjectDraft(draft.id)
-                            }
-                            style={
-                              showingPartner
-                                ? { cursor: "default", opacity: 0.85 }
-                                : undefined
-                            }
+                            // Tapping one of MY project drafts switches
+                            // my active to it (same as today). Tapping
+                            // one of the PARTNER's project drafts clones
+                            // the whole 4-layer bundle onto my side as
+                            // a fresh project draft and makes it active —
+                            // the project-level analog of how the per-
+                            // layer sheet handles partner rows.
+                            onClick={() => {
+                              if (showingPartner) {
+                                if (partnerStory) {
+                                  setStory(s =>
+                                    copyPartnerProjectDraft(s, partnerStory, draft),
+                                  );
+                                }
+                              } else {
+                                handleLoadProjectDraft(draft.id);
+                              }
+                              setDraftsDropdownOpen(false);
+                            }}
                           >
                             <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
@@ -2195,7 +2192,9 @@ function LayerDraftPicker({
                 return (
                   <>
                     <div className="draft-sheet-title">{label} Drafts</div>
-                    <div className="draft-sheet-subtitle">Whose drafts?</div>
+                    <div className="draft-sheet-subtitle">
+                      Whose drafts do you want to see?
+                    </div>
                     <div className="sheet-body">
                       <button
                         className="drafts-whose-row"
@@ -2264,19 +2263,7 @@ function LayerDraftPicker({
               };
               return (
                 <>
-                  <div className="draft-sheet-title" style={{ position: "relative" }}>
-                    {label} Drafts
-                    {isCollab && (
-                      <button
-                        type="button"
-                        className="drafts-whose-back"
-                        onClick={() => setSide(null)}
-                        aria-label="Back to user picker"
-                      >
-                        ← Whose
-                      </button>
-                    )}
-                  </div>
+                  <div className="draft-sheet-title">{label} Drafts</div>
                   {isCollab && (
                     <div className="draft-sheet-subtitle">
                       {showingPartner ? "Partner's drafts" : "My drafts"}

@@ -1062,6 +1062,121 @@ export function createEmptyProjectDraft(story: Story): Story {
   };
 }
 
+/**
+ * Clone one of the partner's project drafts onto my side as a new
+ * project draft, deep-cloning each of its four layer drafts into my
+ * own pool. Makes the new project draft active so the user lands on
+ * a complete snapshot of the partner's combination immediately.
+ *
+ * Called from the project-drafts sheet when the current viewer taps
+ * a row under "Partner's drafts" — same interaction as
+ * `copyPartnerLayerDraft` but for the full 4-layer bundle rather
+ * than a single layer.
+ */
+export function copyPartnerProjectDraft(
+  myStory: Story,
+  partnerStory: Story,
+  partnerDraft: ProjectDraft,
+): Story {
+  const now = new Date().toISOString();
+
+  const srcConcept = partnerStory.conceptDrafts.find(
+    d => d.id === partnerDraft.conceptDraftId,
+  );
+  const srcCharacters = partnerStory.charactersDrafts.find(
+    d => d.id === partnerDraft.charactersDraftId,
+  );
+  const srcStory = partnerStory.storyDrafts.find(
+    d => d.id === partnerDraft.storyDraftId,
+  );
+  const srcScript = partnerStory.scriptDrafts.find(
+    d => d.id === partnerDraft.scriptDraftId,
+  );
+  // If any referenced layer draft can't be found in the partner's
+  // pool we bail silently — the partner row is effectively malformed
+  // and copying half a bundle is worse than copying none.
+  if (!srcConcept || !srcCharacters || !srcStory || !srcScript) {
+    return myStory;
+  }
+
+  const newConcept: ConceptLayerDraft = {
+    id: genId("cd"),
+    number: nextDraftNumber(myStory.conceptDrafts),
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    logline: srcConcept.logline,
+    settings: srcConcept.settings,
+    concept: srcConcept.concept,
+  };
+  const newCharacters: CharactersLayerDraft = {
+    id: genId("chd"),
+    number: nextDraftNumber(myStory.charactersDrafts),
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    characters: srcCharacters.characters.map(c => ({ ...c })),
+  };
+  const newStoryDraft: StoryLayerDraft = {
+    id: genId("sd"),
+    number: nextDraftNumber(myStory.storyDrafts),
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    beats: srcStory.beats.map(b => ({ ...b })),
+    episodes: srcStory.episodes ? srcStory.episodes.map(e => ({ ...e })) : undefined,
+    ingredients: [...srcStory.ingredients],
+    snippets: [...srcStory.snippets],
+  };
+  const newScript: ScriptLayerDraft = {
+    id: genId("scd"),
+    number: nextDraftNumber(myStory.scriptDrafts),
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    script: {
+      ...srcScript.script,
+      scenes: srcScript.script.scenes.map(s => ({ ...s })),
+    },
+  };
+  const newPD: ProjectDraft = {
+    id: genId("pd"),
+    number: nextDraftNumber(myStory.projectDrafts),
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    conceptDraftId: newConcept.id,
+    charactersDraftId: newCharacters.id,
+    storyDraftId: newStoryDraft.id,
+    scriptDraftId: newScript.id,
+    savedConceptDraftId: newConcept.id,
+    savedCharactersDraftId: newCharacters.id,
+    savedStoryDraftId: newStoryDraft.id,
+    savedScriptDraftId: newScript.id,
+    conceptSyncedAt: now,
+    charactersSyncedAt: now,
+    storySyncedAt: now,
+  };
+
+  return {
+    ...myStory,
+    conceptDrafts: [...myStory.conceptDrafts, newConcept],
+    charactersDrafts: [...myStory.charactersDrafts, newCharacters],
+    storyDrafts: [...myStory.storyDrafts, newStoryDraft],
+    scriptDrafts: [...myStory.scriptDrafts, newScript],
+    projectDrafts: [...myStory.projectDrafts, newPD],
+    activeProjectDraftId: newPD.id,
+    counters: {
+      concept: Math.max(myStory.counters.concept, newConcept.number),
+      characters: Math.max(myStory.counters.characters, newCharacters.number),
+      story: Math.max(myStory.counters.story, newStoryDraft.number),
+      script: Math.max(myStory.counters.script, newScript.number),
+      project: Math.max(myStory.counters.project, newPD.number),
+    },
+    updatedAt: now,
+  };
+}
+
 export function switchProjectDraft(story: Story, id: string): Story {
   if (!story.projectDrafts.some(pd => pd.id === id)) return story;
   return {
