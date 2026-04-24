@@ -2417,34 +2417,30 @@ function CollabInitials() {
     onOpenNameCapture,
   } = usePartnerIdentity();
   if (!partnerStory) return null;
-  // Preferred path: creatorEmail / inviteeEmail come from the
-  // project_invites-backed RPC (stable ordering, both resolvable
-  // pre- and post-accept). Render in creator-then-invitee order
-  // regardless of which side the viewer is on, so both users see
-  // the indicator the same way.
+  // Resolve two letters before rendering anything — a half-chip
+  // (one initial only) is worse than holding briefly.
   //
-  // Fallback path: if the RPC hasn't resolved (or the migration
-  // isn't applied yet), use (myEmail, partnerEmail) + the viewer's
-  // own captured name — both are already available by the time
-  // partnerStory exists. Ordering in this case is viewer-local
-  // (me-left, partner-right) rather than canonical creator-left,
-  // but it guarantees we never show "?" when we have perfectly
-  // usable account emails on hand. Self-corrects the moment
-  // projectMembers lands.
-  const canonical = !!(creatorEmail || inviteeEmail);
-  const leftEmail = canonical ? (creatorEmail ?? null) : (myEmail ?? null);
-  const rightEmail = canonical ? (inviteeEmail ?? null) : (partnerEmail ?? null);
-  const leftName = canonical ? (creatorDisplayName ?? null) : (myDisplayName ?? null);
-  const rightName = canonical ? (inviteeDisplayName ?? null) : null;
-  // Compute the actual letter for each side. If neither a name nor
-  // an email resolves to a usable character, skip that circle
-  // entirely rather than rendering "?". Partner is partnerStory-
-  // gated at the top of this component, so at worst the right circle
-  // falls back to the partner row's email via partnerEmail; at best
-  // both resolve via the canonical RPC path.
-  const leftChar = letterOrNull(leftName, leftEmail);
-  const rightChar = letterOrNull(rightName, rightEmail);
-  if (!leftChar && !rightChar) return null;
+  //   * Canonical (projectMembers resolved): creator-left,
+  //     invitee-right regardless of which side the viewer is on.
+  //   * Viewer-local fallback: me-left with myEmail + myDisplayName,
+  //     partner-right with partnerEmail. Self-corrects to canonical
+  //     the instant the members RPC lands.
+  //
+  // Try canonical first. If it yields both letters we use it;
+  // otherwise fall through to the fallback (viewer + partner email).
+  // If that also can't produce two letters we return null and let
+  // the chip pop in complete.
+  let leftChar: string | null = null;
+  let rightChar: string | null = null;
+  if (creatorEmail && inviteeEmail) {
+    leftChar = letterOrNull(creatorDisplayName, creatorEmail);
+    rightChar = letterOrNull(inviteeDisplayName, inviteeEmail);
+  }
+  if ((!leftChar || !rightChar) && myEmail && partnerEmail) {
+    leftChar = letterOrNull(myDisplayName, myEmail);
+    rightChar = letterOrNull(null, partnerEmail);
+  }
+  if (!leftChar || !rightChar) return null;
   // Tapping the chip opens the name-capture modal (via onOpenNameCapture
   // from context). Works whether the current viewer already set a name
   // or not — a re-tap lets them edit. Wrapped in a <button> for the
@@ -2456,8 +2452,8 @@ function CollabInitials() {
       aria-label="Collaborators — edit your name"
       onClick={onOpenNameCapture}
     >
-      {leftChar && <span className="collab-initial">{leftChar}</span>}
-      {rightChar && <span className="collab-initial">{rightChar}</span>}
+      <span className="collab-initial">{leftChar}</span>
+      <span className="collab-initial">{rightChar}</span>
     </button>
   );
 }

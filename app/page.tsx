@@ -206,34 +206,9 @@ export default function Page() {
   }, [user]);
   useEffect(() => { reloadPendingInvites(); }, [reloadPendingInvites]);
 
-  const handleAcceptInvite = useCallback(async (token: string) => {
-    if (!user) return;
-    const res = await acceptInvite(token, user.id);
-    if (typeof res === "string") {
-      alert(
-        res === "email-mismatch"
-          ? "This invite was sent to a different email."
-          : res === "project-full"
-          ? "This project already has a collaborator."
-          : res === "already-used"
-          ? "This invite has already been used."
-          : "Couldn't accept the invite. Please try again."
-      );
-      return;
-    }
-    // Reload both the project list (so the shared project appears)
-    // and the pending-invites list (so the card goes away).
-    const fresh = await loadProjectsFromDB(user.id);
-    setProjects(fresh);
-    await reloadPendingInvites();
-  }, [user, reloadPendingInvites]);
-
-  const handleDeclineInvite = useCallback(async (token: string) => {
-    if (!confirm("Decline this invite?")) return;
-    const ok = await declineInvite(token);
-    if (!ok) { alert("Couldn't decline the invite. Please try again."); return; }
-    await reloadPendingInvites();
-  }, [reloadPendingInvites]);
+  // (handleAcceptInvite / handleDeclineInvite defined below, AFTER the
+  // refresh* callbacks they depend on — we fan those caches out
+  // in parallel at accept time so the card/Studio render complete.)
 
   // ── Phase 2 collab: partner-side story hydration ──────────────────
   // For any project where my row carries a collaboratorUserId, we
@@ -274,6 +249,53 @@ export default function Page() {
     if (!members) return;
     setProjectMembers(prev => ({ ...prev, [projectId]: members }));
   }, []);
+
+  const handleAcceptInvite = useCallback(async (token: string) => {
+    if (!user) return;
+    const res = await acceptInvite(token, user.id);
+    if (typeof res === "string") {
+      alert(
+        res === "email-mismatch"
+          ? "This invite was sent to a different email."
+          : res === "project-full"
+          ? "This project already has a collaborator."
+          : res === "already-used"
+          ? "This invite has already been used."
+          : "Couldn't accept the invite. Please try again."
+      );
+      return;
+    }
+    // Eagerly warm every cache the card and Studio need so the project
+    // renders complete (both circles + creator's logline/thumbnail)
+    // the instant the projects list updates. Without this the user
+    // sees a half-populated card — one initial, "no logline" — while
+    // the dashboard-hydration useEffect sequentially dispatches these
+    // RPCs after the projects state change. We already have the
+    // projectId + creatorUserId directly from the RPC result, so we
+    // can fire all three in parallel before even reloading the list.
+    const { projectId, creatorUserId } = res;
+    void refreshPartnerStory(projectId, creatorUserId);
+    void refreshPartnerEmail(projectId);
+    void refreshProjectMembers(projectId);
+    // Reload both the project list (so the shared project appears)
+    // and the pending-invites list (so the card goes away).
+    const fresh = await loadProjectsFromDB(user.id);
+    setProjects(fresh);
+    await reloadPendingInvites();
+  }, [
+    user,
+    reloadPendingInvites,
+    refreshPartnerStory,
+    refreshPartnerEmail,
+    refreshProjectMembers,
+  ]);
+
+  const handleDeclineInvite = useCallback(async (token: string) => {
+    if (!confirm("Decline this invite?")) return;
+    const ok = await declineInvite(token);
+    if (!ok) { alert("Couldn't decline the invite. Please try again."); return; }
+    await reloadPendingInvites();
+  }, [reloadPendingInvites]);
 
   // When entering a studio view for a shared project, hydrate partner
   // data immediately. Also subscribe to realtime changes on the partner's
@@ -1808,32 +1830,22 @@ function ProjectsTab({
             : p;
         const c = getActiveConceptDraft(displayStory);
 
-        // Initials chip on collab cards. Uses the same resolution as
-        // the studio's CollabInitials:
-        //   * Canonical path (members resolved): creator-left,
-        //     invitee-right regardless of which side the viewer is on.
-        //   * Viewer-local fallback (members null): put the viewer
-        //     on the LEFT with their own email + captured name, and
-        //     the partner's email (loaded eagerly via partnerEmails)
-        //     on the RIGHT. Self-corrects the instant members lands.
-        // In either path, any circle that can't resolve to a usable
-        // letter is skipped entirely — we never render "?".
-        const canonical = !!members;
-        const leftEmail = canonical
-          ? (members!.creator.email ?? null)
-          : (myEmail ?? null);
-        const rightEmail = canonical
-          ? (members!.invitee.email ?? null)
-          : (partnerEmails[p.id] ?? null);
-        const leftName = canonical
-          ? (members!.creator.displayName ?? null)
-          : null;
-        const rightName = canonical
-          ? (members!.invitee.displayName ?? null)
-          : null;
+        // Initials chip on collab cards. We want BOTH circles whenever
+        // possible; rendering a half-chip (one letter only) is worse
+        // than rendering nothing briefly while data flows in. So we
+        // pick the first strategy that can resolve two letters:
+        //   * Canonical (members resolved): creator-left, invitee-right.
+        //   * Viewer-local fallback (members null but partnerEmail
+        //     cached): viewer-left with their own name/email, partner-
+        //     right with partnerEmails[p.id]. Ordering self-corrects to
+        //     canonical the instant members lands.
+        // If neither strategy yields two letters we hold — the chip
+        // pops in complete rather than flickering as one letter.
+        const canonicalLeft = members?.creator ?? null;
+        const canonicalRight = members?.invitee ?? null;
         const pickLetter = (
-          name: string | null,
-          email: string | null,
+          name: string | null | undefined,
+          email: string | null | undefined,
         ): string | null => {
           const n = (name ?? "").trim();
           if (n) return n.charAt(0).toUpperCase();
@@ -1841,8 +1853,18 @@ function ProjectsTab({
           if (e) return e.charAt(0).toUpperCase();
           return null;
         };
-        const leftChar = pickLetter(leftName, leftEmail);
-        const rightChar = pickLetter(rightName, rightEmail);
+        let leftChar: string | null = null;
+        let rightChar: string | null = null;
+        if (canonicalLeft && canonicalRight) {
+          leftChar = pickLetter(canonicalLeft.displayName, canonicalLeft.email);
+          rightChar = pickLetter(canonicalRight.displayName, canonicalRight.email);
+        }
+        if ((!leftChar || !rightChar) && myEmail && partnerEmails[p.id]) {
+          // Fallback: viewer-local ordering, filling whichever sides
+          // canonical didn't supply.
+          leftChar = pickLetter(null, myEmail);
+          rightChar = pickLetter(null, partnerEmails[p.id]);
+        }
 
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
@@ -1866,13 +1888,13 @@ function ProjectsTab({
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
             </div>
-            {isCollab && (leftChar || rightChar) && (
+            {isCollab && leftChar && rightChar && (
               <span
                 className="collab-initials-pair project-card-initials"
                 aria-label="Collaborators"
               >
-                {leftChar && <span className="collab-initial">{leftChar}</span>}
-                {rightChar && <span className="collab-initial">{rightChar}</span>}
+                <span className="collab-initial">{leftChar}</span>
+                <span className="collab-initial">{rightChar}</span>
               </span>
             )}
           </button>
