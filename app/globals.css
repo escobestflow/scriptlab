@@ -563,9 +563,29 @@ html[data-theme="dark"] .topbar {
   text-align: left;
   cursor: pointer;
   align-items: stretch;
+  /* Anchor for the collab-initials chip pinned in the top-right. */
+  position: relative;
   transition:
     transform 220ms var(--ease),
     box-shadow 220ms var(--ease);
+}
+
+/* Overlapping-initials chip on collab cards. Same pair treatment as
+   inside the studio layer bar, just pinned to the card's top-right
+   corner. `pointer-events: none` so the whole card stays tappable
+   through the chip — the chip here is purely a visual indicator,
+   not a tap target (unlike the studio version, where tapping opens
+   the name-capture modal). */
+.project-card-initials {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  margin-left: 0;
+  padding: 0;
+  margin-right: 0;
+  pointer-events: none;
+  background: transparent;
+  border: none;
 }
 .project-card:active {
   transform: scale(0.985);
@@ -5108,6 +5128,72 @@ html[data-theme="dark"] .partner-preview-section {
   color: #ff8a80;
   background: rgba(255, 0, 0, 0.1);
   border-color: rgba(255, 0, 0, 0.28);
+}
+
+/* ── Whose-drafts picker (collab draft sheets) ───────────────────
+   First-step rows on the project-drafts and per-layer sheets when
+   the project is shared. Full-width tap target with the overlapping-
+   initials chip on the left and the label on the right. The chip
+   reuses `.collab-initial` so it's visually identical to the pair
+   shown on the layer bar — a single user's version of it.
+
+   Back button lives inside `.draft-sheet-title` on the step-2 list
+   so users can return to the picker without closing the sheet. */
+.drafts-whose-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.drafts-whose-row:last-child {
+  border-bottom: none;
+}
+.drafts-whose-row:active {
+  opacity: 0.85;
+}
+.drafts-whose-chip {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.drafts-whose-chip .collab-initial {
+  /* Slightly larger in the picker so the chip reads as an identity
+     badge rather than a small indicator. */
+  width: 22px;
+  height: 22px;
+  font-size: 11pt;
+}
+.drafts-whose-label {
+  flex: 1 1 auto;
+  font-family: 'Lato', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+}
+html[data-theme="dark"] .drafts-whose-row {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.drafts-whose-back {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  font-family: 'Lato', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink-mute);
+  cursor: pointer;
+  padding: 6px 8px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ── Name-capture modal ───────────────────────────────────────────

@@ -330,6 +330,48 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [view, projects, refreshPartnerStory, refreshPartnerEmail, refreshProjectMembers, partnerEmails, projectMembers]);
 
+  // Hydrate projectMembers + partner (creator-side) Stories for every
+  // shared project as soon as the dashboard's projects list lands. The
+  // Projects tab uses this data to:
+  //   1. Render the creator's latest-draft content (title/thumb/
+  //      logline/genres) on the invitee's project card, so the invitee
+  //      sees what the creator sees rather than the empty seed row.
+  //   2. Render the overlapping-initials chip in the top-right of every
+  //      collab card, driven by the same creator/invitee pair the
+  //      studio's layer bars use.
+  //
+  // Cheap and idempotent — one RPC per shared project the first time
+  // we see it, then nothing. We piggyback on `projectMembers` /
+  // `partnerStories` caches so studio re-entry doesn't refetch either.
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    projects.forEach(p => {
+      if (!p.collaboratorUserId) return;
+      if (!projectMembers[p.id]) {
+        refreshProjectMembers(p.id);
+      }
+      // Only the invitee benefits from loading the creator's row for
+      // the card — the creator's own row IS the canonical source for
+      // them. We don't know which side is which until projectMembers
+      // lands, so gate on that.
+      const members = projectMembers[p.id];
+      if (members) {
+        const iAmCreator = members.creator.userId === user.id;
+        if (!iAmCreator && !partnerStories[p.id]) {
+          refreshPartnerStory(p.id, members.creator.userId);
+        }
+      }
+    });
+  }, [
+    hydrated,
+    user,
+    projects,
+    projectMembers,
+    partnerStories,
+    refreshProjectMembers,
+    refreshPartnerStory,
+  ]);
+
   // Debounced save: when projects change, save to DB after 1s of inactivity
   const saveProjectsDebounced = useCallback((ps: Story[]) => {
     if (!user) return;
@@ -704,6 +746,10 @@ export default function Page() {
                 pendingInvites={pendingInvites}
                 onAcceptInvite={handleAcceptInvite}
                 onDeclineInvite={handleDeclineInvite}
+                myUserId={user?.id ?? null}
+                myEmail={user?.email ?? null}
+                projectMembers={projectMembers}
+                partnerStories={partnerStories}
               />
             )}
             {mainTab === "moments" && (
@@ -1613,6 +1659,7 @@ function EmptyPosterStack() {
 function ProjectsTab({
   projects, onOpen, onNew,
   pendingInvites, onAcceptInvite, onDeclineInvite,
+  myUserId, myEmail, projectMembers, partnerStories,
 }: {
   projects: Story[];
   onOpen: (id: string) => void;
@@ -1620,6 +1667,22 @@ function ProjectsTab({
   pendingInvites: PendingInvite[];
   onAcceptInvite: (token: string) => void;
   onDeclineInvite: (token: string) => void;
+  /** Current user's auth id — used to tell whether this user is the
+   *  creator or invitee for each shared project. Null while the auth
+   *  session is still hydrating. */
+  myUserId: string | null;
+  /** Current user's email — used as an ordering fallback for the
+   *  initials chip when projectMembers hasn't resolved yet. */
+  myEmail: string | null;
+  /** Creator/invitee pair per project id, backed by the
+   *  project_invites-joined RPC. Drives the overlapping-initials chip
+   *  and the "am I the creator" branch for card content. */
+  projectMembers: Record<string, ProjectMembers>;
+  /** Partner's Story per project id — for invitees, this is the
+   *  CREATOR's row, used as the data source for the project card so
+   *  the invitee sees the creator's latest draft details instead of
+   *  the empty seed row accept_invite left behind. */
+  partnerStories: Record<string, Story>;
 }) {
   const hasInvites = pendingInvites.length > 0;
 
@@ -1715,20 +1778,51 @@ function ProjectsTab({
       )}
 
       {projects.map(p => {
-        const c = getActiveConceptDraft(p);
+        // For shared projects where the current user is the invitee,
+        // render the card from the CREATOR's Story so it mirrors what
+        // the creator sees. accept_invite seeds the invitee's own row
+        // with only id/title/projectType, so their own Story's
+        // logline/genres/thumbnail would otherwise be empty until
+        // they edit. We fall back to their own row while the creator
+        // story is still loading (shows at least title + placeholder).
+        const members = projectMembers[p.id];
+        const isCollab = !!p.collaboratorUserId;
+        const iAmCreator = !!(members && myUserId && members.creator.userId === myUserId);
+        const displayStory =
+          isCollab && !iAmCreator && partnerStories[p.id]
+            ? partnerStories[p.id]
+            : p;
+        const c = getActiveConceptDraft(displayStory);
+
+        // Initials chip on collab cards. Uses the same resolution as
+        // the studio's CollabInitials: projectMembers when available,
+        // falling back to my-email + partner-email in viewer-local
+        // order while the RPC is still resolving.
+        const leftEmail =
+          members?.creator.email ??
+          (iAmCreator ? myEmail : null) ??
+          null;
+        const rightEmail =
+          members?.invitee.email ??
+          (iAmCreator ? null : myEmail) ??
+          (iAmCreator ? partnerStories[p.id] ? null : null : null);
+        // Prefer display names over emails when profiles exist.
+        const leftName = members?.creator.displayName ?? null;
+        const rightName = members?.invitee.displayName ?? null;
+
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
             <div className="project-cover">
-              {p.thumbnail ? (
-                <img src={p.thumbnail} alt="" className="project-cover-img" />
+              {displayStory.thumbnail ? (
+                <img src={displayStory.thumbnail} alt="" className="project-cover-img" />
               ) : (
                 <span className="project-cover-initial">
-                  {p.title ? p.title.charAt(0).toUpperCase() : "?"}
+                  {displayStory.title ? displayStory.title.charAt(0).toUpperCase() : "?"}
                 </span>
               )}
             </div>
             <div className="project-body">
-              <div className="project-title">{p.title || "Untitled"}</div>
+              <div className="project-title">{displayStory.title || "Untitled"}</div>
               <div className="project-genre">
                 {/* .attr-pill matches the collapsed-state genre chips in
                     the Concept tab on the Project Detail page. */}
@@ -1738,6 +1832,27 @@ function ProjectsTab({
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
             </div>
+            {isCollab && (
+              <span
+                className="collab-initials-pair project-card-initials"
+                aria-label="Collaborators"
+              >
+                <span className="collab-initial">
+                  {leftName && leftName.trim()
+                    ? leftName.trim().charAt(0).toUpperCase()
+                    : leftEmail
+                      ? leftEmail.trim().charAt(0).toUpperCase()
+                      : "?"}
+                </span>
+                <span className="collab-initial">
+                  {rightName && rightName.trim()
+                    ? rightName.trim().charAt(0).toUpperCase()
+                    : rightEmail
+                      ? rightEmail.trim().charAt(0).toUpperCase()
+                      : "?"}
+                </span>
+              </span>
+            )}
           </button>
         );
       })}

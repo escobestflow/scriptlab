@@ -253,6 +253,18 @@ export function Studio({
     return () => clearTimeout(t);
   }, [showSuccess]);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
+  // Two-step "whose drafts?" flow on the project-drafts sheet. Mirrors
+  // the layer-draft picker behavior: for collab projects the sheet
+  // shows a side picker (me vs partner) before drafting a list. Reset
+  // to null every time the sheet closes.
+  const [projectDraftsSide, setProjectDraftsSide] =
+    useState<"mine" | "partner" | null>(null);
+  const isCollabProjectForSheets = !!partnerStory;
+  useEffect(() => {
+    if (!draftsDropdownOpen) setProjectDraftsSide(null);
+    // Solo projects: skip the picker, jump straight to the drafts list.
+    else if (!isCollabProjectForSheets) setProjectDraftsSide("mine");
+  }, [draftsDropdownOpen, isCollabProjectForSheets]);
   // Draft-picker presentation toggle. "sheet" = bottom-sheet (default,
   // current treatment); "popup" = inline dropdown menu that pops under
   // the trigger (legacy treatment preserved behind this preference).
@@ -1195,67 +1207,196 @@ export function Studio({
             />
             <div className={`sheet draft-sheet ${draftsDropdownOpen ? "open" : ""}`}>
               <div className="sheet-handle" />
-              <div className="draft-sheet-title">{story.title || "Untitled"}</div>
-              <div className="draft-sheet-subtitle">Project Drafts</div>
-              <div className="sheet-body">
-                {[...story.projectDrafts]
-              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-              .map(draft => {
-                const isActive = draft.id === story.activeProjectDraftId;
-                const date = new Date(draft.updatedAt);
-                const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-                const timeStr = date
-                  .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
-                  .replace(" ", "");
-                const cNum  = story.conceptDrafts.find(x => x.id === draft.conceptDraftId)?.number ?? "?";
-                const chNum = story.charactersDrafts.find(x => x.id === draft.charactersDraftId)?.number ?? "?";
-                const sNum  = story.storyDrafts.find(x => x.id === draft.storyDraftId)?.number ?? "?";
-                const scNum = story.scriptDrafts.find(x => x.id === draft.scriptDraftId)?.number ?? "?";
-                return (
-                  <button
-                    key={draft.id}
-                    className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                    onClick={() => handleLoadProjectDraft(draft.id)}
-                  >
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                        <span>Draft {draft.number}</span>
-                        <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
+              {(() => {
+                const isCollab = isCollabProjectForSheets;
+                // ── Step 1: "whose drafts?" (collab-only). Same
+                // treatment as the per-layer picker — two rows with
+                // the same overlapping-initials chip so the visual
+                // language reads as one feature.
+                if (isCollab && projectDraftsSide === null) {
+                  const creatorEmail = projectMembers?.creator.email ?? null;
+                  const inviteeEmail = projectMembers?.invitee.email ?? null;
+                  const creatorName = projectMembers?.creator.displayName ?? null;
+                  const inviteeName = projectMembers?.invitee.displayName ?? null;
+                  const iAmCreator =
+                    !!(creatorEmail && myEmail && creatorEmail === myEmail);
+                  const mineEmail = myEmail ?? null;
+                  const mineName = iAmCreator ? creatorName : inviteeName;
+                  const theirEmail = partnerEmail ?? null;
+                  const theirName = iAmCreator ? inviteeName : creatorName;
+                  return (
+                    <>
+                      <div className="draft-sheet-title">{story.title || "Untitled"}</div>
+                      <div className="draft-sheet-subtitle">Whose drafts?</div>
+                      <div className="sheet-body">
+                        <button
+                          className="drafts-whose-row"
+                          onClick={() => setProjectDraftsSide("mine")}
+                        >
+                          <span className="drafts-whose-chip">
+                            <span className="collab-initial">
+                              {initialForMember(mineName, mineEmail)}
+                            </span>
+                          </span>
+                          <span className="drafts-whose-label">My drafts</span>
+                        </button>
+                        <button
+                          className="drafts-whose-row"
+                          onClick={() => setProjectDraftsSide("partner")}
+                        >
+                          <span className="drafts-whose-chip">
+                            <span className="collab-initial">
+                              {initialForMember(theirName, theirEmail)}
+                            </span>
+                          </span>
+                          <span className="drafts-whose-label">
+                            {theirName?.trim()
+                              ? `${theirName.trim()}'s drafts`
+                              : theirEmail
+                                ? `${theirEmail}'s drafts`
+                                : "Partner's drafts"}
+                          </span>
+                        </button>
                       </div>
-                      <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
-                        Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
-                      </span>
-                    </div>
-                  </button>
+                    </>
+                  );
+                }
+
+                // ── Step 2: drafts list for the chosen side.
+                const showingPartner = projectDraftsSide === "partner";
+                const sourceStory =
+                  showingPartner && partnerStory ? partnerStory : story;
+                const sourceDrafts = [...sourceStory.projectDrafts].sort(
+                  (a, b) =>
+                    new Date(b.updatedAt).getTime() -
+                    new Date(a.updatedAt).getTime(),
                 );
-              })}
-          </div>
-              <div className="sheet-sticky-footer">
-                <div className="draft-sheet-actions">
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={handleCreateNewProjectDraft}
-                    style={{ flex: 1 }}
-                    icon={
-                      <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <rect x="3.5" width="2" height="9" />
-                        <rect y="5.5" width="2" height="9" transform="rotate(-90 0 5.5)" />
-                      </svg>
-                    }
-                  >
-                    New Draft
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="lg"
-                    onClick={handleDuplicateProjectDraft}
-                    style={{ flex: 1 }}
-                  >
-                    Duplicate Draft
-                  </Button>
-                </div>
-              </div>
+                return (
+                  <>
+                    <div className="draft-sheet-title" style={{ position: "relative" }}>
+                      {story.title || "Untitled"}
+                      {isCollab && (
+                        <button
+                          type="button"
+                          className="drafts-whose-back"
+                          onClick={() => setProjectDraftsSide(null)}
+                          aria-label="Back to user picker"
+                        >
+                          ← Whose
+                        </button>
+                      )}
+                    </div>
+                    <div className="draft-sheet-subtitle">
+                      {showingPartner
+                        ? "Partner's Project Drafts"
+                        : "Project Drafts"}
+                    </div>
+                    <div className="sheet-body">
+                      {sourceDrafts.map(draft => {
+                        const isActive =
+                          draft.id === sourceStory.activeProjectDraftId;
+                        const date = new Date(draft.updatedAt);
+                        const dateStr = date.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        });
+                        const timeStr = date
+                          .toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })
+                          .replace(" ", "");
+                        const cNum =
+                          sourceStory.conceptDrafts.find(
+                            x => x.id === draft.conceptDraftId,
+                          )?.number ?? "?";
+                        const chNum =
+                          sourceStory.charactersDrafts.find(
+                            x => x.id === draft.charactersDraftId,
+                          )?.number ?? "?";
+                        const sNum =
+                          sourceStory.storyDrafts.find(
+                            x => x.id === draft.storyDraftId,
+                          )?.number ?? "?";
+                        const scNum =
+                          sourceStory.scriptDrafts.find(
+                            x => x.id === draft.scriptDraftId,
+                          )?.number ?? "?";
+                        return (
+                          <button
+                            key={draft.id}
+                            className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                            // Partner project drafts are read-only for
+                            // now — there's no single-call copy helper
+                            // analogous to copyPartnerLayerDraft for
+                            // project drafts. Tapping is a no-op so
+                            // the sheet still feels interactive.
+                            onClick={
+                              showingPartner
+                                ? undefined
+                                : () => handleLoadProjectDraft(draft.id)
+                            }
+                            style={
+                              showingPartner
+                                ? { cursor: "default", opacity: 0.85 }
+                                : undefined
+                            }
+                          >
+                            <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                <span>Draft {draft.number}</span>
+                                <span className="drafts-dropdown-date">{dateStr} · {timeStr}</span>
+                              </div>
+                              <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
+                                Concept {cNum} + Characters {chNum} + Story {sNum} + Script {scNum}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {sourceDrafts.length === 0 && (
+                        <div
+                          className="caption"
+                          style={{ padding: "12px 4px", opacity: 0.7 }}
+                        >
+                          {showingPartner
+                            ? "No project drafts on this side yet."
+                            : "No project drafts yet."}
+                        </div>
+                      )}
+                    </div>
+                    {!showingPartner && (
+                      <div className="sheet-sticky-footer">
+                        <div className="draft-sheet-actions">
+                          <Button
+                            variant="primary"
+                            size="lg"
+                            onClick={handleCreateNewProjectDraft}
+                            style={{ flex: 1 }}
+                            icon={
+                              <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <rect x="3.5" width="2" height="9" />
+                                <rect y="5.5" width="2" height="9" transform="rotate(-90 0 5.5)" />
+                              </svg>
+                            }
+                          >
+                            New Draft
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="lg"
+                            onClick={handleDuplicateProjectDraft}
+                            style={{ flex: 1 }}
+                          >
+                            Duplicate Draft
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </>,
           document.body,
@@ -1781,6 +1922,26 @@ function LayerDraftPicker({
   autosaveEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // Two-step side picker — only surfaces for collab projects. First
+  // step asks "whose drafts?" (me vs partner); second step lists
+  // drafts for the chosen side. Reset to null every time the sheet
+  // closes so each re-open starts at the picker again.
+  const {
+    partnerStory,
+    creatorEmail,
+    inviteeEmail,
+    creatorDisplayName,
+    inviteeDisplayName,
+    myEmail,
+    partnerEmail,
+  } = usePartnerIdentity();
+  const isCollab = !!partnerStory;
+  const [side, setSide] = useState<"mine" | "partner" | null>(null);
+  useEffect(() => {
+    if (!open) setSide(null);
+    // Auto-advance for solo projects — no side picker needed.
+    else if (!isCollab) setSide("mine");
+  }, [open, isCollab]);
   // Presentation style pref — "sheet" (default, bottom-sheet) or
   // "popup" (legacy inline dropdown menu). Read here so every
   // per-layer picker across the app tracks the same user choice
@@ -1990,50 +2151,178 @@ function LayerDraftPicker({
           />
           <div className={`sheet draft-sheet ${open ? "open" : ""}`}>
             <div className="sheet-handle" />
-            <div className="draft-sheet-title">{label} Drafts</div>
-            <div className="sheet-body">
-              {sorted.map((d: any) => {
-                const isActive = d.id === activeId;
-                const date = new Date(d.updatedAt);
-                const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            {(() => {
+              // ── Step 1: "Whose drafts?" picker (collab-only).
+              // Shown when a side hasn't been chosen yet. Two rows,
+              // each with the same overlapping-initials treatment as
+              // the layer bar so the visual language is consistent.
+              if (isCollab && side === null) {
+                const iAmCreator =
+                  !!(creatorEmail && myEmail && creatorEmail === myEmail);
+                // Figure out which side maps to "me" vs "partner" so
+                // the picker rows label themselves correctly regardless
+                // of which user is viewing. Fall back to viewer-local
+                // ordering if projectMembers hasn't resolved.
+                const mineIsCreator = iAmCreator;
+                const mineEmail = myEmail ?? null;
+                const mineName = mineIsCreator
+                  ? creatorDisplayName
+                  : inviteeDisplayName;
+                const theirEmail = partnerEmail ?? null;
+                const theirName = mineIsCreator
+                  ? inviteeDisplayName
+                  : creatorDisplayName;
                 return (
-                  <button
-                    key={d.id}
-                    className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
-                    onClick={() => handleSwitch(d.id)}
-                  >
-                    <span>Draft {d.number}</span>
-                    <span className="drafts-dropdown-date">{dateStr}</span>
-                  </button>
+                  <>
+                    <div className="draft-sheet-title">{label} Drafts</div>
+                    <div className="draft-sheet-subtitle">Whose drafts?</div>
+                    <div className="sheet-body">
+                      <button
+                        className="drafts-whose-row"
+                        onClick={() => setSide("mine")}
+                      >
+                        <span className="drafts-whose-chip">
+                          <span className="collab-initial">
+                            {initialForMember(mineName, mineEmail)}
+                          </span>
+                        </span>
+                        <span className="drafts-whose-label">
+                          My drafts
+                        </span>
+                      </button>
+                      <button
+                        className="drafts-whose-row"
+                        onClick={() => setSide("partner")}
+                      >
+                        <span className="drafts-whose-chip">
+                          <span className="collab-initial">
+                            {initialForMember(theirName, theirEmail)}
+                          </span>
+                        </span>
+                        <span className="drafts-whose-label">
+                          {theirName?.trim()
+                            ? `${theirName.trim()}'s drafts`
+                            : theirEmail
+                              ? `${theirEmail}'s drafts`
+                              : "Partner's drafts"}
+                        </span>
+                      </button>
+                    </div>
+                  </>
                 );
-              })}
-            </div>
-            <div className="sheet-sticky-footer">
-              <div className="draft-sheet-actions">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={handleCreate}
-                  style={{ flex: 1 }}
-                  icon={
-                    <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                      <rect x="3.5" width="2" height="9" />
-                      <rect y="5.5" width="2" height="9" transform="rotate(-90 0 5.5)" />
-                    </svg>
-                  }
-                >
-                  New Draft
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={handleDuplicate}
-                  style={{ flex: 1 }}
-                >
-                  Duplicate Draft
-                </Button>
-              </div>
-            </div>
+              }
+
+              // ── Step 2: drafts list for the chosen side.
+              const showingPartner = side === "partner";
+              const sourceStory = showingPartner && partnerStory ? partnerStory : story;
+              const sourcePool: any[] = (
+                layer === "concept"    ? sourceStory.conceptDrafts :
+                layer === "characters" ? sourceStory.charactersDrafts :
+                layer === "story"      ? sourceStory.storyDrafts :
+                                         sourceStory.scriptDrafts
+              );
+              const sourcePd = getActiveProjectDraft(sourceStory);
+              const sourceActiveId = (
+                layer === "concept"    ? sourcePd.conceptDraftId :
+                layer === "characters" ? sourcePd.charactersDraftId :
+                layer === "story"      ? sourcePd.storyDraftId :
+                                         sourcePd.scriptDraftId
+              );
+              const sourceSorted = [...sourcePool].sort((a: any, b: any) =>
+                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+              );
+              // Tapping a partner draft copies it to my side as a new
+              // layer draft (via copyPartnerLayerDraft). Tapping one
+              // of my own drafts switches my active to it, as today.
+              const handleTap = (d: any) => {
+                if (showingPartner) {
+                  setStory(s => copyPartnerLayerDraft(s, d, layer));
+                } else {
+                  setStory(s => switchLayerDraft(s, layer, d.id));
+                }
+                setOpen(false);
+              };
+              return (
+                <>
+                  <div className="draft-sheet-title" style={{ position: "relative" }}>
+                    {label} Drafts
+                    {isCollab && (
+                      <button
+                        type="button"
+                        className="drafts-whose-back"
+                        onClick={() => setSide(null)}
+                        aria-label="Back to user picker"
+                      >
+                        ← Whose
+                      </button>
+                    )}
+                  </div>
+                  {isCollab && (
+                    <div className="draft-sheet-subtitle">
+                      {showingPartner ? "Partner's drafts" : "My drafts"}
+                    </div>
+                  )}
+                  <div className="sheet-body">
+                    {sourceSorted.map((d: any) => {
+                      const isActive = d.id === sourceActiveId;
+                      const date = new Date(d.updatedAt);
+                      const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                      return (
+                        <button
+                          key={d.id}
+                          className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                          onClick={() => handleTap(d)}
+                        >
+                          <span>Draft {d.number}</span>
+                          <span className="drafts-dropdown-date">{dateStr}</span>
+                        </button>
+                      );
+                    })}
+                    {sourceSorted.length === 0 && (
+                      <div
+                        className="caption"
+                        style={{ padding: "12px 4px", opacity: 0.7 }}
+                      >
+                        {showingPartner
+                          ? "No drafts on this side yet."
+                          : "No drafts yet."}
+                      </div>
+                    )}
+                  </div>
+                  {/* New / Duplicate footer only applies to MY side —
+                      those actions create drafts on my own Story and
+                      aren't meaningful while viewing the partner's. */}
+                  {!showingPartner && (
+                    <div className="sheet-sticky-footer">
+                      <div className="draft-sheet-actions">
+                        <Button
+                          variant="primary"
+                          size="lg"
+                          onClick={handleCreate}
+                          style={{ flex: 1 }}
+                          icon={
+                            <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                              <rect x="3.5" width="2" height="9" />
+                              <rect y="5.5" width="2" height="9" transform="rotate(-90 0 5.5)" />
+                            </svg>
+                          }
+                        >
+                          New Draft
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="lg"
+                          onClick={handleDuplicate}
+                          style={{ flex: 1 }}
+                        >
+                          Duplicate Draft
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </>,
         document.body,
@@ -2102,17 +2391,28 @@ function CollabInitials() {
     inviteeEmail,
     creatorDisplayName,
     inviteeDisplayName,
+    myEmail,
+    partnerEmail,
     onOpenNameCapture,
   } = usePartnerIdentity();
   if (!partnerStory) return null;
-  // creatorEmail / inviteeEmail come from the project_invites-backed RPC
-  // (stable ordering, both resolvable pre- and post-accept). Render in
-  // creator-then-invitee order regardless of which side the viewer is
-  // on, so both users see the indicator the same way. Prefer the
-  // captured display name's first letter when we have one — that's the
-  // whole point of the name-capture modal. Fall back to the email's
-  // first letter, and ultimately to "?" if we truly have nothing.
+  // Preferred path: creatorEmail / inviteeEmail come from the
+  // project_invites-backed RPC (stable ordering, both resolvable
+  // pre- and post-accept). Render in creator-then-invitee order
+  // regardless of which side the viewer is on, so both users see
+  // the indicator the same way.
   //
+  // Fallback path: if the RPC hasn't resolved (or the migration
+  // isn't applied yet), use myEmail + partnerEmail — already loaded
+  // by the time partnerStory exists. Ordering in this case is
+  // viewer-local (me-left, partner-right) rather than canonical
+  // creator-left, but it guarantees we never show "?" when we have
+  // perfectly usable account emails on hand. Ordering self-corrects
+  // the moment projectMembers lands.
+  const leftEmail = creatorEmail ?? myEmail ?? null;
+  const rightEmail = inviteeEmail ?? partnerEmail ?? null;
+  const leftName = creatorEmail ? creatorDisplayName : null;
+  const rightName = inviteeEmail ? inviteeDisplayName : null;
   // Tapping the chip opens the name-capture modal (via onOpenNameCapture
   // from context). Works whether the current viewer already set a name
   // or not — a re-tap lets them edit. Wrapped in a <button> for the
@@ -2125,10 +2425,10 @@ function CollabInitials() {
       onClick={onOpenNameCapture}
     >
       <span className="collab-initial">
-        {initialForMember(creatorDisplayName, creatorEmail)}
+        {initialForMember(leftName, leftEmail)}
       </span>
       <span className="collab-initial">
-        {initialForMember(inviteeDisplayName, inviteeEmail)}
+        {initialForMember(rightName, rightEmail)}
       </span>
     </button>
   );
