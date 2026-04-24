@@ -5202,6 +5202,94 @@ html[data-theme="dark"] .drafts-whose-email {
 html[data-theme="dark"] .drafts-whose-row {
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
+
+/* ── Partner-preview banner + lock overlay ──
+ * When the user taps a partner draft in the layer-drafts sheet,
+ * Studio swaps the tab content for that layer's partner draft and
+ * wraps it in `.partner-preview-locked`. The banner sits above the
+ * wrapper (pointer-events auto) and exposes "Copy to my drafts" +
+ * "Exit" actions; the wrapper below disables all interaction with
+ * the tab body via `pointer-events: none`. Text stays selectable so
+ * the user can copy snippets manually while they browse. */
+.partner-preview-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 22px 0;
+  padding: 10px 14px;
+  background: rgba(255, 200, 50, 0.12);
+  border: 1px solid rgba(170, 120, 0, 0.35);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+.partner-preview-banner-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.partner-preview-lock-icon {
+  color: rgba(140, 100, 0, 0.9);
+  flex: 0 0 auto;
+}
+.partner-preview-banner-headline {
+  font-family: 'Lato', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.partner-preview-banner-sub {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(140, 100, 0, 0.85);
+}
+.partner-preview-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+html[data-theme="dark"] .partner-preview-banner {
+  background: rgba(255, 200, 50, 0.08);
+  border-color: rgba(255, 200, 50, 0.35);
+}
+html[data-theme="dark"] .partner-preview-lock-icon,
+html[data-theme="dark"] .partner-preview-banner-sub {
+  color: rgba(255, 220, 130, 0.9);
+}
+.partner-preview-locked {
+  pointer-events: none;
+  opacity: 0.72;
+  user-select: text;
+  position: relative;
+}
+/* Don't let focus ring show through on any focusable child, since
+   nothing inside the locked wrapper can actually receive input. */
+.partner-preview-locked :focus,
+.partner-preview-locked :focus-visible {
+  outline: none !important;
+}
+/* Small lock glyph before "Draft N" on partner-side rows in the
+   layer-drafts sheet, so users can see at a glance that these rows
+   open a read-only preview rather than activating them directly. */
+.drafts-dropdown-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.drafts-dropdown-lock {
+  color: var(--ink-mute);
+  flex: 0 0 auto;
+}
 .drafts-whose-back {
   position: absolute;
   top: 50%;

@@ -86,6 +86,12 @@ interface PartnerIdentity {
    *  CollabInitials chip (rendered deep inside the LayerBar) can
    *  request it without prop-drilling. Undefined for solo projects. */
   onOpenNameCapture?: () => void;
+  /** Enters partner-preview mode for a specific partner draft on a
+   *  specific layer. Called when the user taps a partner row in the
+   *  layer-drafts "Whose?" sheet. Studio swaps the tab content to
+   *  render partner's draft read-only with a lock banner offering an
+   *  explicit "Copy to my drafts" action. Undefined for solo projects. */
+  onEnterPartnerPreview?: (layer: LayerKey, draftId: string) => void;
 }
 const PartnerStoryContext = createContext<PartnerIdentity>({});
 function usePartnerStory(): Story | undefined {
@@ -376,6 +382,15 @@ export function Studio({
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
   // Update-Other-Layers tray: null = closed, otherwise the source layer driving the sync.
   const [updateTraySource, setUpdateTraySource] = useState<LayerKey | null>(null);
+  // Partner-preview mode. When set, the currently-visible tab renders
+  // the PARTNER's draft for the given layer read-only — the user
+  // cannot edit it. A sticky banner offers an explicit "Copy to my
+  // drafts" action (the same clone that previously happened on tap)
+  // and an "Exit" button to return to the user's own story. Set by
+  // the layer-drafts "Whose?" sheet when the user taps a partner row.
+  const [partnerPreview, setPartnerPreview] = useState<
+    { layer: LayerKey; draftId: string } | null
+  >(null);
   // Read-through player sheet (Script tab): shows the full script formatted
   // for reading with per-character voice playback.
   const [readThroughOpen, setReadThroughOpen] = useState(false);
@@ -1007,6 +1022,14 @@ export function Studio({
       // Keeping the handler defined but not wired so the chip is a
       // pure display element for now.
       onOpenNameCapture: undefined,
+      // Enter partner-preview mode. The layer-drafts "Whose?" sheet
+      // calls this when the user taps a partner row instead of
+      // immediately cloning — the clone now happens explicitly from
+      // the lock banner's "Copy to my drafts" action.
+      onEnterPartnerPreview: (layer, draftId) => {
+        setPartnerPreview({ layer, draftId });
+        setSection(layer);
+      },
     }}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
@@ -1413,20 +1436,78 @@ export function Studio({
           document.body,
         )}
 
-        {/* Tab content */}
-        <div style={{ padding: "8px 22px 40px" }}>
+        {/* Tab content. When in partner-preview mode for the current
+            section, swap the `story` fed to the tab with a variant of
+            `partnerStory` whose active layer draft is the previewed
+            one, and replace `setStory` with a no-op so any stray write
+            attempts die silently. The `.partner-preview-locked` wrapper
+            applies `pointer-events: none` so inputs can't be clicked /
+            typed into — the banner above stays interactive. */}
+        {(() => {
+          const previewActive = !!(
+            partnerPreview &&
+            partnerStory &&
+            partnerPreview.layer === section
+          );
+          const previewStory = previewActive
+            ? switchLayerDraft(partnerStory!, partnerPreview!.layer, partnerPreview!.draftId)
+            : story;
+          const tabStory  = previewActive ? previewStory : story;
+          const tabSetStory: typeof setStory = previewActive ? (() => {}) : setStory;
+          // Story-tab expects a derived `beats` list matching the
+          // active story draft. When previewing, recompute it against
+          // partner's currently-previewed draft so the beat order
+          // reflects what the partner sees.
+          const tabBeats = previewActive
+            ? (() => {
+                const pd = getActiveProjectDraft(previewStory);
+                const sd = previewStory.storyDrafts.find(s => s.id === pd.storyDraftId);
+                return sd ? [...sd.beats].sort((a, b) => a.position - b.position) : [];
+              })()
+            : sorted;
+          const previewBanner = previewActive ? (
+            <PartnerPreviewBanner
+              partnerEmail={partnerEmail}
+              draftNumber={(() => {
+                const pool = getLayerPool(partnerStory!, partnerPreview!.layer);
+                return pool.find(d => d.id === partnerPreview!.draftId)?.number ?? null;
+              })()}
+              layerLabel={
+                partnerPreview!.layer === "concept"    ? "Concept"    :
+                partnerPreview!.layer === "characters" ? "Characters" :
+                partnerPreview!.layer === "story"      ? "Story"      :
+                                                         "Script"
+              }
+              onCopy={() => {
+                const pool = getLayerPool(partnerStory!, partnerPreview!.layer);
+                const d = pool.find(x => x.id === partnerPreview!.draftId);
+                if (!d) return;
+                setStory(s => copyPartnerLayerDraft(s, d, partnerPreview!.layer));
+                setPartnerPreview(null);
+              }}
+              onExit={() => setPartnerPreview(null)}
+            />
+          ) : null;
+          return (
+            <>
+              {previewBanner}
+              <div
+                style={{ padding: "8px 22px 40px" }}
+                className={previewActive ? "partner-preview-locked" : undefined}
+                aria-hidden={previewActive ? true : undefined}
+              >
           {section === "concept" && (
             <ConceptTab
-              story={story}
-              setStory={setStory}
+              story={tabStory}
+              setStory={tabSetStory}
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
             />
           )}
           {section === "characters" && (
             <CharactersTab
-              story={story}
-              setStory={setStory}
+              story={tabStory}
+              setStory={tabSetStory}
               run={run}
               busy={busy}
               openNewCharacter={openNewCharacterSheet}
@@ -1438,9 +1519,9 @@ export function Studio({
           )}
           {section === "story" && (
             <StoryTab
-              story={story}
-              setStory={setStory}
-              beats={sorted}
+              story={tabStory}
+              setStory={tabSetStory}
+              beats={tabBeats}
               moments={moments}
               addBeat={addBeat}
               updateBeat={updateBeat}
@@ -1459,9 +1540,9 @@ export function Studio({
           )}
           {section === "script" && (
             <ScriptTab
-              story={story}
-              setStory={setStory}
-              beats={sorted}
+              story={tabStory}
+              setStory={tabSetStory}
+              beats={tabBeats}
               moments={moments}
               run={run}
               busy={busy}
@@ -1482,7 +1563,10 @@ export function Studio({
               }}
             />
           )}
-        </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* "How this page works" help sheet — explains the layer-draft model
@@ -1945,6 +2029,7 @@ function LayerDraftPicker({
     inviteeDisplayName,
     myEmail,
     partnerEmail,
+    onEnterPartnerPreview,
   } = usePartnerIdentity();
   const isCollab = !!partnerStory;
   const [side, setSide] = useState<"mine" | "partner" | null>(null);
@@ -2243,12 +2328,14 @@ function LayerDraftPicker({
               const sourceSorted = [...sourcePool].sort((a: any, b: any) =>
                 new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
               );
-              // Tapping a partner draft copies it to my side as a new
-              // layer draft (via copyPartnerLayerDraft). Tapping one
-              // of my own drafts switches my active to it, as today.
+              // Tapping a partner draft enters partner-preview mode —
+              // Studio swaps the tab content to render the selected
+              // partner draft read-only with a lock banner offering an
+              // explicit "Copy to my drafts" action. Tapping one of my
+              // own drafts switches my active to it, as today.
               const handleTap = (d: any) => {
                 if (showingPartner) {
-                  setStory(s => copyPartnerLayerDraft(s, d, layer));
+                  onEnterPartnerPreview?.(layer, d.id);
                 } else {
                   setStory(s => switchLayerDraft(s, layer, d.id));
                 }
@@ -2273,7 +2360,24 @@ function LayerDraftPicker({
                           className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
                           onClick={() => handleTap(d)}
                         >
-                          <span>Draft {d.number}</span>
+                          <span className="drafts-dropdown-name">
+                            {showingPartner && (
+                              <svg
+                                className="drafts-dropdown-lock"
+                                width="11"
+                                height="11"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                aria-hidden="true"
+                              >
+                                <rect x="4" y="11" width="16" height="10" rx="2" />
+                                <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                              </svg>
+                            )}
+                            Draft {d.number}
+                          </span>
                           <span className="drafts-dropdown-date">{dateStr}</span>
                         </button>
                       );
@@ -2384,6 +2488,61 @@ function DraftPickerStyleToggle() {
  * partner's — both are derived from their email address (or display
  * name, once we capture one) via `initialFor`. Renders nothing for
  * solo projects so the bar stays identical to the non-collab case. */
+/* ── Partner preview banner ──
+ * Sticky banner mounted above a tab when the user taps a partner
+ * draft in the layer-drafts "Whose?" sheet. Signals that the tab
+ * below is locked (read-only view of partner's draft) and exposes
+ * the two actions the user can take from here: copy the partner
+ * draft into their own stack, or exit back to their own story. */
+function PartnerPreviewBanner({
+  partnerEmail,
+  draftNumber,
+  layerLabel,
+  onCopy,
+  onExit,
+}: {
+  partnerEmail?: string;
+  draftNumber: number | null;
+  layerLabel: string;
+  onCopy: () => void;
+  onExit: () => void;
+}) {
+  const who = partnerEmail || "Partner";
+  const draftStr =
+    draftNumber !== null ? `${layerLabel} Draft ${draftNumber}` : `${layerLabel} Draft`;
+  return (
+    <div className="partner-preview-banner">
+      <div className="partner-preview-banner-text">
+        <svg
+          className="partner-preview-lock-icon"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <rect x="4" y="11" width="16" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+        <span className="partner-preview-banner-headline">
+          Viewing {who}'s {draftStr}
+        </span>
+        <span className="partner-preview-banner-sub">Locked · read-only</span>
+      </div>
+      <div className="partner-preview-banner-actions">
+        <Button variant="primary" size="sm" onClick={onCopy}>
+          Copy to my drafts
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onExit}>
+          Exit
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function CollabInitials() {
   const {
     partnerStory,
