@@ -1830,19 +1830,20 @@ function ProjectsTab({
             : p;
         const c = getActiveConceptDraft(displayStory);
 
-        // Initials chip on collab cards. We want BOTH circles whenever
-        // possible; rendering a half-chip (one letter only) is worse
-        // than rendering nothing briefly while data flows in. So we
-        // pick the first strategy that can resolve two letters:
-        //   * Canonical (members resolved): creator-left, invitee-right.
-        //   * Viewer-local fallback (members null but partnerEmail
-        //     cached): viewer-left with their own name/email, partner-
-        //     right with partnerEmails[p.id]. Ordering self-corrects to
-        //     canonical the instant members lands.
-        // If neither strategy yields two letters we hold — the chip
-        // pops in complete rather than flickering as one letter.
-        const canonicalLeft = members?.creator ?? null;
-        const canonicalRight = members?.invitee ?? null;
+        // Initials chip on collab cards. Build each slot
+        // independently, walking multiple sources so a missing RPC
+        // (e.g. get_partner_email / get_project_members not yet
+        // migrated) can't blank out the whole chip.
+        //
+        //   * Canonical data (members) gives stable creator-left /
+        //     invitee-right ordering for both viewers.
+        //   * Gaps in canonical are filled from viewer-local
+        //     sources — myEmail for the viewer's side,
+        //     partnerEmails[id] for the other.
+        //   * With no canonical data we default to viewer-local
+        //     ordering: me-left, partner-right. The viewer's own
+        //     circle always resolves because myEmail comes from
+        //     the auth session.
         const pickLetter = (
           name: string | null | undefined,
           email: string | null | undefined,
@@ -1853,18 +1854,36 @@ function ProjectsTab({
           if (e) return e.charAt(0).toUpperCase();
           return null;
         };
-        let leftChar: string | null = null;
-        let rightChar: string | null = null;
-        if (canonicalLeft && canonicalRight) {
-          leftChar = pickLetter(canonicalLeft.displayName, canonicalLeft.email);
-          rightChar = pickLetter(canonicalRight.displayName, canonicalRight.email);
+        let leftEmail: string | null = null;
+        let leftName: string | null = null;
+        let rightEmail: string | null = null;
+        let rightName: string | null = null;
+        if (members?.creator || members?.invitee) {
+          leftEmail = members?.creator?.email ?? null;
+          leftName = members?.creator?.displayName ?? null;
+          rightEmail = members?.invitee?.email ?? null;
+          rightName = members?.invitee?.displayName ?? null;
+          const iAmLeft =
+            !!(members?.creator?.userId && myUserId &&
+               members.creator.userId === myUserId);
+          const iAmRight =
+            !!(members?.invitee?.userId && myUserId &&
+               members.invitee.userId === myUserId);
+          if (!leftEmail) {
+            if (iAmRight) leftEmail = partnerEmails[p.id] ?? null;
+            else leftEmail = myEmail ?? null;
+          }
+          if (!rightEmail) {
+            if (iAmLeft) rightEmail = partnerEmails[p.id] ?? null;
+            else rightEmail = myEmail ?? null;
+          }
+        } else {
+          // No canonical data — viewer-local ordering.
+          leftEmail = myEmail ?? null;
+          rightEmail = partnerEmails[p.id] ?? null;
         }
-        if ((!leftChar || !rightChar) && myEmail && partnerEmails[p.id]) {
-          // Fallback: viewer-local ordering, filling whichever sides
-          // canonical didn't supply.
-          leftChar = pickLetter(null, myEmail);
-          rightChar = pickLetter(null, partnerEmails[p.id]);
-        }
+        const leftChar = pickLetter(leftName, leftEmail);
+        const rightChar = pickLetter(rightName, rightEmail);
 
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
@@ -1888,13 +1907,13 @@ function ProjectsTab({
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
             </div>
-            {isCollab && leftChar && rightChar && (
+            {isCollab && (leftChar || rightChar) && (
               <span
                 className="collab-initials-pair project-card-initials"
                 aria-label="Collaborators"
               >
-                <span className="collab-initial">{leftChar}</span>
-                <span className="collab-initial">{rightChar}</span>
+                {leftChar && <span className="collab-initial">{leftChar}</span>}
+                {rightChar && <span className="collab-initial">{rightChar}</span>}
               </span>
             )}
           </button>

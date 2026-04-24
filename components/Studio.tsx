@@ -2404,30 +2404,65 @@ function CollabInitials() {
     onOpenNameCapture,
   } = usePartnerIdentity();
   if (!partnerStory) return null;
-  // Resolve two letters before rendering anything — a half-chip
-  // (one initial only) is worse than holding briefly.
+
+  // Build each slot independently, walking multiple sources so a
+  // missing RPC (e.g. get_partner_email not yet migrated) can't
+  // blank out the whole chip. Priority per slot:
   //
-  //   * Canonical (projectMembers resolved): creator-left,
-  //     invitee-right regardless of which side the viewer is on.
-  //   * Viewer-local fallback: me-left with myEmail + myDisplayName,
-  //     partner-right with partnerEmail. Self-corrects to canonical
-  //     the instant the members RPC lands.
+  //   * Canonical data (from projectMembers RPC) gives stable
+  //     creator-left / invitee-right ordering for both viewers.
+  //   * Gaps in canonical are filled from viewer-local sources
+  //     — myEmail + myDisplayName fill the viewer's side,
+  //     partnerEmail fills the other.
+  //   * With no canonical data at all we default to viewer-local
+  //     ordering: me-left, partner-right. The viewer's own circle
+  //     always resolves because we always have myEmail from auth.
   //
-  // Try canonical first. If it yields both letters we use it;
-  // otherwise fall through to the fallback (viewer + partner email).
-  // If that also can't produce two letters we return null and let
-  // the chip pop in complete.
-  let leftChar: string | null = null;
-  let rightChar: string | null = null;
-  if (creatorEmail && inviteeEmail) {
-    leftChar = letterOrNull(creatorDisplayName, creatorEmail);
-    rightChar = letterOrNull(inviteeDisplayName, inviteeEmail);
+  // Each circle renders independently; we never gate "both or
+  // nothing". That was the regression — one missing RPC blanked
+  // the whole chip when it should have shown at least the viewer.
+  let leftName: string | null = null;
+  let leftEmail: string | null = null;
+  let rightName: string | null = null;
+  let rightEmail: string | null = null;
+
+  if (creatorEmail || inviteeEmail) {
+    // Canonical ordering (maybe partial).
+    leftEmail = creatorEmail ?? null;
+    leftName = creatorDisplayName ?? null;
+    rightEmail = inviteeEmail ?? null;
+    rightName = inviteeDisplayName ?? null;
+    const iAmLeft =
+      !!(creatorEmail && myEmail && creatorEmail === myEmail);
+    const iAmRight =
+      !!(inviteeEmail && myEmail && inviteeEmail === myEmail);
+    if (!leftEmail) {
+      if (iAmRight) {
+        leftEmail = partnerEmail ?? null;
+      } else {
+        leftEmail = myEmail ?? null;
+        leftName = myDisplayName ?? null;
+      }
+    }
+    if (!rightEmail) {
+      if (iAmLeft) {
+        rightEmail = partnerEmail ?? null;
+      } else {
+        rightEmail = myEmail ?? null;
+        rightName = myDisplayName ?? null;
+      }
+    }
+  } else {
+    // Viewer-local ordering — no canonical data yet.
+    leftEmail = myEmail ?? null;
+    leftName = myDisplayName ?? null;
+    rightEmail = partnerEmail ?? null;
   }
-  if ((!leftChar || !rightChar) && myEmail && partnerEmail) {
-    leftChar = letterOrNull(myDisplayName, myEmail);
-    rightChar = letterOrNull(null, partnerEmail);
-  }
-  if (!leftChar || !rightChar) return null;
+
+  const leftChar = letterOrNull(leftName, leftEmail);
+  const rightChar = letterOrNull(rightName, rightEmail);
+  if (!leftChar && !rightChar) return null;
+
   // Tapping the chip opens the name-capture modal (via onOpenNameCapture
   // from context). Works whether the current viewer already set a name
   // or not — a re-tap lets them edit. Wrapped in a <button> for the
@@ -2439,8 +2474,8 @@ function CollabInitials() {
       aria-label="Collaborators — edit your name"
       onClick={onOpenNameCapture}
     >
-      <span className="collab-initial">{leftChar}</span>
-      <span className="collab-initial">{rightChar}</span>
+      {leftChar && <span className="collab-initial">{leftChar}</span>}
+      {rightChar && <span className="collab-initial">{rightChar}</span>}
     </button>
   );
 }
