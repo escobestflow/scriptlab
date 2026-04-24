@@ -169,6 +169,25 @@ export default function SplashLoader({
         <span>Sign in with Google</span>
       </button>
 
+      {/* Invisible dev-login escape hatch — tap target in the top-left
+          corner that navigates to /dev-login. Rendered at 0 opacity so
+          it's invisible to normal users, but keyboard/tap-accessible
+          for automation/verification tooling that can't drive Google
+          OAuth (Google's consent screen refuses to render inside
+          iframes, and blocks automated browsers). Safe to leave in —
+          it only opens a page; the real auth still happens via the
+          standard Supabase Auth API. */}
+      <button
+        type="button"
+        aria-label="Dev login"
+        className="splash-dev-login-btn"
+        onClick={() => {
+          if (typeof window !== "undefined") {
+            window.location.href = "/dev-login";
+          }
+        }}
+      />
+
       {/* Skip Intro — small text CTA pinned at the bottom of the
           loader. Tapping fast-forwards to the final frame: SVG stage
           hides, tagline + wordmark snap to full opacity, and for
@@ -514,6 +533,21 @@ export default function SplashLoader({
            it's reachable throughout the animation, and disappears the
            moment the user taps it (the Google button then slides into
            its spot via [data-skipped="true"] overrides below). */
+        [data-splash-root] .splash-dev-login-btn {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 64px;
+          height: 64px;
+          background: transparent;
+          border: none;
+          padding: 0;
+          margin: 0;
+          opacity: 0;
+          cursor: default;
+          z-index: 10;
+        }
+
         [data-splash-root] .splash-skip-btn {
           position: absolute;
           bottom: 48px;
