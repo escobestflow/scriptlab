@@ -14,7 +14,9 @@ import {
   acceptInvite,
   declineInvite,
   getPartnerEmail,
+  getProjectMembers,
   type PendingInvite,
+  type ProjectMembers,
 } from "@/lib/invites";
 import { useAuth } from "@/lib/auth";
 import { Studio } from "@/components/Studio";
@@ -249,6 +251,11 @@ export default function Page() {
   // get_partner_email SECURITY DEFINER RPC because auth.users is not
   // directly queryable from the client.
   const [partnerEmails, setPartnerEmails] = useState<Record<string, string>>({});
+  // Full creator/invitee pair for the overlapping-initials indicator.
+  // Drawn from project_invites so ordering is stable (creator on left,
+  // invitee on right) and the invitee slot has an email to render even
+  // before they've accepted — no more "?" fallbacks.
+  const [projectMembers, setProjectMembers] = useState<Record<string, ProjectMembers>>({});
 
   const refreshPartnerStory = useCallback(async (projectId: string, partnerUserId: string) => {
     const partner = await loadPartnerProjectData(projectId, partnerUserId);
@@ -260,6 +267,12 @@ export default function Page() {
     const email = await getPartnerEmail(projectId);
     if (!email) return;
     setPartnerEmails(prev => ({ ...prev, [projectId]: email }));
+  }, []);
+
+  const refreshProjectMembers = useCallback(async (projectId: string) => {
+    const members = await getProjectMembers(projectId);
+    if (!members) return;
+    setProjectMembers(prev => ({ ...prev, [projectId]: members }));
   }, []);
 
   // When entering a studio view for a shared project, hydrate partner
@@ -283,6 +296,13 @@ export default function Page() {
     // chip has something to render. Cheap, idempotent, and cached.
     if (!partnerEmails[v.projectId]) {
       refreshPartnerEmail(v.projectId);
+    }
+    // Fetch the creator/invitee pair for the stable collab-initials
+    // indicator. Separate from partnerEmail because it resolves the
+    // emails in a fixed order — we render creator left, invitee right,
+    // regardless of which side the current viewer is.
+    if (!projectMembers[v.projectId]) {
+      refreshProjectMembers(v.projectId);
     }
     // Realtime: listen for any UPDATE/INSERT on the partner's row.
     // The `filter` narrows the stream server-side so we don't get every
@@ -308,7 +328,7 @@ export default function Page() {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [view, projects, refreshPartnerStory, refreshPartnerEmail, partnerEmails]);
+  }, [view, projects, refreshPartnerStory, refreshPartnerEmail, refreshProjectMembers, partnerEmails, projectMembers]);
 
   // Debounced save: when projects change, save to DB after 1s of inactivity
   const saveProjectsDebounced = useCallback((ps: Story[]) => {
@@ -644,6 +664,11 @@ export default function Page() {
           partnerEmail={
             studioProject.collaboratorUserId
               ? partnerEmails[studioProject.id]
+              : undefined
+          }
+          projectMembers={
+            studioProject.collaboratorUserId
+              ? projectMembers[studioProject.id]
               : undefined
           }
         />

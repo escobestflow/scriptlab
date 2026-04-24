@@ -63,6 +63,12 @@ interface PartnerIdentity {
   partnerStory?: Story;
   partnerEmail?: string;
   myEmail?: string;
+  /** Stable creator/invitee pair for the overlapping-initials
+   *  indicator. When present, CollabInitials renders
+   *  creatorEmail on the left and inviteeEmail on the right
+   *  regardless of which side the current viewer is on. */
+  creatorEmail?: string;
+  inviteeEmail?: string;
 }
 const PartnerStoryContext = createContext<PartnerIdentity>({});
 function usePartnerStory(): Story | undefined {
@@ -95,6 +101,7 @@ export function Studio({
   emailProjectBusy = false,
   partnerStory,
   partnerEmail,
+  projectMembers,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -126,6 +133,13 @@ export function Studio({
    *  draft picker. Undefined for solo projects or when the RPC hasn't
    *  resolved yet — we fall back to "?" in that case. */
   partnerEmail?: string;
+  /** Stable creator/invitee pair resolved from project_invites. Drives
+   *  the overlapping-initials indicator on every layer bar — creator
+   *  on the left, invitee on the right, same ordering on both sides. */
+  projectMembers?: {
+    creator: { userId: string; email: string | null };
+    invitee: { userId: string | null; email: string | null };
+  };
 }) {
   const [section, setSection] = useState<Section>("concept");
   // Current user's email for the initials chip on the user's own side
@@ -867,7 +881,13 @@ export function Studio({
   // Scroll values are driven directly via refs in handleScroll — no state re-renders
 
   return (
-    <PartnerStoryContext.Provider value={{ partnerStory, partnerEmail, myEmail }}>
+    <PartnerStoryContext.Provider value={{
+      partnerStory,
+      partnerEmail,
+      myEmail,
+      creatorEmail: projectMembers?.creator.email ?? undefined,
+      inviteeEmail: projectMembers?.invitee.email ?? undefined,
+    }}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
         <button className="project-header-btn" onClick={handleBack} aria-label="Back">
@@ -1954,12 +1974,18 @@ function DraftPickerStyleToggle() {
  * name, once we capture one) via `initialFor`. Renders nothing for
  * solo projects so the bar stays identical to the non-collab case. */
 function CollabInitials() {
-  const { partnerStory, partnerEmail, myEmail } = usePartnerIdentity();
+  const { partnerStory, creatorEmail, inviteeEmail } = usePartnerIdentity();
   if (!partnerStory) return null;
+  // creatorEmail / inviteeEmail come from the project_invites-backed RPC
+  // (stable ordering, both resolvable pre- and post-accept). We render
+  // in creator-then-invitee order regardless of which side the viewer
+  // is on, so both users see the indicator the same way. initialFor
+  // falls back to "?" only when we truly have nothing — which shouldn't
+  // happen for any project that has an invite row.
   return (
     <div className="collab-initials-pair" aria-label="Collaborators">
-      <span className="collab-initial">{initialFor(myEmail)}</span>
-      <span className="collab-initial">{initialFor(partnerEmail)}</span>
+      <span className="collab-initial">{initialFor(creatorEmail)}</span>
+      <span className="collab-initial">{initialFor(inviteeEmail)}</span>
     </div>
   );
 }

@@ -4347,9 +4347,21 @@ html[data-theme="dark"] .ds-btn-secondary[style*="background"] { color: #000; }
      offset — Lato's metrics tend to hang a bit low at this size. */
   padding-bottom: 1px;
   box-sizing: border-box;
+  /* Needed so z-index below actually takes effect — without position,
+     stacking is determined purely by DOM order (later wins), which is
+     the opposite of what we want. */
+  position: relative;
+}
+/* Left (creator) chip sits ON TOP of the right (invitee) chip. DOM
+   order is left-then-right, so the later sibling would naturally
+   paint over the earlier one; bumping z-index on the first one
+   flips that. */
+.collab-initial:first-child {
+  z-index: 2;
 }
 .collab-initial + .collab-initial {
   margin-left: -4px;
+  z-index: 1;
 }
 html[data-theme="dark"] .collab-initial {
   border-color: rgba(255, 255, 255, 0.85);

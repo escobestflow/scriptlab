@@ -232,3 +232,38 @@ export async function getPartnerEmail(projectId: string): Promise<string | null>
   if (typeof data === "string" && data.length > 0) return data;
   return null;
 }
+
+/** Stable creator/invitee pair for a shared project. Powers the
+ *  overlapping-initials indicator on every layer bar so both users
+ *  see the same ordering (creator left, invitee right). Resolved
+ *  from project_invites, so `invitee.email` is available even when
+ *  the invitee hasn't accepted yet. */
+export interface ProjectMembers {
+  creator: { userId: string; email: string | null };
+  invitee: { userId: string | null; email: string | null };
+}
+
+export async function getProjectMembers(
+  projectId: string,
+): Promise<ProjectMembers | null> {
+  const { data, error } = await supabase.rpc("get_project_members", {
+    project_id: projectId,
+  });
+  if (error) {
+    console.error("get_project_members RPC error:", error);
+    return null;
+  }
+  if (!data || typeof data !== "object") return null;
+  const obj = data as any;
+  if (!obj.creator || !obj.invitee) return null;
+  return {
+    creator: {
+      userId: obj.creator.userId ?? "",
+      email: obj.creator.email ?? null,
+    },
+    invitee: {
+      userId: obj.invitee.userId ?? null,
+      email: obj.invitee.email ?? null,
+    },
+  };
+}
