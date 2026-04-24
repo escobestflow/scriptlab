@@ -2605,17 +2605,16 @@ function DraftPickerStyleToggle() {
  * partner's — both are derived from their email address (or display
  * name, once we capture one) via `initialFor`. Renders nothing for
  * solo projects so the bar stays identical to the non-collab case. */
-/* ── Collaborator initials pair ──
- * Two overlapping outlined circles rendered on the LEFT of each
- * LayerBar's draft dropdown — creator first, invitee second, overlap
- * by 4px. Hidden on solo projects. Both chips use the outlined style
- * (no dark-fill active indicator); neither is badged as "active" so
- * the pair simply signals "this project has two collaborators".
+/* ── Active-draft owner initial ──
+ * Single outlined circle rendered on the LEFT of each LayerBar's draft
+ * dropdown. Displays the initial of whoever owns the DRAFT currently
+ * loaded in this layer — the viewer normally, the partner while in
+ * partner-preview for this layer. Hidden on solo projects.
  *
- * The `layer` prop is unused today — kept on the signature so a
- * future active/inactive visual could distinguish which side owns
- * the currently-viewed draft without re-threading context. */
-function ActiveDraftInitial({ layer: _layer }: { layer: LayerKey }) {
+ * `layer` identifies which bar we're in so we can compare against
+ * `previewLayer` from context — a global `isPartnerPreviewing` flag
+ * would incorrectly badge non-previewed tabs as partner-owned. */
+function ActiveDraftInitial({ layer }: { layer: LayerKey }) {
   const {
     partnerStory,
     creatorEmail,
@@ -2625,59 +2624,28 @@ function ActiveDraftInitial({ layer: _layer }: { layer: LayerKey }) {
     myEmail,
     myDisplayName,
     partnerEmail,
+    previewLayer,
   } = usePartnerIdentity();
-  // Solo projects: nothing to show.
+  // Solo projects: nothing to distinguish, so skip the chip.
   if (!partnerStory) return null;
 
-  // Canonical ordering: creator LEFT, invitee RIGHT — stable across
-  // viewers so the pair reads the same for both collaborators. Fall
-  // back to viewer-local (me-left / partner-right) when project-
-  // members data hasn't resolved yet so at least one circle renders.
-  let leftName: string | null = null;
-  let leftEmail: string | null = null;
-  let rightName: string | null = null;
-  let rightEmail: string | null = null;
+  const showingPartner = previewLayer === layer;
 
-  if (creatorEmail || inviteeEmail) {
-    leftEmail = creatorEmail ?? null;
-    leftName = creatorDisplayName ?? null;
-    rightEmail = inviteeEmail ?? null;
-    rightName = inviteeDisplayName ?? null;
-    const iAmLeft = !!(creatorEmail && myEmail && creatorEmail === myEmail);
-    const iAmRight = !!(inviteeEmail && myEmail && inviteeEmail === myEmail);
-    if (!leftEmail) {
-      if (iAmRight) {
-        leftEmail = partnerEmail ?? null;
-      } else {
-        leftEmail = myEmail ?? null;
-        leftName = myDisplayName ?? null;
-      }
-    }
-    if (!rightEmail) {
-      if (iAmLeft) {
-        rightEmail = partnerEmail ?? null;
-      } else {
-        rightEmail = myEmail ?? null;
-        rightName = myDisplayName ?? null;
-      }
-    }
-  } else {
-    // No canonical data yet — viewer-local fallback.
-    leftEmail = myEmail ?? null;
-    leftName = myDisplayName ?? null;
-    rightEmail = partnerEmail ?? null;
-  }
+  // Resolve partner's display name from canonical project-members data
+  // when possible: whichever side of (creator, invitee) ISN'T the
+  // viewer is the partner.
+  const partnerDisplayName =
+    creatorEmail && creatorEmail === myEmail
+      ? (inviteeDisplayName ?? null)
+      : inviteeEmail && inviteeEmail === myEmail
+      ? (creatorDisplayName ?? null)
+      : null;
 
-  const leftChar = letterOrNull(leftName, leftEmail);
-  const rightChar = letterOrNull(rightName, rightEmail);
-  if (!leftChar && !rightChar) return null;
-
-  return (
-    <span className="layer-owner-initials-pair" aria-hidden="true">
-      {leftChar && <span className="layer-owner-initial">{leftChar}</span>}
-      {rightChar && <span className="layer-owner-initial">{rightChar}</span>}
-    </span>
-  );
+  const ownerName = showingPartner ? partnerDisplayName : myDisplayName ?? null;
+  const ownerEmail = showingPartner ? (partnerEmail ?? null) : (myEmail ?? null);
+  const ch = letterOrNull(ownerName, ownerEmail);
+  if (!ch) return null;
+  return <span className="layer-owner-initial" aria-hidden="true">{ch}</span>;
 }
 
 /** Returns an uppercase single-character initial derived from the

@@ -4466,18 +4466,13 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   flex: 0 0 auto;
 }
 
-/* Two overlapping outlined owner-initial circles, pinned to the LEFT of
-   the layer draft dropdown trigger inside .layer-bar. Creator first
-   (top of z stack), invitee second (underneath on the right, overlap
-   -4px). Always outlined — no dark-fill active-indicator variant.
-   Reuses the geometry of the project-card `.collab-initial` chip but
-   with a smaller type size (9pt vs. 10pt) to sit more quietly next to
-   the draft-dropdown call-to-action. */
-.layer-owner-initials-pair {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-}
+/* Single outlined owner-initial, pinned to the LEFT of the layer draft
+   dropdown trigger inside .layer-bar. Shows the initial of whoever
+   owns the currently-active draft — the viewer normally, the partner
+   while previewing a partner draft on this layer. Reuses the geometry
+   of the project-card `.collab-initial` chip but with a smaller type
+   size (9pt vs. 10pt) to sit more quietly next to the draft-dropdown
+   call-to-action. Always outlined — no dark-fill variant. */
 .layer-owner-initial {
   width: 18px;
   height: 18px;
@@ -4496,20 +4491,6 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   justify-content: center;
   padding-bottom: 1px;
   box-sizing: border-box;
-  /* `position: relative` is required for z-index to apply. Without
-     it, DOM order (later sibling wins) would flip the overlap. */
-  position: relative;
-}
-/* Left chip sits ON TOP of the right chip. The sibling combinator
-   anchors the -4px overlap to the second chip only, so a lone first
-   chip (fallback when only one email resolves) doesn't get an
-   orphaned negative margin. */
-.layer-owner-initials-pair .layer-owner-initial:first-child {
-  z-index: 2;
-}
-.layer-owner-initials-pair .layer-owner-initial + .layer-owner-initial {
-  margin-left: -4px;
-  z-index: 1;
 }
 html[data-theme="dark"] .layer-owner-initial {
   border-color: rgba(255, 255, 255, 0.85);
