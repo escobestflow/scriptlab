@@ -48,6 +48,7 @@ import {
   buildInviteUrl,
   type Invite,
 } from "@/lib/invites";
+import { loadMyProfile, saveMyDisplayName } from "@/lib/profiles";
 
 type Section = "concept" | "characters" | "story" | "script";
 
@@ -69,6 +70,15 @@ interface PartnerIdentity {
    *  regardless of which side the current viewer is on. */
   creatorEmail?: string;
   inviteeEmail?: string;
+  /** First names captured via the name-capture modal. When present,
+   *  the initials chip uses the name's first letter instead of the
+   *  email's. Null/undefined = user hasn't set a name yet. */
+  creatorDisplayName?: string | null;
+  inviteeDisplayName?: string | null;
+  /** Opens the name-capture modal. Exposed through context so the
+   *  CollabInitials chip (rendered deep inside the LayerBar) can
+   *  request it without prop-drilling. Undefined for solo projects. */
+  onOpenNameCapture?: () => void;
 }
 const PartnerStoryContext = createContext<PartnerIdentity>({});
 function usePartnerStory(): Story | undefined {
@@ -84,6 +94,17 @@ function initialFor(email?: string | null): string {
   if (!email) return "?";
   const ch = email.trim().charAt(0);
   return ch ? ch.toUpperCase() : "?";
+}
+
+/** Prefer the first letter of a captured display name over the email's
+ *  first letter. Mirrors the fallback chain used everywhere the initials
+ *  chip is rendered — name > email > "?". */
+function initialForMember(
+  displayName: string | null | undefined,
+  email: string | null | undefined,
+): string {
+  if (displayName && displayName.trim()) return initialFor(displayName);
+  return initialFor(email);
 }
 
 export function Studio({
@@ -135,10 +156,20 @@ export function Studio({
   partnerEmail?: string;
   /** Stable creator/invitee pair resolved from project_invites. Drives
    *  the overlapping-initials indicator on every layer bar — creator
-   *  on the left, invitee on the right, same ordering on both sides. */
+   *  on the left, invitee on the right, same ordering on both sides.
+   *  `displayName` is each side's captured first name (via the name-
+   *  capture modal); null when the user hasn't set one yet. */
   projectMembers?: {
-    creator: { userId: string; email: string | null };
-    invitee: { userId: string | null; email: string | null };
+    creator: {
+      userId: string;
+      email: string | null;
+      displayName: string | null;
+    };
+    invitee: {
+      userId: string | null;
+      email: string | null;
+      displayName: string | null;
+    };
   };
 }) {
   const [section, setSection] = useState<Section>("concept");
@@ -159,6 +190,55 @@ export function Studio({
   function dismissWelcome() {
     setShowWelcome(false);
     onOnboardingSeen?.();
+  }
+
+  // ── Name-capture modal ────────────────────────────────────────────
+  // Shown on entering a collab project whenever the signed-in user
+  // hasn't yet set a display name in public.profiles. Also opened on
+  // demand when the user taps the overlapping-initials chip (to edit
+  // an existing name). Stays mounted at Studio level so every tab
+  // shares the same instance.
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [nameModalMode, setNameModalMode] =
+    useState<"first-time" | "edit">("first-time");
+  const [myDisplayName, setMyDisplayName] = useState<string | null>(null);
+  const [nameCaptureChecked, setNameCaptureChecked] = useState(false);
+  const isCollabProject = !!partnerStory;
+  // Load the signed-in user's own profile once per Studio mount. We
+  // only auto-open the modal after the profile resolves (so we don't
+  // flash it for users who already have a name set). Editing via the
+  // initials tap doesn't depend on this load — it just reads the
+  // latest cached value and opens.
+  useEffect(() => {
+    let cancelled = false;
+    if (!isCollabProject) {
+      setNameCaptureChecked(true);
+      return;
+    }
+    setNameCaptureChecked(false);
+    loadMyProfile().then(p => {
+      if (cancelled) return;
+      const name = p?.displayName ?? null;
+      setMyDisplayName(name);
+      setNameCaptureChecked(true);
+      if (!name || !name.trim()) {
+        setNameModalMode("first-time");
+        setNameModalOpen(true);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [isCollabProject, authedUser?.id]);
+
+  function openNameCaptureForEdit() {
+    setNameModalMode("edit");
+    setNameModalOpen(true);
+  }
+  async function handleSaveDisplayName(name: string) {
+    const ok = await saveMyDisplayName(name);
+    if (!ok) return false;
+    setMyDisplayName(name.trim());
+    setNameModalOpen(false);
+    return true;
   }
   // "Project Created" toast — shown briefly after a new project is
   // created, then auto-hides. Mirrors the Idea-Added toast on the
@@ -887,6 +967,19 @@ export function Studio({
       myEmail,
       creatorEmail: projectMembers?.creator.email ?? undefined,
       inviteeEmail: projectMembers?.invitee.email ?? undefined,
+      // Prefer the locally-captured display name when the side is the
+      // current viewer — so hitting Save in the modal updates the chip
+      // immediately, without waiting for the parent's projectMembers
+      // RPC to refetch.
+      creatorDisplayName:
+        projectMembers?.creator.email && projectMembers.creator.email === myEmail
+          ? (myDisplayName ?? projectMembers.creator.displayName ?? null)
+          : (projectMembers?.creator.displayName ?? null),
+      inviteeDisplayName:
+        projectMembers?.invitee.email && projectMembers.invitee.email === myEmail
+          ? (myDisplayName ?? projectMembers.invitee.displayName ?? null)
+          : (projectMembers?.invitee.displayName ?? null),
+      onOpenNameCapture: isCollabProject ? openNameCaptureForEdit : undefined,
     }}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
@@ -1505,6 +1598,35 @@ export function Studio({
         </div>
       </div>
 
+      {/* Name-capture modal — shown on collab-project entry when the
+          signed-in user hasn't set a display name yet, and on-demand
+          when they tap the overlapping-initials chip to edit. Only
+          mounted once we've checked the profile, to avoid flashing it
+          in front of users who already have a name on file. */}
+      {isCollabProject && nameCaptureChecked && (() => {
+        // Identify the partner (the OTHER side) so we can greet the
+        // current user with "You're collaborating with <partner>".
+        // Uses projectMembers (stable creator/invitee pair from the
+        // project_invites-backed RPC). Falls back to email when the
+        // partner hasn't set a name yet.
+        const meIsCreator =
+          !!(projectMembers?.creator.email && projectMembers.creator.email === myEmail);
+        const partner = meIsCreator
+          ? projectMembers?.invitee
+          : projectMembers?.creator;
+        return (
+          <NameCaptureModal
+            open={nameModalOpen}
+            mode={nameModalMode}
+            initialName={myDisplayName}
+            partnerDisplayName={partner?.displayName ?? null}
+            partnerEmail={partner?.email ?? null}
+            onSave={handleSaveDisplayName}
+            onCancel={() => setNameModalOpen(false)}
+          />
+        );
+      })()}
+
       {/* Project-created toast (same pattern as Idea Added on main page) */}
       <div className={`toast ${showSuccess ? "show" : ""}`}>Project Created</div>
     </PartnerStoryContext.Provider>
@@ -1974,19 +2096,167 @@ function DraftPickerStyleToggle() {
  * name, once we capture one) via `initialFor`. Renders nothing for
  * solo projects so the bar stays identical to the non-collab case. */
 function CollabInitials() {
-  const { partnerStory, creatorEmail, inviteeEmail } = usePartnerIdentity();
+  const {
+    partnerStory,
+    creatorEmail,
+    inviteeEmail,
+    creatorDisplayName,
+    inviteeDisplayName,
+    onOpenNameCapture,
+  } = usePartnerIdentity();
   if (!partnerStory) return null;
   // creatorEmail / inviteeEmail come from the project_invites-backed RPC
-  // (stable ordering, both resolvable pre- and post-accept). We render
-  // in creator-then-invitee order regardless of which side the viewer
-  // is on, so both users see the indicator the same way. initialFor
-  // falls back to "?" only when we truly have nothing — which shouldn't
-  // happen for any project that has an invite row.
+  // (stable ordering, both resolvable pre- and post-accept). Render in
+  // creator-then-invitee order regardless of which side the viewer is
+  // on, so both users see the indicator the same way. Prefer the
+  // captured display name's first letter when we have one — that's the
+  // whole point of the name-capture modal. Fall back to the email's
+  // first letter, and ultimately to "?" if we truly have nothing.
+  //
+  // Tapping the chip opens the name-capture modal (via onOpenNameCapture
+  // from context). Works whether the current viewer already set a name
+  // or not — a re-tap lets them edit. Wrapped in a <button> for the
+  // tap semantics + keyboard focus; the inner chips are purely visual.
   return (
-    <div className="collab-initials-pair" aria-label="Collaborators">
-      <span className="collab-initial">{initialFor(creatorEmail)}</span>
-      <span className="collab-initial">{initialFor(inviteeEmail)}</span>
-    </div>
+    <button
+      type="button"
+      className="collab-initials-pair"
+      aria-label="Collaborators — edit your name"
+      onClick={onOpenNameCapture}
+    >
+      <span className="collab-initial">
+        {initialForMember(creatorDisplayName, creatorEmail)}
+      </span>
+      <span className="collab-initial">
+        {initialForMember(inviteeDisplayName, inviteeEmail)}
+      </span>
+    </button>
+  );
+}
+
+/* ============================================ */
+/* =========== NAME CAPTURE MODAL ============= */
+/* ============================================ */
+//
+// Shown on entering a shared project whenever the signed-in user
+// hasn't set a display name yet, and on-demand when they tap the
+// overlapping-initials chip. One-field form: first name + Save.
+//
+// Why we prompt: the layer-bar initials chip defaults to the first
+// letter of each side's email, which collides and feels impersonal.
+// A name personalizes the chip and unblocks future name-aware copy
+// ("Madison is editing scene 3…"). Backed by public.profiles.
+//
+// Dismissal rules:
+//   * First-time mode (user has no name yet): backdrop tap does NOT
+//     dismiss — they have to type a name. This is by design; the
+//     modal must re-appear every entry until a name is captured.
+//   * Edit mode (user already has a name and tapped the chip to
+//     change it): backdrop tap cancels, restoring the prior name.
+function NameCaptureModal({
+  open,
+  mode,
+  initialName,
+  partnerDisplayName,
+  partnerEmail,
+  onSave,
+  onCancel,
+}: {
+  open: boolean;
+  mode: "first-time" | "edit";
+  initialName: string | null;
+  partnerDisplayName: string | null;
+  partnerEmail: string | null;
+  onSave: (name: string) => Promise<boolean>;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initialName ?? "");
+  const [saving, setSaving] = useState(false);
+  // Reset the input whenever the modal re-opens, so an edit session
+  // starts with the current name pre-filled and a first-time session
+  // always starts empty.
+  useEffect(() => {
+    if (open) {
+      setValue(initialName ?? "");
+      setSaving(false);
+    }
+  }, [open, initialName]);
+
+  async function handleSave() {
+    const trimmed = value.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    const ok = await onSave(trimmed);
+    if (!ok) setSaving(false);
+  }
+
+  const partnerLabel =
+    partnerDisplayName?.trim() || partnerEmail || "your collaborator";
+
+  return (
+    <>
+      <div
+        className={`sheet-backdrop ${open ? "open" : ""}`}
+        onClick={mode === "edit" ? onCancel : undefined}
+      />
+      <div className={`sheet name-capture-sheet ${open ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-body">
+          <div
+            className="display heading"
+            style={{ marginTop: 25, marginBottom: 8 }}
+          >
+            {mode === "edit" ? "Your name" : "What's your first name?"}
+          </div>
+          <div className="caption" style={{ marginBottom: 20 }}>
+            {mode === "edit"
+              ? `Update the name ${partnerLabel} sees for you on this shared project.`
+              : `You're collaborating with ${partnerLabel}. Your first name helps personalize the initials chip above and any messages that mention you.`}
+          </div>
+
+          <Input
+            autoFocus
+            type="text"
+            placeholder="First name"
+            value={value}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              setValue(e.target.value)
+            }
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void handleSave();
+              }
+            }}
+            disabled={saving}
+          />
+
+          <Button
+            variant="primary"
+            size="lg"
+            block
+            onClick={handleSave}
+            disabled={!value.trim() || saving}
+            style={{ marginTop: 20 }}
+          >
+            {saving ? "Saving…" : "Save"}
+          </Button>
+
+          {mode === "edit" && (
+            <Button
+              variant="secondary"
+              size="lg"
+              block
+              onClick={onCancel}
+              disabled={saving}
+              style={{ marginTop: 10 }}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 

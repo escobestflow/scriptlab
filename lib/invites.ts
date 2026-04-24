@@ -237,10 +237,23 @@ export async function getPartnerEmail(projectId: string): Promise<string | null>
  *  overlapping-initials indicator on every layer bar so both users
  *  see the same ordering (creator left, invitee right). Resolved
  *  from project_invites, so `invitee.email` is available even when
- *  the invitee hasn't accepted yet. */
+ *  the invitee hasn't accepted yet.
+ *
+ *  `displayName` is the name each side entered via the name-capture
+ *  modal (stored in public.profiles). It's null when that user hasn't
+ *  provided a name yet; the initials chip falls back to the email's
+ *  first letter in that case. */
 export interface ProjectMembers {
-  creator: { userId: string; email: string | null };
-  invitee: { userId: string | null; email: string | null };
+  creator: {
+    userId: string;
+    email: string | null;
+    displayName: string | null;
+  };
+  invitee: {
+    userId: string | null;
+    email: string | null;
+    displayName: string | null;
+  };
 }
 
 export async function getProjectMembers(
@@ -260,10 +273,12 @@ export async function getProjectMembers(
     creator: {
       userId: obj.creator.userId ?? "",
       email: obj.creator.email ?? null,
+      displayName: obj.creator.displayName ?? null,
     },
     invitee: {
       userId: obj.invitee.userId ?? null,
       email: obj.invitee.email ?? null,
+      displayName: obj.invitee.displayName ?? null,
     },
   };
 }

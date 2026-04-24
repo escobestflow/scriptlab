@@ -4324,6 +4324,23 @@ html[data-theme="dark"] .ds-btn-secondary[style*="background"] { color: #000; }
   align-items: center;
   margin-left: auto;
   flex: 0 0 auto;
+  /* Rendered as a <button> so tapping opens the name-capture modal —
+     reset the native button chrome so it looks identical to the old
+     non-interactive <div>. */
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin-right: -4px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.collab-initials-pair:focus-visible {
+  outline: 2px solid rgba(0, 0, 0, 0.3);
+  outline-offset: 2px;
+  border-radius: 20px;
+}
+html[data-theme="dark"] .collab-initials-pair:focus-visible {
+  outline-color: rgba(255, 255, 255, 0.5);
 }
 .collab-initial {
   width: 18px;
@@ -5091,5 +5108,21 @@ html[data-theme="dark"] .partner-preview-section {
   color: #ff8a80;
   background: rgba(255, 0, 0, 0.1);
   border-color: rgba(255, 0, 0, 0.28);
+}
+
+/* ── Name-capture modal ───────────────────────────────────────────
+   Reuses the standard .sheet / .sheet-backdrop bottom-sheet pattern.
+   This rule just tightens max-height — one field + two buttons
+   doesn't need the tall variant — and nudges the input to full
+   width so the single form field reads unambiguously. */
+.name-capture-sheet {
+  max-height: 70vh;
+}
+.name-capture-sheet .ds-input-wrap {
+  display: block;
+  width: 100%;
+}
+.name-capture-sheet .ds-input {
+  width: 100%;
 }
 
