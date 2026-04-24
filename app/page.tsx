@@ -350,6 +350,12 @@ export default function Page() {
       if (!projectMembers[p.id]) {
         refreshProjectMembers(p.id);
       }
+      // Eagerly load the partner's email for every shared project so
+      // the card-chip fallback path never has to render "?". The RPC
+      // is cheap and idempotent — once cached, no-ops.
+      if (!partnerEmails[p.id]) {
+        refreshPartnerEmail(p.id);
+      }
       // Only the invitee benefits from loading the creator's row for
       // the card — the creator's own row IS the canonical source for
       // them. We don't know which side is which until projectMembers
@@ -368,8 +374,10 @@ export default function Page() {
     projects,
     projectMembers,
     partnerStories,
+    partnerEmails,
     refreshProjectMembers,
     refreshPartnerStory,
+    refreshPartnerEmail,
   ]);
 
   // Debounced save: when projects change, save to DB after 1s of inactivity
@@ -750,6 +758,7 @@ export default function Page() {
                 myEmail={user?.email ?? null}
                 projectMembers={projectMembers}
                 partnerStories={partnerStories}
+                partnerEmails={partnerEmails}
               />
             )}
             {mainTab === "moments" && (
@@ -1659,7 +1668,7 @@ function EmptyPosterStack() {
 function ProjectsTab({
   projects, onOpen, onNew,
   pendingInvites, onAcceptInvite, onDeclineInvite,
-  myUserId, myEmail, projectMembers, partnerStories,
+  myUserId, myEmail, projectMembers, partnerStories, partnerEmails,
 }: {
   projects: Story[];
   onOpen: (id: string) => void;
@@ -1683,6 +1692,11 @@ function ProjectsTab({
    *  the invitee sees the creator's latest draft details instead of
    *  the empty seed row accept_invite left behind. */
   partnerStories: Record<string, Story>;
+  /** Partner's email per project id — used as the right-circle
+   *  fallback in the card-chip when projectMembers hasn't resolved.
+   *  Loaded eagerly on dashboard hydration so the chip always has a
+   *  letter, never a "?". */
+  partnerEmails: Record<string, string>;
 }) {
   const hasInvites = pendingInvites.length > 0;
 
@@ -1795,20 +1809,40 @@ function ProjectsTab({
         const c = getActiveConceptDraft(displayStory);
 
         // Initials chip on collab cards. Uses the same resolution as
-        // the studio's CollabInitials: projectMembers when available,
-        // falling back to my-email + partner-email in viewer-local
-        // order while the RPC is still resolving.
-        const leftEmail =
-          members?.creator.email ??
-          (iAmCreator ? myEmail : null) ??
-          null;
-        const rightEmail =
-          members?.invitee.email ??
-          (iAmCreator ? null : myEmail) ??
-          (iAmCreator ? partnerStories[p.id] ? null : null : null);
-        // Prefer display names over emails when profiles exist.
-        const leftName = members?.creator.displayName ?? null;
-        const rightName = members?.invitee.displayName ?? null;
+        // the studio's CollabInitials:
+        //   * Canonical path (members resolved): creator-left,
+        //     invitee-right regardless of which side the viewer is on.
+        //   * Viewer-local fallback (members null): put the viewer
+        //     on the LEFT with their own email + captured name, and
+        //     the partner's email (loaded eagerly via partnerEmails)
+        //     on the RIGHT. Self-corrects the instant members lands.
+        // In either path, any circle that can't resolve to a usable
+        // letter is skipped entirely — we never render "?".
+        const canonical = !!members;
+        const leftEmail = canonical
+          ? (members!.creator.email ?? null)
+          : (myEmail ?? null);
+        const rightEmail = canonical
+          ? (members!.invitee.email ?? null)
+          : (partnerEmails[p.id] ?? null);
+        const leftName = canonical
+          ? (members!.creator.displayName ?? null)
+          : null;
+        const rightName = canonical
+          ? (members!.invitee.displayName ?? null)
+          : null;
+        const pickLetter = (
+          name: string | null,
+          email: string | null,
+        ): string | null => {
+          const n = (name ?? "").trim();
+          if (n) return n.charAt(0).toUpperCase();
+          const e = (email ?? "").trim();
+          if (e) return e.charAt(0).toUpperCase();
+          return null;
+        };
+        const leftChar = pickLetter(leftName, leftEmail);
+        const rightChar = pickLetter(rightName, rightEmail);
 
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
@@ -1832,25 +1866,13 @@ function ProjectsTab({
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>
             </div>
-            {isCollab && (
+            {isCollab && (leftChar || rightChar) && (
               <span
                 className="collab-initials-pair project-card-initials"
                 aria-label="Collaborators"
               >
-                <span className="collab-initial">
-                  {leftName && leftName.trim()
-                    ? leftName.trim().charAt(0).toUpperCase()
-                    : leftEmail
-                      ? leftEmail.trim().charAt(0).toUpperCase()
-                      : "?"}
-                </span>
-                <span className="collab-initial">
-                  {rightName && rightName.trim()
-                    ? rightName.trim().charAt(0).toUpperCase()
-                    : rightEmail
-                      ? rightEmail.trim().charAt(0).toUpperCase()
-                      : "?"}
-                </span>
+                {leftChar && <span className="collab-initial">{leftChar}</span>}
+                {rightChar && <span className="collab-initial">{rightChar}</span>}
               </span>
             )}
           </button>

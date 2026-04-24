@@ -75,6 +75,12 @@ interface PartnerIdentity {
    *  email's. Null/undefined = user hasn't set a name yet. */
   creatorDisplayName?: string | null;
   inviteeDisplayName?: string | null;
+  /** The current viewer's captured display name. Separate from the
+   *  creator/invitee variants above because we need it in the
+   *  viewer-local fallback path (when projectMembers hasn't
+   *  resolved, we put the viewer on LEFT with their own name if
+   *  they've saved one). */
+  myDisplayName?: string | null;
   /** Opens the name-capture modal. Exposed through context so the
    *  CollabInitials chip (rendered deep inside the LayerBar) can
    *  request it without prop-drilling. Undefined for solo projects. */
@@ -1000,6 +1006,11 @@ export function Studio({
         projectMembers?.invitee.email && projectMembers.invitee.email === myEmail
           ? (myDisplayName ?? projectMembers.invitee.displayName ?? null)
           : (projectMembers?.invitee.displayName ?? null),
+      // Viewer's own display name — exposed separately so the
+      // viewer-local fallback path in CollabInitials (when
+      // projectMembers hasn't resolved) can still show a letter
+      // derived from the captured name rather than the email.
+      myDisplayName,
       onOpenNameCapture: isCollabProject ? openNameCaptureForEdit : undefined,
     }}>
       {/* Nav row — fixed above scroll, never moves */}
@@ -2401,6 +2412,7 @@ function CollabInitials() {
     creatorDisplayName,
     inviteeDisplayName,
     myEmail,
+    myDisplayName,
     partnerEmail,
     onOpenNameCapture,
   } = usePartnerIdentity();
@@ -2412,16 +2424,27 @@ function CollabInitials() {
   // the indicator the same way.
   //
   // Fallback path: if the RPC hasn't resolved (or the migration
-  // isn't applied yet), use myEmail + partnerEmail — already loaded
-  // by the time partnerStory exists. Ordering in this case is
-  // viewer-local (me-left, partner-right) rather than canonical
-  // creator-left, but it guarantees we never show "?" when we have
-  // perfectly usable account emails on hand. Ordering self-corrects
-  // the moment projectMembers lands.
-  const leftEmail = creatorEmail ?? myEmail ?? null;
-  const rightEmail = inviteeEmail ?? partnerEmail ?? null;
-  const leftName = creatorEmail ? creatorDisplayName : null;
-  const rightName = inviteeEmail ? inviteeDisplayName : null;
+  // isn't applied yet), use (myEmail, partnerEmail) + the viewer's
+  // own captured name — both are already available by the time
+  // partnerStory exists. Ordering in this case is viewer-local
+  // (me-left, partner-right) rather than canonical creator-left,
+  // but it guarantees we never show "?" when we have perfectly
+  // usable account emails on hand. Self-corrects the moment
+  // projectMembers lands.
+  const canonical = !!(creatorEmail || inviteeEmail);
+  const leftEmail = canonical ? (creatorEmail ?? null) : (myEmail ?? null);
+  const rightEmail = canonical ? (inviteeEmail ?? null) : (partnerEmail ?? null);
+  const leftName = canonical ? (creatorDisplayName ?? null) : (myDisplayName ?? null);
+  const rightName = canonical ? (inviteeDisplayName ?? null) : null;
+  // Compute the actual letter for each side. If neither a name nor
+  // an email resolves to a usable character, skip that circle
+  // entirely rather than rendering "?". Partner is partnerStory-
+  // gated at the top of this component, so at worst the right circle
+  // falls back to the partner row's email via partnerEmail; at best
+  // both resolve via the canonical RPC path.
+  const leftChar = letterOrNull(leftName, leftEmail);
+  const rightChar = letterOrNull(rightName, rightEmail);
+  if (!leftChar && !rightChar) return null;
   // Tapping the chip opens the name-capture modal (via onOpenNameCapture
   // from context). Works whether the current viewer already set a name
   // or not — a re-tap lets them edit. Wrapped in a <button> for the
@@ -2433,14 +2456,25 @@ function CollabInitials() {
       aria-label="Collaborators — edit your name"
       onClick={onOpenNameCapture}
     >
-      <span className="collab-initial">
-        {initialForMember(leftName, leftEmail)}
-      </span>
-      <span className="collab-initial">
-        {initialForMember(rightName, rightEmail)}
-      </span>
+      {leftChar && <span className="collab-initial">{leftChar}</span>}
+      {rightChar && <span className="collab-initial">{rightChar}</span>}
     </button>
   );
+}
+
+/** Returns an uppercase single-character initial derived from the
+ *  display name (preferred) or the email. Returns null when neither
+ *  yields a usable character — callers should skip rendering that
+ *  circle rather than fall through to "?". */
+function letterOrNull(
+  displayName: string | null | undefined,
+  email: string | null | undefined,
+): string | null {
+  const name = (displayName ?? "").trim();
+  if (name) return name.charAt(0).toUpperCase();
+  const em = (email ?? "").trim();
+  if (em) return em.charAt(0).toUpperCase();
+  return null;
 }
 
 /* ============================================ */
