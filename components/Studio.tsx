@@ -19,6 +19,9 @@ import {
   applySyncResult,
   copyPartnerLayerDraft,
   copyPartnerProjectDraft,
+  upsertCharacterInActiveDraft,
+  copyConceptFieldFromPartner,
+  type ConceptCopyField,
 } from "@/lib/story";
 import {
   syncLayer,
@@ -97,6 +100,17 @@ interface PartnerIdentity {
    *  side owns the draft currently on screen gets the inverted black-
    *  on-white circle and is pulled to the front of the overlap. */
   isPartnerPreviewing?: boolean;
+  /** Copy a single character from the partner's currently-previewed
+   *  characters draft into my own active characters draft, overwriting
+   *  by id or case-insensitive name match if present, else appending.
+   *  Only defined while `isPartnerPreviewing` is true and the preview
+   *  layer is "characters". */
+  onCopyPartnerCharacter?: (characterId: string) => void;
+  /** Copy a single concept field from the partner's currently-previewed
+   *  concept draft into my own active concept draft, overwriting the
+   *  matching field. Only defined while `isPartnerPreviewing` is true
+   *  and the preview layer is "concept". */
+  onCopyPartnerConceptField?: (field: ConceptCopyField) => void;
 }
 const PartnerStoryContext = createContext<PartnerIdentity>({});
 function usePartnerStory(): Story | undefined {
@@ -1036,6 +1050,31 @@ export function Studio({
         setSection(layer);
       },
       isPartnerPreviewing: !!partnerPreview,
+      // Per-item copy handlers from partner-preview. Only meaningful
+      // while `partnerPreview` is active — the inline Copy affordances
+      // inside CharactersTab/ConceptTab only render in that mode, so
+      // exposing them unconditionally on the context is harmless.
+      onCopyPartnerCharacter: partnerPreview && partnerStory && partnerPreview.layer === "characters"
+        ? (characterId: string) => {
+            const pool = getLayerPool(partnerStory, "characters") as CharactersLayerDraft[];
+            const src = pool.find(d => d.id === partnerPreview.draftId);
+            const ch = src?.characters.find(c => c.id === characterId);
+            if (!ch) return;
+            setStory(s => upsertCharacterInActiveDraft(s, ch));
+          }
+        : undefined,
+      onCopyPartnerConceptField: partnerPreview && partnerStory && partnerPreview.layer === "concept"
+        ? (field: ConceptCopyField) => {
+            const pool = getLayerPool(partnerStory, "concept") as ConceptLayerDraft[];
+            const src = pool.find(d => d.id === partnerPreview.draftId);
+            if (!src) return;
+            setStory(s => copyConceptFieldFromPartner(s, field, {
+              title: partnerStory.title,
+              projectType: partnerStory.projectType,
+              draft: src,
+            }));
+          }
+        : undefined,
     }}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
@@ -4131,6 +4170,7 @@ function AttrRow({
   dot,
   ai,
   aiLoading,
+  copyAction,
 }: {
   label: string;
   values?: string[];
@@ -4141,6 +4181,10 @@ function AttrRow({
   dot?: boolean;
   ai?: () => void;
   aiLoading?: boolean;
+  /** When set, renders a small copy button after the label — used by
+   *  partner-preview mode to cherry-pick individual fields from the
+   *  partner's concept draft into the user's own active draft. */
+  copyAction?: () => void;
 }) {
   const hasValues = values && values.length > 0;
   return (
@@ -4149,6 +4193,17 @@ function AttrRow({
         <span className="attr-label">
           {label}
           {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+          {copyAction && (
+            <button
+              type="button"
+              className="partner-copy-field-btn"
+              title="Copy this from partner's draft"
+              aria-label="Copy this field from partner's draft"
+              onClick={(e) => { e.stopPropagation(); copyAction(); }}
+            >
+              <CopyGlyph />
+            </button>
+          )}
           {dot && <span className="sync-dot attr-dot" />}
         </span>
         <div className="attr-values">
@@ -4424,6 +4479,27 @@ function AISparkleIcon() {
 }
 
 /* ── AI wand button — elegant sparkle, sits next to field labels ── */
+/* Tiny copy glyph used by partner-preview per-item copy buttons.
+ * Two overlapping rounded rectangles — the standard "copy" metaphor. */
+function CopyGlyph() {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+}
+
 function AIWandButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
   return (
     <button
@@ -4459,6 +4535,7 @@ function TextAttrRow({
   aiLoading,
   pager,
   speak,
+  copyAction,
 }: {
   label: string;
   value: string;
@@ -4471,6 +4548,8 @@ function TextAttrRow({
   pager?: React.ReactNode;
   /** Optional slot rendered next to the AI wand (used for the read-aloud button). */
   speak?: React.ReactNode;
+  /** Same as AttrRow.copyAction — partner-preview per-field copy. */
+  copyAction?: () => void;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -4485,6 +4564,18 @@ function TextAttrRow({
     }
   }, [value, focused, multiline]);
 
+  const copyBtn = copyAction ? (
+    <button
+      type="button"
+      className="partner-copy-field-btn"
+      title="Copy this from partner's draft"
+      aria-label="Copy this field from partner's draft"
+      onClick={(e) => { e.stopPropagation(); copyAction(); }}
+    >
+      <CopyGlyph />
+    </button>
+  ) : null;
+
   if (!isOpen) {
     return (
       <div className="attr-row">
@@ -4492,6 +4583,7 @@ function TextAttrRow({
           <span className="attr-label">
             {label}
             {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+            {copyBtn}
             {speak}
             {dot && <span className="sync-dot attr-dot" />}
           </span>
@@ -4515,6 +4607,7 @@ function TextAttrRow({
         <span className="attr-label">
           {label}
           {ai && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+          {copyBtn}
           {dot && <span className="sync-dot attr-dot" />}
         </span>
         {pager}
@@ -4561,6 +4654,15 @@ function ConceptTab({
 }) {
   const d = getActiveConceptDraft(story);
   const [openAttr, setOpenAttr] = useState<string | null>(null);
+  // Partner-preview mode: expose per-field Copy buttons so the user can
+  // pull individual concept fields (title, logline, tone, etc.) from
+  // the partner's draft into their own active Concept draft, overwriting
+  // the matching field if already populated.
+  const { isPartnerPreviewing, onCopyPartnerConceptField } = usePartnerIdentity();
+  const previewCopy = (field: ConceptCopyField): (() => void) | undefined =>
+    isPartnerPreviewing && onCopyPartnerConceptField
+      ? () => onCopyPartnerConceptField(field)
+      : undefined;
   const [themeInput, setThemeInput] = useState("");
   const [toneInput, setToneInput] = useState("");
   const [toneCustomOpen, setToneCustomOpen] = useState(false);
@@ -4761,6 +4863,7 @@ function ConceptTab({
         expanded={openAttr === "format"}
         onToggle={() => toggle("format")}
         dot={!autosaveEnabled && isConceptFieldDirty(story, "projectType")}
+        copyAction={previewCopy("projectType")}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -4794,6 +4897,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "title")}
         ai={() => generateConcept("title")}
         aiLoading={aiBusy === "title"}
+        copyAction={previewCopy("title")}
         pager={
           <HistoryPager
             history={titleHistory.history}
@@ -4820,6 +4924,7 @@ function ConceptTab({
         expanded={openAttr === "genre"}
         onToggle={() => toggle("genre")}
         dot={!autosaveEnabled && isConceptFieldDirty(story, "genres")}
+        copyAction={previewCopy("genres")}
       >
         <div className="chip-row">
           {(["thriller","drama","comedy","sci-fi","horror","romance","action","mystery"] as const).map(g => (
@@ -4909,6 +5014,7 @@ function ConceptTab({
         placeholder="Add films or shows"
         expanded={openAttr === "references"}
         onToggle={() => toggle("references")}
+        copyAction={previewCopy("references")}
       >
         <div className="reference-list">
           {d.settings.references.map(ref => (
@@ -4971,7 +5077,20 @@ function ConceptTab({
           duplicate chip list). */}
       <div className="attr-row">
         <div className="attr-row-header attr-row-header-static">
-          <span className="attr-label">Writer Style</span>
+          <span className="attr-label">
+            Writer Style
+            {previewCopy("writerStyles") && (
+              <button
+                type="button"
+                className="partner-copy-field-btn"
+                title="Copy this from partner's draft"
+                aria-label="Copy writer style from partner's draft"
+                onClick={(e) => { e.stopPropagation(); previewCopy("writerStyles")!(); }}
+              >
+                <CopyGlyph />
+              </button>
+            )}
+          </span>
           <div className="attr-values">
             {d.settings.writerStyles.length > 0
               ? d.settings.writerStyles.map(w => (
@@ -5002,6 +5121,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "logline")}
         ai={() => generateConcept("logline")}
         aiLoading={aiBusy === "logline"}
+        copyAction={previewCopy("logline")}
         speak={
           d.logline?.trim() ? (
             <SpeakButton
@@ -5039,6 +5159,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "summary")}
         ai={() => generateConcept("summary")}
         aiLoading={aiBusy === "summary"}
+        copyAction={previewCopy("summary")}
         pager={
           <HistoryPager
             history={summaryHistory.history}
@@ -5067,6 +5188,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "tone")}
         ai={() => generateConcept("tone")}
         aiLoading={aiBusy === "tone"}
+        copyAction={previewCopy("tone")}
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {TONE_PRESETS.map(t => (
@@ -5123,6 +5245,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "themes")}
         ai={() => generateConcept("themes")}
         aiLoading={aiBusy === "themes"}
+        copyAction={previewCopy("themes")}
       >
         {d.concept.themes.length > 0 && (
           <div className="chip-row" style={{ marginBottom: 10 }}>
@@ -5238,6 +5361,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "endingTypes")}
         ai={() => generateConcept("ending")}
         aiLoading={aiBusy === "ending"}
+        copyAction={previewCopy("endingTypes")}
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
@@ -5414,6 +5538,12 @@ function CharactersTab({
 }) {
   const d = getActiveCharactersDraft(story);
   const { profile } = useProfileCapture();
+  // Partner-preview mode: when we're rendering the partner's characters
+  // draft read-only, expose a per-card "copy to my draft" button so the
+  // user can cherry-pick individual cast rows without wholesale cloning
+  // the entire partner draft.
+  const { isPartnerPreviewing, onCopyPartnerCharacter } = usePartnerIdentity();
+  const previewActive = !!(isPartnerPreviewing && onCopyPartnerCharacter);
 
   // "Create all" — one-tap cast generation driven by the active Concept
   // draft. Uses the same cross-layer sync path the Update Other Layers
@@ -5497,6 +5627,21 @@ function CharactersTab({
             </div>
             <span className="beat-expand">›</span>
           </button>
+          {previewActive && (
+            <button
+              type="button"
+              className="partner-copy-item-btn"
+              title="Copy this character to my draft"
+              aria-label="Copy this character to my draft"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopyPartnerCharacter!(ch.id);
+              }}
+            >
+              <CopyGlyph />
+              <span>Copy</span>
+            </button>
+          )}
         </div>
       ))}
 

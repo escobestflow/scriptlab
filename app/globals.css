@@ -5363,6 +5363,87 @@ html[data-theme="dark"] .partner-preview-banner-action.is-exit:hover {
   user-select: text;
   position: relative;
 }
+/* Per-item Copy buttons inside partner-preview mode need to escape the
+   lock wrapper's pointer-events:none so they stay clickable. They also
+   opt out of the dimmed-opacity visual (reset to full opacity) so they
+   remain clearly interactive above the dimmed preview body. */
+.partner-preview-locked .partner-copy-item-btn,
+.partner-preview-locked .partner-copy-field-btn {
+  pointer-events: auto;
+  opacity: 1;
+}
+/* Per-character Copy pill overlaid on each character-card while
+   partner-previewing. Positioned in the card's top-right corner. */
+.character-card {
+  position: relative;
+}
+.partner-copy-item-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px 0 7px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+  font-family: 'Lato', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms ease;
+  z-index: 2;
+}
+.partner-copy-item-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+.partner-copy-item-btn:active {
+  background: rgba(0, 0, 0, 0.18);
+}
+html[data-theme="dark"] .partner-copy-item-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+html[data-theme="dark"] .partner-copy-item-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+/* Per-field Copy button inline with attribute-row labels. Compact icon-
+   only circle so it sits comfortably next to the AI wand without
+   dominating the label. */
+.partner-copy-field-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 120ms ease;
+  vertical-align: middle;
+}
+.partner-copy-field-btn:hover {
+  background: rgba(0, 0, 0, 0.12);
+}
+.partner-copy-field-btn:active {
+  background: rgba(0, 0, 0, 0.18);
+}
+html[data-theme="dark"] .partner-copy-field-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+html[data-theme="dark"] .partner-copy-field-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
 /* Don't let focus ring show through on any focusable child, since
    nothing inside the locked wrapper can actually receive input. */
 .partner-preview-locked :focus,

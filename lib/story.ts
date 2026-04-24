@@ -744,6 +744,114 @@ export function copyPartnerLayerDraft(
   }
 }
 
+// ── Per-item copy from a partner's preview ──
+// Used by the inline "copy this" affordances inside partner-preview mode
+// (characters tab + concept tab). Unlike copyPartnerLayerDraft, these do
+// NOT create a new draft — they merge a single item into my currently
+// active draft, overwriting if a matching item already exists.
+//
+// Matching rule for characters: prefer exact id match (same partner
+// character already copied once before), then fall back to case-
+// insensitive name match (prevents duplicate cast rows when the id
+// differs but the character is obviously the same person). If no
+// match, append a fresh row with a new id local to my draft so my
+// beats/scenes that reference the partner's id don't accidentally
+// get linked.
+
+export function upsertCharacterInActiveDraft(
+  story: Story,
+  source: Character,
+): Story {
+  const d = getActiveCharactersDraft(story);
+  const srcName = source.name.trim().toLowerCase();
+  const byId = d.characters.findIndex(c => c.id === source.id);
+  const byName = srcName.length > 0
+    ? d.characters.findIndex(c => c.name.trim().toLowerCase() === srcName)
+    : -1;
+  const idx = byId >= 0 ? byId : byName;
+  let next: Character[];
+  if (idx >= 0) {
+    // Overwrite — keep my local id so references elsewhere still resolve.
+    const mine = d.characters[idx];
+    next = d.characters.map((c, i) =>
+      i === idx ? { ...source, id: mine.id } : c,
+    );
+  } else {
+    next = [
+      ...d.characters,
+      { ...source, id: genId("char") },
+    ];
+  }
+  return updateCharactersDraft(story, { characters: next });
+}
+
+// Fields available for per-item copy on the Concept tab. Unlike the
+// automated sync flow in syncLayer.ts (which treats title / projectType
+// / genres as sovereign), this is a manual user action — if the user
+// explicitly clicks "copy title from partner", we do honor it.
+export type ConceptCopyField =
+  | "title"
+  | "projectType"
+  | "logline"
+  | "genres"
+  | "summary"
+  | "tone"
+  | "themes"
+  | "endingTypes"
+  | "references"
+  | "writerStyles";
+
+export function copyConceptFieldFromPartner(
+  story: Story,
+  field: ConceptCopyField,
+  source: { title: string; projectType: ProjectType; draft: ConceptLayerDraft },
+): Story {
+  const me = getActiveConceptDraft(story);
+  const s = source.draft;
+  switch (field) {
+    case "title":
+      return updateConceptDraft({ ...story, title: source.title }, {});
+    case "projectType":
+      return updateConceptDraft({ ...story, projectType: source.projectType }, {});
+    case "logline":
+      return updateConceptDraft(story, { logline: s.logline });
+    case "summary":
+      return updateConceptDraft(story, {
+        concept: { ...me.concept, summary: s.concept.summary },
+      });
+    case "tone":
+      return updateConceptDraft(story, {
+        concept: { ...me.concept, tone: s.concept.tone },
+      });
+    case "themes":
+      return updateConceptDraft(story, {
+        concept: { ...me.concept, themes: [...s.concept.themes] },
+      });
+    case "genres":
+      return updateConceptDraft(story, {
+        settings: { ...me.settings, genres: [...s.settings.genres] },
+      });
+    case "endingTypes":
+      return updateConceptDraft(story, {
+        settings: { ...me.settings, endingTypes: [...s.settings.endingTypes] },
+      });
+    case "references":
+      return updateConceptDraft(story, {
+        settings: {
+          ...me.settings,
+          references: s.settings.references.map(r => ({
+            ...r,
+            aspects: [...r.aspects],
+          })),
+        },
+      });
+    case "writerStyles":
+      return updateConceptDraft(story, {
+        settings: { ...me.settings, writerStyles: [...s.settings.writerStyles] },
+      });
+  }
+}
+
 // ── Save layer draft ──
 // Mark the active layer draft as "saved" — advances savedAt to updatedAt.
 // No new draft is created; this just clears the dirty state.
