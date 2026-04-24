@@ -92,6 +92,11 @@ interface PartnerIdentity {
    *  render partner's draft read-only with a lock banner offering an
    *  explicit "Copy to my drafts" action. Undefined for solo projects. */
   onEnterPartnerPreview?: (layer: LayerKey, draftId: string) => void;
+  /** True while Studio is rendering a partner draft via partner-preview
+   *  mode. Drives the CollabInitials active-chip indicator: whichever
+   *  side owns the draft currently on screen gets the inverted black-
+   *  on-white circle and is pulled to the front of the overlap. */
+  isPartnerPreviewing?: boolean;
 }
 const PartnerStoryContext = createContext<PartnerIdentity>({});
 function usePartnerStory(): Story | undefined {
@@ -1030,6 +1035,7 @@ export function Studio({
         setPartnerPreview({ layer, draftId });
         setSection(layer);
       },
+      isPartnerPreviewing: !!partnerPreview,
     }}>
       {/* Nav row — fixed above scroll, never moves */}
       <div className="studio-nav-fixed">
@@ -2554,6 +2560,7 @@ function CollabInitials() {
     myDisplayName,
     partnerEmail,
     onOpenNameCapture,
+    isPartnerPreviewing,
   } = usePartnerIdentity();
   if (!partnerStory) return null;
 
@@ -2615,6 +2622,28 @@ function CollabInitials() {
   const rightChar = letterOrNull(rightName, rightEmail);
   if (!leftChar && !rightChar) return null;
 
+  // Decide which chip represents the "currently loaded" side. In
+  // normal use that's the viewer (they're editing their own draft);
+  // in partner-preview mode it flips to the partner. The active chip
+  // gets `.collab-initial-active` which both inverts its colors
+  // (black bg / white letter) and pulls it to the front of the
+  // overlap via a higher z-index. Falls back silently if we can't
+  // tell which side is the viewer — no halo in that case.
+  const mineOnLeft =
+    !!(leftEmail && myEmail && leftEmail === myEmail);
+  const mineOnRight =
+    !!(rightEmail && myEmail && rightEmail === myEmail);
+  let activeSide: "left" | "right" | null = null;
+  if (mineOnLeft || mineOnRight) {
+    const mineSide: "left" | "right" = mineOnLeft ? "left" : "right";
+    const partnerSide: "left" | "right" =
+      mineSide === "left" ? "right" : "left";
+    activeSide = isPartnerPreviewing ? partnerSide : mineSide;
+  }
+
+  const leftCls = `collab-initial${activeSide === "left" ? " collab-initial-active" : ""}`;
+  const rightCls = `collab-initial${activeSide === "right" ? " collab-initial-active" : ""}`;
+
   // Tapping the chip opens the name-capture modal (via onOpenNameCapture
   // from context). Works whether the current viewer already set a name
   // or not — a re-tap lets them edit. Wrapped in a <button> for the
@@ -2626,8 +2655,8 @@ function CollabInitials() {
       aria-label="Collaborators — edit your name"
       onClick={onOpenNameCapture}
     >
-      {leftChar && <span className="collab-initial">{leftChar}</span>}
-      {rightChar && <span className="collab-initial">{rightChar}</span>}
+      {leftChar && <span className={leftCls}>{leftChar}</span>}
+      {rightChar && <span className={rightCls}>{rightChar}</span>}
     </button>
   );
 }

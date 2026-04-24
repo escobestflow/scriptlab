@@ -4405,6 +4405,23 @@ html[data-theme="dark"] .collab-initial {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
 }
+/* Inverted "currently-loaded" chip. In light mode the active side
+   reads as a black circle with a white letter; in dark mode we
+   invert to a white circle with a black letter. The z-index
+   override lifts it above both the default first-child (z:2) and
+   the default second (z:1) so it always sits in front of the
+   overlap, regardless of which slot it occupies. */
+.collab-initial.collab-initial-active {
+  background: #000;
+  color: #fff;
+  border-color: #000;
+  z-index: 3;
+}
+html[data-theme="dark"] .collab-initial.collab-initial-active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
 /* Dark-mode override for the actual full-width sticky bar (the wrapper
    that paints the SVG gradient in light mode). The earlier override on
    .layer-draft-picker was a no-op because when the picker is nested in
