@@ -4323,7 +4323,12 @@ html[data-theme="dark"] .ds-btn-secondary[style*="background"] { color: #000; }
   padding: 10px 20px 9px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  /* Tightened 6px vs. original 12px per product direction — the
+     initials pair + draft dropdown should read as a single group,
+     not two loosely-spaced elements. Affects spacing from the
+     initials pair through the draft trigger, read-through button,
+     and the right-aligned READ-ONLY indicator. */
+  gap: 6px;
   min-height: 44px;
   background-image: url('/draft-bar-bg.svg');
   background-size: 100% 100%;
@@ -4459,6 +4464,86 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
   min-height: 0;
   z-index: auto;
   flex: 0 0 auto;
+}
+
+/* Two overlapping outlined owner-initial circles, pinned to the LEFT of
+   the layer draft dropdown trigger inside .layer-bar. Creator first
+   (top of z stack), invitee second (underneath on the right, overlap
+   -4px). Always outlined — no dark-fill active-indicator variant.
+   Reuses the geometry of the project-card `.collab-initial` chip but
+   with a smaller type size (9pt vs. 10pt) to sit more quietly next to
+   the draft-dropdown call-to-action. */
+.layer-owner-initials-pair {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.layer-owner-initial {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid #454646;
+  background: #fff;
+  font-family: 'Lato', sans-serif;
+  font-weight: 700;
+  font-size: 9pt;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #454646;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 1px;
+  box-sizing: border-box;
+  /* `position: relative` is required for z-index to apply. Without
+     it, DOM order (later sibling wins) would flip the overlap. */
+  position: relative;
+}
+/* Left chip sits ON TOP of the right chip. The sibling combinator
+   anchors the -4px overlap to the second chip only, so a lone first
+   chip (fallback when only one email resolves) doesn't get an
+   orphaned negative margin. */
+.layer-owner-initials-pair .layer-owner-initial:first-child {
+  z-index: 2;
+}
+.layer-owner-initials-pair .layer-owner-initial + .layer-owner-initial {
+  margin-left: -4px;
+  z-index: 1;
+}
+html[data-theme="dark"] .layer-owner-initial {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* READ-ONLY indicator, pinned to the RIGHT edge of the layer bar.
+   Visible only while previewing the partner's draft for THIS layer.
+   Type style mirrors the top studio-tab-label (Lato 10px, 500 weight,
+   uppercase, 0.06em tracking). Both the lock icon (embedded as an
+   <img>, SVG recolored to #949595) and the text render in the same
+   muted gray. */
+.layer-read-only-indicator {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  font-family: 'Lato', sans-serif;
+  font-size: 10px;
+  /* One step bolder than the studio-tab-label (500) per product
+     direction — the READ-ONLY badge is a higher-priority status read
+     than a tab label, so it wants a touch more weight to stand out. */
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #949595;
+  white-space: nowrap;
+}
+.layer-read-only-lock {
+  width: 10px;
+  height: 11px;
+  display: inline-block;
 }
 
 .layer-update-trigger {
@@ -5220,143 +5305,14 @@ html[data-theme="dark"] .drafts-whose-row {
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 
-/* ── Partner-preview banner + lock overlay ──
- * When the user taps a partner draft in the layer-drafts sheet,
- * Studio swaps the tab content for that layer's partner draft and
- * wraps it in `.partner-preview-locked`. The banner sits above the
- * wrapper (pointer-events auto) and exposes "Copy to my drafts" +
- * "Exit" actions; the wrapper below disables all interaction with
- * the tab body via `pointer-events: none`. Text stays selectable so
- * the user can copy snippets manually while they browse. */
-.partner-preview-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 8px auto 0;
-  padding: 5px 6px 5px 12px;
-  width: fit-content;
-  max-width: calc(100% - 44px);
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 999px;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.04),
-    0 4px 14px rgba(0, 0, 0, 0.05);
-  -webkit-backdrop-filter: saturate(140%) blur(8px);
-  backdrop-filter: saturate(140%) blur(8px);
-  position: relative;
-  z-index: 2;
-  font-family: 'Lato', sans-serif;
-}
-.partner-preview-lock-icon {
-  color: rgba(0, 0, 0, 0.5);
-  flex: 0 0 auto;
-}
-.partner-preview-banner-text {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  line-height: 1;
-  color: rgba(0, 0, 0, 0.78);
-}
-.partner-preview-banner-who {
-  font-weight: 600;
-  color: var(--ink);
-  max-width: 12ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.partner-preview-banner-sep {
-  color: rgba(0, 0, 0, 0.3);
-  font-weight: 400;
-}
-.partner-preview-banner-draft {
-  font-weight: 400;
-  color: rgba(0, 0, 0, 0.6);
-  letter-spacing: 0.01em;
-}
-.partner-preview-banner-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 0 auto;
-  margin-left: 2px;
-}
-.partner-preview-banner-action {
-  appearance: none;
-  -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 22px;
-  padding: 0 10px;
-  border: none;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-}
-.partner-preview-banner-action:hover {
-  background: rgba(0, 0, 0, 0.1);
-}
-.partner-preview-banner-action:active {
-  background: rgba(0, 0, 0, 0.14);
-}
-.partner-preview-banner-action.is-exit {
-  width: 22px;
-  padding: 0;
-  background: transparent;
-  color: rgba(0, 0, 0, 0.5);
-}
-.partner-preview-banner-action.is-exit:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--ink);
-}
-
-html[data-theme="dark"] .partner-preview-banner {
-  background: rgba(28, 28, 30, 0.72);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 4px 14px rgba(0, 0, 0, 0.35);
-}
-html[data-theme="dark"] .partner-preview-lock-icon {
-  color: rgba(255, 255, 255, 0.55);
-}
-html[data-theme="dark"] .partner-preview-banner-text {
-  color: rgba(255, 255, 255, 0.8);
-}
-html[data-theme="dark"] .partner-preview-banner-sep {
-  color: rgba(255, 255, 255, 0.3);
-}
-html[data-theme="dark"] .partner-preview-banner-draft {
-  color: rgba(255, 255, 255, 0.6);
-}
-html[data-theme="dark"] .partner-preview-banner-action {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.95);
-}
-html[data-theme="dark"] .partner-preview-banner-action:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-html[data-theme="dark"] .partner-preview-banner-action.is-exit {
-  background: transparent;
-  color: rgba(255, 255, 255, 0.55);
-}
-html[data-theme="dark"] .partner-preview-banner-action.is-exit:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-}
+/* ── Partner-preview lock overlay ──
+ * When the user taps a partner draft in the layer-drafts sheet, Studio
+ * swaps the tab content for that layer's partner draft and wraps it in
+ * `.partner-preview-locked` — disables all interaction with the tab
+ * body via `pointer-events: none` while keeping text selectable for
+ * manual copy. The old pill banner that sat above the wrapper was
+ * replaced by a compact READ-ONLY + lock indicator inside .layer-bar
+ * (see .layer-read-only-indicator above). */
 .partner-preview-locked {
   pointer-events: none;
   opacity: 0.72;

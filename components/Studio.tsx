@@ -100,6 +100,13 @@ interface PartnerIdentity {
    *  side owns the draft currently on screen gets the inverted black-
    *  on-white circle and is pulled to the front of the overlap. */
   isPartnerPreviewing?: boolean;
+  /** Which layer the preview is currently pinned to, if any. LayerBar
+   *  uses this to decide whether THIS layer's bar should show the
+   *  READ-ONLY indicator + render the partner's initial instead of
+   *  the viewer's. `isPartnerPreviewing` alone is insufficient: it's
+   *  a global boolean that stays true even when the user switches to
+   *  a non-previewed tab. */
+  previewLayer?: LayerKey;
   /** Copy a single character from the partner's currently-previewed
    *  characters draft into my own active characters draft, overwriting
    *  by id or case-insensitive name match if present, else appending.
@@ -1129,6 +1136,7 @@ export function Studio({
         setSection(layer);
       },
       isPartnerPreviewing: !!partnerPreview,
+      previewLayer: partnerPreview?.layer,
       // Per-item copy handlers from partner-preview. Only meaningful
       // while `partnerPreview` is active — the inline Copy affordances
       // inside CharactersTab/ConceptTab only render in that mode, so
@@ -1589,32 +1597,17 @@ export function Studio({
                 return sd ? [...sd.beats].sort((a, b) => a.position - b.position) : [];
               })()
             : sorted;
-          const previewBanner = previewActive ? (
-            <PartnerPreviewBanner
-              partnerEmail={partnerEmail}
-              draftNumber={(() => {
-                const pool = getLayerPool(partnerStory!, partnerPreview!.layer);
-                return pool.find(d => d.id === partnerPreview!.draftId)?.number ?? null;
-              })()}
-              layerLabel={
-                partnerPreview!.layer === "concept"    ? "Concept"    :
-                partnerPreview!.layer === "characters" ? "Characters" :
-                partnerPreview!.layer === "story"      ? "Story"      :
-                                                         "Script"
-              }
-              onCopy={() => {
-                const pool = getLayerPool(partnerStory!, partnerPreview!.layer);
-                const d = pool.find(x => x.id === partnerPreview!.draftId);
-                if (!d) return;
-                setStory(s => copyPartnerLayerDraft(s, d, partnerPreview!.layer));
-                setPartnerPreview(null);
-              }}
-              onExit={() => setPartnerPreview(null)}
-            />
-          ) : null;
+          // Previous design rendered a full-width "lock icon + email +
+          // draft number + Copy" banner above each tab while in partner
+          // preview. That bar was deleted in favor of a compact
+          // READ-ONLY + lock icon on the right side of the LayerBar
+          // itself (see LayerBar below). The copy affordance moved to
+          // per-row inline buttons (see per-field Copy in ConceptTab and
+          // per-card Copy in CharactersTab). Exit-from-preview now
+          // happens by selecting a different draft in the layer-drafts
+          // picker, so no dedicated close button is needed here.
           return (
             <>
-              {previewBanner}
               <div
                 style={{ padding: "8px 22px 40px" }}
                 className={previewActive ? "partner-preview-locked" : undefined}
@@ -2612,80 +2605,17 @@ function DraftPickerStyleToggle() {
  * partner's — both are derived from their email address (or display
  * name, once we capture one) via `initialFor`. Renders nothing for
  * solo projects so the bar stays identical to the non-collab case. */
-/* ── Partner preview banner ──
- * Sticky banner mounted above a tab when the user taps a partner
- * draft in the layer-drafts "Whose?" sheet. Signals that the tab
- * below is locked (read-only view of partner's draft) and exposes
- * the two actions the user can take from here: copy the partner
- * draft into their own stack, or exit back to their own story. */
-function PartnerPreviewBanner({
-  partnerEmail,
-  draftNumber,
-  layerLabel,
-  onCopy,
-  onExit,
-}: {
-  partnerEmail?: string;
-  draftNumber: number | null;
-  layerLabel: string;
-  onCopy: () => void;
-  onExit: () => void;
-}) {
-  const who = partnerEmail ? partnerEmail.split("@")[0] : "partner";
-  const draftStr =
-    draftNumber !== null ? `${layerLabel} Draft ${draftNumber}` : `${layerLabel} Draft`;
-  return (
-    <div className="partner-preview-banner" role="status">
-      <svg
-        className="partner-preview-lock-icon"
-        width="11"
-        height="11"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        aria-hidden="true"
-      >
-        <rect x="4" y="11" width="16" height="10" rx="2" />
-        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-      </svg>
-      <span className="partner-preview-banner-text">
-        <span className="partner-preview-banner-who">{who}</span>
-        <span className="partner-preview-banner-sep">·</span>
-        <span className="partner-preview-banner-draft">{draftStr}</span>
-      </span>
-      <div className="partner-preview-banner-actions">
-        <button
-          type="button"
-          className="partner-preview-banner-action"
-          onClick={onCopy}
-        >
-          Copy
-        </button>
-        <button
-          type="button"
-          className="partner-preview-banner-action is-exit"
-          onClick={onExit}
-          aria-label="Exit partner preview"
-        >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.4"
-            aria-hidden="true"
-          >
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function CollabInitials() {
+/* ── Collaborator initials pair ──
+ * Two overlapping outlined circles rendered on the LEFT of each
+ * LayerBar's draft dropdown — creator first, invitee second, overlap
+ * by 4px. Hidden on solo projects. Both chips use the outlined style
+ * (no dark-fill active indicator); neither is badged as "active" so
+ * the pair simply signals "this project has two collaborators".
+ *
+ * The `layer` prop is unused today — kept on the signature so a
+ * future active/inactive visual could distinguish which side owns
+ * the currently-viewed draft without re-threading context. */
+function ActiveDraftInitial({ layer: _layer }: { layer: LayerKey }) {
   const {
     partnerStory,
     creatorEmail,
@@ -2695,42 +2625,26 @@ function CollabInitials() {
     myEmail,
     myDisplayName,
     partnerEmail,
-    onOpenNameCapture,
-    isPartnerPreviewing,
   } = usePartnerIdentity();
+  // Solo projects: nothing to show.
   if (!partnerStory) return null;
 
-  // Build each slot independently, walking multiple sources so a
-  // missing RPC (e.g. get_partner_email not yet migrated) can't
-  // blank out the whole chip. Priority per slot:
-  //
-  //   * Canonical data (from projectMembers RPC) gives stable
-  //     creator-left / invitee-right ordering for both viewers.
-  //   * Gaps in canonical are filled from viewer-local sources
-  //     — myEmail + myDisplayName fill the viewer's side,
-  //     partnerEmail fills the other.
-  //   * With no canonical data at all we default to viewer-local
-  //     ordering: me-left, partner-right. The viewer's own circle
-  //     always resolves because we always have myEmail from auth.
-  //
-  // Each circle renders independently; we never gate "both or
-  // nothing". That was the regression — one missing RPC blanked
-  // the whole chip when it should have shown at least the viewer.
+  // Canonical ordering: creator LEFT, invitee RIGHT — stable across
+  // viewers so the pair reads the same for both collaborators. Fall
+  // back to viewer-local (me-left / partner-right) when project-
+  // members data hasn't resolved yet so at least one circle renders.
   let leftName: string | null = null;
   let leftEmail: string | null = null;
   let rightName: string | null = null;
   let rightEmail: string | null = null;
 
   if (creatorEmail || inviteeEmail) {
-    // Canonical ordering (maybe partial).
     leftEmail = creatorEmail ?? null;
     leftName = creatorDisplayName ?? null;
     rightEmail = inviteeEmail ?? null;
     rightName = inviteeDisplayName ?? null;
-    const iAmLeft =
-      !!(creatorEmail && myEmail && creatorEmail === myEmail);
-    const iAmRight =
-      !!(inviteeEmail && myEmail && inviteeEmail === myEmail);
+    const iAmLeft = !!(creatorEmail && myEmail && creatorEmail === myEmail);
+    const iAmRight = !!(inviteeEmail && myEmail && inviteeEmail === myEmail);
     if (!leftEmail) {
       if (iAmRight) {
         leftEmail = partnerEmail ?? null;
@@ -2748,7 +2662,7 @@ function CollabInitials() {
       }
     }
   } else {
-    // Viewer-local ordering — no canonical data yet.
+    // No canonical data yet — viewer-local fallback.
     leftEmail = myEmail ?? null;
     leftName = myDisplayName ?? null;
     rightEmail = partnerEmail ?? null;
@@ -2758,42 +2672,11 @@ function CollabInitials() {
   const rightChar = letterOrNull(rightName, rightEmail);
   if (!leftChar && !rightChar) return null;
 
-  // Decide which chip represents the "currently loaded" side. In
-  // normal use that's the viewer (they're editing their own draft);
-  // in partner-preview mode it flips to the partner. The active chip
-  // gets `.collab-initial-active` which both inverts its colors
-  // (black bg / white letter) and pulls it to the front of the
-  // overlap via a higher z-index. Falls back silently if we can't
-  // tell which side is the viewer — no halo in that case.
-  const mineOnLeft =
-    !!(leftEmail && myEmail && leftEmail === myEmail);
-  const mineOnRight =
-    !!(rightEmail && myEmail && rightEmail === myEmail);
-  let activeSide: "left" | "right" | null = null;
-  if (mineOnLeft || mineOnRight) {
-    const mineSide: "left" | "right" = mineOnLeft ? "left" : "right";
-    const partnerSide: "left" | "right" =
-      mineSide === "left" ? "right" : "left";
-    activeSide = isPartnerPreviewing ? partnerSide : mineSide;
-  }
-
-  const leftCls = `collab-initial${activeSide === "left" ? " collab-initial-active" : ""}`;
-  const rightCls = `collab-initial${activeSide === "right" ? " collab-initial-active" : ""}`;
-
-  // Tapping the chip opens the name-capture modal (via onOpenNameCapture
-  // from context). Works whether the current viewer already set a name
-  // or not — a re-tap lets them edit. Wrapped in a <button> for the
-  // tap semantics + keyboard focus; the inner chips are purely visual.
   return (
-    <button
-      type="button"
-      className="collab-initials-pair"
-      aria-label="Collaborators — edit your name"
-      onClick={onOpenNameCapture}
-    >
-      {leftChar && <span className={leftCls}>{leftChar}</span>}
-      {rightChar && <span className={rightCls}>{rightChar}</span>}
-    </button>
+    <span className="layer-owner-initials-pair" aria-hidden="true">
+      {leftChar && <span className="layer-owner-initial">{leftChar}</span>}
+      {rightChar && <span className="layer-owner-initial">{rightChar}</span>}
+    </span>
   );
 }
 
@@ -2968,8 +2851,15 @@ function LayerBar({
   onOpenReadThrough?: () => void;
 }) {
   const hasSource = !isLayerDraftEmpty(story, layer);
+  const { previewLayer } = usePartnerIdentity();
+  // READ-ONLY badge only on the bar for the exact layer we're
+  // previewing. Global `isPartnerPreviewing` stays true even after the
+  // user taps another tab, which would incorrectly badge their own
+  // drafts as read-only.
+  const showReadOnly = previewLayer === layer;
   return (
     <div className="layer-bar">
+      <ActiveDraftInitial layer={layer} />
       <LayerDraftPicker
         layer={layer}
         label={label}
@@ -2988,7 +2878,18 @@ function LayerBar({
           <span>Read-through</span>
         </button>
       )}
-      <CollabInitials />
+
+      {/* READ-ONLY indicator — pinned to the right edge via margin-left:
+          auto on the CSS rule. Replaces the old lock-banner that sat
+          above the tab content; that bar is gone and its exit action
+          is served by the layer-drafts picker (select any own-side
+          draft to leave preview mode). */}
+      {showReadOnly && (
+        <span className="layer-read-only-indicator" role="status">
+          <img src="/read-only-lock.svg" alt="" className="layer-read-only-lock" />
+          <span>READ ONLY</span>
+        </span>
+      )}
 
       {/* Update Other Layers trigger hidden for now — we may bring the
           cross-layer sync surface back later. Gated on `false` instead
@@ -4306,7 +4207,13 @@ function AttrRow({
             : <span className="attr-placeholder">{readOnly ? "None added" : (placeholder || "Not set")}</span>
           }
         </div>
-        {!suppressControls && (
+        {/* Caret hidden in partner-preview (readOnly) mode entirely —
+            the user can't interact with the tab anyway (the wrapper
+            .partner-preview-locked has pointer-events: none), so an
+            expand indicator is misleading. Previously we only hid it
+            on empty rows via `suppressControls`; user asked to pull
+            it from ALL concept rows while previewing a partner draft. */}
+        {!readOnly && !suppressControls && (
           <svg className={`attr-caret ${expanded ? "open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
