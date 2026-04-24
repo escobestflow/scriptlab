@@ -2513,37 +2513,55 @@ function PartnerPreviewBanner({
   onCopy: () => void;
   onExit: () => void;
 }) {
-  const who = partnerEmail || "Partner";
+  const who = partnerEmail ? partnerEmail.split("@")[0] : "partner";
   const draftStr =
     draftNumber !== null ? `${layerLabel} Draft ${draftNumber}` : `${layerLabel} Draft`;
   return (
-    <div className="partner-preview-banner">
-      <div className="partner-preview-banner-text">
-        <svg
-          className="partner-preview-lock-icon"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden="true"
-        >
-          <rect x="4" y="11" width="16" height="10" rx="2" />
-          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-        </svg>
-        <span className="partner-preview-banner-headline">
-          Viewing {who}'s {draftStr}
-        </span>
-        <span className="partner-preview-banner-sub">Locked · read-only</span>
-      </div>
+    <div className="partner-preview-banner" role="status">
+      <svg
+        className="partner-preview-lock-icon"
+        width="11"
+        height="11"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        aria-hidden="true"
+      >
+        <rect x="4" y="11" width="16" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      </svg>
+      <span className="partner-preview-banner-text">
+        <span className="partner-preview-banner-who">{who}</span>
+        <span className="partner-preview-banner-sep">·</span>
+        <span className="partner-preview-banner-draft">{draftStr}</span>
+      </span>
       <div className="partner-preview-banner-actions">
-        <Button variant="primary" size="sm" onClick={onCopy}>
-          Copy to my drafts
-        </Button>
-        <Button variant="secondary" size="sm" onClick={onExit}>
-          Exit
-        </Button>
+        <button
+          type="button"
+          className="partner-preview-banner-action"
+          onClick={onCopy}
+        >
+          Copy
+        </button>
+        <button
+          type="button"
+          className="partner-preview-banner-action is-exit"
+          onClick={onExit}
+          aria-label="Exit partner preview"
+        >
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            aria-hidden="true"
+          >
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
       </div>
     </div>
   );
