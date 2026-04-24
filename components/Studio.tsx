@@ -234,10 +234,19 @@ export function Studio({
     setNameModalOpen(true);
   }
   async function handleSaveDisplayName(name: string) {
-    const ok = await saveMyDisplayName(name);
-    if (!ok) return false;
-    setMyDisplayName(name.trim());
+    // Optimistic close: update the chip locally + close the modal
+    // regardless of whether the DB write lands. The DB write is a
+    // nice-to-have — the chip is driven off local state anyway, and
+    // failing silently here (e.g., the `profiles` migration hasn't
+    // been applied yet) should NOT trap the user inside a modal
+    // they can never escape. Log the error but don't block.
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    setMyDisplayName(trimmed);
     setNameModalOpen(false);
+    saveMyDisplayName(trimmed).catch(err => {
+      console.error("saveMyDisplayName failed (non-fatal):", err);
+    });
     return true;
   }
   // "Project Created" toast — shown briefly after a new project is
@@ -2491,13 +2500,17 @@ function NameCaptureModal({
   }
 
   const partnerLabel =
-    partnerDisplayName?.trim() || partnerEmail || "your collaborator";
+    partnerDisplayName?.trim() || partnerEmail || "someone";
 
   return (
     <>
+      {/* Backdrop tap closes the sheet in BOTH modes. We used to block
+          dismissal in first-time mode to force a name capture, but the
+          modal re-opens on the next project entry anyway — no point
+          holding the user hostage here. */}
       <div
         className={`sheet-backdrop ${open ? "open" : ""}`}
-        onClick={mode === "edit" ? onCancel : undefined}
+        onClick={onCancel}
       />
       <div className={`sheet name-capture-sheet ${open ? "open" : ""}`}>
         <div className="sheet-handle" />
@@ -2506,12 +2519,19 @@ function NameCaptureModal({
             className="display heading"
             style={{ marginTop: 25, marginBottom: 8 }}
           >
-            {mode === "edit" ? "Your name" : "What's your first name?"}
+            {mode === "edit" ? "Your name" : "Introductions?"}
           </div>
           <div className="caption" style={{ marginBottom: 20 }}>
-            {mode === "edit"
-              ? `Update the name ${partnerLabel} sees for you on this shared project.`
-              : `You're collaborating with ${partnerLabel}. Your first name helps personalize the initials chip above and any messages that mention you.`}
+            {mode === "edit" ? (
+              <>Change what {partnerLabel} sees next to your work on this project.</>
+            ) : (
+              <>
+                You're sharing this project with <strong>{partnerLabel}</strong>.
+                A first name makes it a lot easier to tell whose genius wrote
+                which beat — beats squinting at <em>{"m@…"}</em> vs{" "}
+                <em>{"m@…"}</em> in the credits.
+              </>
+            )}
           </div>
 
           <Input
@@ -2542,18 +2562,16 @@ function NameCaptureModal({
             {saving ? "Saving…" : "Save"}
           </Button>
 
-          {mode === "edit" && (
-            <Button
-              variant="secondary"
-              size="lg"
-              block
-              onClick={onCancel}
-              disabled={saving}
-              style={{ marginTop: 10 }}
-            >
-              Cancel
-            </Button>
-          )}
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={onCancel}
+            disabled={saving}
+            style={{ marginTop: 10 }}
+          >
+            {mode === "edit" ? "Cancel" : "Not now"}
+          </Button>
         </div>
       </div>
     </>
