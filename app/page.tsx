@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Story, getActiveConceptDraft, getActiveStoryLayerDraft, updateConceptDraft } from "@/lib/story";
+import { Story, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, updateConceptDraft } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
@@ -232,6 +232,26 @@ export default function Page() {
   // before they've accepted — no more "?" fallbacks.
   const [projectMembers, setProjectMembers] = useState<Record<string, ProjectMembers>>({});
 
+  // "Empty invitee seed" detection — used to decide whether to
+  // backfill from the creator's row. Legacy rows created by the old
+  // accept_invite (pre-collab-accept-seed-full.sql) had no logline,
+  // no characters, no beats, no scenes. We treat that shape as a
+  // candidate for one-time backfill. Any edit the invitee has
+  // already made (even a single character, beat, or scene) causes
+  // this to return false and we leave their row alone.
+  const isEmptyInviteeSeed = (s: Story): boolean => {
+    const c = getActiveConceptDraft(s);
+    const ch = getActiveCharactersDraft(s);
+    const st = getActiveStoryLayerDraft(s);
+    const sc = getActiveScriptDraft(s);
+    const hasLogline = !!c.logline?.trim();
+    const hasCharacters = ch.characters.length > 0;
+    const hasBeats = st.beats.length > 0 ||
+      (st.episodes?.some(e => e.beats.length > 0) ?? false);
+    const hasScenes = sc.script.scenes.length > 0;
+    return !hasLogline && !hasCharacters && !hasBeats && !hasScenes;
+  };
+
   const refreshPartnerStory = useCallback(async (projectId: string, partnerUserId: string) => {
     const partner = await loadPartnerProjectData(projectId, partnerUserId);
     if (!partner) return;
@@ -352,19 +372,26 @@ export default function Page() {
     return () => { supabase.removeChannel(channel); };
   }, [view, projects, refreshPartnerStory, refreshPartnerEmail, refreshProjectMembers, partnerEmails, projectMembers]);
 
-  // Hydrate projectMembers + partner (creator-side) Stories for every
-  // shared project as soon as the dashboard's projects list lands. The
-  // Projects tab uses this data to:
-  //   1. Render the creator's latest-draft content (title/thumb/
-  //      logline/genres) on the invitee's project card, so the invitee
-  //      sees what the creator sees rather than the empty seed row.
-  //   2. Render the overlapping-initials chip in the top-right of every
-  //      collab card, driven by the same creator/invitee pair the
-  //      studio's layer bars use.
+  // Hydrate projectMembers + partnerEmails for every shared project on
+  // dashboard landing. These back the overlapping-initials chip in the
+  // top-right of every collab card.
   //
-  // Cheap and idempotent — one RPC per shared project the first time
-  // we see it, then nothing. We piggyback on `projectMembers` /
-  // `partnerStories` caches so studio re-entry doesn't refetch either.
+  // We used to also fetch the *creator's Story* here (for the invitee's
+  // card) — but that depended on loadPartnerProjectData, and the
+  // invitee's logline would flicker out across dashboard re-entries /
+  // page reloads whenever the cache got invalidated. The new accept_invite
+  // RPC (collab-accept-seed-full.sql) seeds the invitee's own row with
+  // the creator's full data payload at accept time, so the invitee's
+  // local row already carries logline / thumbnail / drafts — no partner
+  // fetch needed on the dashboard. Studio entry still fetches partnerStory
+  // (below, in the studio-view effect) because the "Partner's drafts"
+  // picker needs the partner's live content.
+  // One-time backfill bookkeeping: per-project, we only want to try
+  // filling an empty invitee seed once per app session. This ref
+  // tracks which project ids we've already attempted — another
+  // attempt on the same project would redundantly hit the DB.
+  const inviteeSeedBackfilledRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!hydrated || !user) return;
     projects.forEach(p => {
@@ -378,16 +405,38 @@ export default function Page() {
       if (!partnerEmails[p.id]) {
         refreshPartnerEmail(p.id);
       }
-      // Only the invitee benefits from loading the creator's row for
-      // the card — the creator's own row IS the canonical source for
-      // them. We don't know which side is which until projectMembers
-      // lands, so gate on that.
+
+      // One-time invitee-seed backfill. Projects accepted BEFORE the
+      // collab-accept-seed-full.sql migration have an empty invitee
+      // row ({id,title,projectType}); post-migration new invitees get
+      // the full clone at accept time. For the legacy rows, when we
+      // know we're the invitee (projectMembers says so) and our local
+      // row has no logline / characters / beats / scenes, we fetch
+      // the creator's row and save it into ours. One shot per session.
       const members = projectMembers[p.id];
-      if (members) {
-        const iAmCreator = members.creator.userId === user.id;
-        if (!iAmCreator && !partnerStories[p.id]) {
-          refreshPartnerStory(p.id, members.creator.userId);
-        }
+      if (
+        members &&
+        !inviteeSeedBackfilledRef.current.has(p.id) &&
+        members.creator.userId !== user.id &&
+        p.collaboratorUserId === members.creator.userId &&
+        isEmptyInviteeSeed(p)
+      ) {
+        inviteeSeedBackfilledRef.current.add(p.id);
+        (async () => {
+          const partner = await loadPartnerProjectData(p.id, members.creator.userId);
+          if (!partner) return;
+          // Preserve my own reverse-pointer (collaboratorUserId = creator);
+          // everything else comes from the creator. Save + hydrate local
+          // state so the card updates without a reload.
+          const merged: Story = {
+            ...partner,
+            collaboratorUserId: members.creator.userId,
+          };
+          await saveProjectToDB(user.id, merged);
+          setProjects(prev =>
+            prev.map(x => (x.id === p.id ? merged : x)),
+          );
+        })();
       }
     });
   }, [
@@ -395,10 +444,8 @@ export default function Page() {
     user,
     projects,
     projectMembers,
-    partnerStories,
     partnerEmails,
     refreshProjectMembers,
-    refreshPartnerStory,
     refreshPartnerEmail,
   ]);
 
@@ -779,7 +826,6 @@ export default function Page() {
                 myUserId={user?.id ?? null}
                 myEmail={user?.email ?? null}
                 projectMembers={projectMembers}
-                partnerStories={partnerStories}
                 partnerEmails={partnerEmails}
               />
             )}
@@ -1690,7 +1736,7 @@ function EmptyPosterStack() {
 function ProjectsTab({
   projects, onOpen, onNew,
   pendingInvites, onAcceptInvite, onDeclineInvite,
-  myUserId, myEmail, projectMembers, partnerStories, partnerEmails,
+  myUserId, myEmail, projectMembers, partnerEmails,
 }: {
   projects: Story[];
   onOpen: (id: string) => void;
@@ -1706,14 +1752,8 @@ function ProjectsTab({
    *  initials chip when projectMembers hasn't resolved yet. */
   myEmail: string | null;
   /** Creator/invitee pair per project id, backed by the
-   *  project_invites-joined RPC. Drives the overlapping-initials chip
-   *  and the "am I the creator" branch for card content. */
+   *  project_invites-joined RPC. Drives the overlapping-initials chip. */
   projectMembers: Record<string, ProjectMembers>;
-  /** Partner's Story per project id — for invitees, this is the
-   *  CREATOR's row, used as the data source for the project card so
-   *  the invitee sees the creator's latest draft details instead of
-   *  the empty seed row accept_invite left behind. */
-  partnerStories: Record<string, Story>;
   /** Partner's email per project id — used as the right-circle
    *  fallback in the card-chip when projectMembers hasn't resolved.
    *  Loaded eagerly on dashboard hydration so the chip always has a
@@ -1814,21 +1854,14 @@ function ProjectsTab({
       )}
 
       {projects.map(p => {
-        // For shared projects where the current user is the invitee,
-        // render the card from the CREATOR's Story so it mirrors what
-        // the creator sees. accept_invite seeds the invitee's own row
-        // with only id/title/projectType, so their own Story's
-        // logline/genres/thumbnail would otherwise be empty until
-        // they edit. We fall back to their own row while the creator
-        // story is still loading (shows at least title + placeholder).
+        // Card renders straight from the user's own row. For the
+        // invitee, accept_invite now seeds their row with a full
+        // copy of the creator's data (logline, thumbnail, drafts, …)
+        // at accept time — see supabase/collab-accept-seed-full.sql.
+        // No partner-story fetch needed on the dashboard.
         const members = projectMembers[p.id];
         const isCollab = !!p.collaboratorUserId;
-        const iAmCreator = !!(members && myUserId && members.creator.userId === myUserId);
-        const displayStory =
-          isCollab && !iAmCreator && partnerStories[p.id]
-            ? partnerStories[p.id]
-            : p;
-        const c = getActiveConceptDraft(displayStory);
+        const c = getActiveConceptDraft(p);
 
         // Initials chip on collab cards. Build each slot
         // independently, walking multiple sources so a missing RPC
@@ -1888,16 +1921,16 @@ function ProjectsTab({
         return (
           <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
             <div className="project-cover">
-              {displayStory.thumbnail ? (
-                <img src={displayStory.thumbnail} alt="" className="project-cover-img" />
+              {p.thumbnail ? (
+                <img src={p.thumbnail} alt="" className="project-cover-img" />
               ) : (
                 <span className="project-cover-initial">
-                  {displayStory.title ? displayStory.title.charAt(0).toUpperCase() : "?"}
+                  {p.title ? p.title.charAt(0).toUpperCase() : "?"}
                 </span>
               )}
             </div>
             <div className="project-body">
-              <div className="project-title">{displayStory.title || "Untitled"}</div>
+              <div className="project-title">{p.title || "Untitled"}</div>
               <div className="project-genre">
                 {/* .attr-pill matches the collapsed-state genre chips in
                     the Concept tab on the Project Detail page. */}
