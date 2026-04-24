@@ -4474,8 +4474,12 @@ html[data-theme="dark"] .layer-update-trigger .drafts-caret {
    size (9pt vs. 10pt) to sit more quietly next to the draft-dropdown
    call-to-action. Always outlined — no dark-fill variant. */
 .layer-owner-initial {
-  width: 18px;
-  height: 18px;
+  /* Circle is 1px larger than the project-card `.collab-initial`
+     version (19px vs. 18px) — gives the chip a touch more presence
+     next to the draft-dropdown CTA without growing the letter
+     itself, which stays at 9pt. */
+  width: 19px;
+  height: 19px;
   flex: 0 0 auto;
   border-radius: 50%;
   border: 1px solid #454646;
