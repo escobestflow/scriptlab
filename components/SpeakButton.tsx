@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Character, Genre, ProjectType } from "@/lib/story";
+import type { TtsVoice } from "@/lib/scriptParse";
 import { playback, speak, speakScript, stopSpeaking } from "@/lib/tts";
 
 type Size = "sm" | "md";
@@ -22,6 +23,16 @@ interface CommonProps {
   title?: string;
   /** Extra className merged onto the root button. */
   className?: string;
+  /** Override the voice used for single-voice (`text`) reads — e.g. the
+   *  Character editor's voice picker uses this to preview each voice
+   *  with the same sample line. Ignored in `script` mode (which builds
+   *  a per-character voice map from the parsed screenplay). */
+  voice?: TtsVoice;
+  /** Override the project-level dialogue/narrator style instructions —
+   *  used by the character picker to feed the user's free-text voice
+   *  description (e.g. "hushed, menacing") into TTS so the preview
+   *  reflects what they'd hear at script-read time. */
+  instructions?: string;
 }
 
 type Props =
@@ -72,6 +83,8 @@ export function SpeakButton(props: Props) {
         await speak(text, ownerRef.current, {
           projectType: props.projectType,
           genres: props.genres,
+          voice: props.voice,
+          instructions: props.instructions,
         });
       }
     } catch (err) {

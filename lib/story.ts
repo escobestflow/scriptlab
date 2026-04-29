@@ -92,6 +92,14 @@ export interface CharacterRelationship {
  */
 export type CharacterGender = string;
 
+/** OpenAI gpt-4o-mini-tts voice IDs the app supports today.
+ *  Kept in sync with `CHARACTER_VOICES` + `"onyx"` in lib/scriptParse.ts.
+ *  Defined here (not in scriptParse) so Character can reference it
+ *  without dragging the screenplay parser into every story-layer
+ *  import. */
+export type CharacterAiVoice =
+  | "alloy" | "echo" | "fable" | "nova" | "onyx" | "shimmer";
+
 export interface Character {
   id: string;
   name: string;
@@ -107,7 +115,15 @@ export interface Character {
   want: string;
   need: string;
   relationships: CharacterRelationship[];
+  /** Free-text voice direction, e.g. "hushed, menacing, mid-30s".
+   *  Read aloud passes this string to TTS as the `instructions`
+   *  parameter so the model adopts the described delivery. Doubles
+   *  as a gender-keyword hint when `aiVoice` isn't explicitly set. */
   voice: string;
+  /** Explicit AI voice pick from the read-aloud picker. `null`/missing
+   *  means "Auto" — fall back to the name-hash + `voice`-keyword
+   *  heuristic so unset characters still sound consistent. */
+  aiVoice?: CharacterAiVoice | null;
   arc: string;
   notes: string;
 }

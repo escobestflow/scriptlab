@@ -2396,6 +2396,61 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
   margin-left: auto;
 }
 
+/* ======= CHARACTER VOICE PICKER ======= */
+/* 7 cards (Auto + 6 OpenAI voices) laid out in a 2-column grid that
+   collapses to 1 column on narrow screens. Each card is a tap target
+   for selection, with the preview SpeakButton floating top-right —
+   tapping the button never selects the card, so users can audition
+   without committing. */
+.char-voice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.char-voice-card {
+  position: relative;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 200ms var(--ease), background 200ms var(--ease);
+}
+.char-voice-card.selected {
+  border-color: var(--ink);
+  background: var(--bg-secondary);
+}
+.char-voice-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 12px 44px 12px 14px; /* reserve right side for SpeakButton */
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  border-radius: inherit;
+}
+.char-voice-pick:active { transform: scale(0.985); }
+.char-voice-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.char-voice-desc {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink-mute);
+}
+.char-voice-card .speak-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+@media (max-width: 480px) {
+  .char-voice-grid { grid-template-columns: 1fr; }
+}
+
 /* Sync banner */
 .sync-banner {
   position: relative;

@@ -375,11 +375,25 @@ export async function speakScript(
   const charStyle = getStyleForProject(opts.projectType, opts.genres);
   const speed = opts.speed ?? DEFAULT_TTS_SPEED;
 
-  // Pre-seed voice map from the Characters layer so `voice` hints carry over.
+  // Pre-seed voice map from the Characters layer. Two layers of override:
+  //   1. `aiVoice` — explicit pick from the read-aloud picker. Wins over
+  //      everything; if the user said "Marian sounds like fable", we use
+  //      fable, period.
+  //   2. `voice` — free-text direction ("hushed, menacing"). Used as a
+  //      gender-keyword hint into assignCharacterVoice when no aiVoice
+  //      is set, AND piped into the TTS `instructions` payload below so
+  //      the model actually delivers in the described tone.
   const voiceMap = new Map<string, TtsVoice>();
+  const directionMap = new Map<string, string>();
   for (const c of characters) {
-    if (c.name) {
-      voiceMap.set(c.name.toUpperCase(), assignCharacterVoice(c.name, c.voice));
+    if (!c.name) continue;
+    const key = c.name.toUpperCase();
+    voiceMap.set(
+      key,
+      c.aiVoice ?? assignCharacterVoice(c.name, c.voice),
+    );
+    if (c.voice && c.voice.trim()) {
+      directionMap.set(key, c.voice.trim());
     }
   }
   const voiceFor = (rawName: string): TtsVoice => {
@@ -390,6 +404,16 @@ export async function speakScript(
     voiceMap.set(key, v);
     return v;
   };
+  // Per-character delivery direction. We splice the user's free-text
+  // voice description into the project-level dialogue style so the
+  // model still gets the genre/pacing baseline plus the character-
+  // specific layer. No description = plain project style.
+  const styleFor = (rawName: string): string => {
+    const key = rawName.toUpperCase();
+    const direction = directionMap.get(key);
+    if (!direction) return charStyle;
+    return `${charStyle}\n\nFor this character specifically: ${direction}`;
+  };
 
   const producers = chunks
     // Parentheticals are acting notes, not spoken — skip them.
@@ -398,7 +422,8 @@ export async function speakScript(
       if (c.kind === "heading" || c.kind === "action") {
         return fetchAudio(c.text, "onyx", narratorStyle, speed);
       }
-      return fetchAudio(c.text, voiceFor(c.character || ""), charStyle, speed);
+      const name = c.character || "";
+      return fetchAudio(c.text, voiceFor(name), styleFor(name), speed);
     });
 
   await playback.play(owner, producers);

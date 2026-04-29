@@ -6193,8 +6193,70 @@ function CharacterEditForm({
         pager={pagerFor("need")}
       />
 
+      {/* Read-aloud voice — explicit OpenAI gpt-4o-mini-tts voice ID
+          used when the script is read aloud. "Auto" leaves it unset
+          and the playback layer falls back to a deterministic name-
+          hash + gender-keyword heuristic, so unpicked characters
+          still get a stable voice across sessions.
+
+          The free-text "Voice direction" field below is separate but
+          related: it's the delivery instructions ("hushed, menacing")
+          that go to TTS as the `instructions` payload on top of the
+          project-level dialogue style. The preview play button on
+          each chip uses the SAME instructions as the real read-aloud
+          flow, so what users hear during selection matches what
+          they'll hear in Read Mode. */}
+      <div className="eyebrow" style={{ marginTop: 4 }}>Read-aloud voice</div>
+      <div className="char-voice-grid">
+        {([
+          { id: null,      label: "Auto",     desc: "Pick automatically based on the character." },
+          { id: "alloy",   label: "Alloy",    desc: "Neutral, even-toned." },
+          { id: "echo",    label: "Echo",     desc: "Warm, masculine." },
+          { id: "fable",   label: "Fable",    desc: "British, narrator-leaning, masculine." },
+          { id: "onyx",    label: "Onyx",     desc: "Deep, gravelly, masculine." },
+          { id: "nova",    label: "Nova",     desc: "Bright, expressive, feminine." },
+          { id: "shimmer", label: "Shimmer",  desc: "Calm, soft, feminine." },
+        ] as const).map(v => {
+          // Selected when the explicit aiVoice matches, OR when both
+          // are nullish and this is the Auto card. Splitting the
+          // comparison across the union avoids `null === undefined`
+          // surprises on legacy rows.
+          const selected = v.id === null
+            ? !ch.aiVoice
+            : ch.aiVoice === v.id;
+          return (
+            <div key={v.label} className={`char-voice-card${selected ? " selected" : ""}`}>
+              <button
+                type="button"
+                className="char-voice-pick"
+                onClick={() => onUpdate({ aiVoice: v.id })}
+                aria-pressed={selected}
+              >
+                <span className="char-voice-name">{v.label}</span>
+                <span className="char-voice-desc">{v.desc}</span>
+              </button>
+              {/* Auto has no preview — it doesn't resolve to a single
+                  voice until a name is in play, and previewing a name-
+                  hash result before the user has typed a name would be
+                  misleading. */}
+              {v.id && (
+                <SpeakButton
+                  size="sm"
+                  text={`I have to do this. There is no other way.`}
+                  voice={v.id}
+                  instructions={ch.voice && ch.voice.trim()
+                    ? `Deliver this line with the following voice direction: ${ch.voice.trim()}`
+                    : undefined}
+                  title={`Preview ${v.label}`}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
       <CharField
-        label="Voice / speaking style"
+        label="Voice direction (read aloud as…)"
         value={ch.voice}
         onChange={v => onUpdate({ voice: v })}
         onAI={() => generateCharacterField("voice")}

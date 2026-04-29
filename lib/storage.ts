@@ -24,12 +24,20 @@ function normalizeBeat(b: any, index: number): Beat {
   };
 }
 
+// Whitelist matching CHARACTER_VOICES + "onyx" in lib/scriptParse.ts
+// (and CharacterAiVoice in lib/story.ts). Anything else loaded from a
+// legacy save normalizes to null — i.e. "Auto, use the heuristic."
+const ALLOWED_AI_VOICES = new Set([
+  "alloy", "echo", "fable", "nova", "onyx", "shimmer",
+]);
+
 function normalizeCharacter(c: any): Character {
   return {
     id: c.id || "ch_" + Math.random().toString(36).slice(2),
     name: c.name || "",
     role: c.role || "",
     archetype: c.archetype || "",
+    gender: typeof c.gender === "string" && c.gender ? c.gender : undefined,
     backstory: c.backstory || "",
     motivations: c.motivations || "",
     flaws: c.flaws || "",
@@ -37,6 +45,8 @@ function normalizeCharacter(c: any): Character {
     need: c.need || "",
     relationships: c.relationships || [],
     voice: c.voice || "",
+    aiVoice: ALLOWED_AI_VOICES.has(c.aiVoice)
+      ? (c.aiVoice as Character["aiVoice"]) : null,
     arc: c.arc || "",
     notes: c.notes || "",
   };
