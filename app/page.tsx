@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Story, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, updateConceptDraft } from "@/lib/story";
+import { Story, LayerKey, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, updateConceptDraft } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
+import { runEasyMode, type EasyModeStep, EasyModeError } from "@/lib/easyMode";
+import { EasyModeOverlay } from "@/components/EasyModeOverlay";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
@@ -30,7 +32,7 @@ import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 
 type View =
   | { kind: "main" }
-  | { kind: "studio"; projectId: string; isNew?: boolean; isFirstProject?: boolean };
+  | { kind: "studio"; projectId: string; isNew?: boolean; isFirstProject?: boolean; initialSection?: LayerKey };
 
 // localStorage key that gates the first-project onboarding sheet. Set once
 // the user dismisses the sheet; absence of this flag means "show welcome
@@ -159,6 +161,14 @@ export default function Page() {
   // but visually we treat Format as "unselected" until the user taps a
   // choice — which is what gates the Step 0 Continue button.
   const [createFormatTouched, setCreateFormatTouched] = useState(false);
+  // Easy-mode pipeline state. easyModeRunning gates the fullscreen
+  // overlay; easyModeStep tracks which row's mini-spinner is animating;
+  // easyModeError flips the overlay into the failure card; the projectId
+  // ref keeps the seed reachable for Retry / Open project anyway.
+  const [easyModeRunning, setEasyModeRunning] = useState(false);
+  const [easyModeStep, setEasyModeStep] = useState<EasyModeStep | null>(null);
+  const [easyModeError, setEasyModeError] = useState<{ step: EasyModeStep; message: string } | null>(null);
+  const [easyModeProjectId, setEasyModeProjectId] = useState<string | null>(null);
   // New idea (moment) sheet — mirrors the Project/Idea creation UX.
   const [newIdeaOpen, setNewIdeaOpen] = useState(false);
   const [newIdeaText, setNewIdeaText] = useState("");
@@ -687,6 +697,70 @@ export default function Page() {
     generateThumbnail(saved.id, saved.title, getActiveConceptDraft(saved).logline, getActiveConceptDraft(saved).settings.genres);
   }
 
+  // ── Easy mode: run the AI pipeline against the freshly created seed ──
+  //
+  // Pulled into its own function so the EasyModeOverlay's Retry button can
+  // re-invoke the chain against an existing project (which already exists
+  // because the seed is committed before the chain starts — see
+  // finishCreateEasy below). Persist callback awaits both local state and
+  // Supabase upsert so a crash mid-chain leaves recoverable state.
+  async function runEasyModeWithSeed(seed: Story) {
+    setEasyModeRunning(true);
+    setEasyModeError(null);
+    setEasyModeStep(null);
+    try {
+      const finished = await runEasyMode(seed, {
+        onStep: (s) => setEasyModeStep(s),
+        persist: async (next) => {
+          setProjects(ps => ps.map(p => p.id === next.id ? next : p));
+          if (user) await saveProjectToDB(user.id, next);
+        },
+      });
+      // Success: navigate into the project on the Script tab so the
+      // user lands on the final output. Thumbnail generation reads the
+      // freshly populated logline + genres.
+      setEasyModeRunning(false);
+      setEasyModeStep(null);
+      const firstTime = !hasSeenFirstProjectOnboarding();
+      setView({
+        kind: "studio",
+        projectId: finished.id,
+        isNew: true,
+        isFirstProject: firstTime,
+        initialSection: "script",
+      });
+      generateThumbnail(
+        finished.id,
+        finished.title,
+        getActiveConceptDraft(finished).logline,
+        getActiveConceptDraft(finished).settings.genres,
+      );
+    } catch (e: any) {
+      // EasyModeError carries the offending step + the partial story.
+      // We leave easyModeRunning true so the overlay stays mounted in
+      // its error state with Retry / Open project anyway buttons.
+      const failedStep: EasyModeStep =
+        e instanceof EasyModeError ? e.failedStep : "concept";
+      const message =
+        e instanceof Error ? e.message : String(e ?? "Unknown error");
+      setEasyModeError({ step: failedStep, message });
+    }
+  }
+
+  async function finishCreateEasy() {
+    if (!createDraft) return;
+    const seed = createDraft;
+    // Commit the empty seed FIRST so the project shows up in the user's
+    // list immediately and a crash mid-AI-run doesn't leave nothing.
+    setProjects(ps => [seed, ...ps]);
+    setEasyModeProjectId(seed.id);
+    if (user) {
+      try { await saveProjectToDB(user.id, seed); } catch { /* persist below */ }
+    }
+    closeCreateModal();
+    await runEasyModeWithSeed(seed);
+  }
+
   function updateDraft(u: (s: Story) => Story) {
     setCreateDraft(prev => prev ? u(prev) : prev);
   }
@@ -756,6 +830,7 @@ export default function Page() {
           onBack={() => setView({ kind: "main" })}
           isNew={(view as any).isNew ?? false}
           isFirstProject={(view as any).isFirstProject ?? false}
+          initialSection={(view as any).initialSection}
           onOnboardingSeen={markFirstProjectOnboardingSeen}
           onCreateProjectFromDraft={(newStory) => {
             setProjects(ps => [newStory, ...ps]);
@@ -1216,8 +1291,8 @@ export default function Page() {
           {/* Elevated step indicator — centered in the header, no cancel button.
               Completed steps show a checkmark; upcoming/active render an empty
               node (no numbers). */}
-          <div className="create-stepper create-stepper-compact" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={createStep + 1}>
-            {(["Format", "Title", "Genre"] as const).map((name, i) => {
+          <div className="create-stepper create-stepper-compact" role="progressbar" aria-valuemin={1} aria-valuemax={4} aria-valuenow={createStep + 1}>
+            {(["Format", "Title", "Genre", "Start"] as const).map((name, i) => {
               const state = i < createStep ? "done" : i === createStep ? "active" : "upcoming";
               return (
                 <div key={name} className={`create-step create-step-${state}`}>
@@ -1229,7 +1304,7 @@ export default function Page() {
                     )}
                   </div>
                   <div className="create-step-label">{name}</div>
-                  {i < 2 && <div className="create-step-track" aria-hidden="true" />}
+                  {i < 3 && <div className="create-step-track" aria-hidden="true" />}
                 </div>
               );
             })}
@@ -1250,6 +1325,9 @@ export default function Page() {
           {createDraft && createStep === 2 && (
             <CreateStepGenre draft={createDraft} setDraft={updateDraft} />
           )}
+          {createDraft && createStep === 3 && (
+            <CreateStepHowToStart />
+          )}
         </div>
         <div className="create-modal-footer">
           <div className="create-modal-actions">
@@ -1259,39 +1337,100 @@ export default function Page() {
                 Back
               </Button>
             )}
-            {createStep < 2 ? (
+            {createStep < 3 ? (
               <Button
                 variant="primary"
                 size="lg"
                 onClick={() => setCreateStep(s => s + 1)}
-                // Each step gates Continue: Format must be actively chosen,
-                // Title must be non-empty.
+                // Each step gates Continue:
+                //   step 0 Format: must be actively chosen
+                //   step 1 Title:  must be non-empty
+                //   step 2 Genre:  at least one genre selected
                 disabled={
                   (createStep === 0 && !createFormatTouched) ||
-                  (createStep === 1 && !createDraft?.title?.trim())
+                  (createStep === 1 && !createDraft?.title?.trim()) ||
+                  (createStep === 2 && (createDraft ? getActiveConceptDraft(createDraft).settings.genres.length === 0 : true))
                 }
                 style={{ flex: 1 }}
               >
                 Continue
               </Button>
             ) : (
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={finishCreate}
-                // Step 2 requires title + at least one selected genre.
-                disabled={
-                  !createDraft?.title?.trim() ||
-                  (createDraft ? getActiveConceptDraft(createDraft).settings.genres.length === 0 : true)
-                }
-                style={{ flex: 1 }}
-              >
-                Create Project
-              </Button>
+              // Step 3 (How-to-Start) — two side-by-side buttons. The
+              // checkbox-style "choice" lives in the buttons themselves
+              // rather than tappable cards, keeping the visual rhythm
+              // of the prior steps' Back/Continue footer intact.
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  onClick={finishCreateEasy}
+                  block
+                >
+                  Use Easy mode
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={finishCreate}
+                  block
+                >
+                  Just create project
+                </Button>
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Easy-mode overlay — fullscreen scrim shown while the
+          Concept→Characters→Story→Script chain is running, and on
+          failure (with Retry / Open project anyway buttons). Mounted
+          here at the app level rather than inside Studio because it
+          has to be visible during project creation, before the user
+          has navigated into Studio at all. */}
+      {easyModeRunning && (
+        <EasyModeOverlay
+          currentStep={easyModeStep}
+          error={easyModeError}
+          onRetry={() => {
+            // Re-run from the seed (which was committed before the
+            // first run started). Prior partial writes get overwritten
+            // by the new run's persist() calls.
+            const seed = projects.find(p => p.id === easyModeProjectId);
+            if (!seed) {
+              setEasyModeRunning(false);
+              setEasyModeError(null);
+              return;
+            }
+            runEasyModeWithSeed(seed);
+          }}
+          onOpenAnyway={() => {
+            // Hide the overlay and navigate the user into the partial
+            // project. Land on the most-upstream layer that DID get
+            // content before the failure — i.e. the layer just before
+            // the failing step.
+            setEasyModeRunning(false);
+            const failed = easyModeError?.step ?? "concept";
+            setEasyModeError(null);
+            const partial = projects.find(p => p.id === easyModeProjectId);
+            if (!partial) return;
+            const landing: LayerKey =
+              failed === "script"     ? "story"      :
+              failed === "story"      ? "characters" :
+              failed === "characters" ? "concept"    :
+              "concept";
+            const firstTime = !hasSeenFirstProjectOnboarding();
+            setView({
+              kind: "studio",
+              projectId: partial.id,
+              isNew: true,
+              isFirstProject: firstTime,
+              initialSection: landing,
+            });
+          }}
+        />
+      )}
 
       {/* Success toast */}
       <div className={`toast ${toastVisible ? "show" : ""}`}>Idea Added</div>
@@ -2674,6 +2813,49 @@ function CreateStepGenre({
           Blend: {conceptDraft.settings.genres.join(" + ")}
         </div>
       )}
+    </>
+  );
+}
+
+// Step 4 of the create flow — "How do you want to start?". Pure
+// presentational; the actual choice is made via the two footer
+// buttons (Use Easy mode / Just create project), keeping the visual
+// rhythm of the prior steps' Back / Continue layout intact rather
+// than introducing a new tappable-card pattern just for this one
+// screen.
+function CreateStepHowToStart() {
+  return (
+    <>
+      <div className="display heading" style={{ marginTop: 25 }}>How do you want to start?</div>
+      <div className="caption" style={{ marginTop: 14, marginBottom: 16 }}>
+        Pick how you{"'"}d like to begin.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{
+          padding: "14px 16px",
+          border: "1px solid var(--border, #e2e2e3)",
+          borderRadius: 12,
+          background: "var(--surface, #fff)",
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Use Easy mode</div>
+          <div className="caption" style={{ margin: 0 }}>
+            AI fills in your concept, characters, story beats, and a
+            first-pass script — all from your title, format, and genre.
+            Takes a couple of minutes; you can edit everything after.
+          </div>
+        </div>
+        <div style={{
+          padding: "14px 16px",
+          border: "1px solid var(--border, #e2e2e3)",
+          borderRadius: 12,
+          background: "var(--surface, #fff)",
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Just create project</div>
+          <div className="caption" style={{ margin: 0 }}>
+            Start with empty drafts and build each layer yourself.
+          </div>
+        </div>
+      </div>
     </>
   );
 }

@@ -374,6 +374,15 @@ Rules:
     case "sync_script_to_concept":
       return syncPrompt_toConcept(story, "script");
 
+    // ── Easy mode: expand a fresh Concept from just title + format + genre ──
+    // Used by Easy mode at project creation. The story bible above already
+    // contains the seeded title/projectType/genres; this prompt asks the
+    // model to invent a coherent logline/summary/tone/themes/endingTypes
+    // that fit. Title/projectType/genres are sovereign — model is told
+    // not to emit them, and the client strips them defensively anyway.
+    case "generate_full_concept":
+      return generateFullConceptPrompt(story);
+
     // ── Script-import pipeline ──
 
     case "import_extract_scenes": {
@@ -699,6 +708,41 @@ Write concept content that accurately reflects what exists in the source materia
 - tone: short evocative phrase (2–6 words), e.g. "bone-dry deadpan", "neon-lit dread".
 - themes: 3–5 punchy noun phrases (1–3 words each).
 - endingTypes: 1 or 2 entries from: "happy" | "bittersweet" | "tragic" | "ambiguous" | "twist" — whichever best fits what the source suggests.
+
+Return STRICT JSON:
+{
+  "logline": string,
+  "summary": string,
+  "tone": string,
+  "themes": string[],
+  "endingTypes": ("happy" | "bittersweet" | "tragic" | "ambiguous" | "twist")[]
+}
+
+No prose outside the JSON.`;
+}
+
+// Easy mode: invent a coherent Concept layer from just the seeded
+// title + format + genres. The storyBible above already exposes those
+// three fields. We ask the model to fill the *remaining* concept fields
+// (logline, summary, tone, themes, endingTypes) and to leave title /
+// format / genres alone — those are sovereign once the user picked them.
+function generateFullConceptPrompt(story: Story): string {
+  const projectTypeLabel =
+    story.projectType === "tv-show" ? "TV show"
+      : story.projectType === "short" ? "short film"
+      : "feature film";
+  return `You are kicking off a new ${projectTypeLabel} project. The user has provided ONLY the title, format, and genres above — every other concept field is empty. Invent a coherent Concept layer that an experienced screenwriter would happily build the rest of the project on.
+
+The project's **title, format, and genres are fixed** — the user chose these at creation. Do NOT reconsider them and do NOT include them in your output.
+
+Each field:
+- logline: 1–2 sentences, ≤40 words. Protagonist + inciting event + goal + conflict + stakes. Must read like a real logline a working writer would pitch.
+- summary: 3–5 sentences, ~80 words. World → protagonist → inciting event → central tension → thematic undertow. Specific, sensory, not generic.
+- tone: short evocative phrase (2–6 words), e.g. "bone-dry deadpan", "neon-lit dread".
+- themes: 3–5 punchy noun phrases (1–3 words each).
+- endingTypes: 1 or 2 entries from: "happy" | "bittersweet" | "tragic" | "ambiguous" | "twist" — whichever best fits the genre + tone you settled on.
+
+Stay faithful to the genres listed above. If multiple genres are set, blend them naturally rather than picking one.
 
 Return STRICT JSON:
 {

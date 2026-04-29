@@ -3519,6 +3519,141 @@ body:has(.sheet.open) .layer-sticky-bar {
   to { transform: rotate(360deg); }
 }
 
+/* ──────────────────────────────────────────────────────────────
+   Easy-mode overlay — mounts at the app/page level and rides on
+   .generate-scrim's backdrop. The card holds a 4-row checklist
+   for Concept → Characters → Story → Script. Each row's icon
+   reflects the step's state (pending hollow dot, active mini-
+   spinner, done check, error bang). On failure the card swaps
+   in an error message + Retry / Open project anyway buttons.
+   ────────────────────────────────────────────────────────────── */
+.easy-mode-card {
+  width: min(360px, calc(100vw - 32px));
+  background: #1a1a1f;
+  color: #f5f5f5;
+  border-radius: 18px;
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.easy-mode-title {
+  font-family: 'Lato', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
+  text-align: center;
+  margin-top: 2px;
+}
+.easy-mode-subtitle {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  color: rgba(245, 245, 245, 0.72);
+  max-width: 280px;
+  margin-bottom: 6px;
+}
+.easy-mode-step-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.easy-mode-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  font-family: 'Lato', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(245, 245, 245, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: color 200ms ease, opacity 200ms ease;
+}
+.easy-mode-step:last-child {
+  border-bottom: none;
+}
+.easy-mode-step-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+.easy-mode-step.is-pending {
+  color: rgba(245, 245, 245, 0.42);
+}
+.easy-mode-step.is-pending .easy-mode-step-icon {
+  border: 1.5px solid rgba(245, 245, 245, 0.22);
+}
+.easy-mode-step.is-active {
+  color: #ffffff;
+}
+.easy-mode-step.is-active .easy-mode-step-icon {
+  /* Center the spinner ring; no border so it doesn't double up. */
+}
+.easy-mode-step.is-done {
+  color: rgba(245, 245, 245, 0.7);
+}
+.easy-mode-step.is-done .easy-mode-step-icon {
+  background: #22c55e;
+  color: #0a0a0e;
+}
+.easy-mode-step.is-error {
+  color: #ffb4b4;
+}
+.easy-mode-step.is-error .easy-mode-step-icon {
+  background: #ef4444;
+  color: #ffffff;
+}
+.easy-mode-step-label {
+  flex: 1;
+}
+/* Mini-spinner inside the active step's icon slot. Reuses the
+   keyframes from the main scrim spinner. */
+.easy-mode-step-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: generateScrimSpin 820ms linear infinite;
+}
+.easy-mode-error-message {
+  width: 100%;
+  font-family: 'Lato', sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255, 180, 180, 0.92);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.easy-mode-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 /* Spacer matching the sticky bar's height so the last list row
    isn't hidden behind the pinned bar. Placed as the last child of
    the tab content when the sticky bar is rendered. */

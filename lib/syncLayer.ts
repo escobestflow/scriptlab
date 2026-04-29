@@ -47,7 +47,9 @@ export function compareLayers(a: LayerKey, b: LayerKey): number {
 
 // ── /api/generate call ─────────────────────────────────────────────
 
-async function callGenerate(
+// Exported so other orchestrators (e.g. lib/easyMode.ts) can reuse the
+// same ndjson-streaming + error-handling logic without duplication.
+export async function callGenerate(
   story: Story,
   action: ActionRequest,
   profile?: WriterProfile | null,
@@ -102,7 +104,10 @@ async function callGenerate(
 //   4. On failure, include a preview of the raw output so the user has
 //      something actionable to report.
 
-function extractJson(text: string): any {
+// Exported alongside callGenerate so other orchestrators can use the
+// same lenient JSON-extraction strategy (strip code fences, walk
+// balanced braces, fall back to last-`}` on truncation).
+export function extractJson(text: string): any {
   let body = text.trim();
   // Strip surrounding code fences.
   const fenced = body.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
@@ -223,7 +228,11 @@ function normalizeScene(raw: any): Scene {
 const ALLOWED_ENDING_TYPES: ReadonlySet<EndingType> =
   new Set(["happy", "bittersweet", "tragic", "ambiguous", "twist"]);
 
-function normalizeConceptPatch(raw: any) {
+// Exported so Easy mode's expandFullConcept can reuse the protected-
+// fields stripping (defense-in-depth: the prompt asks the model to
+// omit title/projectType/genres; this guarantees they never make it
+// into the patch even if the model misbehaves).
+export function normalizeConceptPatch(raw: any) {
   // Strip any protected fields defensively — the prompt asks the model
   // to omit them, but don't trust.
   const patch: {

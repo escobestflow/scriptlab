@@ -51,6 +51,13 @@ export type ActionType =
   | "generate_concept_tone"
   | "generate_concept_themes"
   | "generate_concept_ending"
+  // Top-level concept expansion. Used by Easy mode at project creation:
+  // takes a freshly-created Story whose only seeded fields are title +
+  // genres + projectType, and fills out logline / summary / tone /
+  // themes / endingTypes in a single Sonnet call. Protected fields
+  // (title, projectType, genres) are stripped from the response client-
+  // side, same defense-in-depth as the sync_*_to_concept actions.
+  | "generate_full_concept"
   // Character-tab per-field generators (Haiku, JSON-out)
   | "generate_character_name"
   | "generate_character_archetype"
@@ -108,6 +115,10 @@ export function modelForAction(type: ActionType): string {
     case "sync_concept_to_script":
     case "sync_characters_to_script":
     case "sync_story_to_script":
+    // Easy-mode concept expansion: writing a coherent logline, summary,
+    // tone, themes, and endingTypes from just title+genre is creative
+    // work — Sonnet handles tonal nuance better than Haiku.
+    case "generate_full_concept":
     // Import-pipeline extraction also benefits from Sonnet: scene
     // identification against a 20–40k-token source needs high recall,
     // and per-scene summarization over the full script is dense work.

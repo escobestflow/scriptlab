@@ -162,6 +162,7 @@ export function Studio({
   partnerStory,
   partnerEmail,
   projectMembers,
+  initialSection,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -210,8 +211,14 @@ export function Studio({
       displayName: string | null;
     };
   };
+  /** Which section tab to show on first paint. Used by Easy mode at
+   *  project creation to drop the user on Script (the final output)
+   *  rather than the default Concept. Set as the useState initializer
+   *  rather than via useEffect so there's no one-frame flash of the
+   *  default tab before the user-visible tab takes over. */
+  initialSection?: Section;
 }) {
-  const [section, setSection] = useState<Section>("concept");
+  const [section, setSection] = useState<Section>(initialSection ?? "concept");
   // Current user's email for the initials chip on the user's own side
   // of the dual pickers. useAuth gives us the live session; when the
   // session isn't hydrated yet we just render "?" until it is.
