@@ -759,7 +759,9 @@ export default function Page() {
       // the Script tab); this fire-and-forget loop drains the rest.
       // Persistence per iteration means a tab close mid-loop loses
       // only the in-flight scene; everything before it is durable.
-      startBackgroundScriptLoop(finished);
+      // The returned Promise is ignored — Easy mode doesn't gate any
+      // UI on first-scene-done because scene 1 is already written.
+      void startBackgroundScriptLoop(finished);
     } catch (e: any) {
       // EasyModeError carries the offending step + the partial story.
       // We leave easyModeRunning true so the overlay stays mounted in
@@ -772,54 +774,79 @@ export default function Page() {
     }
   }
 
-  // Background script-generation loop. Runs after Easy-mode hands off
-  // to the Script tab, draining the unwritten beats one by one. Lives
-  // at page.tsx scope (not Studio's) so the loop survives the user
-  // navigating between Studio tabs or even back to the project list —
-  // only a tab close kills it. Each scene's prose is persisted to
-  // Supabase before the next iteration starts, so partial completion
-  // survives a tab close mid-loop.
-  function startBackgroundScriptLoop(story: Story) {
-    const initialPending = pendingBeatIds(story);
-    if (!initialPending.size) return;
-    setBgScriptJob({
-      projectId: story.id,
-      inflightBeatId: null,
-      pendingBeatIds: initialPending,
-    });
-    void runScriptGenerationLoop({
-      initialStory: story,
-      persist: async (next) => {
-        setProjects(ps => ps.map(p => p.id === next.id ? next : p));
-        if (user) await saveProjectToDB(user.id, next);
-      },
-      onBeatStart: (beatId) => {
-        // Promote this beat from pending → inflight so the Script tab
-        // swaps its spinner copy from "Queued…" to "Writing now…".
-        setBgScriptJob(j => {
-          if (!j) return j;
-          const nextPending = new Set(j.pendingBeatIds);
-          nextPending.delete(beatId);
-          return { ...j, inflightBeatId: beatId, pendingBeatIds: nextPending };
-        });
-      },
-      onBeatDone: (beatId) => {
-        // Clear inflight; the next iteration's onBeatStart will fill
-        // it with the next beat. If this was the last beat, onComplete
-        // fires next and clears the whole job.
-        setBgScriptJob(j => j && j.inflightBeatId === beatId
-          ? { ...j, inflightBeatId: null }
-          : j,
-        );
-      },
-      onComplete: () => setBgScriptJob(null),
-      onError: (err) => {
-        // Surface to console for now; completed scenes are persisted
-        // and the user can resume manually via the per-scene "Write
-        // this scene with AI" button.
-        console.error("[bg script loop]", err);
-        setBgScriptJob(null);
-      },
+  // Background script-generation loop. Two callers:
+  //   1. Easy mode hand-off — fires this fire-and-forget after step 4
+  //      writes scene 1, draining scenes 2..N while the user reads.
+  //   2. Studio's "Write all scenes with AI" button — awaits the
+  //      returned Promise wrapped in Studio's scrim, so the scrim
+  //      covers exactly scene 1 and closes when scene 1 lands.
+  //
+  // Lives at page.tsx scope (not Studio's) so the loop survives the
+  // user navigating between Studio tabs or even back to the project
+  // list — only a tab close kills it. Each scene's prose is persisted
+  // to Supabase before the next iteration starts, so partial
+  // completion survives a tab close mid-loop.
+  //
+  // Returns a Promise that resolves when:
+  //   - the FIRST onBeatDone fires (manual mode's scrim closes here), OR
+  //   - the queue was empty to begin with (no work, resolve immediately), OR
+  //   - the loop errors out (resolve so caller's scrim doesn't hang).
+  // Resolution semantics are "first scene ready or terminal" — callers
+  // who care about full-loop completion should observe bgScriptJob
+  // clearing instead.
+  function startBackgroundScriptLoop(
+    story: Story,
+    profile?: WriterProfile | null,
+  ): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const initialPending = pendingBeatIds(story);
+      if (!initialPending.size) { resolve(); return; }
+      setBgScriptJob({
+        projectId: story.id,
+        inflightBeatId: null,
+        pendingBeatIds: initialPending,
+      });
+      // Resolve once-only — onBeatDone fires per scene but we only want
+      // to dismiss the scrim on the first one.
+      let resolved = false;
+      const resolveOnce = () => { if (!resolved) { resolved = true; resolve(); } };
+      void runScriptGenerationLoop({
+        initialStory: story,
+        profile,
+        persist: async (next) => {
+          setProjects(ps => ps.map(p => p.id === next.id ? next : p));
+          if (user) await saveProjectToDB(user.id, next);
+        },
+        onBeatStart: (beatId) => {
+          // Promote this beat from pending → inflight so the Script tab
+          // swaps its spinner copy from "Queued…" to "Writing now…".
+          setBgScriptJob(j => {
+            if (!j) return j;
+            const nextPending = new Set(j.pendingBeatIds);
+            nextPending.delete(beatId);
+            return { ...j, inflightBeatId: beatId, pendingBeatIds: nextPending };
+          });
+        },
+        onBeatDone: (beatId, _index, isFirstDone) => {
+          // Clear inflight; the next iteration's onBeatStart will fill
+          // it with the next beat. If this was the last beat, onComplete
+          // fires next and clears the whole job.
+          setBgScriptJob(j => j && j.inflightBeatId === beatId
+            ? { ...j, inflightBeatId: null }
+            : j,
+          );
+          if (isFirstDone) resolveOnce();
+        },
+        onComplete: () => { setBgScriptJob(null); resolveOnce(); },
+        onError: (err) => {
+          // Surface to console for now; completed scenes are persisted
+          // and the user can resume manually via the per-scene "Write
+          // this scene with AI" button.
+          console.error("[bg script loop]", err);
+          setBgScriptJob(null);
+          resolveOnce();
+        },
+      });
     });
   }
 
@@ -949,6 +976,7 @@ export default function Page() {
                 }
               : null
           }
+          onStartBackgroundScriptLoop={startBackgroundScriptLoop}
         />
       );
     }

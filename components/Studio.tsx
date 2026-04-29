@@ -40,6 +40,7 @@ import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
 import { useProfileCapture } from "@/lib/writerProfileStore";
+import type { WriterProfile } from "@/lib/writerProfile";
 import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
@@ -164,6 +165,7 @@ export function Studio({
   projectMembers,
   initialSection,
   bgScriptJob = null,
+  onStartBackgroundScriptLoop,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -228,6 +230,14 @@ export function Studio({
     inflightBeatId: string | null;
     pendingBeatIds: Set<string>;
   } | null;
+  /** Kick off the same background-loop machinery Easy mode uses. The
+   *  returned Promise resolves when scene 1 is written + persisted (or
+   *  the loop terminates with no work / an error). Studio's "Write all
+   *  scenes with AI" wraps this in `runGenerateAll` so its scrim covers
+   *  exactly scene 1; scenes 2..N stream into the Script tab via the
+   *  `bgScriptJob` spinner cards. Owned by page.tsx because the loop's
+   *  state has to outlive Studio (user can navigate away mid-run). */
+  onStartBackgroundScriptLoop?: (story: Story, profile?: WriterProfile | null) => Promise<void>;
 }) {
   const [section, setSection] = useState<Section>(initialSection ?? "concept");
   // Current user's email for the initials chip on the user's own side
@@ -1697,6 +1707,7 @@ export function Studio({
                 setBeatTrayOpen(true);
               }}
               bgScriptJob={bgScriptJob}
+              onStartBackgroundScriptLoop={onStartBackgroundScriptLoop}
             />
           )}
               </div>
@@ -6545,6 +6556,7 @@ function ScriptTab({
   onAddScene,
   runGenerateAll,
   bgScriptJob,
+  onStartBackgroundScriptLoop,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -6578,6 +6590,10 @@ function ScriptTab({
     inflightBeatId: string | null;
     pendingBeatIds: Set<string>;
   } | null;
+  /** Forwarded from Studio. The "Write all scenes with AI" button calls
+   *  this — page.tsx orchestrates the loop, returning a Promise that
+   *  resolves once scene 1 lands so we can dismiss the scrim. */
+  onStartBackgroundScriptLoop?: (story: Story, profile?: WriterProfile | null) => Promise<void>;
 }) {
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
@@ -6594,122 +6610,40 @@ function ScriptTab({
     setStory(s => markLayerSynced(s, "script"));
   }
 
-  // "Write all scenes with AI" — generates prose for every unwritten
-  // beat one at a time.
+  // "Write all scenes with AI" — kicks off the same background-loop
+  // machinery Easy mode uses. The scrim from runGenerateAll covers
+  // exactly the FIRST scene's generation; once scene 1 lands, the
+  // promise resolves, the scrim closes, and scenes 2..N continue
+  // streaming into the Script tab via per-beat spinner cards.
   //
-  // Previously this fired a single `sync_story_to_script` action asking
-  // the model for ALL scenes in one JSON payload. With 14–22 scenes at
-  // 100–400 words each, the response routinely blew past the 8192-token
-  // ceiling in /api/generate, truncated mid-JSON, and `extractJson`
-  // threw. Individual scene generation always worked because each call
-  // stays well under the cap — so the fix is to reuse that per-beat
-  // flow in a loop.
+  // Why this delegates to page.tsx (via onStartBackgroundScriptLoop):
+  //   - The loop's state (bgScriptJob) lives at page.tsx scope so it
+  //     survives Studio unmounting (user navigates back to home or to
+  //     another project mid-loop). The same machinery that powers
+  //     Easy mode's hand-off — same persistence, same spinner UX.
+  //   - This replaces what used to be ~80 lines of inline streaming
+  //     code that duplicated lib/syncLayer.ts's callGenerate without
+  //     persisting per iteration. The new path persists each scene
+  //     before the next, so a tab close mid-loop loses only the
+  //     in-flight scene; everything before it is durable.
   //
-  // Rules:
-  //   - Skip beats that already have prose (status === "written" with
-  //     non-empty sceneContent). This preserves user-edited scenes
-  //     and lets the button act as a "fill the rest" action if the
-  //     user partially wrote the script by hand.
-  //   - On any failure, surface the error naming which scene failed
-  //     and stop the loop. Scenes already written this run are kept.
-  //   - Re-reads `story` via an updater snapshot every iteration so
-  //     the contextBuilder sees prior scenes on disk (cohesion).
+  // Rules preserved:
+  //   - Skip beats that already have prose (filtered by scriptLoop's
+  //     pendingBeatIds — same status/sceneContent check).
+  //   - On any failure, the loop stops and clears bgScriptJob; scenes
+  //     written so far survive. The button re-enables so the user can
+  //     resume by clicking again (queue picks up at first unwritten).
   const { profile } = useProfileCapture();
   const [genBusy, setGenBusy] = useState(false);
   async function generateAllScript() {
-    if (genBusy) return;
+    if (genBusy || bgScriptJob || !onStartBackgroundScriptLoop) return;
     setGenBusy(true);
     try {
       await runGenerateAll(async () => {
-        // Snapshot beats at start — beat ids are stable so we can
-        // match back through story even if the beats array shape
-        // changes during the loop.
-        const beatsSnapshot = beats.map((b, i) => ({
-          id: b.id,
-          index: i,
-          needsWriting:
-            b.status !== "written" || !b.sceneContent?.trim(),
-        }));
-
-        for (const entry of beatsSnapshot) {
-          if (!entry.needsWriting) continue;
-
-          // Read the latest story out of React state so the scene
-          // generator sees prior-iteration writes in its prompt.
-          let currentStory: Story = story;
-          setStory(s => { currentStory = s; return s; });
-
-          const action: ActionRequest = {
-            type: "generate_scene",
-            payload: { beatIndex: entry.index },
-          };
-
-          const res = await fetch("/api/generate", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ story: currentStory, action, profile }),
-          });
-          if (!res.ok || !res.body) {
-            const body = await res.text().catch(() => "");
-            throw new Error(
-              `Scene ${entry.index + 1} failed: ${res.status} ${body || "(no body)"}`,
-            );
-          }
-
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buf = "";
-          let fullText = "";
-          let streamError: string | null = null;
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            const lines = buf.split("\n");
-            buf = lines.pop() ?? "";
-            for (const line of lines) {
-              if (!line.trim()) continue;
-              try {
-                const msg = JSON.parse(line);
-                if (msg.type === "text") fullText += msg.value;
-                else if (msg.type === "error") streamError = msg.value;
-              } catch {
-                /* ignore malformed line */
-              }
-            }
-          }
-          if (streamError && !fullText) {
-            throw new Error(`Scene ${entry.index + 1} failed: ${streamError}`);
-          }
-          if (!fullText.trim()) {
-            throw new Error(`Scene ${entry.index + 1} returned no text.`);
-          }
-
-          // Persist this scene's prose onto the matching beat by id.
-          // Mirrors the setBeats path used by run() for single-scene
-          // generation, but matches by id rather than array index so
-          // it's robust to re-ordering between iterations.
-          const sceneText = fullText;
-          const beatId = entry.id;
-          setStory(s => {
-            const sl = getActiveStoryLayerDraft(s);
-            if (!sl) return s;
-            const writeInto = (arr: Beat[]): Beat[] => arr.map(b =>
-              b.id === beatId
-                ? { ...b, status: "written" as const, sceneContent: sceneText }
-                : b
-            );
-            if (s.projectType === "tv-show") {
-              return updateStoryLayerDraft(s, {
-                episodes: (sl.episodes ?? []).map(ep => ({
-                  ...ep,
-                  beats: writeInto(ep.beats),
-                })),
-              });
-            }
-            return updateStoryLayerDraft(s, { beats: writeInto(sl.beats) });
-          });
-        }
+        // Resolves when scene 1 is written + persisted (or the loop
+        // terminates early — empty queue / error). Scenes 2..N keep
+        // generating in the background after this returns.
+        await onStartBackgroundScriptLoop(story, profile);
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
