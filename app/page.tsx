@@ -161,6 +161,10 @@ export default function Page() {
   // but visually we treat Format as "unselected" until the user taps a
   // choice — which is what gates the Step 0 Continue button.
   const [createFormatTouched, setCreateFormatTouched] = useState(false);
+  // Step 3 (Finish) "how do you want to start" selection. Null means no
+  // option chosen yet — gates the Finish button. "easy" runs the AI
+  // pipeline; "just" creates an empty project as before.
+  const [easyModeChoice, setEasyModeChoice] = useState<"easy" | "just" | null>(null);
   // Easy-mode pipeline state. easyModeRunning gates the fullscreen
   // overlay; easyModeStep tracks which row's mini-spinner is animating;
   // easyModeError flips the overlay into the failure card; the projectId
@@ -676,6 +680,7 @@ export default function Page() {
     setCreateDraft(newBlankProject());
     setCreateStep(0);
     setCreateFormatTouched(false);
+    setEasyModeChoice(null);
     setCreateOpen(true);
   }
 
@@ -684,6 +689,7 @@ export default function Page() {
     setCreateDraft(null);
     setCreateStep(0);
     setCreateFormatTouched(false);
+    setEasyModeChoice(null);
   }
 
   function finishCreate() {
@@ -1292,7 +1298,7 @@ export default function Page() {
               Completed steps show a checkmark; upcoming/active render an empty
               node (no numbers). */}
           <div className="create-stepper create-stepper-compact" role="progressbar" aria-valuemin={1} aria-valuemax={4} aria-valuenow={createStep + 1}>
-            {(["Format", "Title", "Genre", "Start"] as const).map((name, i) => {
+            {(["Format", "Title", "Genre", "Finish"] as const).map((name, i) => {
               const state = i < createStep ? "done" : i === createStep ? "active" : "upcoming";
               return (
                 <div key={name} className={`create-step create-step-${state}`}>
@@ -1326,7 +1332,10 @@ export default function Page() {
             <CreateStepGenre draft={createDraft} setDraft={updateDraft} />
           )}
           {createDraft && createStep === 3 && (
-            <CreateStepHowToStart />
+            <CreateStepHowToStart
+              value={easyModeChoice}
+              onChange={setEasyModeChoice}
+            />
           )}
         </div>
         <div className="create-modal-footer">
@@ -1337,48 +1346,32 @@ export default function Page() {
                 Back
               </Button>
             )}
-            {createStep < 3 ? (
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={() => setCreateStep(s => s + 1)}
-                // Each step gates Continue:
-                //   step 0 Format: must be actively chosen
-                //   step 1 Title:  must be non-empty
-                //   step 2 Genre:  at least one genre selected
-                disabled={
-                  (createStep === 0 && !createFormatTouched) ||
-                  (createStep === 1 && !createDraft?.title?.trim()) ||
-                  (createStep === 2 && (createDraft ? getActiveConceptDraft(createDraft).settings.genres.length === 0 : true))
-                }
-                style={{ flex: 1 }}
-              >
-                Continue
-              </Button>
-            ) : (
-              // Step 3 (How-to-Start) — two side-by-side buttons. The
-              // checkbox-style "choice" lives in the buttons themselves
-              // rather than tappable cards, keeping the visual rhythm
-              // of the prior steps' Back/Continue footer intact.
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={finishCreateEasy}
-                  block
-                >
-                  Use Easy mode
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={finishCreate}
-                  block
-                >
-                  Just create project
-                </Button>
-              </div>
-            )}
+            <Button
+              variant="primary"
+              size="lg"
+              // Steps 0–2 advance to the next step. Step 3 (Finish)
+              // dispatches to the chosen creation path — Easy mode runs
+              // the AI pipeline, Just create makes an empty project.
+              onClick={() => {
+                if (createStep < 3) { setCreateStep(s => s + 1); return; }
+                if (easyModeChoice === "easy") finishCreateEasy();
+                else if (easyModeChoice === "just") finishCreate();
+              }}
+              // Each step gates the primary action:
+              //   step 0 Format: must be actively chosen
+              //   step 1 Title:  must be non-empty
+              //   step 2 Genre:  at least one genre selected
+              //   step 3 Start:  one of Easy mode / Just create selected
+              disabled={
+                (createStep === 0 && !createFormatTouched) ||
+                (createStep === 1 && !createDraft?.title?.trim()) ||
+                (createStep === 2 && (createDraft ? getActiveConceptDraft(createDraft).settings.genres.length === 0 : true)) ||
+                (createStep === 3 && !easyModeChoice)
+              }
+              style={{ flex: 1 }}
+            >
+              {createStep < 3 ? "Continue" : "Finish"}
+            </Button>
           </div>
         </div>
       </div>
@@ -2817,44 +2810,48 @@ function CreateStepGenre({
   );
 }
 
-// Step 4 of the create flow — "How do you want to start?". Pure
-// presentational; the actual choice is made via the two footer
-// buttons (Use Easy mode / Just create project), keeping the visual
-// rhythm of the prior steps' Back / Continue layout intact rather
-// than introducing a new tappable-card pattern just for this one
-// screen.
-function CreateStepHowToStart() {
+// Step 4 of the create flow — "How do you want to start?". Renders
+// two tappable .choice cards (matching the Format step's visual
+// pattern) for "Use Easy mode" vs "Just create project". The picked
+// value is owned by the parent so the footer's Finish button can gate
+// on it and dispatch to the right finish handler on click.
+function CreateStepHowToStart({
+  value, onChange,
+}: {
+  value: "easy" | "just" | null;
+  onChange: (v: "easy" | "just") => void;
+}) {
+  const options: Array<{
+    key: "easy" | "just";
+    title: string;
+    sub: string;
+  }> = [
+    {
+      key: "easy",
+      title: "Use Easy mode",
+      sub: "AI fills in your concept, characters, story beats, and a first-pass script from your title, format, and genre. Takes a couple of minutes; edit everything after.",
+    },
+    {
+      key: "just",
+      title: "Just create project",
+      sub: "Start with empty drafts and build each layer yourself.",
+    },
+  ];
   return (
     <>
       <div className="display heading" style={{ marginTop: 25 }}>How do you want to start?</div>
-      <div className="caption" style={{ marginTop: 14, marginBottom: 16 }}>
-        Pick how you{"'"}d like to begin.
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{
-          padding: "14px 16px",
-          border: "1px solid var(--border, #e2e2e3)",
-          borderRadius: 12,
-          background: "var(--surface, #fff)",
-        }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Use Easy mode</div>
-          <div className="caption" style={{ margin: 0 }}>
-            AI fills in your concept, characters, story beats, and a
-            first-pass script — all from your title, format, and genre.
-            Takes a couple of minutes; you can edit everything after.
-          </div>
-        </div>
-        <div style={{
-          padding: "14px 16px",
-          border: "1px solid var(--border, #e2e2e3)",
-          borderRadius: 12,
-          background: "var(--surface, #fff)",
-        }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Just create project</div>
-          <div className="caption" style={{ margin: 0 }}>
-            Start with empty drafts and build each layer yourself.
-          </div>
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 25 }}>
+        {options.map(opt => (
+          <button
+            key={opt.key}
+            className={`choice ${value === opt.key ? "selected" : ""}`}
+            onClick={() => onChange(opt.key)}
+            style={{ textAlign: "left" }}
+          >
+            <div className="choice-title">{opt.title}</div>
+            <div className="choice-sub">{opt.sub}</div>
+          </button>
+        ))}
       </div>
     </>
   );
