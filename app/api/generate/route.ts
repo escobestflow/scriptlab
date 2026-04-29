@@ -36,10 +36,25 @@ export async function POST(req: Request) {
     const wantsJsonPrefill = action.type.startsWith("sync_");
     const JSON_PREFILL = "{";
 
-    // Sync extractions can be large — a full-feature script's cast plus
-    // every character field can exceed 4k tokens. Give sync ops more
-    // headroom; keep everything else at the original default.
-    const maxTokens = wantsJsonPrefill ? 8192 : 4096;
+    // Output-budget tiers, smallest to largest:
+    //   - 4k  → per-field generators (logline, single character name)
+    //   - 8k  → sync_* that returns structured metadata (characters,
+    //           beats) — a full cast with every field can hit ~6k.
+    //   - 32k → anything that emits a full screenplay's worth of prose:
+    //           every sync_*_to_script (22 feature scenes × ~250 words
+    //           ≈ 7k content tokens, plus JSON encoding overhead, has
+    //           historically truncated at 8k mid-array), and the import
+    //           pipeline which extracts/summarizes every scene of an
+    //           uploaded screenplay. Sonnet-4.5 supports up to 64k
+    //           output tokens; 32k is conservative headroom and ~4×
+    //           the worst observed real-world response.
+    const isScriptHeavy =
+      action.type === "sync_concept_to_script" ||
+      action.type === "sync_characters_to_script" ||
+      action.type === "sync_story_to_script" ||
+      action.type === "import_extract_scenes" ||
+      action.type === "import_summarize_scenes";
+    const maxTokens = isScriptHeavy ? 32000 : wantsJsonPrefill ? 8192 : 4096;
 
     const messages: any[] = [{ role: "user", content: userMessage }];
     if (wantsJsonPrefill) {
