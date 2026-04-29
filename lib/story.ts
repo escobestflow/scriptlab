@@ -13,6 +13,14 @@ export type Framework =
 export type EndingType =
   | "happy" | "bittersweet" | "tragic" | "ambiguous" | "twist";
 
+/** The kind of short film the user is making. Drives the beat-skeleton
+ *  flavor the prompts ask the model to produce, replacing the feature-
+ *  style framework picker for shorts. Each value implies a different
+ *  ending posture but all share the same flexible Situation → Pressure
+ *  → Shift skeleton. Surfaced in the UI only when projectType="short". */
+export type ShortStructure =
+  | "complete" | "open-ended" | "proof-of-concept" | "slice-of-life" | "twist";
+
 export type ProjectType = "feature" | "short" | "tv-show";
 
 export interface StorySettings {
@@ -37,6 +45,18 @@ export interface StorySettings {
   darkness: number;          // 1-10
   pace: number;              // 1-10
   endingTypes: EndingType[];
+  /** For projectType === "short" only. Target runtime in minutes.
+   *  Drives the default scene count (≈ duration/1.5 clamped 6–12)
+   *  in short-form prompts. `undefined` = unset → prompts default to
+   *  a 12-minute / ~9-scene path. UI hides this row for non-short
+   *  formats; stored values survive a temporary format swap. */
+  duration?: number;
+  /** For projectType === "short" only. Which kind of short the user
+   *  is making — drives the beat-skeleton flavor the model produces.
+   *  `null` = unset → prompts fall back to a generic Situation →
+   *  Pressure → Shift skeleton. Mirrors `framework`'s null-as-unset
+   *  pattern. */
+  shortStructure?: ShortStructure | null;
 }
 
 export interface Reference {

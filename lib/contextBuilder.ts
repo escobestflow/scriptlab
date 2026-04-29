@@ -71,6 +71,11 @@ ${logline || "(none yet)"}
 - Darkness: ${settings.darkness}/10
 - Pace: ${settings.pace}/10
 - Ending types: ${settings.endingTypes?.join(", ") || "none"}
+${story.projectType === "short" ? `
+## Short-film parameters
+- Target duration: ${settings.duration ? `${settings.duration} min` : "unspecified (default 10–15 min)"}
+- Short structure: ${settings.shortStructure ?? "unspecified (default flexible Situation → Pressure → Shift)"}
+` : ""}
 
 ## Characters
 ${characters.map(c => {
@@ -107,6 +112,60 @@ ${beats.length
 `;
 }
 
+// ── Short-film helpers ────────────────────────────────────────────
+// Shared between generate_beats, sync_*_to_story, sync_*_to_script, and
+// the Easy-mode generate_full_concept prompts.
+
+/** Target scene count for a short. ~1 scene per 1.5 minutes of runtime,
+ *  clamped to [6, 12]. Default 12-min runtime when duration is unset.
+ *  Returns the number plus a presentation string ready to splice into
+ *  prompt text. */
+function shortSceneCount(durationMin: number | undefined): { n: number; label: string } {
+  const dur = typeof durationMin === "number" && durationMin > 0 ? durationMin : 12;
+  const raw = Math.round(dur / 1.5);
+  const n = Math.max(6, Math.min(12, raw));
+  return { n, label: `${n} scenes` };
+}
+
+/** Per-shortStructure ending posture. Returns empty string when the
+ *  user hasn't picked one — the generic 3-stage skeleton in
+ *  shortFilmGuidance is enough on its own. */
+function shortStructureFlavor(s: string | null | undefined): string {
+  switch (s) {
+    case "complete":
+      return "End on a clear resolution — the situation set up in stage 1 is fully addressed. The shift is conclusive.";
+    case "open-ended":
+      return "End on emotional clarity, not plot resolution. The character feels different at the end; the world's outcome is left open.";
+    case "proof-of-concept":
+      return "End on a hook that implies a larger story. The shift suggests scope rather than resolution — this is a tone/world piece for a bigger work.";
+    case "slice-of-life":
+      return "Stay observational. The shift can be small or interior — a realization, not a plot beat. No forced climax.";
+    case "twist":
+      return "Withhold one key piece of information until the final scene. The shift is a reveal that recontextualizes everything that came before.";
+    default:
+      return "";
+  }
+}
+
+/** The block of guidance we splice into every short-form generation
+ *  prompt. Empty string for non-shorts so callers can append
+ *  unconditionally. */
+function shortFilmGuidance(story: Story): string {
+  if (story.projectType !== "short") return "";
+  const settings = getActiveConceptDraft(story).settings;
+  const { n } = shortSceneCount(settings.duration);
+  const dur = settings.duration ?? 12;
+  const flavor = shortStructureFlavor(settings.shortStructure);
+  return `
+This is a short film, not a feature. Target runtime ~${dur} minutes → about ${n} scenes total.
+
+Do NOT use a full feature-length arc. Use a flexible 3-stage skeleton:
+  1. Situation — drop us into a clear world / problem / relationship / tension.
+  2. Pressure — something pushes the character into a decision, reaction, or exposure.
+  3. Shift — something changes (external, emotional, moral, comic, or symbolic).
+${flavor ? `\n${flavor}` : ""}`;
+}
+
 function buildAsk(story: Story, action: ActionRequest): string {
   const c  = getActiveConceptDraft(story);
   const sl = getActiveStoryLayerDraft(story);
@@ -123,7 +182,7 @@ Rules:
 - Use every locked ingredient meaningfully.
 - Weave in at least one snippet where it fits naturally (reference by title in the purpose field).
 - Match the darkness/pace/unpredictability levels.
-- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".`;
+- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${shortFilmGuidance(story)}`;
 
     case "swap_ingredient": {
       const id = action.payload.ingredientId;
@@ -631,6 +690,32 @@ Rules:
 - No prose outside the JSON.`;
   }
 
+  // Short-film path: ignore the feature-style framework field (for shorts
+  // we let `shortStructure` drive flavor and `duration` drive count). The
+  // framework picker is still rendered for shorts as a soft fallback, but
+  // the shortFilmGuidance block is the primary lever.
+  if (story.projectType === "short") {
+    const settings = getActiveConceptDraft(story).settings;
+    const { n } = shortSceneCount(settings.duration);
+    return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
+
+${source === "script"
+  ? "Extract the beat structure implicit in the scene prose — one beat per narrative turn, not per scene."
+  : "Build a beat sheet sized for a short film — see the short-film guidance below."}
+
+Return STRICT JSON:
+{
+  "beats": [
+    { "name": string, "summary": string, "purpose": string }
+  ]
+}
+
+Rules:
+- Produce ${n} beats — one per scene the screenplay will end up with.
+- Each "summary" is 1–2 sentences; each "purpose" is 1 sentence naming what the beat does for the audience.
+- No prose outside the JSON.${shortFilmGuidance(story)}`;
+  }
+
   return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
 ${source === "script"
@@ -656,11 +741,17 @@ function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "s
   const c = getActiveConceptDraft(story);
   const genres = c.settings.genres?.join(", ") || "drama";
   const isShort = story.projectType === "short";
+  // Short scene count comes from duration when set (≈ 1 scene per 1.5 min,
+  // clamped 6–12); when unset we fall back to the legacy "6–10 scenes"
+  // label so the model has a range to aim at instead of an exact integer.
+  const shortScenes = isShort && c.settings.duration
+    ? shortSceneCount(c.settings.duration).label
+    : "6–10 scenes";
   const targetScenes =
     source === "story"
       ? "one scene per beat in the beat sheet above"
       : isShort
-      ? "6–10 scenes"
+      ? shortScenes
       : "14–22 scenes";
   // When generating a fresh script but a prior script already exists,
   // include the prior prose as tonal/character reference so the new
@@ -693,14 +784,14 @@ Formatting rules inside each "content":
 - No scene numbering; no "FADE IN/OUT" surrounding the scenes.
 - Keep each scene 100–400 words.
 
-No prose outside the JSON.`;
+No prose outside the JSON.${shortFilmGuidance(story)}`;
 }
 
 function syncPrompt_toConcept(story: Story, source: "characters" | "story" | "script"): string {
   const sourceBlock = cohesionScriptBlock(story, source);
   return `Derive a refreshed Concept layer from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
-The project's **title, format, and genres are fixed** — the user chose these at creation and they are NOT to be reconsidered. Do not include them in the output.
+The project's **title, format, genres, duration, and short-structure type are fixed** — the user chose these explicitly and they are NOT to be reconsidered. Do not include them in the output.
 
 Write concept content that accurately reflects what exists in the source material. Each field:
 - logline: 1–2 sentences, ≤40 words. Protagonist + inciting event + goal + conflict + stakes.
@@ -731,9 +822,15 @@ function generateFullConceptPrompt(story: Story): string {
     story.projectType === "tv-show" ? "TV show"
       : story.projectType === "short" ? "short film"
       : "feature film";
+  // For shorts, nudge Sonnet toward a concept that fits the runtime so
+  // downstream Story/Script generation isn't trying to compress a feature
+  // arc into 6–12 scenes.
+  const shortRuntimeHint = story.projectType === "short"
+    ? `\n\nThis is a short film. Target runtime ~${getActiveConceptDraft(story).settings.duration ?? 12} minutes — the concept must fit a short-film scope (one focused idea, turning point, or contradiction) rather than a feature arc.`
+    : "";
   return `You are kicking off a new ${projectTypeLabel} project. The user has provided ONLY the title, format, and genres above — every other concept field is empty. Invent a coherent Concept layer that an experienced screenwriter would happily build the rest of the project on.
 
-The project's **title, format, and genres are fixed** — the user chose these at creation. Do NOT reconsider them and do NOT include them in your output.
+The project's **title, format, and genres are fixed** — the user chose these at creation. Do NOT reconsider them and do NOT include them in your output.${shortRuntimeHint}
 
 Each field:
 - logline: 1–2 sentences, ≤40 words. Protagonist + inciting event + goal + conflict + stakes. Must read like a real logline a working writer would pitch.

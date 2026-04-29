@@ -8,6 +8,13 @@ import { supabase } from "./supabase";
 
 // ── Field normalization helpers ──
 
+// Whitelist for the short-structure enum stored on StorySettings. Anything
+// else loaded from a legacy save (including null/undefined) normalizes to
+// null — i.e. "unset, prompts use generic Situation→Pressure→Shift".
+const ALLOWED_SHORT_STRUCTURES = new Set([
+  "complete", "open-ended", "proof-of-concept", "slice-of-life", "twist",
+]);
+
 function normalizeBeat(b: any, index: number): Beat {
   return {
     position: index,
@@ -76,6 +83,13 @@ function normalizeSettings(s: any): StorySettings {
     darkness: s?.darkness ?? 5,
     pace: s?.pace ?? 5,
     endingTypes: s?.endingTypes ?? (s?.endingType ? [s.endingType] : []),
+    // Short-film fields. Both default to absent for legacy saves and for
+    // non-short projects; the UI hides them and the prompts use safe
+    // defaults (12 min / generic 3-stage skeleton).
+    duration: typeof s?.duration === "number" && s.duration > 0 && s.duration <= 60
+      ? s.duration : undefined,
+    shortStructure: ALLOWED_SHORT_STRUCTURES.has(s?.shortStructure)
+      ? (s.shortStructure as StorySettings["shortStructure"]) : null,
   };
 }
 
