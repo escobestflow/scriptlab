@@ -493,9 +493,21 @@ No prose outside the JSON.`;
         selectedText: string;
         instruction: string;
       };
-      const sc = getActiveScriptDraft(story);
-      const scene = (sc?.script.scenes ?? []).find(s => s.id === sceneId);
-      if (!scene) return `Unknown scene.`;
+      // ReadThroughSheet synthesizes "scene" rows from beats, using
+      // beat.id as the scene id. So look up the beat by id from the
+      // active story-layer draft — that's where prose actually lives.
+      const sl = getActiveStoryLayerDraft(story);
+      const flatBeats = sl
+        ? story.projectType === "tv-show"
+          ? (sl.episodes ?? []).flatMap(ep => ep.beats)
+          : sl.beats
+        : [];
+      const beat = flatBeats.find(b => b.id === sceneId);
+      if (!beat) return `Unknown scene.`;
+      const scene = {
+        heading: beat.name,
+        content: beat.sceneContent ?? "",
+      };
       const PASSAGE = selectedText;
       return `Rewrite the quoted passage inside this scene per the user's instruction. Return only the rewritten passage — a drop-in replacement for the quoted text. Preserve the surrounding formatting conventions (dialogue "NAME: line" cues, action paragraphs, scene headings in ALL CAPS). Match the scene's voice and tone.
 ${scene.heading ? `\nScene heading: ${scene.heading}` : ""}

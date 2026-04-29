@@ -3582,11 +3582,32 @@ function ReadThroughSheet({
   setStory: (u: (s: Story) => Story) => void;
   onClose: () => void;
 }) {
-  const scriptDraft = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
   const conceptDraft = getActiveConceptDraft(story);
-  const scenes = scriptDraft.script?.scenes ?? [];
   const title = story.title || "Untitled";
+
+  // Read-through scenes are derived from beats[i].sceneContent — the
+  // bucket the Script tab actually renders from. The historical
+  // scriptDraft.script.scenes path is orphaned legacy data from the
+  // pre-fix sync_*_to_script flow; reading from it here was why the
+  // sheet showed "No scenes…" for projects whose prose lived only on
+  // beats. We use beat.id as scene.id so highlight rects + the
+  // submitComposer write-back can map back to the source beat.
+  const sl = getActiveStoryLayerDraft(story);
+  const flatBeats: Beat[] = sl
+    ? story.projectType === "tv-show"
+      ? (sl.episodes ?? []).flatMap(ep => ep.beats)
+      : sl.beats
+    : [];
+  const scenes: Scene[] = flatBeats
+    .filter(b => b.status === "written" && b.sceneContent?.trim())
+    .map(b => ({
+      id: b.id,
+      beatId: b.id,
+      heading: b.name,
+      content: b.sceneContent ?? "",
+      notes: "",
+    }));
 
   // Build one big text blob for the "Play all" button — speakScript()
   // parses headings + cues back out via scriptParse. Joining with two
@@ -3727,23 +3748,34 @@ function ReadThroughSheet({
       if (!replacement) {
         throw new Error("AI returned no replacement text.");
       }
-      // Splice into the scene. We replace the FIRST occurrence of the
-      // selected text — in practice the highlighted text is unlikely
-      // to appear verbatim twice in one scene. If it does, the first
-      // match wins; users can re-run the highlighter on the second
-      // instance.
+      // Splice into the source beat. scene.id === beat.id (we built
+      // the scenes array from beats above), so we match by id and
+      // overwrite that beat's sceneContent. The Script tab and any
+      // future re-render of the read-through both source from beats,
+      // so this single write is observable everywhere. We replace the
+      // FIRST occurrence of the selected text — in practice the
+      // highlighted text is unlikely to appear verbatim twice in one
+      // scene. If it does, the first match wins; users can re-run the
+      // highlighter on the second instance.
       const sid = activeHighlight.sceneId;
       const needle = activeHighlight.text;
       setStory((s) => {
-        const draft = getActiveScriptDraft(s);
-        const scenes = draft.script.scenes.map((sc) =>
-          sc.id === sid
-            ? { ...sc, content: replaceFirst(sc.content, needle, replacement) }
-            : sc,
+        const sl = getActiveStoryLayerDraft(s);
+        if (!sl) return s;
+        const writeInto = (arr: Beat[]): Beat[] => arr.map(b =>
+          b.id === sid && b.sceneContent
+            ? { ...b, sceneContent: replaceFirst(b.sceneContent, needle, replacement) }
+            : b,
         );
-        return updateScriptDraft(s, {
-          script: { ...draft.script, scenes },
-        });
+        if (s.projectType === "tv-show") {
+          return updateStoryLayerDraft(s, {
+            episodes: (sl.episodes ?? []).map(ep => ({
+              ...ep,
+              beats: writeInto(ep.beats),
+            })),
+          });
+        }
+        return updateStoryLayerDraft(s, { beats: writeInto(sl.beats) });
       });
       // Close composer, clear the highlight, exit highlight mode —
       // a clean landing so the user sees their change immediately.
