@@ -3874,6 +3874,34 @@ body:has(.sheet.open) .layer-sticky-bar {
   flex-shrink: 0;
 }
 
+/* Per-scene Rewrite-with-AI trigger that sits inline next to the
+   SpeakButton on written scene cards. Subtle border-pill styling so it
+   doesn't compete with the prose itself or with the bulk "Rewrite all
+   scenes" sticky bar. The disabled state goes ghost rather than
+   removing the button from the layout — a stable row layout prevents
+   the SpeakButton from jumping around mid-AI-call. */
+.scene-rewrite-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: 'Lato', -apple-system, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  transition: background 140ms var(--ease), opacity 140ms var(--ease);
+}
+.scene-rewrite-trigger:hover:not(:disabled) { background: var(--surface, #f5f5f4); }
+.scene-rewrite-trigger:active:not(:disabled) { opacity: 0.6; }
+.scene-rewrite-trigger:disabled { opacity: 0.4; cursor: not-allowed; }
+.scene-rewrite-trigger svg { opacity: 0.85; }
+
 /* ======= MENU DRAWER ======= */
 
 /* ======= MENU PANEL (full-screen black drop-down under topbar) =======

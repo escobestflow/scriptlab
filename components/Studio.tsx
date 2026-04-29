@@ -236,8 +236,19 @@ export function Studio({
    *  scenes with AI" wraps this in `runGenerateAll` so its scrim covers
    *  exactly scene 1; scenes 2..N stream into the Script tab via the
    *  `bgScriptJob` spinner cards. Owned by page.tsx because the loop's
-   *  state has to outlive Studio (user can navigate away mid-run). */
-  onStartBackgroundScriptLoop?: (story: Story, profile?: WriterProfile | null) => Promise<void>;
+   *  state has to outlive Studio (user can navigate away mid-run).
+   *
+   *  `opts.rewriteNewDraft` — when set, page.tsx clones the active
+   *  story-layer + script-layer drafts and clears every beat to
+   *  "design" before the loop runs. Studio passes this when the user
+   *  taps the bulk button on a script that already has prose, so the
+   *  prior prose is preserved on the older draft and the rewrite goes
+   *  into a fresh one. */
+  onStartBackgroundScriptLoop?: (
+    story: Story,
+    profile?: WriterProfile | null,
+    opts?: { rewriteNewDraft?: boolean },
+  ) => Promise<void>;
 }) {
   const [section, setSection] = useState<Section>(initialSection ?? "concept");
   // Current user's email for the initials chip on the user's own side
@@ -6618,8 +6629,18 @@ function ScriptTab({
   } | null;
   /** Forwarded from Studio. The "Write all scenes with AI" button calls
    *  this — page.tsx orchestrates the loop, returning a Promise that
-   *  resolves once scene 1 lands so we can dismiss the scrim. */
-  onStartBackgroundScriptLoop?: (story: Story, profile?: WriterProfile | null) => Promise<void>;
+   *  resolves once scene 1 lands so we can dismiss the scrim.
+   *
+   *  `opts.rewriteNewDraft` switches the button into rewrite mode:
+   *  page.tsx clones the active story+script layer drafts and clears
+   *  every beat to "design" before the loop runs, so the prior prose
+   *  is preserved on the older draft. Studio sets this when there's
+   *  already at least one written scene. */
+  onStartBackgroundScriptLoop?: (
+    story: Story,
+    profile?: WriterProfile | null,
+    opts?: { rewriteNewDraft?: boolean },
+  ) => Promise<void>;
 }) {
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
@@ -6661,6 +6682,13 @@ function ScriptTab({
   //     resume by clicking again (queue picks up at first unwritten).
   const { profile } = useProfileCapture();
   const [genBusy, setGenBusy] = useState(false);
+  // When ANY scene has prose, the bulk button switches into rewrite
+  // mode: page.tsx clones the story-layer + script-layer drafts and
+  // clears every beat before the loop runs, so the prior prose is
+  // preserved on the older draft. The label flips to "Rewrite all
+  // scenes with AI (New Draft)" so the destructive intent is explicit.
+  // No prior prose → first-write mode (overwrite empty draft, no clone).
+  const isRewriteMode = writtenCount > 0;
   async function generateAllScript() {
     if (genBusy || bgScriptJob || !onStartBackgroundScriptLoop) return;
     setGenBusy(true);
@@ -6669,7 +6697,9 @@ function ScriptTab({
         // Resolves when scene 1 is written + persisted (or the loop
         // terminates early — empty queue / error). Scenes 2..N keep
         // generating in the background after this returns.
-        await onStartBackgroundScriptLoop(story, profile);
+        await onStartBackgroundScriptLoop(story, profile, {
+          rewriteNewDraft: isRewriteMode,
+        });
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -6790,7 +6820,30 @@ function ScriptTab({
           )}
           {beat.status === "written" && beat.sceneContent && (
             <div style={{ padding: "0 16px 16px" }}>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              {/* Per-scene action row: Rewrite-with-AI sits left of the
+                  SpeakButton so the destructive option is far enough
+                  from the play affordance to avoid mis-taps. Hidden
+                  when this beat is currently inflight in the bg loop;
+                  disabled (but still rendered) while any other AI work
+                  is happening, so users can't stack two generations on
+                  the same beat. */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 8 }}>
+                {bgScriptJob?.inflightBeatId !== beat.id && (
+                  <button
+                    type="button"
+                    className="scene-rewrite-trigger"
+                    disabled={busy || !!bgScriptJob}
+                    onClick={() => run(
+                      { type: "generate_scene", payload: { beatIndex: i } },
+                      `Rewrite · ${beat.name}`,
+                    )}
+                    aria-label={`Rewrite ${beat.name} with AI`}
+                    title="Rewrite this scene with AI (overwrites the current prose)"
+                  >
+                    <AISparkleIcon />
+                    <span>Rewrite with AI</span>
+                  </button>
+                )}
                 <SpeakButton
                   mode="script"
                   size="md"
@@ -6896,7 +6949,13 @@ function ScriptTab({
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            label={bgScriptJob ? "Writing scenes…" : "Write all scenes with AI"}
+            label={
+              bgScriptJob
+                ? "Writing scenes…"
+                : isRewriteMode
+                  ? "Rewrite all scenes with AI (New Draft)"
+                  : "Write all scenes with AI"
+            }
             onClick={generateAllScript}
             // Disable while a background loop is already filling the
             // queue (Easy mode hand-off). Two parallel loops would

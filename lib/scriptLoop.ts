@@ -31,7 +31,12 @@
 //     button has the same behavior today.
 
 import type { Story, Beat } from "./story";
-import { getActiveStoryLayerDraft, updateStoryLayerDraft } from "./story";
+import {
+  getActiveStoryLayerDraft,
+  updateStoryLayerDraft,
+  createNewStoryLayerDraft,
+  createNewScriptDraft,
+} from "./story";
 import type { ActionRequest } from "./prompt";
 import type { WriterProfile } from "./writerProfile";
 import { callGenerate } from "./syncLayer";
@@ -200,4 +205,54 @@ export function pendingBeatIds(story: Story): Set<string> {
       .filter(b => b.status !== "written" || !b.sceneContent?.trim())
       .map(b => b.id),
   );
+}
+
+/**
+ * Prepare a Story for the "Rewrite all scenes with AI (New Draft)"
+ * flow. Clones BOTH the active story-layer draft (where scene prose
+ * actually lives — `beats[i].sceneContent`) AND the active script-layer
+ * draft (so the Script tab's draft picker surfaces a fresh entry users
+ * can switch back to). On the cloned story-layer draft every beat is
+ * reset to status "design" with empty sceneContent so the script-
+ * generation loop sees a full queue and the model isn't anchored on the
+ * prior prose.
+ *
+ * The original drafts are untouched — calling code can persist the
+ * returned Story knowing the user can swap back via either layer's
+ * draft picker if they prefer the previous take. Sibling helpers in
+ * lib/story.ts already handle the project-draft pointer math, so this
+ * function is just a thin clone+clear wrapper.
+ *
+ * Used by app/page.tsx's startBackgroundScriptLoop when the
+ * `rewriteNewDraft` option is set; the manual one-shot per-scene
+ * rewrite button (see Studio.tsx) does NOT clone — it overwrites the
+ * single scene in place because cloning the entire draft for a single
+ * paragraph rewrite would be heavy-handed.
+ */
+export function prepareRewriteNewDraft(story: Story): Story {
+  let next = createNewStoryLayerDraft(story);
+  const sl = getActiveStoryLayerDraft(next);
+  if (sl) {
+    const clearBeat = (b: Beat): Beat => ({
+      ...b,
+      status: "design" as const,
+      sceneContent: "",
+    });
+    if (next.projectType === "tv-show") {
+      next = updateStoryLayerDraft(next, {
+        episodes: (sl.episodes ?? []).map(ep => ({
+          ...ep,
+          beats: ep.beats.map(clearBeat),
+        })),
+      });
+    } else {
+      next = updateStoryLayerDraft(next, { beats: sl.beats.map(clearBeat) });
+    }
+  }
+  // Pair-clone the script-layer draft so the Script tab's draft picker
+  // shows a fresh entry alongside the cloned story draft. The active
+  // prose lives on story-layer beats, not on this draft's scenes array,
+  // but the picker still surfaces the entry to the user.
+  next = createNewScriptDraft(next);
+  return next;
 }

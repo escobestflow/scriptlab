@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Story, LayerKey, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, updateConceptDraft } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import { runEasyMode, type EasyModeStep, EasyModeError } from "@/lib/easyMode";
-import { runScriptGenerationLoop, pendingBeatIds } from "@/lib/scriptLoop";
+import {
+  runScriptGenerationLoop,
+  pendingBeatIds,
+  prepareRewriteNewDraft,
+} from "@/lib/scriptLoop";
 import { EasyModeOverlay } from "@/components/EasyModeOverlay";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
@@ -777,15 +781,24 @@ export default function Page() {
   // Background script-generation loop. Two callers:
   //   1. Easy mode hand-off — fires this fire-and-forget after step 4
   //      writes scene 1, draining scenes 2..N while the user reads.
-  //   2. Studio's "Write all scenes with AI" button — awaits the
-  //      returned Promise wrapped in Studio's scrim, so the scrim
-  //      covers exactly scene 1 and closes when scene 1 lands.
+  //   2. Studio's "Write all scenes with AI" / "Rewrite all scenes
+  //      with AI (New Draft)" button — awaits the returned Promise
+  //      wrapped in Studio's scrim, so the scrim covers exactly
+  //      scene 1 and closes when scene 1 lands.
   //
   // Lives at page.tsx scope (not Studio's) so the loop survives the
   // user navigating between Studio tabs or even back to the project
   // list — only a tab close kills it. Each scene's prose is persisted
   // to Supabase before the next iteration starts, so partial
   // completion survives a tab close mid-loop.
+  //
+  // `opts.rewriteNewDraft` engages the rewrite path: clone the active
+  // story-layer + script-layer drafts and reset every beat to "design"
+  // before running the loop. The original prose is preserved on the
+  // older story-layer draft (accessible via the Story tab's draft
+  // picker) so users can swap back to it if they prefer the previous
+  // take. Without this flag, the loop overwrites the existing draft
+  // in place — used by Easy mode's hand-off (no prior prose to lose).
   //
   // Returns a Promise that resolves when:
   //   - the FIRST onBeatDone fires (manual mode's scrim closes here), OR
@@ -797,12 +810,29 @@ export default function Page() {
   function startBackgroundScriptLoop(
     story: Story,
     profile?: WriterProfile | null,
+    opts?: { rewriteNewDraft?: boolean },
   ): Promise<void> {
     return new Promise<void>((resolve) => {
-      const initialPending = pendingBeatIds(story);
+      // Rewrite-new-draft path: clone the story + script layer drafts
+      // and clear every beat's sceneContent before the loop runs.
+      // We update React state (and fire-and-forget the DB save) so the
+      // Script tab visually resets to "no prose yet" while the loop
+      // begins; the per-scene persist callback below will save the
+      // cumulative state (cleared draft + scene 1) on the first
+      // iteration anyway, so this upfront save is mostly belt-and-
+      // suspenders for the case where the user closes the tab between
+      // clearing and the first scene landing.
+      let starting = story;
+      if (opts?.rewriteNewDraft) {
+        starting = prepareRewriteNewDraft(starting);
+        setProjects(ps => ps.map(p => p.id === starting.id ? starting : p));
+        if (user) void saveProjectToDB(user.id, starting);
+      }
+
+      const initialPending = pendingBeatIds(starting);
       if (!initialPending.size) { resolve(); return; }
       setBgScriptJob({
-        projectId: story.id,
+        projectId: starting.id,
         inflightBeatId: null,
         pendingBeatIds: initialPending,
       });
@@ -811,7 +841,7 @@ export default function Page() {
       let resolved = false;
       const resolveOnce = () => { if (!resolved) { resolved = true; resolve(); } };
       void runScriptGenerationLoop({
-        initialStory: story,
+        initialStory: starting,
         profile,
         persist: async (next) => {
           setProjects(ps => ps.map(p => p.id === next.id ? next : p));
