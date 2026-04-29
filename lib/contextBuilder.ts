@@ -116,15 +116,22 @@ ${beats.length
 // Shared between generate_beats, sync_*_to_story, sync_*_to_script, and
 // the Easy-mode generate_full_concept prompts.
 
-/** Target scene count for a short. ~1 scene per 1.5 minutes of runtime,
- *  clamped to [6, 12]. Default 12-min runtime when duration is unset.
- *  Returns the number plus a presentation string ready to splice into
- *  prompt text. */
-function shortSceneCount(durationMin: number | undefined): { n: number; label: string } {
+/** Target scene count for a short. Maps the user's chosen runtime onto
+ *  one of seven duration buckets, each carrying its own scene/beat range.
+ *  Default bucket = 8–12 min when duration is unset (≈ 7–12 scenes).
+ *  Returns the low/high inclusive range plus a presentation string ready
+ *  to splice into prompt text (e.g. "10–15 scenes"). */
+function shortSceneCount(durationMin: number | undefined): { low: number; high: number; label: string } {
   const dur = typeof durationMin === "number" && durationMin > 0 ? durationMin : 12;
-  const raw = Math.round(dur / 1.5);
-  const n = Math.max(6, Math.min(12, raw));
-  return { n, label: `${n} scenes` };
+  let low = 7, high = 12;
+  if (dur <= 3)        { low = 2;  high = 4;  }
+  else if (dur <= 5)   { low = 3;  high = 6;  }
+  else if (dur <= 8)   { low = 5;  high = 8;  }
+  else if (dur <= 12)  { low = 7;  high = 12; }
+  else if (dur <= 15)  { low = 10; high = 15; }
+  else if (dur <= 20)  { low = 12; high = 20; }
+  else                 { low = 15; high = 30; }
+  return { low, high, label: `${low}–${high} scenes` };
 }
 
 /** Per-shortStructure ending posture. Returns empty string when the
@@ -153,11 +160,11 @@ function shortStructureFlavor(s: string | null | undefined): string {
 function shortFilmGuidance(story: Story): string {
   if (story.projectType !== "short") return "";
   const settings = getActiveConceptDraft(story).settings;
-  const { n } = shortSceneCount(settings.duration);
+  const { low, high } = shortSceneCount(settings.duration);
   const dur = settings.duration ?? 12;
   const flavor = shortStructureFlavor(settings.shortStructure);
   return `
-This is a short film, not a feature. Target runtime ~${dur} minutes → about ${n} scenes total.
+This is a short film, not a feature. Target runtime ~${dur} minutes → about ${low}–${high} scenes total.
 
 Do NOT use a full feature-length arc. Use a flexible 3-stage skeleton:
   1. Situation — drop us into a clear world / problem / relationship / tension.
@@ -696,7 +703,7 @@ Rules:
   // the shortFilmGuidance block is the primary lever.
   if (story.projectType === "short") {
     const settings = getActiveConceptDraft(story).settings;
-    const { n } = shortSceneCount(settings.duration);
+    const { low, high } = shortSceneCount(settings.duration);
     return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
 ${source === "script"
@@ -711,7 +718,7 @@ Return STRICT JSON:
 }
 
 Rules:
-- Produce ${n} beats — one per scene the screenplay will end up with.
+- Produce ${low}–${high} beats — one per scene the screenplay will end up with.
 - Each "summary" is 1–2 sentences; each "purpose" is 1 sentence naming what the beat does for the audience.
 - No prose outside the JSON.${shortFilmGuidance(story)}`;
   }

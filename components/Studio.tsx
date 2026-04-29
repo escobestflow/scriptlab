@@ -4916,12 +4916,79 @@ function ConceptTab({
         </div>
       </AttrRow>
 
+      {/* Short Structure — short-film only. Sits directly under Format
+          because it's the primary structural lever for shorts: prompts
+          use a flexible Situation → Pressure → Shift skeleton, and the
+          picked value adds an ending-posture flavor (resolution / openness
+          / hook / observation / reveal). Hidden for features and TV. The
+          legacy "Story Framework" row further down is still rendered for
+          shorts as a soft fallback (used only when shortStructure is
+          unset). Tap-to-toggle clears, matching the Framework picker. */}
+      {story.projectType === "short" && (
+        <AttrRow
+          label="Short Structure"
+          values={d.settings.shortStructure
+            ? [d.settings.shortStructure.replace(/-/g, " ").toUpperCase()]
+            : undefined}
+          placeholder="Pick a short-form structure"
+          expanded={openAttr === "shortStructure"}
+          onToggle={() => toggle("shortStructure")}
+          readOnly={isPartnerPreviewing}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {([
+              {
+                value: "complete" as const,
+                label: "Complete Short",
+                description: "A compact story with a clear beginning, middle, and end. Resolves.",
+              },
+              {
+                value: "open-ended" as const,
+                label: "Open-Ended Short",
+                description: "A story moment that resolves emotionally but leaves the larger outcome unknown.",
+              },
+              {
+                value: "proof-of-concept" as const,
+                label: "Proof of Concept",
+                description: "A short that introduces a world, tone, character, or premise for a bigger story.",
+              },
+              {
+                value: "slice-of-life" as const,
+                label: "Slice of Life",
+                description: "A focused moment from a character's life — subtle, observational, often unresolved.",
+              },
+              {
+                value: "twist" as const,
+                label: "Twist Short",
+                description: "A compact setup built around a reveal, reversal, or final punch.",
+              },
+            ]).map(s => (
+              <button
+                key={s.value}
+                className={`choice ${d.settings.shortStructure === s.value ? "selected" : ""}`}
+                onClick={() => {
+                  // Tap-to-toggle: tapping the already-selected option
+                  // clears it. Mirrors Framework's behavior.
+                  const next = d.settings.shortStructure === s.value ? null : s.value;
+                  updateDraft({ settings: { ...d.settings, shortStructure: next } });
+                }}
+                style={{ textAlign: "left", padding: "12px 17px" }}
+              >
+                <div className="choice-title">{s.label}</div>
+                <div className="choice-sub">{s.description}</div>
+              </button>
+            ))}
+          </div>
+        </AttrRow>
+      )}
+
       {/* Duration — short-film only. Drives the default scene count in
-          short-form prompts (~1 scene per 1.5 minutes, clamped 6–12).
-          Hidden for features and TV — feature scene count is already
-          handled by the legacy "14–22 scenes" range, and TV uses pilot-
-          episode logic. Stored value survives a temporary format swap so
-          the user can experiment without losing the runtime they picked. */}
+          short-form prompts via 7-bucket runtime → scene-count mapping
+          (1–3 min → 2–4 scenes ... 20–30 min → 15–30 scenes). Hidden for
+          features and TV — feature scene count is already handled by the
+          legacy "14–22 scenes" range, and TV uses pilot-episode logic.
+          Stored value survives a temporary format swap so the user can
+          experiment without losing the runtime they picked. */}
       {story.projectType === "short" && (
         <AttrRow
           label="Duration"
@@ -5367,80 +5434,16 @@ function ConceptTab({
         )}
       </AttrRow>
 
-      {/* Short structure — short-film only. Replaces the feature-style
-          "Structure" framework picker as the primary lever for shorts:
-          prompts use a flexible Situation → Pressure → Shift skeleton,
-          and the picked value adds an ending-posture flavor (resolution
-          / openness / hook / observation / reveal). Hidden for features
-          and TV. The legacy "Structure" row below is still rendered for
-          shorts as a soft fallback (used only when shortStructure is
-          unset). Tap-to-toggle clears, matching the Framework picker. */}
-      {story.projectType === "short" && (
-        <AttrRow
-          label="Short structure"
-          values={d.settings.shortStructure
-            ? [d.settings.shortStructure.replace(/-/g, " ").toUpperCase()]
-            : undefined}
-          placeholder="Pick a short-form structure"
-          expanded={openAttr === "shortStructure"}
-          onToggle={() => toggle("shortStructure")}
-          readOnly={isPartnerPreviewing}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {([
-              {
-                value: "complete" as const,
-                label: "Complete Short",
-                description: "A compact story with a clear beginning, middle, and end. Resolves.",
-              },
-              {
-                value: "open-ended" as const,
-                label: "Open-Ended Short",
-                description: "A story moment that resolves emotionally but leaves the larger outcome unknown.",
-              },
-              {
-                value: "proof-of-concept" as const,
-                label: "Proof of Concept",
-                description: "A short that introduces a world, tone, character, or premise for a bigger story.",
-              },
-              {
-                value: "slice-of-life" as const,
-                label: "Slice of Life",
-                description: "A focused moment from a character's life — subtle, observational, often unresolved.",
-              },
-              {
-                value: "twist" as const,
-                label: "Twist Short",
-                description: "A compact setup built around a reveal, reversal, or final punch.",
-              },
-            ]).map(s => (
-              <button
-                key={s.value}
-                className={`choice ${d.settings.shortStructure === s.value ? "selected" : ""}`}
-                onClick={() => {
-                  // Tap-to-toggle: tapping the already-selected option
-                  // clears it. Mirrors Framework's behavior.
-                  const next = d.settings.shortStructure === s.value ? null : s.value;
-                  updateDraft({ settings: { ...d.settings, shortStructure: next } });
-                }}
-                style={{ textAlign: "left", padding: "12px 17px" }}
-              >
-                <div className="choice-title">{s.label}</div>
-                <div className="choice-sub">{s.description}</div>
-              </button>
-            ))}
-          </div>
-        </AttrRow>
-      )}
-
-      {/* Structure — beat-skeleton framework the AI uses when generating
+      {/* Story Framework — beat-skeleton framework the AI uses when generating
           beats and syncing Story from other layers. Optional: if unset,
-          prompts tell the model to pick whatever fits the concept.
-          Rendered with the same .choice button treatment as Format, but
-          each option includes a 1–2 sentence description under the title
-          so newcomers can recognize what they're picking. */}
+          prompts tell the model to pick whatever fits the concept. For
+          shorts, this is the soft fallback — Short Structure (rendered up
+          near Format) is the primary lever. Rendered with the same .choice
+          button treatment as Format, but each option includes a 1–2
+          sentence description under the title so newcomers can recognize
+          what they're picking. */}
       <AttrRow
-        label="Structure"
+        label="Story Framework"
         values={d.settings.framework
           ? [d.settings.framework.replace(/-/g, " ").toUpperCase()]
           : undefined}
