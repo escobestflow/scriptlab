@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Story, LayerKey, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, updateConceptDraft } from "@/lib/story";
 import { Moment } from "@/lib/sampleData";
 import { runEasyMode, type EasyModeStep, EasyModeError } from "@/lib/easyMode";
+import { runScriptGenerationLoop, pendingBeatIds } from "@/lib/scriptLoop";
 import { EasyModeOverlay } from "@/components/EasyModeOverlay";
 import {
   loadProjectsFromDB, saveProjectToDB, deleteProjectFromDB, newBlankProject,
@@ -173,6 +174,18 @@ export default function Page() {
   const [easyModeStep, setEasyModeStep] = useState<EasyModeStep | null>(null);
   const [easyModeError, setEasyModeError] = useState<{ step: EasyModeStep; message: string } | null>(null);
   const [easyModeProjectId, setEasyModeProjectId] = useState<string | null>(null);
+  // Background script-generation job. Easy mode hands off to this after
+  // scene 1 lands so the user can read scene 1 in the Script tab while
+  // scenes 2..N stream in. `inflightBeatId` is the beat currently being
+  // written; `pendingBeatIds` are beats queued behind it. Studio reads
+  // both to render spinner cards. null when no loop is running. Only
+  // one job at a time — Easy mode is gated on creation, and Studio's
+  // "Write all scenes with AI" button is disabled while this is set.
+  const [bgScriptJob, setBgScriptJob] = useState<{
+    projectId: string;
+    inflightBeatId: string | null;
+    pendingBeatIds: Set<string>;
+  } | null>(null);
   // New idea (moment) sheet — mirrors the Project/Idea creation UX.
   const [newIdeaOpen, setNewIdeaOpen] = useState(false);
   const [newIdeaText, setNewIdeaText] = useState("");
@@ -741,6 +754,12 @@ export default function Page() {
         getActiveConceptDraft(finished).logline,
         getActiveConceptDraft(finished).settings.genres,
       );
+      // Hand off to the background script-generation loop. runEasyMode
+      // already wrote scene 1 (so the user has something to read on
+      // the Script tab); this fire-and-forget loop drains the rest.
+      // Persistence per iteration means a tab close mid-loop loses
+      // only the in-flight scene; everything before it is durable.
+      startBackgroundScriptLoop(finished);
     } catch (e: any) {
       // EasyModeError carries the offending step + the partial story.
       // We leave easyModeRunning true so the overlay stays mounted in
@@ -751,6 +770,57 @@ export default function Page() {
         e instanceof Error ? e.message : String(e ?? "Unknown error");
       setEasyModeError({ step: failedStep, message });
     }
+  }
+
+  // Background script-generation loop. Runs after Easy-mode hands off
+  // to the Script tab, draining the unwritten beats one by one. Lives
+  // at page.tsx scope (not Studio's) so the loop survives the user
+  // navigating between Studio tabs or even back to the project list —
+  // only a tab close kills it. Each scene's prose is persisted to
+  // Supabase before the next iteration starts, so partial completion
+  // survives a tab close mid-loop.
+  function startBackgroundScriptLoop(story: Story) {
+    const initialPending = pendingBeatIds(story);
+    if (!initialPending.size) return;
+    setBgScriptJob({
+      projectId: story.id,
+      inflightBeatId: null,
+      pendingBeatIds: initialPending,
+    });
+    void runScriptGenerationLoop({
+      initialStory: story,
+      persist: async (next) => {
+        setProjects(ps => ps.map(p => p.id === next.id ? next : p));
+        if (user) await saveProjectToDB(user.id, next);
+      },
+      onBeatStart: (beatId) => {
+        // Promote this beat from pending → inflight so the Script tab
+        // swaps its spinner copy from "Queued…" to "Writing now…".
+        setBgScriptJob(j => {
+          if (!j) return j;
+          const nextPending = new Set(j.pendingBeatIds);
+          nextPending.delete(beatId);
+          return { ...j, inflightBeatId: beatId, pendingBeatIds: nextPending };
+        });
+      },
+      onBeatDone: (beatId) => {
+        // Clear inflight; the next iteration's onBeatStart will fill
+        // it with the next beat. If this was the last beat, onComplete
+        // fires next and clears the whole job.
+        setBgScriptJob(j => j && j.inflightBeatId === beatId
+          ? { ...j, inflightBeatId: null }
+          : j,
+        );
+      },
+      onComplete: () => setBgScriptJob(null),
+      onError: (err) => {
+        // Surface to console for now; completed scenes are persisted
+        // and the user can resume manually via the per-scene "Write
+        // this scene with AI" button.
+        console.error("[bg script loop]", err);
+        setBgScriptJob(null);
+      },
+    });
   }
 
   async function finishCreateEasy() {
@@ -870,6 +940,14 @@ export default function Page() {
             studioProject.collaboratorUserId
               ? projectMembers[studioProject.id]
               : undefined
+          }
+          bgScriptJob={
+            bgScriptJob && bgScriptJob.projectId === studioProject.id
+              ? {
+                  inflightBeatId: bgScriptJob.inflightBeatId,
+                  pendingBeatIds: bgScriptJob.pendingBeatIds,
+                }
+              : null
           }
         />
       );

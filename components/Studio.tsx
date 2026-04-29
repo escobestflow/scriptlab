@@ -163,6 +163,7 @@ export function Studio({
   partnerEmail,
   projectMembers,
   initialSection,
+  bgScriptJob = null,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -217,6 +218,16 @@ export function Studio({
    *  rather than via useEffect so there's no one-frame flash of the
    *  default tab before the user-visible tab takes over. */
   initialSection?: Section;
+  /** Background script-generation job. Set by app/page.tsx after Easy
+   *  mode hands off to the Script tab (scene 1 written, scenes 2..N
+   *  draining in the background). Drives:
+   *    - per-beat spinners on unwritten beats in the Script tab
+   *    - the "Write all scenes with AI" button being disabled
+   *  null when no background loop is running for this project. */
+  bgScriptJob?: {
+    inflightBeatId: string | null;
+    pendingBeatIds: Set<string>;
+  } | null;
 }) {
   const [section, setSection] = useState<Section>(initialSection ?? "concept");
   // Current user's email for the initials chip on the user's own side
@@ -1685,6 +1696,7 @@ export function Studio({
                 setBeatTrayInsertAt(sorted.length);
                 setBeatTrayOpen(true);
               }}
+              bgScriptJob={bgScriptJob}
             />
           )}
               </div>
@@ -6532,6 +6544,7 @@ function ScriptTab({
   importStep,
   onAddScene,
   runGenerateAll,
+  bgScriptJob,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -6557,6 +6570,14 @@ function ScriptTab({
   /** Wrap a Create-all action with the Studio-level scrim + sheet-close
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
+  /** Background script-generation job state, when one is running for
+   *  this project. Drives per-beat spinner cards (inflight + queued)
+   *  and disables the bulk "Write all scenes with AI" button so we
+   *  don't kick off a second loop on top of the first. */
+  bgScriptJob?: {
+    inflightBeatId: string | null;
+    pendingBeatIds: Set<string>;
+  } | null;
 }) {
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
@@ -6816,7 +6837,35 @@ function ScriptTab({
               <div className="scene-content">{beat.sceneContent}</div>
             </div>
           )}
-          {beat.status === "design" && (
+          {/* Background-loop states. Take precedence over the "design"
+              branch so an unwritten beat that's queued by Easy mode's
+              background loop renders a spinner instead of a competing
+              "Write this scene with AI" button. Three exclusive cases:
+                - inflight: this beat is being generated right now
+                - queued:   this beat is waiting behind the inflight one
+                - design:   no bgScriptJob touches this beat → existing
+                            manual-write button (unchanged) */}
+          {beat.status !== "written" && bgScriptJob?.inflightBeatId === beat.id && (
+            <div style={{ padding: "0 16px 16px" }}>
+              <div className="scene-bg-row">
+                <div className="scene-bg-spinner" aria-hidden />
+                <span>Writing this scene…</span>
+              </div>
+            </div>
+          )}
+          {beat.status !== "written"
+            && bgScriptJob?.inflightBeatId !== beat.id
+            && bgScriptJob?.pendingBeatIds.has(beat.id) && (
+            <div style={{ padding: "0 16px 16px" }}>
+              <div className="scene-bg-row queued">
+                <div className="scene-bg-spinner" aria-hidden />
+                <span>Queued — writing soon…</span>
+              </div>
+            </div>
+          )}
+          {beat.status === "design"
+            && bgScriptJob?.inflightBeatId !== beat.id
+            && !bgScriptJob?.pendingBeatIds.has(beat.id) && (
             <div style={{ padding: "0 16px 16px" }}>
               {/* Secondary treatment on the per-scene CTA so it sits
                   quieter inside the card; the sticky "Write all scenes
@@ -6880,9 +6929,12 @@ function ScriptTab({
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
-            label="Write all scenes with AI"
+            label={bgScriptJob ? "Writing scenes…" : "Write all scenes with AI"}
             onClick={generateAllScript}
-            disabled={genBusy}
+            // Disable while a background loop is already filling the
+            // queue (Easy mode hand-off). Two parallel loops would
+            // race for the same beats and double-write.
+            disabled={genBusy || !!bgScriptJob}
             icon={<AISparkleIcon />}
           />
         </>

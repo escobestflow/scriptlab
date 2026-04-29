@@ -1,12 +1,18 @@
-// Easy-mode project creation: chain four AI calls to populate every
-// layer (Concept → Characters → Story → Script) sequentially from a
-// freshly-seeded Story whose only filled fields are title + format +
-// genres. Each step's result is persisted to Supabase before the next
-// step runs, so a crash mid-chain leaves the user with recoverable
-// partial state rather than nothing.
+// Easy-mode project creation: chain AI calls to populate every layer
+// (Concept → Characters → Story → first Script scene) from a freshly-
+// seeded Story whose only filled fields are title + format + genres.
+// Each step's result is persisted to Supabase before the next step
+// runs, so a crash mid-chain leaves the user with recoverable partial
+// state rather than nothing.
+//
+// Step 4 only writes the FIRST scene — once it lands the caller
+// (app/page.tsx) navigates the user to the Script tab and kicks off a
+// background loop (lib/scriptLoop.ts) to drain the rest. This keeps
+// the loader blocking-time short (~30s for steps 1–3 + scene 1 instead
+// of several minutes for all scenes) so users don't quit mid-run.
 //
 // Why this exists in addition to lib/syncLayer.ts:
-//   - syncLayer is the right primitive for steps 2–4. It POSTs to
+//   - syncLayer is the right primitive for steps 2 and 3. It POSTs to
 //     /api/generate, parses, and writes the result to the next active
 //     draft. Each call sends the *full* story, so passing the evolving
 //     story between calls means each step's prompt sees the prior
@@ -21,12 +27,19 @@
 //     types only flow INTO concept from a populated upstream layer, and
 //     chaining 5 per-field generators would be 5 sequential roundtrips
 //     when one Sonnet call can do it.
+//   - Step 4 used to call `syncLayer(..., "story", "script")` which
+//     wrote prose to scriptDraft.script.scenes[i] — but the Script tab
+//     renders from beats[i].sceneContent, not from scriptDraft.scenes.
+//     The result: Easy mode "completed" but the Script tab looked
+//     empty. The fix is the per-beat loop in lib/scriptLoop.ts which
+//     writes to the bucket the UI actually reads from.
 
 import type { Story, LayerKey } from "./story";
 import { applySyncResult } from "./story";
 import type { ActionRequest } from "./prompt";
 import type { WriterProfile } from "./writerProfile";
 import { callGenerate, extractJson, normalizeConceptPatch, syncLayer } from "./syncLayer";
+import { runScriptGenerationLoop } from "./scriptLoop";
 
 export type EasyModeStep = "concept" | "characters" | "story" | "script";
 
@@ -132,11 +145,30 @@ export async function runEasyMode(
     throw new EasyModeError("story", current, e);
   }
 
-  // Step 4: Script from Story. Sonnet — long-form prose.
+  // Step 4: Script from Story — but ONLY the first scene. We hand the
+  // user off to the Script tab as soon as they have something to read,
+  // and the caller (page.tsx) kicks off a background loop to drain the
+  // remaining beats while the user reads scene 1. See lib/scriptLoop.ts
+  // for the rationale and lib/easyMode.ts's history for what this used
+  // to do (a single sync_story_to_script call that wrote prose to the
+  // wrong storage bucket — script.scenes instead of beats[i].sceneContent
+  // — so Easy mode "completed" but the Script tab looked empty).
   onStep("script");
   try {
-    current = await syncLayer(current, "story", "script", profile);
-    await persist(current);
+    let scriptCurrent = current;
+    let firstSceneError: Error | null = null;
+    await runScriptGenerationLoop({
+      initialStory: scriptCurrent,
+      profile,
+      maxScenes: 1,
+      persist: async (next) => {
+        scriptCurrent = next;
+        await persist(next);
+      },
+      onError: (err) => { firstSceneError = err; },
+    });
+    if (firstSceneError) throw firstSceneError;
+    current = scriptCurrent;
   } catch (e) {
     throw new EasyModeError("script", current, e);
   }
