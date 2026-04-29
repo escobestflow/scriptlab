@@ -2406,9 +2406,21 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
   margin-bottom: 12px;
 }
 .sync-banner-text {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   font-size: 13px;
   line-height: 1.5;
   color: var(--ink-soft);
+}
+/* Triangle alert glyph that leads the banner. Picks up the amber sync
+   color so light + dark themes both render correctly. flex-shrink: 0
+   keeps the icon from squishing on narrow screens; the slight top nudge
+   visually centers it against the first line of body text. */
+.sync-banner-icon {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--sync);
 }
 .sync-banner-actions {
   display: flex;
@@ -4934,40 +4946,43 @@ html[data-theme="dark"] .partner-preview-section {
   white-space: nowrap;
 }
 
-/* ── Read-through trigger (Script tab LayerBar) ─────────────────────
+/* ── Read Mode trigger (Script tab LayerBar) ────────────────────────
    Lives between the draft picker and the Update-Other-Layers chevron,
    so it gets `margin-left: auto` and the Update trigger loses its own
-   auto-margin via the adjacent-sibling rule below. */
+   auto-margin via the adjacent-sibling rule below. Solid ink fill —
+   this is the entry point to the read-through experience and the
+   previous transparent pill was disappearing into the LayerBar. The
+   label always renders (no icon-only narrow-screen fallback) so the
+   button reads as "Read Mode" at every breakpoint. */
 .layer-read-trigger {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 10px;
+  gap: 6px;
+  padding: 7px 14px;
   margin-right: 8px;
-  background: transparent;
-  border: 1px solid var(--border);
+  background: var(--ink);
+  border: 1px solid var(--ink);
   border-radius: 999px;
   cursor: pointer;
   font-family: 'Lato', -apple-system, system-ui, sans-serif;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: var(--ink);
-  transition: background 140ms var(--ease), opacity 140ms var(--ease);
+  color: var(--bg);
+  transition: opacity 140ms var(--ease), transform 140ms var(--ease);
 }
-.layer-read-trigger:hover { background: var(--surface, #f5f5f4); }
-.layer-read-trigger:active { opacity: 0.55; }
-.layer-read-trigger svg { opacity: 0.75; }
+.layer-read-trigger:hover { opacity: 0.85; }
+.layer-read-trigger:active { opacity: 0.7; transform: translateY(1px); }
+.layer-read-trigger svg { opacity: 0.95; }
 /* When read-through is present, the Update trigger is no longer the
    first auto-margin child — drop its auto so the two sit side-by-side. */
 .layer-read-trigger + .layer-update-trigger { margin-left: 0; }
 
 @media (max-width: 420px) {
-  .layer-read-trigger > span:not(:empty) {
-    display: none; /* icon-only on narrow screens */
-  }
-  .layer-read-trigger { padding: 6px 8px; }
+  /* Tighter padding on narrow screens, but keep the label visible —
+     this button's whole point is to be discoverable. */
+  .layer-read-trigger { padding: 6px 11px; gap: 5px; }
 }
 
 /* ── Import-a-script card at the bottom of Script tab ─────────────── */
