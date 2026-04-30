@@ -3279,7 +3279,7 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
   transition: opacity 200ms;
 }
 .moment-picker-item:active { opacity: 0.6; }
-.moment-picker-item.linked { opacity: 0.4; pointer-events: none; }
+.moment-picker-item.linked { opacity: 0.55; }
 .moment-picker-item .mp-type {
   font-size: 10px;
   font-weight: 700;
