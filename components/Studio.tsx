@@ -433,8 +433,13 @@ export function Studio({
   const [pickerBeatId, setPickerBeatId] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [beatTrayOpen, setBeatTrayOpen] = useState(false);
-  const [beatTrayInsertAt, setBeatTrayInsertAt] = useState<number | null>(null);
+  // Scene sheet — single sheet used for BOTH scene creation and editing,
+  // mirroring the character-sheet pattern. null = closed; an existing
+  // beat id = open. `sceneSheetIsNew` distinguishes a freshly-inserted
+  // blank scene from one the user explicitly opened, so the form can
+  // hide the Delete CTA on a not-yet-committed scene.
+  const [sceneSheetBeatId, setSceneSheetBeatId] = useState<string | null>(null);
+  const [sceneSheetIsNew, setSceneSheetIsNew] = useState<boolean>(false);
   // Character sheet — a single sheet used for BOTH creation and editing.
   // null = closed. "new-char-draft" marker or an existing character id = open.
   const [charSheetCharId, setCharSheetCharId] = useState<string | null>(null);
@@ -483,7 +488,7 @@ export function Studio({
     setShowSetup(false);
     setSheetOpen(false);
     setPickerOpen(false);
-    setBeatTrayOpen(false);
+    setSceneSheetBeatId(null);
     setReadThroughOpen(false);
     setConfirmDeleteProject(false);
     setCharSheetCharId(null);
@@ -682,6 +687,55 @@ export function Studio({
     }));
     setCharSheetCharId(newChar.id);
   };
+  // ── Scene sheet open/close ──
+  // Mirrors the character-sheet pattern: opening "new" optimistically
+  // inserts a blank beat at the requested position, opens its sheet, and
+  // discards the blank record on close if nothing was filled in.
+  const openExistingSceneSheet = (id: string) => {
+    setSceneSheetIsNew(false);
+    setSceneSheetBeatId(id);
+  };
+  const openNewSceneSheet = (insertAt?: number) => {
+    setSceneSheetIsNew(true);
+    const newBeat: Beat = {
+      id: "b_" + Math.random().toString(36).slice(2),
+      name: "",
+      summary: "",
+      purpose: "",
+      position: 0,
+      momentIds: [],
+      characterIds: [],
+      status: "design",
+    };
+    setBeats(bs => {
+      const idx = insertAt != null ? insertAt : bs.length;
+      const updated = [...bs];
+      updated.splice(idx, 0, newBeat);
+      return updated.map((b, i) => ({ ...b, position: i }));
+    });
+    setSceneSheetBeatId(newBeat.id);
+  };
+  const closeSceneSheet = () => {
+    const id = sceneSheetBeatId;
+    if (!id) return;
+    // Auto-discard a blank scene (no name + no summary + no linked
+    // ideas + no characters + no twist/weirdness dial moved).
+    setBeats(bs => {
+      const beat = bs.find(b => b.id === id);
+      if (!beat) return bs;
+      const isBlank =
+        !beat.name.trim() &&
+        !beat.summary.trim() &&
+        beat.momentIds.length === 0 &&
+        (beat.characterIds ?? []).length === 0 &&
+        beat.twist === undefined &&
+        beat.weirdness === undefined;
+      if (!isBlank) return bs;
+      return bs.filter(b => b.id !== id).map((b, i) => ({ ...b, position: i }));
+    });
+    setSceneSheetBeatId(null);
+  };
+
   const closeCharacterSheet = () => {
     const id = charSheetCharId;
     if (!id) return;
@@ -1679,13 +1733,9 @@ export function Studio({
               setStory={tabSetStory}
               beats={tabBeats}
               moments={moments}
-              addBeat={addBeat}
-              updateBeat={updateBeat}
               moveBeat={moveBeat}
-              removeBeat={removeBeat}
-              unlinkMoment={unlinkMoment}
-              openMomentPicker={(id) => { setPickerBeatId(id); setPickerOpen(true); }}
-              openBeatTray={(insertAt) => { setBeatTrayInsertAt(insertAt); setBeatTrayOpen(true); }}
+              openExistingScene={openExistingSceneSheet}
+              openNewScene={openNewSceneSheet}
               run={run}
               busy={busy}
               syncState={syncState}
@@ -1711,11 +1761,10 @@ export function Studio({
               importStep={importStep}
               onAddScene={() => {
                 // Scene (beat) creation lives on the Story tab. Switch
-                // over and open the creation tray inserting at the end
-                // so the user lands exactly where they expect.
+                // over and open the unified scene sheet appending at
+                // the end so the user lands exactly where they expect.
                 setSection("story");
-                setBeatTrayInsertAt(sorted.length);
-                setBeatTrayOpen(true);
+                openNewSceneSheet(sorted.length);
               }}
               bgScriptJob={bgScriptJob}
               onStartBackgroundScriptLoop={onStartBackgroundScriptLoop}
@@ -1827,27 +1876,55 @@ export function Studio({
         </div>
       </div>
 
-      {/* Beat creation tray */}
-      <div className={`sheet-backdrop ${beatTrayOpen ? "open" : ""}`}
-        onClick={() => setBeatTrayOpen(false)} />
-      <div className={`sheet sheet-tall ${beatTrayOpen ? "open" : ""}`}>
-        <div className="sheet-handle" />
-        <div className="sheet-header">
-          <div className="sheet-title">New scene</div>
-          <Button variant="secondary" size="sm" onClick={() => setBeatTrayOpen(false)}>Cancel</Button>
-        </div>
-        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
-          <BeatCreationForm
-            story={story}
-            onSave={(name, summary, characterIds) => {
-              addBeat(name, summary, beatTrayInsertAt ?? undefined, characterIds);
-              setBeatTrayOpen(false);
-              setBeatTrayInsertAt(null);
-            }}
-            busy={busy}
-          />
-        </div>
-      </div>
+      {/* Scene sheet — single sheet for both creation and editing,
+          mirroring the character-sheet pattern below. Sheet title
+          reflects whether the scene already has a name. */}
+      {(() => {
+        const open = sceneSheetBeatId !== null;
+        const activeBeat = open
+          ? beats.find(b => b.id === sceneSheetBeatId)
+          : null;
+        return (
+          <>
+            <div className={`sheet-backdrop ${open ? "open" : ""}`}
+              onClick={closeSceneSheet} />
+            <div className={`sheet sheet-tall ${open ? "open" : ""}`}>
+              <div className="sheet-handle" />
+              <div className="sheet-header">
+                <div className="sheet-title">
+                  {activeBeat?.name?.trim() || "New scene"}
+                </div>
+                <Button variant="secondary" size="sm" onClick={closeSceneSheet}>Close</Button>
+              </div>
+              <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+                {activeBeat && (
+                  <SceneEditForm
+                    beat={activeBeat}
+                    story={story}
+                    moments={moments}
+                    isNew={sceneSheetIsNew}
+                    onUpdate={(patch) => updateBeat(activeBeat.id, patch)}
+                    onRemove={() => {
+                      removeBeat(activeBeat.id);
+                      setSceneSheetBeatId(null);
+                    }}
+                  />
+                )}
+              </div>
+              <div className="sheet-sticky-footer">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  block
+                  onClick={closeSceneSheet}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Character sheet — single sheet for both creation and editing.
           Sheet title reflects whether the character already has a name. */}
@@ -6316,8 +6393,9 @@ function CharacterEditForm({
 
 function StoryTab({
   story, setStory,
-  beats, moments, addBeat, updateBeat, moveBeat, removeBeat,
-  unlinkMoment, openMomentPicker, openBeatTray, run, busy, syncState,
+  beats, moments, moveBeat,
+  openExistingScene, openNewScene,
+  run, busy, syncState,
   autosaveEnabled = true,
   onOpenUpdateTray,
   runGenerateAll,
@@ -6326,13 +6404,12 @@ function StoryTab({
   setStory: (u: (s: Story) => Story) => void;
   beats: Beat[];
   moments: Moment[];
-  addBeat: (name: string, summary: string, insertAt?: number, characterIds?: string[]) => void;
-  updateBeat: (id: string, patch: Partial<Beat>) => void;
   moveBeat: (index: number, direction: "up" | "down") => void;
-  removeBeat: (id: string) => void;
-  unlinkMoment: (beatId: string, momentId: string) => void;
-  openMomentPicker: (beatId: string) => void;
-  openBeatTray: (insertAt: number) => void;
+  /** Open the unified scene sheet for editing an existing beat. */
+  openExistingScene: (beatId: string) => void;
+  /** Insert a fresh blank beat at the given position and open its
+   *  sheet — auto-discarded on close if the user filled nothing in. */
+  openNewScene: (insertAt?: number) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
   syncState: LayerSyncState;
@@ -6342,9 +6419,6 @@ function StoryTab({
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
 }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [editingField, setEditingField] = useState<{ beatId: string; field: "name" | "summary" } | null>(null);
-  const [editValue, setEditValue] = useState("");
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -6376,17 +6450,6 @@ function StoryTab({
     }
   }
 
-  function startEdit(beatId: string, field: "name" | "summary", currentValue: string) {
-    setEditingField({ beatId, field });
-    setEditValue(currentValue);
-  }
-  function saveEdit() {
-    if (editingField) {
-      updateBeat(editingField.beatId, { [editingField.field]: editValue });
-      setEditingField(null);
-    }
-  }
-
   const hasBeats = beats.length > 0;
 
   return (
@@ -6409,7 +6472,7 @@ function StoryTab({
             title="No scenes yet"
             caption="Start building your story structure — add your first scene."
             addLabel="Add scene"
-            onAdd={() => openBeatTray(0)}
+            onAdd={() => openNewScene(0)}
             onGenerate={generateAllBeats}
             generating={genBusy}
             generateLabel="Write all with AI"
@@ -6418,10 +6481,6 @@ function StoryTab({
         )}
 
         {beats.map((beat, i) => {
-          const isExpanded = expanded === beat.id;
-          const linkedMoments = beat.momentIds
-            .map(id => moments.find(m => m.id === id))
-            .filter(Boolean) as Moment[];
           const isDragging = draggingIdx === i;
 
           return (
@@ -6429,7 +6488,7 @@ function StoryTab({
               {/* Drop indicator before this beat */}
               <div className={`beat-drop-indicator ${draggingIdx != null && dropTargetIdx === i && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1 ? "active" : ""}`} />
               <div
-                className={`beat-card ${isExpanded ? "expanded" : ""} ${isDragging ? "dragging" : ""}`}
+                className={`beat-card ${isDragging ? "dragging" : ""}`}
                 onTouchStart={(e) => {
                   const y = e.touches[0].clientY;
                   touchStartY.current = y;
@@ -6439,7 +6498,6 @@ function StoryTab({
                     isDragActive.current = true;
                     setDraggingIdx(i);
                     setDropTargetIdx(i);
-                    setExpanded(null);
                     if (cardEl) {
                       const rect = cardEl.getBoundingClientRect();
                       touchOffsetY.current = y - rect.top;
@@ -6503,16 +6561,14 @@ function StoryTab({
                   <div className="beat-grip" aria-hidden="true">&#10303;</div>
                   <button
                     style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
-                    onClick={() => { if (!isDragActive.current) setExpanded(isExpanded ? null : beat.id); }}
+                    onClick={() => { if (!isDragActive.current) openExistingScene(beat.id); }}
                   >
                   <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
                     {i + 1}
                   </div>
                   <div className="beat-info">
                     <div className="beat-name">{beat.name || "Untitled scene"}</div>
-                    {!isExpanded && (
-                      <div className="beat-summary-preview">{beat.summary || "No summary"}</div>
-                    )}
+                    <div className="beat-summary-preview">{beat.summary || "No summary"}</div>
                   </div>
                   {beat.momentIds.length > 0 && (
                     <span className="caption" style={{ flexShrink: 0 }}>
@@ -6522,120 +6578,6 @@ function StoryTab({
                   <span className="beat-expand">›</span>
                   </button>
                 </div>
-
-                {isExpanded && (
-                  <div className="beat-body">
-                    <div className="beat-section-label">Name</div>
-                    {editingField?.beatId === beat.id && editingField.field === "name" ? (
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <Input size="compact" value={editValue}
-                          onChange={e => setEditValue(e.target.value)}
-                          onBlur={saveEdit}
-                          onKeyDown={e => e.key === "Enter" && saveEdit()}
-                          autoFocus />
-                      </div>
-                    ) : (
-                      <div className="beat-text" onClick={() => startEdit(beat.id, "name", beat.name)}
-                        style={{ cursor: "text" }}>
-                        {beat.name || <span className="beat-text muted">Tap to edit</span>}
-                      </div>
-                    )}
-
-                    <div className="beat-section-label">Summary</div>
-                    {editingField?.beatId === beat.id && editingField.field === "summary" ? (
-                      <Textarea size="compact" value={editValue}
-                        onChange={e => setEditValue(e.target.value)}
-                        onBlur={saveEdit}
-                        autoFocus rows={4} />
-                    ) : (
-                      <div className="beat-text" onClick={() => startEdit(beat.id, "summary", beat.summary)}
-                        style={{ cursor: "text" }}>
-                        {beat.summary || <span className="beat-text muted">Tap to edit</span>}
-                      </div>
-                    )}
-
-                    {beat.purpose && (
-                      <>
-                        <div className="beat-section-label">Purpose</div>
-                        <div className="beat-text">{beat.purpose}</div>
-                      </>
-                    )}
-
-                    {/* Characters-in-this-beat picker. Populated from the
-                        active Characters-layer draft (same source the
-                        BeatCreationForm uses) so the picker stays in
-                        sync with whatever the user has in Characters —
-                        add a character there and it immediately shows
-                        up as a selectable chip here. Selection persists
-                        onto `beat.characterIds`, which the AI consumes
-                        when generating scene prose for this beat. */}
-                    <div className="beat-section-label">Characters in this scene</div>
-                    {(() => {
-                      const namedChars = getActiveCharactersDraft(story).characters
-                        .filter(c => c.name && c.name.trim() !== "");
-                      if (namedChars.length === 0) {
-                        return (
-                          <div className="caption">
-                            No characters yet. Add some in the Characters tab.
-                          </div>
-                        );
-                      }
-                      const selectedIds = beat.characterIds ?? [];
-                      return (
-                        <div className="chip-row">
-                          {namedChars.map(c => {
-                            const on = selectedIds.includes(c.id);
-                            return (
-                              <Selector
-                                key={c.id}
-                                selected={on}
-                                onClick={() => {
-                                  const next = on
-                                    ? selectedIds.filter(x => x !== c.id)
-                                    : [...selectedIds, c.id];
-                                  updateBeat(beat.id, { characterIds: next });
-                                }}
-                              >
-                                {c.name}
-                              </Selector>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-
-                    <div className="beat-section-label">Linked moments · {linkedMoments.length}</div>
-                    {linkedMoments.length > 0 ? (
-                      <div className="beat-moments">
-                        {linkedMoments.map(m => (
-                          <div key={m.id} className="linked-moment">
-                            <div className="moment-type-dot" />
-                            <div className="moment-preview">{m.text}</div>
-                            <button className="btn-icon" style={{ width: 28, height: 28, fontSize: 14 }}
-                              onClick={() => unlinkMoment(beat.id, m.id)} aria-label="Unlink">&#10005;</button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="caption">No moments linked.</div>
-                    )}
-
-                    <div className="beat-actions">
-                      <Button variant="secondary" size="sm"
-                        onClick={() => openMomentPicker(beat.id)}>+ Link moment</Button>
-                      <Button variant="secondary" size="sm"
-                        style={{ color: "var(--ink-mute)" }}
-                        onClick={() => removeBeat(beat.id)}>Remove</Button>
-                    </div>
-
-                    <div className="beat-reorder">
-                      <button className="reorder-btn" disabled={i === 0}
-                        onClick={() => moveBeat(i, "up")} aria-label="Move up">&#8593;</button>
-                      <button className="reorder-btn" disabled={i === beats.length - 1}
-                        onClick={() => moveBeat(i, "down")} aria-label="Move down">&#8595;</button>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {i === beats.length - 1 && (
@@ -6645,7 +6587,7 @@ function StoryTab({
               <div className="beat-insert-row">
                 <button
                   className="beat-insert-btn"
-                  onClick={() => openBeatTray(i + 1)}
+                  onClick={() => openNewScene(i + 1)}
                   aria-label="Insert scene here"
                 >
                   + Add scene
@@ -6661,7 +6603,7 @@ function StoryTab({
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
             label="Add scene"
-            onClick={() => openBeatTray(beats.length)}
+            onClick={() => openNewScene(beats.length)}
             disabled={genBusy}
             icon={<span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>}
           />
@@ -7157,103 +7099,269 @@ function ImportScriptCard({
 }
 
 /* ============================================ */
-/* ============ BEAT CREATION FORM ============ */
+/* ============ SCENE EDIT FORM =============== */
 /* ============================================ */
 
-interface BeatAISettings {
-  weirdness: number;
-  darkness: number;
-  humor: number;
-  length: number;
-}
+// Pretty type-name table for the Linked-Idea picker. Kept in sync with
+// the Moment["type"] union — adding a new type means adding an entry
+// here too.
+const MOMENT_TYPE_LABELS: Record<Moment["type"], string> = {
+  scene: "Scene",
+  dialogue: "Dialogue",
+  joke: "Joke",
+  memory: "Memory",
+  character: "Character",
+  image: "Image",
+  note: "Note",
+  dream: "Dream",
+};
 
-const DEFAULT_BEAT_AI: BeatAISettings = { weirdness: 5, darkness: 5, humor: 3, length: 5 };
-const BEAT_AI_KEY = "scriptlab.beatAISettings";
-
-function loadBeatAISettings(): BeatAISettings {
-  if (typeof window === "undefined") return DEFAULT_BEAT_AI;
-  try { return { ...DEFAULT_BEAT_AI, ...JSON.parse(localStorage.getItem(BEAT_AI_KEY) || "{}") }; }
-  catch { return DEFAULT_BEAT_AI; }
-}
-function saveBeatAISettings(s: BeatAISettings) {
-  if (typeof window !== "undefined") localStorage.setItem(BEAT_AI_KEY, JSON.stringify(s));
-}
-
-function BeatCreationForm({
-  story, onSave, busy,
+function SceneEditForm({
+  beat, story, moments, isNew, onUpdate, onRemove,
 }: {
+  beat: Beat;
   story: Story;
-  onSave: (name: string, summary: string, characterIds: string[]) => void;
-  busy: boolean;
+  moments: Moment[];
+  isNew: boolean;
+  onUpdate: (patch: Partial<Beat>) => void;
+  onRemove: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [summary, setSummary] = useState("");
+  const [openAttr, setOpenAttr] = useState<string | null>(null);
+  const toggleAttr = (k: string) => setOpenAttr(o => o === k ? null : k);
+
+  // Linked-idea picker: which idea-type the user is currently browsing.
+  // Defaults to the first type that has any ideas the moment the user
+  // expands the row, but stays whatever they last picked thereafter.
+  const [browseIdeaType, setBrowseIdeaType] = useState<Moment["type"] | null>(null);
+
+  // Writer profile — used by Clean Up With AI so the cleaned text
+  // tracks the user's recorded voice/preference signature.
+  const { profile } = useProfileCapture();
   const [cleaning, setCleaning] = useState(false);
 
-  // Characters available for this beat — pulled from the active
-  // Characters-layer draft. Only named characters are shown.
+  const linkedIds = beat.momentIds;
+  const linkedMoments = linkedIds
+    .map(id => moments.find(m => m.id === id))
+    .filter(Boolean) as Moment[];
+
+  // Available characters (named only) from the active Characters draft.
   const availableCharacters = getActiveCharactersDraft(story).characters
     .filter(c => c.name && c.name.trim() !== "");
-  const [selectedCharIds, setSelectedCharIds] = useState<string[]>([]);
-  const toggleCharacter = (id: string) => {
-    setSelectedCharIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-  // Writer profile — injected into beat-generation requests so the
-  // generated beat matches the user's voice + preference signature.
-  const { profile } = useProfileCapture();
+  const selectedCharIds = beat.characterIds ?? [];
+  const selectedCharNames = selectedCharIds
+    .map(id => availableCharacters.find(c => c.id === id)?.name)
+    .filter(Boolean) as string[];
 
-  async function callAI(actionType: string, payload: Record<string, any>,
-    onResult: (parsed: any) => void) {
-    const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ story, action: { type: actionType, payload }, profile }),
+  // Idea-types that have at least one saved idea — used to drive the
+  // type picker inside the Linked-Idea AttrRow. If the user hasn't
+  // saved any ideas at all we render an empty-state caption instead
+  // of the type picker.
+  const ideaTypesWithIdeas = (Object.keys(MOMENT_TYPE_LABELS) as Moment["type"][])
+    .filter(t => moments.some(m => m.type === t));
+
+  // Header pills for the Linked-Idea row: one pill per type linked,
+  // shaped like "1 DREAM" / "2 JOKES" so the user can see distribution
+  // at a glance without expanding.
+  const linkedTypeCounts = linkedMoments.reduce<Partial<Record<Moment["type"], number>>>((acc, m) => {
+    acc[m.type] = (acc[m.type] ?? 0) + 1;
+    return acc;
+  }, {});
+  const linkedIdeaPills = (Object.entries(linkedTypeCounts) as [Moment["type"], number][])
+    .map(([t, n]) => {
+      const label = MOMENT_TYPE_LABELS[t].toUpperCase();
+      return n > 1 ? `${n} ${label}S` : `${n} ${label}`;
     });
-    if (!res.ok || !res.body) return;
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = "", full = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
-      }
+
+  function toggleLinkIdea(momentId: string) {
+    if (linkedIds.includes(momentId)) {
+      onUpdate({ momentIds: linkedIds.filter(id => id !== momentId) });
+    } else {
+      onUpdate({ momentIds: [...linkedIds, momentId] });
     }
-    try {
-      const match = full.match(/\{[\s\S]*\}/);
-      if (match) onResult(JSON.parse(match[0]));
-    } catch {}
   }
 
+  function toggleCharacter(id: string) {
+    const next = selectedCharIds.includes(id)
+      ? selectedCharIds.filter(x => x !== id)
+      : [...selectedCharIds, id];
+    onUpdate({ characterIds: next });
+  }
+
+  // Clean Up With AI — same /api/generate `clean_beat` action the old
+  // create form used; this version patches the result back into the
+  // beat directly via onUpdate so the auto-save flow handles
+  // persistence. Gated on `summary` having content (the AI rewrites
+  // freeform notes into a clean name + summary).
   async function cleanUp() {
-    if (!summary.trim() || busy) return;
+    if (!beat.summary.trim() || cleaning) return;
     setCleaning(true);
     try {
-      await callAI("clean_beat", { rawText: summary }, (parsed) => {
-        if (parsed.name) setName(parsed.name);
-        if (parsed.summary) setSummary(parsed.summary);
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story,
+          action: { type: "clean_beat", payload: { rawText: beat.summary } },
+          profile,
+        }),
       });
-    } finally { setCleaning(false); }
+      if (!res.ok || !res.body) return;
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "", full = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try { const msg = JSON.parse(line); if (msg.type === "text") full += msg.value; } catch {}
+        }
+      }
+      const match = full.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          const patch: Partial<Beat> = {};
+          if (parsed.name) patch.name = parsed.name;
+          if (parsed.summary) patch.summary = parsed.summary;
+          if (Object.keys(patch).length) onUpdate(patch);
+        } catch {}
+      }
+    } finally {
+      setCleaning(false);
+    }
   }
 
+  // Bump browseIdeaType to the first type-with-ideas the first time
+  // the user opens the Linked-Idea row, so the lower picker isn't
+  // empty-on-paint.
+  useEffect(() => {
+    if (openAttr === "idea" && browseIdeaType === null && ideaTypesWithIdeas.length > 0) {
+      setBrowseIdeaType(ideaTypesWithIdeas[0]);
+    }
+  }, [openAttr, browseIdeaType, ideaTypesWithIdeas]);
+
+  const ideasOfBrowseType = browseIdeaType
+    ? moments.filter(m => m.type === browseIdeaType)
+    : [];
+
+  const twistVal = beat.twist ?? 0;
+  const weirdnessVal = beat.weirdness ?? 0;
+
   return (
-    <div className="stack">
-      {/* Characters first. The picker is the most scene-shaping
-          choice a writer makes, so it leads the sheet. Always
-          rendered so users see the feature even on a blank project;
-          if no characters exist yet, an empty-state hint takes the
-          place of the chip row. */}
-      <div>
-        <div className="eyebrow" style={{ marginBottom: 8 }}>
-          Characters in this scene
-        </div>
+    <div>
+      {/* Scene name */}
+      <TextAttrRow
+        label="Scene name"
+        value={beat.name}
+        placeholder="Add a scene name"
+        onChange={v => onUpdate({ name: v })}
+      />
+
+      {/* Linked idea — two-stage picker. Header pills summarize what's
+          already linked by type. Body lists currently-linked ideas
+          (with × to unlink), then a type chip row filtered to types
+          that actually have saved ideas, then the ideas of the
+          selected type as cards (tap toggles link). */}
+      <AttrRow
+        label="Link an idea"
+        values={linkedIdeaPills.length > 0 ? linkedIdeaPills : undefined}
+        placeholder={moments.length === 0 ? "No saved ideas yet" : "Pick from your ideas"}
+        expanded={openAttr === "idea"}
+        onToggle={() => toggleAttr("idea")}
+      >
+        {moments.length === 0 ? (
+          <div className="caption">
+            No ideas saved yet. Add some on the Ideas tab.
+          </div>
+        ) : (
+          <>
+            {linkedMoments.length > 0 && (
+              <div className="beat-moments" style={{ marginBottom: 12 }}>
+                {linkedMoments.map(m => (
+                  <div key={m.id} className="linked-moment">
+                    <div className="moment-type-dot" />
+                    <div className="moment-preview">{m.text}</div>
+                    <button
+                      className="btn-icon"
+                      style={{ width: 28, height: 28, fontSize: 14 }}
+                      onClick={() => toggleLinkIdea(m.id)}
+                      aria-label="Unlink"
+                    >&#10005;</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="eyebrow" style={{ marginBottom: 8 }}>Type</div>
+            <div className="chip-row" style={{ marginBottom: 12 }}>
+              {ideaTypesWithIdeas.map(t => (
+                <Selector
+                  key={t}
+                  selected={browseIdeaType === t}
+                  onClick={() => setBrowseIdeaType(t)}
+                >
+                  {MOMENT_TYPE_LABELS[t]}
+                </Selector>
+              ))}
+            </div>
+
+            {browseIdeaType && (
+              <>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
+                  {MOMENT_TYPE_LABELS[browseIdeaType]}s · {ideasOfBrowseType.length}
+                </div>
+                <div>
+                  {ideasOfBrowseType.map(m => {
+                    const isLinked = linkedIds.includes(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`moment-picker-item ${isLinked ? "linked" : ""}`}
+                        onClick={() => toggleLinkIdea(m.id)}
+                        style={{ width: "100%", textAlign: "left" }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div className="mp-text">{m.text}</div>
+                          {m.tags.length > 0 && (
+                            <div className="mp-tags">{m.tags.map(t => <span key={t}>{t}</span>)}</div>
+                          )}
+                        </div>
+                        {isLinked && <div className="mp-linked-badge">Linked</div>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </AttrRow>
+
+      {/* Description (summary) — multiline, with Clean-up AI pinned next
+          to the label via the TextAttrRow `ai` slot. */}
+      <TextAttrRow
+        label="Description"
+        value={beat.summary}
+        placeholder="Describe what happens in this scene"
+        onChange={v => onUpdate({ summary: v })}
+        multiline
+        ai={cleanUp}
+        aiLoading={cleaning}
+      />
+
+      {/* Characters in this scene */}
+      <AttrRow
+        label="Characters"
+        values={selectedCharNames.length > 0 ? selectedCharNames.map(n => n.toUpperCase()) : undefined}
+        placeholder={availableCharacters.length === 0 ? "No characters yet" : "Pick characters"}
+        expanded={openAttr === "characters"}
+        onToggle={() => toggleAttr("characters")}
+      >
         {availableCharacters.length === 0 ? (
           <div className="caption">
             No characters yet. Add some in the Characters tab.
@@ -7271,49 +7379,74 @@ function BeatCreationForm({
             ))}
           </div>
         )}
-      </div>
+      </AttrRow>
 
-      {/* 15px between the characters pills and the title field.
-          Overrides the .stack sibling margin (12px) with an inline
-          marginTop so the gap is exactly what the spec calls for. */}
-      <Input
-        placeholder="Scene name"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        style={{ marginTop: 15 }}
-      />
+      {/* Twist — per-scene "how surprising should the turn be" dial.
+          Stored on Beat.twist (1-10 or undefined). Pill shows the
+          current value when set; expand to access the slider. */}
+      <AttrRow
+        label="Twist"
+        values={twistVal ? [`${twistVal}/10`] : undefined}
+        placeholder="How surprising"
+        expanded={openAttr === "twist"}
+        onToggle={() => toggleAttr("twist")}
+      >
+        <div className="slider-row">
+          <div className="label">{twistVal ? "Set" : "Off"}</div>
+          <div className="value">{twistVal ? `${twistVal}/10` : "—"}</div>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={10}
+          value={twistVal}
+          onChange={e => {
+            const v = Number(e.target.value);
+            onUpdate({ twist: v === 0 ? undefined : v });
+          }}
+        />
+      </AttrRow>
 
-      <Textarea placeholder="Describe this scene"
-        value={summary} onChange={e => setSummary(e.target.value)} rows={4} />
+      {/* Weirdness — per-scene tone/imagery dial. Same shape as Twist. */}
+      <AttrRow
+        label="Weirdness"
+        values={weirdnessVal ? [`${weirdnessVal}/10`] : undefined}
+        placeholder="How strange"
+        expanded={openAttr === "weirdness"}
+        onToggle={() => toggleAttr("weirdness")}
+      >
+        <div className="slider-row">
+          <div className="label">{weirdnessVal ? "Set" : "Off"}</div>
+          <div className="value">{weirdnessVal ? `${weirdnessVal}/10` : "—"}</div>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={10}
+          value={weirdnessVal}
+          onChange={e => {
+            const v = Number(e.target.value);
+            onUpdate({ weirdness: v === 0 ? undefined : v });
+          }}
+        />
+      </AttrRow>
 
-      {/* Footer row: Clean Up With AI + Save. Equal-flex so the pair
-          of CTAs reads as a balanced commit row; Save is primary
-          (black) per the sheet's save-button convention, Clean Up is
-          secondary + AI sparkle so the magic step is obvious. Clean
-          Up is disabled until there's summary text to clean.
-          marginTop bumped from 4 → 19 (+15) to breathe the row away
-          from the Describe textarea per design direction. */}
-      <div style={{ display: "flex", gap: 8, marginTop: 19 }}>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={cleanUp}
-          disabled={!summary.trim() || cleaning || busy}
-          icon={<AISparkleIcon />}
-          style={{ flex: 1 }}
-        >
-          {cleaning ? "Cleaning..." : "Clean up with AI"}
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => onSave(name || "Untitled scene", summary, selectedCharIds)}
-          disabled={!summary.trim()}
-          style={{ flex: 1 }}
-        >
-          Save
-        </Button>
-      </div>
+      {/* Delete sits at the very bottom — same treatment as
+          CharacterEditForm. Hidden in "New scene" mode: a not-yet-
+          committed scene auto-discards on close, so there's nothing
+          to delete. */}
+      {!isNew && (
+        <div style={{ marginTop: 24, display: "flex", justifyContent: "center" }}>
+          <Button
+            variant="secondary"
+            size="sm"
+            style={{ color: "var(--ink-mute)" }}
+            onClick={onRemove}
+          >
+            Delete scene
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

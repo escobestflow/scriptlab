@@ -16,11 +16,20 @@ const ALLOWED_SHORT_STRUCTURES = new Set([
 ]);
 
 function normalizeBeat(b: any, index: number): Beat {
+  // Per-scene Twist / Weirdness dials. Both optional — undefined means
+  // "unset", which the prompts read as "fall back to the project-level
+  // defaults." Only accept finite numbers in [1,10] from disk.
+  const twist = typeof b?.twist === "number" && b.twist >= 1 && b.twist <= 10
+    ? b.twist : undefined;
+  const weirdness = typeof b?.weirdness === "number" && b.weirdness >= 1 && b.weirdness <= 10
+    ? b.weirdness : undefined;
   return {
     position: index,
     momentIds: [],
     status: "design",
     ...b,
+    twist,
+    weirdness,
   };
 }
 

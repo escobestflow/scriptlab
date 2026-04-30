@@ -156,6 +156,13 @@ export interface Beat {
    *  Characters-layer active draft. Optional so older saved beats
    *  (pre-feature) still deserialize cleanly. */
   characterIds?: string[];
+  /** Per-scene Twist dial (1-10). Hint to the AI for how surprising
+   *  this scene's reveal/turn should be. `undefined` = unset → prompts
+   *  fall back to the project-level defaults. */
+  twist?: number;
+  /** Per-scene Weirdness dial (1-10). Hint to the AI for how strange
+   *  the scene's tone/imagery should run. `undefined` = unset. */
+  weirdness?: number;
   status: BeatStatus;
   sceneContent?: string;
 }
