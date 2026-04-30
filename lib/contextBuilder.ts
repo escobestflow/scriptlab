@@ -10,7 +10,7 @@
 // This means iterative edits inside a session reuse ~90% of input tokens
 // at 10% price. Without this pattern, heavy usage is uneconomical.
 
-import { Story, Scene, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft } from "./story";
+import { Story, Scene, Character, Snippet, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft } from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
 import { WriterProfile, renderProfileForPrompt, isProfileMeaningful } from "./writerProfile";
 
@@ -66,6 +66,9 @@ ${logline || "(none yet)"}
 ## Settings
 - Framework: ${settings.framework ?? "unspecified (let the structure fit the concept)"}
 - Genres: ${settings.genres?.join(", ") || "none"}
+- Sub-genres: ${settings.subGenres?.length ? settings.subGenres.join(", ") : "none"}
+- Writer voices to echo (study their craft, do not pastiche): ${settings.writerStyles?.length ? settings.writerStyles.join(", ") : "none"}
+- References (titles to mirror, with the aspects to borrow): ${settings.references?.length ? settings.references.map(r => `"${r.title}"${r.aspects?.length ? ` — ${r.aspects.join(", ")}` : ""}`).join("; ") : "none"}
 - Vibe: ${settings.vibe}
 - Unpredictability: ${settings.unpredictability}/10
 - Darkness: ${settings.darkness}/10
@@ -86,6 +89,7 @@ ${characters.map(c => {
   if (c.flaws) line += `; flaws: ${c.flaws}`;
   if (c.voice) line += `; voice: ${c.voice}`;
   if (c.arc) line += `; arc: ${c.arc}`;
+  if (c.backstory) line += `; backstory: ${c.backstory}`;
   if (c.notes) line += `; ${c.notes}`;
   return line;
 }).join("\n") || "(none)"}
@@ -101,11 +105,32 @@ ${beats.length
   ? beats
       .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
       .map((b, i) => {
-        let line = `${i + 1}. [${b.status ?? "design"}] ${b.name}: ${b.summary}`;
-        if (b.momentIds?.length) {
-          line += `\n   Linked moments: ${b.momentIds.join(", ")}`;
+        const lines: string[] = [];
+        lines.push(`${i + 1}. [${b.status ?? "design"}] ${b.name}: ${b.summary}`);
+        if (b.purpose) lines.push(`   Purpose: ${b.purpose}`);
+        const dials: string[] = [];
+        if (typeof b.twist === "number") dials.push(`Twist ${b.twist}/10`);
+        if (typeof b.weirdness === "number") dials.push(`Weirdness ${b.weirdness}/10`);
+        if (dials.length) lines.push(`   Per-scene dials: ${dials.join(" · ")}`);
+        if (b.characterIds?.length) {
+          const names = b.characterIds
+            .map(id => characters.find(c => c.id === id)?.name)
+            .filter(Boolean) as string[];
+          if (names.length) lines.push(`   Cast in scene: ${names.join(", ")}`);
         }
-        return line;
+        if (b.momentIds?.length) {
+          const linked = b.momentIds
+            .map(id => snippets.find(s => s.id === id))
+            .filter(Boolean) as Snippet[];
+          if (linked.length) {
+            lines.push(`   Linked ideas to weave into this scene:`);
+            for (const m of linked) {
+              const tags = m.tags?.length ? ` [${m.tags.join(", ")}]` : "";
+              lines.push(`     • ${m.title}${tags}: ${m.content}`);
+            }
+          }
+        }
+        return lines.join("\n");
       })
       .join("\n")
   : "(no beats yet)"}
@@ -219,8 +244,58 @@ Return STRICT JSON: { "beat": { "name": string, "summary": string, "purpose": st
     case "generate_scene": {
       const idx = action.payload.beatIndex;
       const beat = d.beats[idx];
-      return `Write the full scene for beat #${idx + 1} ("${beat?.name}" — ${beat?.summary}).
-Match the vibe "${d.settings.vibe}" and genres "${d.settings.genres?.join(", ") || "drama"}".
+      if (!beat) {
+        return `Unknown beat #${idx + 1}.`;
+      }
+
+      // Resolve per-scene cast (Beat.characterIds → Character objects)
+      // and per-scene linked ideas (Beat.momentIds → Snippet objects)
+      // from the active drafts. Both are intentionally re-stated in the
+      // ask block (not just the bible) so the screenwriter can't miss
+      // them: the bible is "everything true about the project", the ask
+      // is "your specific job for this scene".
+      const chDraft = getActiveCharactersDraft(story);
+      const sceneCast = (beat.characterIds ?? [])
+        .map(id => chDraft.characters.find(c => c.id === id))
+        .filter(Boolean) as Character[];
+      const linkedMoments = (beat.momentIds ?? [])
+        .map(id => d.snippets.find(s => s.id === id))
+        .filter(Boolean) as Snippet[];
+
+      const dials: string[] = [];
+      if (typeof beat.twist === "number") {
+        dials.push(`- Twist: ${beat.twist}/10 — how surprising the reveal/turn should land in this specific scene`);
+      }
+      if (typeof beat.weirdness === "number") {
+        dials.push(`- Weirdness: ${beat.weirdness}/10 — how strange the tone/imagery can run in this specific scene`);
+      }
+      const dialsBlock = dials.length
+        ? `\n\nPer-scene tone dials (override the project defaults for this scene only):\n${dials.join("\n")}`
+        : "";
+
+      const castBlock = sceneCast.length
+        ? `\n\nCharacters present in this scene:\n${sceneCast.map(c => {
+            const bits: string[] = [];
+            if (c.archetype) bits.push(c.archetype);
+            if (c.want) bits.push(`wants: ${c.want}`);
+            if (c.voice) bits.push(`voice: ${c.voice}`);
+            return `- ${c.name}${bits.length ? ` — ${bits.join("; ")}` : ""}`;
+          }).join("\n")}`
+        : "";
+
+      const linkedBlock = linkedMoments.length
+        ? `\n\nIdeas the user explicitly linked to THIS scene — weave them in, do not drop them:\n${linkedMoments.map(m => {
+            const tags = m.tags?.length ? ` [${m.tags.join(", ").toLowerCase()}]` : "";
+            return `- ${m.title}${tags}\n  "${m.content}"`;
+          }).join("\n")}`
+        : "";
+
+      return `Write the full scene for beat #${idx + 1}: "${beat.name}".
+
+Beat summary: ${beat.summary}${beat.purpose ? `\nBeat purpose (what this scene does for the audience): ${beat.purpose}` : ""}${dialsBlock}${castBlock}${linkedBlock}
+
+Honor the project bible above — vibe "${d.settings.vibe}", genres "${d.settings.genres?.join(", ") || "drama"}", tone, themes, framework, writer voices, and reference titles all apply. The cast block above is who is on screen; characters not listed there should not appear unless the beat clearly requires it.
+
 Return prose in screenplay-adjacent format. No JSON, no preamble.`;
     }
 
@@ -759,6 +834,16 @@ Rules:
 function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "story"): string {
   const c = getActiveConceptDraft(story);
   const genres = c.settings.genres?.join(", ") || "drama";
+  const writerStyles = c.settings.writerStyles?.length
+    ? c.settings.writerStyles.join(", ")
+    : "";
+  const references = c.settings.references?.length
+    ? c.settings.references.map(r => `"${r.title}"${r.aspects?.length ? ` (${r.aspects.join(", ")})` : ""}`).join("; ")
+    : "";
+  const styleBlock =
+    writerStyles || references
+      ? `\n\nVoice and tonal targets (already in the bible — restated here so they actually shape the prose):${writerStyles ? `\n- Writer voices to echo: ${writerStyles}` : ""}${references ? `\n- References to mirror: ${references}` : ""}`
+      : "";
   const isShort = story.projectType === "short";
   // Short scene count comes from duration when set (≈ 1 scene per 1.5 min,
   // clamped 6–12); when unset we fall back to the legacy "6–10 scenes"
@@ -783,9 +868,9 @@ function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "s
 
   return `Write a complete ${isShort ? "short-film" : story.projectType === "tv-show" ? "pilot-episode" : "feature-length"} screenplay driven by the ${sourceLabel(source)} above.
 
-Produce ${targetScenes}. Match the genres "${genres}" and the tone on the brief.
+Produce ${targetScenes}. Match the genres "${genres}" and the tone on the brief.${styleBlock}
 
-${source !== "story" ? "No beat sheet has been written yet, so synthesize coherent scene structure as you go. The user will back-fill the Story layer separately." : ""}${priorScriptBlock}
+${source === "story" ? "Each beat in the bible above carries its own per-scene dials (Twist / Weirdness), cast list, and linked ideas. Honor them per-scene — those instructions override the project defaults for that one scene only. Linked ideas listed under a beat MUST appear in that beat's prose." : "No beat sheet has been written yet, so synthesize coherent scene structure as you go. The user will back-fill the Story layer separately."}${priorScriptBlock}
 
 Return STRICT JSON:
 {
