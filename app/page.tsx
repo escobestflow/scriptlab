@@ -2890,10 +2890,16 @@ function CreateStepTitle({
   draft: Story;
   setDraft: (u: (s: Story) => Story) => void;
 }) {
+  const isTV = draft.projectType === "tv-show";
+  const storyLayer = getActiveStoryLayerDraft(draft);
+  const firstEpisode = storyLayer.episodes?.[0];
   return (
     <>
       <div className="display heading">Let{"'"}s name it.</div>
       <div style={{ marginTop: 25 }}>
+        {isTV && (
+          <div className="caption" style={{ marginBottom: 8 }}>TV Show Title</div>
+        )}
         <Input
           placeholder="The Quiet Room"
           value={draft.title}
@@ -2901,6 +2907,36 @@ function CreateStepTitle({
           autoFocus
         />
       </div>
+      {isTV && firstEpisode && (
+        <div style={{ marginTop: 16 }}>
+          <div className="caption" style={{ marginBottom: 8 }}>Episode Title</div>
+          <Input
+            placeholder="Pilot"
+            value={firstEpisode.title}
+            onChange={e => {
+              const value = e.target.value;
+              setDraft(s => {
+                const activeId = getActiveStoryLayerDraft(s).id;
+                return {
+                  ...s,
+                  storyDrafts: s.storyDrafts.map(d =>
+                    d.id === activeId
+                      ? {
+                          ...d,
+                          episodes: (d.episodes ?? []).map((ep, i) =>
+                            i === 0 ? { ...ep, title: value } : ep
+                          ),
+                          updatedAt: new Date().toISOString(),
+                        }
+                      : d
+                  ),
+                  updatedAt: new Date().toISOString(),
+                };
+              });
+            }}
+          />
+        </div>
+      )}
     </>
   );
 }

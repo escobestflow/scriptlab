@@ -331,6 +331,12 @@ export function Studio({
     return () => clearTimeout(t);
   }, [showSuccess]);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
+  // TV-only: dropdown to switch the active episode. Sheet mirrors the
+  // project-drafts treatment — same trigger style, same bottom-sheet.
+  // Tapping an episode sets `activeEpisodeId` globally (so the Story tab
+  // drills into that episode on next visit, and the trigger label
+  // updates everywhere). Non-TV projects never render this.
+  const [episodeSheetOpen, setEpisodeSheetOpen] = useState(false);
   // Two-step "whose drafts?" flow on the project-drafts sheet. Mirrors
   // the layer-draft picker behavior: for collab projects the sheet
   // shows a side picker (me vs partner) before drafting a list. Reset
@@ -1332,14 +1338,45 @@ export function Studio({
           {/* Project drafts dropdown trigger. Identical on solo and
               shared projects — collaboration is signaled by the
               overlapping-initials pair on the layer bar, not by
-              duplicating the dropdown. */}
-          <button
-            className="drafts-dropdown-trigger"
-            onClick={() => setDraftsDropdownOpen(v => !v)}
-          >
-            <span>Draft {activeProjectDraft.number}</span>
-            <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
-          </button>
+              duplicating the dropdown.
+
+              For TV shows, an episode trigger is rendered to the left
+              in the same row treatment, so the user picks Episode →
+              Draft as one motion. The two triggers are mutually
+              exclusive: opening either closes the other. */}
+          {isTV && (activeStoryLayer.episodes?.length ?? 0) > 0 ? (
+            <div className="project-drafts-row">
+              <button
+                className="drafts-dropdown-trigger"
+                onClick={() => {
+                  setDraftsDropdownOpen(false);
+                  setEpisodeSheetOpen(v => !v);
+                }}
+                aria-label="Pick episode"
+              >
+                <span>{activeEpisode ? `Ep ${activeEpisode.number}` : "Episodes"}</span>
+                <img src="/caret-sm.svg" alt="" className={`drafts-caret ${episodeSheetOpen ? "open" : ""}`} />
+              </button>
+              <button
+                className="drafts-dropdown-trigger"
+                onClick={() => {
+                  setEpisodeSheetOpen(false);
+                  setDraftsDropdownOpen(v => !v);
+                }}
+              >
+                <span>Draft {activeProjectDraft.number}</span>
+                <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="drafts-dropdown-trigger"
+              onClick={() => setDraftsDropdownOpen(v => !v)}
+            >
+              <span>Draft {activeProjectDraft.number}</span>
+              <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+            </button>
+          )}
 
           {isTV && activeEpisode && (
             <div className="caption" style={{ textAlign: "center" }}>{activeEpisode.title}</div>
@@ -1656,6 +1693,56 @@ export function Studio({
                   </>
                 );
               })()}
+            </div>
+          </>,
+          document.body,
+        )}
+
+        {/* Episode-picker bottom sheet (TV-only). Reuses the project-
+            drafts sheet styling — same `.draft-sheet` and
+            `.drafts-dropdown-item` treatment so the two pickers feel
+            like one feature. Tapping an episode sets `activeEpisodeId`
+            globally; the next visit to the Story tab drills into that
+            episode rather than the grid. Only mounted when TV + at
+            least one episode exists, so non-TV projects never pay for
+            the portal. */}
+        {isTV && (activeStoryLayer.episodes?.length ?? 0) > 0 && typeof document !== "undefined" && createPortal(
+          <>
+            <div
+              className={`sheet-backdrop ${episodeSheetOpen ? "open" : ""}`}
+              onClick={() => setEpisodeSheetOpen(false)}
+            />
+            <div className={`sheet draft-sheet ${episodeSheetOpen ? "open" : ""}`}>
+              <div className="sheet-handle" />
+              <div className="sheet-body">
+                {(activeStoryLayer.episodes ?? []).map(ep => {
+                  const effectiveActiveId =
+                    activeEpisodeId ?? activeStoryLayer.episodes?.[0]?.id;
+                  const isActive = ep.id === effectiveActiveId;
+                  return (
+                    <button
+                      key={ep.id}
+                      className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                      onClick={() => {
+                        setActiveEpisodeId(ep.id);
+                        setEpisodeSheetOpen(false);
+                      }}
+                    >
+                      <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                          <span>Episode {ep.number}</span>
+                          <span className="drafts-dropdown-date">
+                            {ep.beats.length} {ep.beats.length === 1 ? "scene" : "scenes"}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: 10, color: "var(--ink-mute)", fontWeight: 400 }}>
+                          {ep.title}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </>,
           document.body,
