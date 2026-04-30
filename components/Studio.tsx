@@ -5710,48 +5710,6 @@ const CHAR_AI_ACTION: Record<CharAIField, string> = {
 };
 
 /* ── Character field wrapper: input/textarea with an inline AI wand ── */
-function CharField({
-  label, value, onChange, onAI, aiBusy, multiline, rows, pager,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  onAI: () => void;
-  aiBusy: boolean;
-  multiline?: boolean;
-  rows?: number;
-  pager?: React.ReactNode;
-}) {
-  // Header row: eyebrow label on the left, AI wand (+ optional history
-  // pager) on the right — kept flush with the label so the wand never
-  // overlaps input text. Field below stretches the full width.
-  return (
-    <div className={`char-field ${multiline ? "char-field-multiline" : ""}`}>
-      <div className="char-field-header">
-        <div className="eyebrow char-field-label">{label}</div>
-        <div className="char-field-ai">
-          <AIWandButton onClick={onAI} loading={aiBusy} />
-          {pager}
-        </div>
-      </div>
-      {multiline ? (
-        <Textarea
-          placeholder={label}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          rows={rows ?? 2}
-        />
-      ) : (
-        <Input
-          placeholder={label}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-        />
-      )}
-    </div>
-  );
-}
-
 function CharactersTab({
   story,
   setStory,
@@ -5929,6 +5887,8 @@ function CharacterEditForm({
   const [archetypeCustomOpen, setArchetypeCustomOpen] = useState(false);
   const [archetypeInput, setArchetypeInput] = useState("");
   const [aiBusy, setAiBusy] = useState<CharAIField | null>(null);
+  const [openAttr, setOpenAttr] = useState<string | null>(null);
+  const toggleAttr = (k: string) => setOpenAttr(o => o === k ? null : k);
   // Writer profile — attached to every character-field AI call so the
   // generated trait biases toward the user's recorded voice/preferences.
   const { profile } = useProfileCapture();
@@ -6034,14 +5994,29 @@ function CharacterEditForm({
     onUpdate({ archetype: ch.archetype === a ? "" : a });
   }
 
+  // Display-friendly version of role/gender for the collapsed AttrRow header.
+  const genderLabel = (() => {
+    const map: Record<string, string> = {
+      male: "MALE", female: "FEMALE", nonbinary: "NON-BINARY", unspecified: "UNSPECIFIED",
+    };
+    if (!ch.gender) return undefined;
+    return map[ch.gender] ?? ch.gender.toUpperCase();
+  })();
+  const roleLabel = roles.find(r => r.key === ch.role)?.label.toUpperCase();
+  const voiceLabel = (() => {
+    if (!ch.aiVoice) return "AUTO";
+    return ch.aiVoice.toUpperCase();
+  })();
+
   return (
-    <div className="stack char-editor-stack">
-      <CharField
+    <div>
+      <TextAttrRow
         label="Name"
         value={ch.name}
+        placeholder="Add a name"
         onChange={v => onUpdate({ name: v })}
-        onAI={() => generateCharacterField("name")}
-        aiBusy={aiBusy === "name"}
+        ai={() => generateCharacterField("name")}
+        aiLoading={aiBusy === "name"}
         pager={pagerFor("name")}
       />
 
@@ -6050,51 +6025,62 @@ function CharacterEditForm({
           etc.). Optional: if the user leaves this blank, the sheet-
           close handler in Studio kicks off a name-based AI detection
           and fills it in. */}
-      <div className="eyebrow">Gender</div>
-      <div className="chip-row">
-        {([
-          { key: "male",        label: "Male" },
-          { key: "female",      label: "Female" },
-          { key: "nonbinary",   label: "Non-binary" },
-          { key: "unspecified", label: "Unspecified" },
-        ] as const).map(g => (
-          <Selector
-            key={g.key}
-            selected={ch.gender === g.key}
-            onClick={() => onUpdate({ gender: ch.gender === g.key ? "" : g.key })}
-          >
-            {g.label}
-          </Selector>
-        ))}
-        {/* Custom chip — when gender is set to something outside the
-            canonical four, it renders here as a selected chip showing
-            the actual value; tapping it clears the field (back to
-            "not set"). Gives users a non-destructive way to see and
-            remove a free-text value without a separate input field
-            at this layout tier. */}
-        {ch.gender && !["male","female","nonbinary","unspecified"].includes(ch.gender) && (
-          <Selector
-            selected
-            onClick={() => onUpdate({ gender: "" })}
-          >
-            {ch.gender} &#10005;
-          </Selector>
-        )}
-      </div>
+      <AttrRow
+        label="Gender"
+        values={genderLabel ? [genderLabel] : undefined}
+        placeholder="Pick a gender"
+        expanded={openAttr === "gender"}
+        onToggle={() => toggleAttr("gender")}
+      >
+        <div className="chip-row">
+          {([
+            { key: "male",        label: "Male" },
+            { key: "female",      label: "Female" },
+            { key: "nonbinary",   label: "Non-binary" },
+            { key: "unspecified", label: "Unspecified" },
+          ] as const).map(g => (
+            <Selector
+              key={g.key}
+              selected={ch.gender === g.key}
+              onClick={() => onUpdate({ gender: ch.gender === g.key ? "" : g.key })}
+            >
+              {g.label}
+            </Selector>
+          ))}
+          {/* Custom chip — when gender is set to something outside the
+              canonical four, render here as a selected chip showing the
+              actual value; tapping clears the field. */}
+          {ch.gender && !["male","female","nonbinary","unspecified"].includes(ch.gender) && (
+            <Selector
+              selected
+              onClick={() => onUpdate({ gender: "" })}
+            >
+              {ch.gender} &#10005;
+            </Selector>
+          )}
+        </div>
+      </AttrRow>
 
       {/* Role — chip selector matching Concept tab (Genre, etc). */}
-      <div className="eyebrow">Role</div>
-      <div className="chip-row">
-        {roles.map(r => (
-          <Selector
-            key={r.key}
-            selected={ch.role === r.key}
-            onClick={() => onUpdate({ role: r.key })}
-          >
-            {r.label}
-          </Selector>
-        ))}
-      </div>
+      <AttrRow
+        label="Role"
+        values={roleLabel ? [roleLabel] : undefined}
+        placeholder="Pick a role"
+        expanded={openAttr === "role"}
+        onToggle={() => toggleAttr("role")}
+      >
+        <div className="chip-row">
+          {roles.map(r => (
+            <Selector
+              key={r.key}
+              selected={ch.role === r.key}
+              onClick={() => onUpdate({ role: r.key })}
+            >
+              {r.label}
+            </Selector>
+          ))}
+        </div>
+      </AttrRow>
 
       {/* Archetype — 20 presets + custom input + AI */}
       <div className="char-archetype-block">
@@ -6148,51 +6134,56 @@ function CharacterEditForm({
         )}
       </div>
 
-      <CharField
+      <TextAttrRow
         label="Backstory"
         value={ch.backstory}
+        placeholder="Where they come from, what shaped them"
         onChange={v => onUpdate({ backstory: v })}
-        onAI={() => generateCharacterField("backstory")}
-        aiBusy={aiBusy === "backstory"}
-        multiline rows={3}
+        multiline
+        ai={() => generateCharacterField("backstory")}
+        aiLoading={aiBusy === "backstory"}
         pager={pagerFor("backstory")}
       />
 
-      <CharField
+      <TextAttrRow
         label="Motivations"
         value={ch.motivations}
+        placeholder="What drives them"
         onChange={v => onUpdate({ motivations: v })}
-        onAI={() => generateCharacterField("motivations")}
-        aiBusy={aiBusy === "motivations"}
-        multiline rows={2}
+        multiline
+        ai={() => generateCharacterField("motivations")}
+        aiLoading={aiBusy === "motivations"}
         pager={pagerFor("motivations")}
       />
 
-      <CharField
+      <TextAttrRow
         label="Flaws"
         value={ch.flaws}
+        placeholder="The cracks that complicate them"
         onChange={v => onUpdate({ flaws: v })}
-        onAI={() => generateCharacterField("flaws")}
-        aiBusy={aiBusy === "flaws"}
-        multiline rows={2}
+        multiline
+        ai={() => generateCharacterField("flaws")}
+        aiLoading={aiBusy === "flaws"}
         pager={pagerFor("flaws")}
       />
 
-      <CharField
+      <TextAttrRow
         label="What they want (external)"
         value={ch.want}
+        placeholder="The visible goal"
         onChange={v => onUpdate({ want: v })}
-        onAI={() => generateCharacterField("want")}
-        aiBusy={aiBusy === "want"}
+        ai={() => generateCharacterField("want")}
+        aiLoading={aiBusy === "want"}
         pager={pagerFor("want")}
       />
 
-      <CharField
+      <TextAttrRow
         label="What they need (internal)"
         value={ch.need}
+        placeholder="What they actually have to learn"
         onChange={v => onUpdate({ need: v })}
-        onAI={() => generateCharacterField("need")}
-        aiBusy={aiBusy === "need"}
+        ai={() => generateCharacterField("need")}
+        aiLoading={aiBusy === "need"}
         pager={pagerFor("need")}
       />
 
@@ -6209,86 +6200,92 @@ function CharacterEditForm({
           each chip uses the SAME instructions as the real read-aloud
           flow, so what users hear during selection matches what
           they'll hear in Read Mode. */}
-      <div className="eyebrow">Read-aloud voice</div>
-      <div className="char-voice-grid">
-        {([
-          { id: null,      label: "Auto",     desc: "Pick automatically based on the character." },
-          { id: "alloy",   label: "Alloy",    desc: "Neutral, even-toned." },
-          { id: "echo",    label: "Echo",     desc: "Warm, masculine." },
-          { id: "fable",   label: "Fable",    desc: "British, narrator-leaning, masculine." },
-          { id: "onyx",    label: "Onyx",     desc: "Deep, gravelly, masculine." },
-          { id: "nova",    label: "Nova",     desc: "Bright, expressive, feminine." },
-          { id: "shimmer", label: "Shimmer",  desc: "Calm, soft, feminine." },
-        ] as const).map(v => {
-          // Selected when the explicit aiVoice matches, OR when both
-          // are nullish and this is the Auto card. Splitting the
-          // comparison across the union avoids `null === undefined`
-          // surprises on legacy rows.
-          const selected = v.id === null
-            ? !ch.aiVoice
-            : ch.aiVoice === v.id;
-          return (
-            <div
-              key={v.label}
-              className={`char-voice-card${selected ? " selected" : ""}`}
-              title={v.desc}
-            >
-              <button
-                type="button"
-                className="char-voice-pick"
-                onClick={() => onUpdate({ aiVoice: v.id })}
-                aria-pressed={selected}
-                aria-label={`${v.label} — ${v.desc}`}
+      <AttrRow
+        label="Read-aloud voice"
+        values={[voiceLabel]}
+        placeholder="Pick a voice"
+        expanded={openAttr === "voice"}
+        onToggle={() => toggleAttr("voice")}
+      >
+        <div className="char-voice-grid">
+          {([
+            { id: null,      label: "Auto",     desc: "Pick automatically based on the character." },
+            { id: "alloy",   label: "Alloy",    desc: "Neutral, even-toned." },
+            { id: "echo",    label: "Echo",     desc: "Warm, masculine." },
+            { id: "fable",   label: "Fable",    desc: "British, narrator-leaning, masculine." },
+            { id: "onyx",    label: "Onyx",     desc: "Deep, gravelly, masculine." },
+            { id: "nova",    label: "Nova",     desc: "Bright, expressive, feminine." },
+            { id: "shimmer", label: "Shimmer",  desc: "Calm, soft, feminine." },
+          ] as const).map(v => {
+            // Selected when the explicit aiVoice matches, OR when both
+            // are nullish and this is the Auto card.
+            const selected = v.id === null
+              ? !ch.aiVoice
+              : ch.aiVoice === v.id;
+            return (
+              <div
+                key={v.label}
+                className={`char-voice-card${selected ? " selected" : ""}`}
+                title={v.desc}
               >
-                <span className="char-voice-name">{v.label}</span>
-              </button>
-              {/* Auto has no preview — it doesn't resolve to a single
-                  voice until a name is in play, and previewing a name-
-                  hash result before the user has typed a name would be
-                  misleading. */}
-              {v.id && (
-                <SpeakButton
-                  size="sm"
-                  text={`I have to do this. There is no other way.`}
-                  voice={v.id}
-                  instructions={ch.voice && ch.voice.trim()
-                    ? `Deliver this line with the following voice direction: ${ch.voice.trim()}`
-                    : undefined}
-                  title={`Preview ${v.label}`}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
+                <button
+                  type="button"
+                  className="char-voice-pick"
+                  onClick={() => onUpdate({ aiVoice: v.id })}
+                  aria-pressed={selected}
+                  aria-label={`${v.label} — ${v.desc}`}
+                >
+                  <span className="char-voice-name">{v.label}</span>
+                </button>
+                {/* Auto has no preview — it doesn't resolve to a single
+                    voice until a name is in play. */}
+                {v.id && (
+                  <SpeakButton
+                    size="sm"
+                    text={`I have to do this. There is no other way.`}
+                    voice={v.id}
+                    instructions={ch.voice && ch.voice.trim()
+                      ? `Deliver this line with the following voice direction: ${ch.voice.trim()}`
+                      : undefined}
+                    title={`Preview ${v.label}`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </AttrRow>
 
-      <CharField
+      <TextAttrRow
         label="Voice direction (read aloud as…)"
         value={ch.voice}
+        placeholder='e.g. "hushed, menacing, mid-30s"'
         onChange={v => onUpdate({ voice: v })}
-        onAI={() => generateCharacterField("voice")}
-        aiBusy={aiBusy === "voice"}
-        multiline rows={2}
+        multiline
+        ai={() => generateCharacterField("voice")}
+        aiLoading={aiBusy === "voice"}
         pager={pagerFor("voice")}
       />
 
-      <CharField
+      <TextAttrRow
         label="Character arc"
         value={ch.arc}
+        placeholder="How they change over the story"
         onChange={v => onUpdate({ arc: v })}
-        onAI={() => generateCharacterField("arc")}
-        aiBusy={aiBusy === "arc"}
-        multiline rows={2}
+        multiline
+        ai={() => generateCharacterField("arc")}
+        aiLoading={aiBusy === "arc"}
         pager={pagerFor("arc")}
       />
 
-      <CharField
+      <TextAttrRow
         label="Additional notes"
         value={ch.notes}
+        placeholder="Anything else worth tracking"
         onChange={v => onUpdate({ notes: v })}
-        onAI={() => generateCharacterField("notes")}
-        aiBusy={aiBusy === "notes"}
-        multiline rows={2}
+        multiline
+        ai={() => generateCharacterField("notes")}
+        aiLoading={aiBusy === "notes"}
         pager={pagerFor("notes")}
       />
 

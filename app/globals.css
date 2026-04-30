@@ -2328,39 +2328,6 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
   vertical-align: baseline;
 }
 
-/* ======= CHARACTER FIELD — label + AI wand header row, then input ======= */
-.char-field {
-  position: relative;
-}
-/* Header row: persistent eyebrow label on the left, AI wand cluster
-   pinned to the far right. The label stays visible after typing
-   (placeholders vanish on first character) and the wand never floats
-   over the input. */
-.char-field-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.char-field-label {
-  margin: 0;
-}
-.char-field-ai {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-.char-field-ai .ai-wand {
-  margin-left: 0;
-  vertical-align: top;
-}
-.char-field-ai .ai-pager {
-  margin-left: 0;
-  vertical-align: top;
-}
-
 /* ======= CHARACTER ARCHETYPE BLOCK ======= */
 .char-archetype-block {
   padding: 12px;
@@ -2452,22 +2419,6 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
 }
 
 /* ======= CHARACTER EDITOR SECTION SPACING ======= */
-/* Scoped to the character-edit sheet so the global `.stack` rule (used
-   elsewhere) keeps its tight 12px gap. Inside this form every top-
-   level child IS a section header (CharField with eyebrow label, or a
-   bare eyebrow + chips/grid block), and the user reads it as a
-   stack of clearly delimited attribute groups. */
-.char-editor-stack > * + * {
-  margin-top: 20px;
-}
-/* Bare eyebrow + its content (chip-row, voice grid) is conceptually
-   one section — the eyebrow's 20px provides the section gap, so
-   collapse the gap between eyebrow and its content. */
-.char-editor-stack > .eyebrow + .chip-row,
-.char-editor-stack > .eyebrow + .char-voice-grid {
-  margin-top: 8px;
-}
-
 /* Sync banner */
 .sync-banner {
   position: relative;
