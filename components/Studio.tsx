@@ -4477,6 +4477,7 @@ function AttrRow({
   aiLoading,
   copyAction,
   readOnly,
+  noToggle,
 }: {
   label: string;
   values?: string[];
@@ -4498,21 +4499,29 @@ function AttrRow({
    *  content; the surrounding `.partner-preview-locked` wrapper stops
    *  clicks from actually toggling anything. */
   readOnly?: boolean;
+  /** Cross-episode lock (TV, non-pilot episode). When set, the row is
+   *  rendered as a header-only display: caret is hidden, body never
+   *  expands, and tapping the header invokes this callback (used to
+   *  surface a toast explaining the lock). Takes precedence over
+   *  `readOnly` since the two locks are mutually exclusive in
+   *  practice. */
+  noToggle?: () => void;
 }) {
   const hasValues = values && values.length > 0;
-  const suppressControls = readOnly && !hasValues;
+  const suppressControls = (readOnly || !!noToggle) && !hasValues;
+  const isLockedDisplay = !!noToggle;
   return (
     <div className="attr-row">
       <button
         className="attr-row-header"
-        onClick={onToggle}
-        disabled={suppressControls}
+        onClick={isLockedDisplay ? noToggle : onToggle}
+        disabled={!isLockedDisplay && suppressControls}
       >
         <span className="attr-label">
           {label}
           {/* AI wand hidden in readOnly (partner-preview) rows —
               there's nothing to generate into someone else's draft. */}
-          {ai && !readOnly && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+          {ai && !readOnly && !isLockedDisplay && <AIWandButton onClick={ai} loading={!!aiLoading} />}
           {copyAction && (
             <button
               type="button"
@@ -4529,22 +4538,16 @@ function AttrRow({
         <div className="attr-values">
           {hasValues
             ? values.map(v => <span key={v} className="attr-pill">{v}</span>)
-            : <span className="attr-placeholder">{readOnly ? "None added" : (placeholder || "Not set")}</span>
+            : <span className="attr-placeholder">{(readOnly || isLockedDisplay) ? "None added" : (placeholder || "Not set")}</span>
           }
         </div>
-        {/* Caret hidden in partner-preview (readOnly) mode entirely —
-            the user can't interact with the tab anyway (the wrapper
-            .partner-preview-locked has pointer-events: none), so an
-            expand indicator is misleading. Previously we only hid it
-            on empty rows via `suppressControls`; user asked to pull
-            it from ALL concept rows while previewing a partner draft. */}
-        {!readOnly && !suppressControls && (
+        {!readOnly && !isLockedDisplay && !suppressControls && (
           <svg className={`attr-caret ${expanded ? "open" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         )}
       </button>
-      {expanded && (
+      {expanded && !isLockedDisplay && (
         <div className="attr-row-body">
           {readOnly ? (
             <div className="partner-preview-locked">{children}</div>
@@ -4867,6 +4870,7 @@ function TextAttrRow({
   speak,
   copyAction,
   readOnly,
+  noToggle,
 }: {
   label: string;
   value: string;
@@ -4886,11 +4890,17 @@ function TextAttrRow({
    *  the collapsed header is no longer clickable. Rows with content
    *  render normally. */
   readOnly?: boolean;
+  /** Cross-episode lock — see AttrRow.noToggle. When set, the row
+   *  shows the value as static read-only text and a tap fires the
+   *  callback (used to surface a toast). Caret hidden, no input
+   *  rendered. */
+  noToggle?: () => void;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const hasValue = value.trim().length > 0;
-  const isOpen = hasValue || focused;
+  const isLockedDisplay = !!noToggle;
+  const isOpen = (hasValue || focused) && !isLockedDisplay;
 
   // Auto-resize textarea to fit content (full text visible, no cutoff)
   useEffect(() => {
@@ -4913,32 +4923,41 @@ function TextAttrRow({
   ) : null;
 
   if (!isOpen) {
-    // Collapsed branch only renders when the field is empty AND not
-    // focused. In partner-preview (readOnly), the header becomes
-    // non-interactive and shows "None added" — the caret is hidden
-    // because there's nothing the user can do to expand the row.
+    // Collapsed branch covers three cases:
+    //  1. Normal: empty + not focused → tappable, opens to input.
+    //  2. Partner-preview (readOnly): header non-interactive, shows
+    //     "None added" placeholder, caret hidden.
+    //  3. Cross-episode lock (noToggle): header tap fires noToggle to
+    //     show a toast. Renders the value (if any) as a read-only
+    //     pill so the user can see what's set; caret hidden.
     return (
       <div className="attr-row">
         <button
           className="attr-row-header"
-          onClick={() => { if (!readOnly) setFocused(true); }}
-          disabled={readOnly}
+          onClick={() => {
+            if (isLockedDisplay) { noToggle!(); return; }
+            if (!readOnly) setFocused(true);
+          }}
+          disabled={!isLockedDisplay && readOnly}
         >
           <span className="attr-label">
             {label}
-            {/* AI wand + history pager hide in readOnly (partner-
-                preview) mode — neither action makes sense against a
-                draft the viewer can't write to. */}
-            {ai && !readOnly && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+            {/* AI wand + history pager hide in readOnly / locked
+                modes — neither action makes sense when the viewer
+                can't write to the draft. */}
+            {ai && !readOnly && !isLockedDisplay && <AIWandButton onClick={ai} loading={!!aiLoading} />}
             {copyBtn}
             {speak}
             {dot && <span className="sync-dot attr-dot" />}
           </span>
           <div className="attr-values">
-            <span className="attr-placeholder">{readOnly ? "None added" : placeholder}</span>
+            {hasValue
+              ? <span className="attr-pill">{value}</span>
+              : <span className="attr-placeholder">{(readOnly || isLockedDisplay) ? "None added" : placeholder}</span>
+            }
           </div>
-          {!readOnly && pager}
-          {!readOnly && (
+          {!readOnly && !isLockedDisplay && pager}
+          {!readOnly && !isLockedDisplay && (
             <svg className="attr-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <polyline points="6 9 12 15 18 9"/>
             </svg>
@@ -5037,10 +5056,26 @@ function ConceptTab({
   const activeEpisode = episodes.find(ep => ep.id === effectiveEpisodeId) ?? null;
   const conceptLocked =
     isTV && !!pilotEpisode && effectiveEpisodeId !== pilotEpisode.id;
-  // OR with the existing partner-preview gate so the pilot-only rule
-  // composes with partner-preview rather than overriding it.
+  // Toast that fires when the user taps a locked Concept row on a
+  // non-pilot episode. Auto-clears after 2.6s. The lockTap handler
+  // is passed to AttrRow/TextAttrRow as `noToggle`, which routes the
+  // header click here instead of opening the row.
+  const [lockToast, setLockToast] = useState<string | null>(null);
+  const lockToastTimer = useRef<number | null>(null);
+  const showLockToast = () => {
+    setLockToast(`Concept is set on Episode 1 — open ${pilotEpisode ? `“${pilotEpisode.title || "the Pilot"}”` : "Episode 1"} to edit.`);
+    if (lockToastTimer.current) window.clearTimeout(lockToastTimer.current);
+    lockToastTimer.current = window.setTimeout(() => setLockToast(null), 2600);
+  };
+  useEffect(() => () => {
+    if (lockToastTimer.current) window.clearTimeout(lockToastTimer.current);
+  }, []);
+  const lockTap: (() => void) | undefined = conceptLocked ? showLockToast : undefined;
+  // ro() = partner-preview only; cross-episode lock now flows through
+  // `noToggle={lockTap}` instead, which fully prevents row expansion
+  // and surfaces the toast on tap.
   const ro = (extra?: boolean): boolean =>
-    isPartnerPreviewing || conceptLocked || !!extra;
+    isPartnerPreviewing || !!extra;
   const [themeInput, setThemeInput] = useState("");
   const [toneInput, setToneInput] = useState("");
   const [toneCustomOpen, setToneCustomOpen] = useState(false);
@@ -5274,6 +5309,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "projectType")}
         copyAction={previewCopy("projectType")}
         readOnly={ro()}
+        noToggle={lockTap}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -5314,6 +5350,7 @@ function ConceptTab({
           expanded={openAttr === "shortStructure"}
           onToggle={() => toggle("shortStructure")}
           readOnly={ro()}
+          noToggle={lockTap}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {([
@@ -5377,6 +5414,7 @@ function ConceptTab({
           expanded={openAttr === "duration"}
           onToggle={() => toggle("duration")}
           readOnly={ro()}
+          noToggle={lockTap}
         >
           <Input
             type="number"
@@ -5406,6 +5444,7 @@ function ConceptTab({
         aiLoading={aiBusy === "title"}
         copyAction={previewCopy("title")}
         readOnly={ro()}
+        noToggle={lockTap}
         pager={
           <HistoryPager
             history={titleHistory.history}
@@ -5470,6 +5509,7 @@ function ConceptTab({
         dot={!autosaveEnabled && isConceptFieldDirty(story, "genres")}
         copyAction={previewCopy("genres")}
         readOnly={ro()}
+        noToggle={lockTap}
       >
         <div className="chip-row">
           {(["thriller","drama","comedy","sci-fi","horror","romance","action","mystery"] as const).map(g => (
@@ -5514,6 +5554,7 @@ function ConceptTab({
             expanded={openAttr === "subgenre"}
             onToggle={() => toggle("subgenre")}
             readOnly={ro()}
+            noToggle={lockTap}
           >
             {d.settings.genres.length === 0 ? (
               <div className="caption" style={{ padding: "4px 0" }}>
@@ -5562,6 +5603,7 @@ function ConceptTab({
         onToggle={() => toggle("references")}
         copyAction={previewCopy("references")}
         readOnly={ro()}
+        noToggle={lockTap}
       >
         <div className="reference-list">
           {d.settings.references.map(ref => (
@@ -5675,6 +5717,7 @@ function ConceptTab({
         aiLoading={aiBusy === "logline"}
         copyAction={previewCopy("logline")}
         readOnly={ro()}
+        noToggle={lockTap}
         speak={
           d.logline?.trim() ? (
             <SpeakButton
@@ -5714,6 +5757,7 @@ function ConceptTab({
         aiLoading={aiBusy === "summary"}
         copyAction={previewCopy("summary")}
         readOnly={ro()}
+        noToggle={lockTap}
         pager={
           <HistoryPager
             history={summaryHistory.history}
@@ -5744,6 +5788,7 @@ function ConceptTab({
         aiLoading={aiBusy === "tone"}
         copyAction={previewCopy("tone")}
         readOnly={ro()}
+        noToggle={lockTap}
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {TONE_PRESETS.map(t => (
@@ -5802,6 +5847,7 @@ function ConceptTab({
         aiLoading={aiBusy === "themes"}
         copyAction={previewCopy("themes")}
         readOnly={ro()}
+        noToggle={lockTap}
       >
         {d.concept.themes.length > 0 && (
           <div className="chip-row" style={{ marginBottom: 10 }}>
@@ -5867,6 +5913,7 @@ function ConceptTab({
         expanded={openAttr === "structure"}
         onToggle={() => toggle("structure")}
         readOnly={ro()}
+        noToggle={lockTap}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -5922,6 +5969,7 @@ function ConceptTab({
         aiLoading={aiBusy === "ending"}
         copyAction={previewCopy("endingTypes")}
         readOnly={ro()}
+        noToggle={lockTap}
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
@@ -5983,6 +6031,10 @@ function ConceptTab({
           )}
         </div>
       </div>
+      {/* Cross-episode lock toast — fires when the user taps a Concept
+          row on a non-pilot episode. Auto-clears via setTimeout in
+          showLockToast. Reuses the global `.toast` class. */}
+      <div className={`toast ${lockToast ? "show" : ""}`}>{lockToast}</div>
     </>
   );
 }
