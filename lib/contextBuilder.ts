@@ -43,6 +43,48 @@ export function buildPrompt(
   return { system, userMessage: ask };
 }
 
+/** Render a single beat list as the bible's `## Current beat sheet` body.
+ *  Extracted so the TV path can call it once per episode while feature/
+ *  short paths render the project-level beats inline. */
+function renderBeatLines(
+  beats: import("./story").Beat[],
+  characters: Character[],
+  snippets: Snippet[],
+): string {
+  if (!beats.length) return "(no beats yet)";
+  return beats
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((b, i) => {
+      const lines: string[] = [];
+      lines.push(`${i + 1}. [${b.status ?? "design"}] ${b.name}: ${b.summary}`);
+      if (b.purpose) lines.push(`   Purpose: ${b.purpose}`);
+      const dials: string[] = [];
+      if (typeof b.twist === "number") dials.push(`Twist ${b.twist}/10`);
+      if (typeof b.weirdness === "number") dials.push(`Weirdness ${b.weirdness}/10`);
+      if (dials.length) lines.push(`   Per-scene dials: ${dials.join(" · ")}`);
+      if (b.characterIds?.length) {
+        const names = b.characterIds
+          .map(id => characters.find(c => c.id === id)?.name)
+          .filter(Boolean) as string[];
+        if (names.length) lines.push(`   Cast in scene: ${names.join(", ")}`);
+      }
+      if (b.momentIds?.length) {
+        const linked = b.momentIds
+          .map(id => snippets.find(s => s.id === id))
+          .filter(Boolean) as Snippet[];
+        if (linked.length) {
+          lines.push(`   Linked ideas to weave into this scene:`);
+          for (const m of linked) {
+            const tags = m.tags?.length ? ` [${m.tags.join(", ")}]` : "";
+            lines.push(`     • ${m.title}${tags}: ${m.content}`);
+          }
+        }
+      }
+      return lines.join("\n");
+    })
+    .join("\n");
+}
+
 function storyBible(story: Story): string {
   const c  = getActiveConceptDraft(story);
   const ch = getActiveCharactersDraft(story);
@@ -50,6 +92,8 @@ function storyBible(story: Story): string {
   const { settings, concept, logline } = c;
   const { characters } = ch;
   const { ingredients, snippets, beats } = sl;
+  const isTV = story.projectType === "tv-show";
+  const episodes = sl.episodes ?? [];
   return `# CURRENT PROJECT BIBLE
 
 ## Title
@@ -100,41 +144,27 @@ ${ingredients.map(i => `- [${i.locked ? "LOCKED" : "free"}] ${i.label}: ${i.desc
 ## Snippets (pre-written moments the user loves)
 ${snippets.map(s => `### ${s.title} [${s.tags.join(", ")}]\n${s.content}`).join("\n\n") || "(none)"}
 
-## Current beat sheet
-${beats.length
-  ? beats
-      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-      .map((b, i) => {
-        const lines: string[] = [];
-        lines.push(`${i + 1}. [${b.status ?? "design"}] ${b.name}: ${b.summary}`);
-        if (b.purpose) lines.push(`   Purpose: ${b.purpose}`);
-        const dials: string[] = [];
-        if (typeof b.twist === "number") dials.push(`Twist ${b.twist}/10`);
-        if (typeof b.weirdness === "number") dials.push(`Weirdness ${b.weirdness}/10`);
-        if (dials.length) lines.push(`   Per-scene dials: ${dials.join(" · ")}`);
-        if (b.characterIds?.length) {
-          const names = b.characterIds
-            .map(id => characters.find(c => c.id === id)?.name)
-            .filter(Boolean) as string[];
-          if (names.length) lines.push(`   Cast in scene: ${names.join(", ")}`);
-        }
-        if (b.momentIds?.length) {
-          const linked = b.momentIds
-            .map(id => snippets.find(s => s.id === id))
-            .filter(Boolean) as Snippet[];
-          if (linked.length) {
-            lines.push(`   Linked ideas to weave into this scene:`);
-            for (const m of linked) {
-              const tags = m.tags?.length ? ` [${m.tags.join(", ")}]` : "";
-              lines.push(`     • ${m.title}${tags}: ${m.content}`);
-            }
-          }
-        }
-        return lines.join("\n");
-      })
-      .join("\n")
-  : "(no beats yet)"}
-`;
+${isTV
+  ? `## Series structure
+This project is a continuous TV series — Concept and Characters above are shared across every episode, and each episode below builds on whatever came before it. When generating new material for one episode, treat earlier episodes as established canon (events have happened, characters have evolved); when generating material for a later episode, do not contradict prior beats.
+
+## Episode list
+${episodes.length
+    ? episodes
+        .map(ep => `- Episode ${ep.number} — "${ep.title}" (${ep.beats.length} ${ep.beats.length === 1 ? "beat" : "beats"})`)
+        .join("\n")
+    : "(no episodes yet)"}
+
+## Beat sheets per episode
+${episodes.length
+    ? episodes
+        .map(ep => `### Episode ${ep.number} — "${ep.title}"\n${renderBeatLines(ep.beats, characters, snippets)}`)
+        .join("\n\n")
+    : "(no beats yet)"}
+`
+  : `## Current beat sheet
+${renderBeatLines(beats, characters, snippets)}
+`}`;
 }
 
 // ── Short-film helpers ────────────────────────────────────────────
@@ -763,13 +793,31 @@ function syncPrompt_toStory(story: Story, source: "concept" | "characters" | "sc
   const sourceBlock = cohesionScriptBlock(story, source);
 
   if (isTV) {
-    return `Derive the Story layer (beat sheet) for this TV project from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
+    // Pick the next episode that has zero beats — that's the one the user
+    // is implicitly asking us to plan. Falls back to "the next episode" if
+    // every existing one is already populated, so the AI still has a clear
+    // target rather than dumping into an arbitrary slot.
+    const sl = getActiveStoryLayerDraft(story);
+    const allEpisodes = sl.episodes ?? [];
+    const targetEpisode =
+      allEpisodes.find(ep => ep.beats.length === 0) ??
+      allEpisodes[allEpisodes.length - 1];
+    const targetLabel = targetEpisode
+      ? `Episode ${targetEpisode.number} ("${targetEpisode.title}")`
+      : "the next episode";
+    const priorCount = targetEpisode
+      ? allEpisodes.filter(ep => ep.number < targetEpisode.number && ep.beats.length > 0).length
+      : 0;
+    const continuityNote = priorCount > 0
+      ? ` There ${priorCount === 1 ? "is" : "are"} ${priorCount} prior ${priorCount === 1 ? "episode" : "episodes"} of established canon in the bible above — your beats must continue that throughline, not contradict or reset it.`
+      : "";
+    return `Derive a beat sheet for ${targetLabel} of this TV series from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${continuityNote}${sourceBlock}
 
 ${source === "script"
   ? "Extract the beat structure implicit in the scene prose."
   : framework
     ? `Use the ${framework} framework.`
-    : "Choose whichever structural framework best fits the concept and genre, and apply it consistently."} Return a single pilot episode's worth of beats (one episode).
+    : "Choose whichever structural framework best fits the concept and genre, and apply it consistently."} Return one episode's worth of beats — for ${targetLabel} specifically.
 
 Return STRICT JSON:
 {
@@ -845,6 +893,7 @@ function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "s
       ? `\n\nVoice and tonal targets (already in the bible — restated here so they actually shape the prose):${writerStyles ? `\n- Writer voices to echo: ${writerStyles}` : ""}${references ? `\n- References to mirror: ${references}` : ""}`
       : "";
   const isShort = story.projectType === "short";
+  const isTV = story.projectType === "tv-show";
   // Short scene count comes from duration when set (≈ 1 scene per 1.5 min,
   // clamped 6–12); when unset we fall back to the legacy "6–10 scenes"
   // label so the model has a range to aim at instead of an exact integer.
@@ -857,6 +906,27 @@ function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "s
       : isShort
       ? shortScenes
       : "14–22 scenes";
+  // For TV, identify which episode this script run targets — same logic as
+  // syncPrompt_toStory: the first empty episode (next to write), or the
+  // last one if every episode already has beats. The label gets spliced
+  // into the lead sentence so the model commits prose to the right episode.
+  let tvEpisodeLabel = "pilot-episode";
+  let tvContinuityNote = "";
+  if (isTV) {
+    const sl = getActiveStoryLayerDraft(story);
+    const allEpisodes = sl.episodes ?? [];
+    const target =
+      allEpisodes.find(ep => ep.beats.length > 0 && !ep.beats.some(b => b.status === "written")) ??
+      allEpisodes.find(ep => ep.beats.length === 0) ??
+      allEpisodes[allEpisodes.length - 1];
+    if (target) {
+      tvEpisodeLabel = `Episode ${target.number} ("${target.title}")`;
+      const priorWritten = allEpisodes.filter(ep => ep.number < target.number && ep.beats.some(b => b.status === "written")).length;
+      if (priorWritten > 0) {
+        tvContinuityNote = ` ${priorWritten === 1 ? "One prior episode has" : `${priorWritten} prior episodes have`} already been written and ${priorWritten === 1 ? "is" : "are"} canon — keep this episode consistent with the established voice, character behavior, and continuity shown in the bible above.`;
+      }
+    }
+  }
   // When generating a fresh script but a prior script already exists,
   // include the prior prose as tonal/character reference so the new
   // draft feels cohesive with what the user has seen.
@@ -866,7 +936,7 @@ function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "s
       ? `\n\n## Prior script prose (for tonal reference only)\nA prior version of this script exists. Treat it as reference for the project's voice, characters, and tone. You are writing a fresh take driven by the ${sourceLabel(source)} — feel free to restructure — but keep character names and established tone consistent.\n\n${existingProse}`
       : "";
 
-  return `Write a complete ${isShort ? "short-film" : story.projectType === "tv-show" ? "pilot-episode" : "feature-length"} screenplay driven by the ${sourceLabel(source)} above.
+  return `Write a complete ${isShort ? "short-film" : isTV ? tvEpisodeLabel : "feature-length"} screenplay driven by the ${sourceLabel(source)} above.${tvContinuityNote}
 
 Produce ${targetScenes}. Match the genres "${genres}" and the tone on the brief.${styleBlock}
 

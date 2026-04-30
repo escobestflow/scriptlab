@@ -1742,6 +1742,55 @@ export function Studio({
                     </button>
                   );
                 })}
+                {/* Make the show-vs-episode scope explicit. Concept and
+                    Characters live at the project level, so they apply
+                    across every episode automatically — adding a new
+                    episode doesn't fork them. Only the Story (beats)
+                    and Script differ per-episode. */}
+                <div
+                  className="caption"
+                  style={{ padding: "12px 4px 4px", opacity: 0.7, lineHeight: 1.4 }}
+                >
+                  Concept and Characters are shared across all episodes.
+                  Each episode has its own Story beats and Script.
+                </div>
+              </div>
+              <div className="sheet-sticky-footer">
+                <div className="draft-sheet-actions">
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    onClick={() => {
+                      const newEpisodeId = "ep_" + Math.random().toString(36).slice(2);
+                      setStory(s => {
+                        const ad = getActiveStoryLayerDraft(s);
+                        const nextNumber = (ad.episodes?.length ?? 0) + 1;
+                        return updateStoryLayerDraft(s, {
+                          episodes: [
+                            ...(ad.episodes ?? []),
+                            {
+                              id: newEpisodeId,
+                              title: `Episode ${nextNumber}`,
+                              number: nextNumber,
+                              beats: [],
+                            },
+                          ],
+                        });
+                      });
+                      setActiveEpisodeId(newEpisodeId);
+                      setEpisodeSheetOpen(false);
+                    }}
+                    style={{ flex: 1 }}
+                    icon={
+                      <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <rect x="3.5" width="2" height="9" />
+                        <rect y="5.5" width="2" height="9" transform="rotate(-90 0 5.5)" />
+                      </svg>
+                    }
+                  >
+                    New Episode
+                  </Button>
+                </div>
               </div>
             </div>
           </>,
