@@ -126,6 +126,14 @@ export interface Character {
   aiVoice?: CharacterAiVoice | null;
   arc: string;
   notes: string;
+  /** TV-only: id of the Episode this character was created in. Set on
+   *  add and never re-stamped, so the creator-episode is stable. The
+   *  Characters tab uses it to lock cross-episode edits — a character
+   *  introduced in Episode 2 can't be edited or deleted while the user
+   *  is viewing Episode 1, and vice versa. `undefined` means the
+   *  character predates this rule (legacy projects) — treat as "owned
+   *  by the pilot episode" via the storage migration in normalizeCharacter. */
+  createdInEpisodeId?: string;
 }
 
 export interface Ingredient {

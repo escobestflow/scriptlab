@@ -673,6 +673,14 @@ export function Studio({
   };
   const openNewCharacterSheet = () => {
     setCharSheetIsNew(true);
+    // Stamp the creator-episode for TV projects so cross-episode edits
+    // can be locked downstream. Falls back to the first episode's id when
+    // the user hasn't explicitly picked one yet, so a brand-new TV project
+    // doesn't end up with a free-floating character that's editable
+    // everywhere.
+    const creatorEpisodeId = isTV
+      ? (activeEpisodeId ?? activeStoryLayer.episodes?.[0]?.id ?? null)
+      : null;
     const newChar: Character = {
       id: "ch_" + Math.random().toString(36).slice(2),
       name: "",
@@ -687,6 +695,7 @@ export function Studio({
       voice: "",
       arc: "",
       notes: "",
+      ...(creatorEpisodeId ? { createdInEpisodeId: creatorEpisodeId } : {}),
     };
     setStory(s => updateCharactersDraft(s, {
       characters: [...getActiveCharactersDraft(s).characters, newChar],
@@ -1848,6 +1857,7 @@ export function Studio({
               setStory={tabSetStory}
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
+              activeEpisodeId={activeEpisodeId}
             />
           )}
           {section === "characters" && (
@@ -1861,6 +1871,7 @@ export function Studio({
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
               runGenerateAll={runGenerateAll}
+              activeEpisodeId={activeEpisodeId}
             />
           )}
           {section === "story" && (
@@ -2069,6 +2080,22 @@ export function Studio({
         const activeChar = open
           ? getActiveCharactersDraft(story).characters.find(c => c.id === charSheetCharId)
           : null;
+        // Cross-episode lock: a character belongs to the episode it was
+        // created in. Viewing it from any other episode renders the form
+        // read-only — same `.partner-preview-locked` wrapper the partner-
+        // preview flow uses, so the visual treatment (dim + pointer-
+        // events:none) is consistent. A small banner above the form
+        // tells the user where to go to edit.
+        const charCreatedInId = activeChar?.createdInEpisodeId;
+        const effectiveCharEpisodeId =
+          activeEpisodeId ?? activeStoryLayer.episodes?.[0]?.id ?? null;
+        const charOwnerEpisode = isTV && charCreatedInId
+          ? activeStoryLayer.episodes?.find(ep => ep.id === charCreatedInId) ?? null
+          : null;
+        const isCharLocked = isTV
+          && !!charCreatedInId
+          && !!effectiveCharEpisodeId
+          && charCreatedInId !== effectiveCharEpisodeId;
         return (
           <>
             <div className={`sheet-backdrop ${open ? "open" : ""}`}
@@ -2082,25 +2109,43 @@ export function Studio({
                 <Button variant="secondary" size="sm" onClick={closeCharacterSheet}>Close</Button>
               </div>
               <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+                {isCharLocked && charOwnerEpisode && (
+                  <div
+                    className="caption"
+                    style={{
+                      padding: "10px 12px",
+                      marginBottom: 12,
+                      background: "var(--surface-2, #f3f3f4)",
+                      borderRadius: 10,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    Locked — this character was created in Episode {charOwnerEpisode.number}{charOwnerEpisode.title ? ` (“${charOwnerEpisode.title}”)` : ""}. Switch to that episode to edit or delete it.
+                  </div>
+                )}
                 {activeChar && (
-                  <CharacterEditForm
-                    character={activeChar}
-                    story={story}
-                    isNew={charSheetIsNew}
-                    onUpdate={(patch) => {
-                      setStory(s => updateCharactersDraft(s, {
-                        characters: getActiveCharactersDraft(s).characters.map(c =>
-                          c.id === activeChar.id ? { ...c, ...patch } : c
-                        ),
-                      }));
-                    }}
-                    onRemove={() => {
-                      setStory(s => updateCharactersDraft(s, {
-                        characters: getActiveCharactersDraft(s).characters.filter(c => c.id !== activeChar.id),
-                      }));
-                      setCharSheetCharId(null);
-                    }}
-                  />
+                  <div className={isCharLocked ? "partner-preview-locked" : undefined}>
+                    <CharacterEditForm
+                      character={activeChar}
+                      story={story}
+                      isNew={charSheetIsNew || isCharLocked}
+                      onUpdate={(patch) => {
+                        if (isCharLocked) return;
+                        setStory(s => updateCharactersDraft(s, {
+                          characters: getActiveCharactersDraft(s).characters.map(c =>
+                            c.id === activeChar.id ? { ...c, ...patch } : c
+                          ),
+                        }));
+                      }}
+                      onRemove={() => {
+                        if (isCharLocked) return;
+                        setStory(s => updateCharactersDraft(s, {
+                          characters: getActiveCharactersDraft(s).characters.filter(c => c.id !== activeChar.id),
+                        }));
+                        setCharSheetCharId(null);
+                      }}
+                    />
+                  </div>
                 )}
               </div>
               <div className="sheet-sticky-footer">
@@ -4501,7 +4546,9 @@ function AttrRow({
       </button>
       {expanded && (
         <div className="attr-row-body">
-          {children}
+          {readOnly ? (
+            <div className="partner-preview-locked">{children}</div>
+          ) : children}
         </div>
       )}
     </div>
@@ -4916,29 +4963,32 @@ function TextAttrRow({
         {!readOnly && pager}
       </div>
       <div className="attr-row-body">
-        {multiline ? (
-          <textarea
-            ref={taRef}
-            className={inputClass}
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder={focused ? placeholder : ""}
-            rows={1}
-            autoFocus={!hasValue}
-          />
-        ) : (
-          <input
-            className={inputClass}
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder={focused ? placeholder : ""}
-            autoFocus={!hasValue}
-          />
-        )}
+        {(() => {
+          const inputEl = multiline ? (
+            <textarea
+              ref={taRef}
+              className={inputClass}
+              value={value}
+              onChange={e => onChange(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={focused ? placeholder : ""}
+              rows={1}
+              autoFocus={!hasValue}
+            />
+          ) : (
+            <input
+              className={inputClass}
+              value={value}
+              onChange={e => onChange(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={focused ? placeholder : ""}
+              autoFocus={!hasValue}
+            />
+          );
+          return readOnly ? <div className="partner-preview-locked">{inputEl}</div> : inputEl;
+        })()}
       </div>
     </div>
   );
@@ -4949,11 +4999,18 @@ function ConceptTab({
   setStory,
   autosaveEnabled = true,
   onOpenUpdateTray,
+  activeEpisodeId,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   autosaveEnabled?: boolean;
   onOpenUpdateTray: (source: LayerKey) => void;
+  /** TV-only: the episode the user is currently viewing. Episode 1 is
+   *  the master for Concept — every other episode shows Concept rows
+   *  read-only, and only the new "Episode Title" row remains editable
+   *  (it edits the active episode's title, not the show title). `null`
+   *  / undefined falls back to treating the pilot as active. */
+  activeEpisodeId?: string | null;
 }) {
   const d = getActiveConceptDraft(story);
   const [openAttr, setOpenAttr] = useState<string | null>(null);
@@ -4966,6 +5023,24 @@ function ConceptTab({
     isPartnerPreviewing && onCopyPartnerConceptField
       ? () => onCopyPartnerConceptField(field)
       : undefined;
+  // Episode-1-as-master gate. For TV projects, every Concept field below
+  // is owned by the pilot — viewing any other episode renders the rows
+  // as read-only. The new Episode Title row (added below) is the single
+  // exception: it always edits the active episode's title. For non-TV
+  // projects, `conceptLocked` is permanently false so feature/short
+  // behavior is unchanged.
+  const isTV = story.projectType === "tv-show";
+  const activeStoryLayer = getActiveStoryLayerDraft(story);
+  const episodes = activeStoryLayer.episodes ?? [];
+  const pilotEpisode = episodes[0];
+  const effectiveEpisodeId = activeEpisodeId ?? pilotEpisode?.id ?? null;
+  const activeEpisode = episodes.find(ep => ep.id === effectiveEpisodeId) ?? null;
+  const conceptLocked =
+    isTV && !!pilotEpisode && effectiveEpisodeId !== pilotEpisode.id;
+  // OR with the existing partner-preview gate so the pilot-only rule
+  // composes with partner-preview rather than overriding it.
+  const ro = (extra?: boolean): boolean =>
+    isPartnerPreviewing || conceptLocked || !!extra;
   const [themeInput, setThemeInput] = useState("");
   const [toneInput, setToneInput] = useState("");
   const [toneCustomOpen, setToneCustomOpen] = useState(false);
@@ -5198,7 +5273,7 @@ function ConceptTab({
         onToggle={() => toggle("format")}
         dot={!autosaveEnabled && isConceptFieldDirty(story, "projectType")}
         copyAction={previewCopy("projectType")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -5238,7 +5313,7 @@ function ConceptTab({
           placeholder="Pick a short-form structure"
           expanded={openAttr === "shortStructure"}
           onToggle={() => toggle("shortStructure")}
-          readOnly={isPartnerPreviewing}
+          readOnly={ro()}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {([
@@ -5301,7 +5376,7 @@ function ConceptTab({
           placeholder="10–15 min"
           expanded={openAttr === "duration"}
           onToggle={() => toggle("duration")}
-          readOnly={isPartnerPreviewing}
+          readOnly={ro()}
         >
           <Input
             type="number"
@@ -5322,7 +5397,7 @@ function ConceptTab({
           project-identity fields (format + title) cluster at the top
           of Concept, before the genre/tone/theme triage begins. */}
       <TextAttrRow
-        label="Title"
+        label={isTV ? "Show Title" : "Title"}
         value={story.title}
         placeholder="Add a title"
         onChange={v => setStory(s => updateConceptDraft({ ...s, title: v }, {}))}
@@ -5330,7 +5405,7 @@ function ConceptTab({
         ai={() => generateConcept("title")}
         aiLoading={aiBusy === "title"}
         copyAction={previewCopy("title")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
         pager={
           <HistoryPager
             history={titleHistory.history}
@@ -5349,6 +5424,42 @@ function ConceptTab({
         }
       />
 
+      {/* Episode Title — TV-only attribute row. Sits directly under
+          Show Title and is the ONE field that remains editable when the
+          user is viewing a non-pilot episode (every other Concept row
+          locks via `ro()`). Writes to the active episode's `title` on
+          the active StoryLayerDraft, so the value lives alongside the
+          beats it belongs to. */}
+      {isTV && activeEpisode && (
+        <TextAttrRow
+          label="Episode Title"
+          value={activeEpisode.title}
+          placeholder={`Episode ${activeEpisode.number}`}
+          onChange={v => {
+            const targetId = activeEpisode.id;
+            setStory(s => {
+              const slId = getActiveStoryLayerDraft(s).id;
+              return {
+                ...s,
+                storyDrafts: s.storyDrafts.map(sd =>
+                  sd.id === slId
+                    ? {
+                        ...sd,
+                        episodes: (sd.episodes ?? []).map(ep =>
+                          ep.id === targetId ? { ...ep, title: v } : ep
+                        ),
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : sd
+                ),
+                updatedAt: new Date().toISOString(),
+              };
+            });
+          }}
+          readOnly={isPartnerPreviewing}
+        />
+      )}
+
       {/* Genre */}
       <AttrRow
         label="Genre"
@@ -5358,7 +5469,7 @@ function ConceptTab({
         onToggle={() => toggle("genre")}
         dot={!autosaveEnabled && isConceptFieldDirty(story, "genres")}
         copyAction={previewCopy("genres")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
       >
         <div className="chip-row">
           {(["thriller","drama","comedy","sci-fi","horror","romance","action","mystery"] as const).map(g => (
@@ -5402,7 +5513,7 @@ function ConceptTab({
             placeholder={d.settings.genres.length === 0 ? "Select a genre first" : "Select sub-genres"}
             expanded={openAttr === "subgenre"}
             onToggle={() => toggle("subgenre")}
-            readOnly={isPartnerPreviewing}
+            readOnly={ro()}
           >
             {d.settings.genres.length === 0 ? (
               <div className="caption" style={{ padding: "4px 0" }}>
@@ -5450,7 +5561,7 @@ function ConceptTab({
         expanded={openAttr === "references"}
         onToggle={() => toggle("references")}
         copyAction={previewCopy("references")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
       >
         <div className="reference-list">
           {d.settings.references.map(ref => (
@@ -5563,7 +5674,7 @@ function ConceptTab({
         ai={() => generateConcept("logline")}
         aiLoading={aiBusy === "logline"}
         copyAction={previewCopy("logline")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
         speak={
           d.logline?.trim() ? (
             <SpeakButton
@@ -5602,7 +5713,7 @@ function ConceptTab({
         ai={() => generateConcept("summary")}
         aiLoading={aiBusy === "summary"}
         copyAction={previewCopy("summary")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
         pager={
           <HistoryPager
             history={summaryHistory.history}
@@ -5632,7 +5743,7 @@ function ConceptTab({
         ai={() => generateConcept("tone")}
         aiLoading={aiBusy === "tone"}
         copyAction={previewCopy("tone")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {TONE_PRESETS.map(t => (
@@ -5690,7 +5801,7 @@ function ConceptTab({
         ai={() => generateConcept("themes")}
         aiLoading={aiBusy === "themes"}
         copyAction={previewCopy("themes")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
       >
         {d.concept.themes.length > 0 && (
           <div className="chip-row" style={{ marginBottom: 10 }}>
@@ -5755,7 +5866,7 @@ function ConceptTab({
         placeholder="Pick a structure"
         expanded={openAttr === "structure"}
         onToggle={() => toggle("structure")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -5810,7 +5921,7 @@ function ConceptTab({
         ai={() => generateConcept("ending")}
         aiLoading={aiBusy === "ending"}
         copyAction={previewCopy("endingTypes")}
-        readOnly={isPartnerPreviewing}
+        readOnly={ro()}
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
@@ -5933,6 +6044,7 @@ function CharactersTab({
   autosaveEnabled = true,
   onOpenUpdateTray,
   runGenerateAll,
+  activeEpisodeId,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -5945,6 +6057,12 @@ function CharactersTab({
   /** Wrap a Create-all action with the Studio-level scrim + sheet-close
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
+  /** TV-only: the episode the user is currently viewing. Used to lock
+   *  edit/delete on characters whose createdInEpisodeId differs — the
+   *  card stays visible but read-only until the user switches to the
+   *  episode that owns it. `null` means "no episode picked yet"; in
+   *  that case we fall back to treating the pilot as active. */
+  activeEpisodeId?: string | null;
 }) {
   const d = getActiveCharactersDraft(story);
   const { profile } = useProfileCapture();
@@ -5987,6 +6105,20 @@ function CharactersTab({
   };
 
   const hasCharacters = d.characters.length > 0;
+  // Cross-episode lock: any character whose creator-episode differs from
+  // the active one shows a lock badge on its card. The card still opens
+  // the sheet — the sheet itself renders read-only with a banner pointing
+  // at the right episode. Non-TV projects always treat as unlocked.
+  const isTV = story.projectType === "tv-show";
+  const activeStoryLayer = getActiveStoryLayerDraft(story);
+  const effectiveEpisodeId =
+    activeEpisodeId ?? activeStoryLayer.episodes?.[0]?.id ?? null;
+  const lockedFromEpisode = (ch: Character): { number: number } | null => {
+    if (!isTV || !ch.createdInEpisodeId || !effectiveEpisodeId) return null;
+    if (ch.createdInEpisodeId === effectiveEpisodeId) return null;
+    const owner = activeStoryLayer.episodes?.find(ep => ep.id === ch.createdInEpisodeId);
+    return owner ? { number: owner.number } : null;
+  };
 
   return (
     <>
@@ -6017,7 +6149,9 @@ function CharactersTab({
       )}
 
       {/* Character rows — tapping opens the unified character sheet. */}
-      {d.characters.map(ch => (
+      {d.characters.map(ch => {
+        const lock = lockedFromEpisode(ch);
+        return (
         <div key={ch.id} className="card character-card">
           <button
             className="character-header"
@@ -6027,8 +6161,32 @@ function CharactersTab({
               {ch.name ? ch.name[0].toUpperCase() : "?"}
             </div>
             <div style={{ flex: 1, textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 900 }}>
+              <div style={{ fontSize: 15, fontWeight: 900, display: "flex", alignItems: "center", gap: 6 }}>
                 {ch.name || "Unnamed character"}
+                {lock && (
+                  <span
+                    aria-label={`Created in Episode ${lock.number} — locked`}
+                    title={`Created in Episode ${lock.number} — switch to that episode to edit`}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 3,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: "2px 6px",
+                      borderRadius: 999,
+                      background: "var(--surface-2, #f3f3f4)",
+                      color: "var(--ink-mute)",
+                      letterSpacing: 0.3,
+                    }}
+                  >
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="4" y="11" width="16" height="10" rx="2" />
+                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                    </svg>
+                    EP {lock.number}
+                  </span>
+                )}
               </div>
               <div className="caption">
                 {roleLabels[ch.role] || ch.role || "No role"}
@@ -6053,7 +6211,7 @@ function CharactersTab({
             </button>
           )}
         </div>
-      ))}
+      );})}
 
       {hasCharacters && (
         <>

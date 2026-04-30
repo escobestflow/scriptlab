@@ -58,6 +58,14 @@ function normalizeCharacter(c: any): Character {
       ? (c.aiVoice as Character["aiVoice"]) : null,
     arc: c.arc || "",
     notes: c.notes || "",
+    // Cross-episode lock: characters carry the id of the episode they
+    // were created in. Legacy saves predate this — leave undefined and
+    // let the Characters tab fall back to "owned by the active layer's
+    // first episode" for the purpose of edit gating, so existing
+    // projects remain editable rather than being silently locked.
+    createdInEpisodeId: typeof c.createdInEpisodeId === "string" && c.createdInEpisodeId
+      ? c.createdInEpisodeId
+      : undefined,
   };
 }
 
