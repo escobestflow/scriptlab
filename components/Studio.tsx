@@ -5724,9 +5724,14 @@ function CharField({
 }) {
   // Reserve extra right-side padding when a pager is present so
   // the cluster (pager + wand) doesn't cover input text.
+  // The eyebrow label is rendered above the input so the field name
+  // stays visible after the user has filled it in — placeholders
+  // disappear on type, which made the sheet hard to scan once any
+  // of these had real content.
   const reservedClass = pager ? "char-field-has-pager" : "";
   return (
     <div className={`char-field ${multiline ? "char-field-multiline" : ""} ${reservedClass}`}>
+      <div className="eyebrow char-field-label">{label}</div>
       {multiline ? (
         <Textarea
           placeholder={label}
@@ -6032,7 +6037,7 @@ function CharacterEditForm({
   }
 
   return (
-    <div className="stack">
+    <div className="stack char-editor-stack">
       <CharField
         label="Name"
         value={ch.name}
@@ -6047,7 +6052,7 @@ function CharacterEditForm({
           etc.). Optional: if the user leaves this blank, the sheet-
           close handler in Studio kicks off a name-based AI detection
           and fills it in. */}
-      <div className="eyebrow" style={{ marginTop: 4 }}>Gender</div>
+      <div className="eyebrow">Gender</div>
       <div className="chip-row">
         {([
           { key: "male",        label: "Male" },
@@ -6080,7 +6085,7 @@ function CharacterEditForm({
       </div>
 
       {/* Role — chip selector matching Concept tab (Genre, etc). */}
-      <div className="eyebrow" style={{ marginTop: 4 }}>Role</div>
+      <div className="eyebrow">Role</div>
       <div className="chip-row">
         {roles.map(r => (
           <Selector
@@ -6206,7 +6211,7 @@ function CharacterEditForm({
           each chip uses the SAME instructions as the real read-aloud
           flow, so what users hear during selection matches what
           they'll hear in Read Mode. */}
-      <div className="eyebrow" style={{ marginTop: 4 }}>Read-aloud voice</div>
+      <div className="eyebrow">Read-aloud voice</div>
       <div className="char-voice-grid">
         {([
           { id: null,      label: "Auto",     desc: "Pick automatically based on the character." },
@@ -6225,15 +6230,19 @@ function CharacterEditForm({
             ? !ch.aiVoice
             : ch.aiVoice === v.id;
           return (
-            <div key={v.label} className={`char-voice-card${selected ? " selected" : ""}`}>
+            <div
+              key={v.label}
+              className={`char-voice-card${selected ? " selected" : ""}`}
+              title={v.desc}
+            >
               <button
                 type="button"
                 className="char-voice-pick"
                 onClick={() => onUpdate({ aiVoice: v.id })}
                 aria-pressed={selected}
+                aria-label={`${v.label} — ${v.desc}`}
               >
                 <span className="char-voice-name">{v.label}</span>
-                <span className="char-voice-desc">{v.desc}</span>
               </button>
               {/* Auto has no preview — it doesn't resolve to a single
                   voice until a name is in play, and previewing a name-

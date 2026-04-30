@@ -2332,6 +2332,13 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
 .char-field {
   position: relative;
 }
+/* Persistent eyebrow label above the input so the field name stays
+   visible after typing. Placeholders disappear on first character; a
+   sheet full of "Backstory / Motivations / Voice direction" looks like
+   a pile of unlabeled boxes once any of them have content. */
+.char-field-label {
+  margin-bottom: 6px;
+}
 .char-field .field {
   /* reserve space on the right so long content doesn't slide under the wand */
   padding-right: 40px;
@@ -2341,17 +2348,21 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
 }
 .char-field-ai {
   position: absolute;
-  top: 8px;
+  /* Account for the eyebrow label height so the wand sits inside the
+     input, not next to the label. ~22px of label + margin. */
+  top: 30px;
   right: 8px;
   z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-/* On single-line inputs the wand should be vertically centered */
+/* On single-line inputs the wand should be vertically centered on
+   the input only — not on the whole (label + input) block. */
 .char-field:not(.char-field-multiline) .char-field-ai {
-  top: 50%;
-  transform: translateY(-50%);
+  top: auto;
+  bottom: 8px;
+  transform: none;
 }
 /* Drop the wand's own extra margin when it lives inside the float slot */
 .char-field-ai .ai-wand {
@@ -2397,19 +2408,22 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
 }
 
 /* ======= CHARACTER VOICE PICKER ======= */
-/* 7 cards (Auto + 6 OpenAI voices) laid out in a 2-column grid that
-   collapses to 1 column on narrow screens. Each card is a tap target
-   for selection, with the preview SpeakButton floating top-right —
-   tapping the button never selects the card, so users can audition
-   without committing. */
+/* 7 chips (Auto + 6 OpenAI voices) in a 3-column compact grid. Each
+   chip is a single-line label + small play button — short enough that
+   the whole picker is one glanceable block, not a paragraph. The full
+   description ("Bright, expressive, feminine.") lives in the chip's
+   title attribute so a long-press / hover still surfaces it. */
 .char-voice-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 .char-voice-card {
   position: relative;
-  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   transition: border-color 200ms var(--ease), background 200ms var(--ease);
@@ -2419,36 +2433,52 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
   background: var(--bg-secondary);
 }
 .char-voice-pick {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 100%;
-  padding: 12px 44px 12px 14px; /* reserve right side for SpeakButton */
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px 0 12px;
   background: transparent;
   border: 0;
   text-align: left;
   cursor: pointer;
   border-radius: inherit;
+  display: flex;
+  align-items: center;
 }
 .char-voice-pick:active { transform: scale(0.985); }
 .char-voice-name {
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--ink);
-}
-.char-voice-desc {
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--ink-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .char-voice-card .speak-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
+  flex: 0 0 auto;
+  margin-right: 4px;
 }
-@media (max-width: 480px) {
-  .char-voice-grid { grid-template-columns: 1fr; }
+/* Auto chip spans the row width left over after the 6 voices on
+   smaller widths — fine for now; the grid auto-flow handles it. */
+@media (max-width: 380px) {
+  .char-voice-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ======= CHARACTER EDITOR SECTION SPACING ======= */
+/* Scoped to the character-edit sheet so the global `.stack` rule (used
+   elsewhere) keeps its tight 12px gap. Inside this form every top-
+   level child IS a section header (CharField with eyebrow label, or a
+   bare eyebrow + chips/grid block), and the user reads it as a
+   stack of clearly delimited attribute groups. */
+.char-editor-stack > * + * {
+  margin-top: 20px;
+}
+/* Bare eyebrow + its content (chip-row, voice grid) is conceptually
+   one section — the eyebrow's 20px provides the section gap, so
+   collapse the gap between eyebrow and its content. */
+.char-editor-stack > .eyebrow + .chip-row,
+.char-editor-stack > .eyebrow + .char-voice-grid {
+  margin-top: 8px;
 }
 
 /* Sync banner */
