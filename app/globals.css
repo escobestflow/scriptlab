@@ -2328,43 +2328,30 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
   vertical-align: baseline;
 }
 
-/* ======= CHARACTER FIELD — input/textarea with floating AI wand ======= */
+/* ======= CHARACTER FIELD — label + AI wand header row, then input ======= */
 .char-field {
   position: relative;
 }
-/* Persistent eyebrow label above the input so the field name stays
-   visible after typing. Placeholders disappear on first character; a
-   sheet full of "Backstory / Motivations / Voice direction" looks like
-   a pile of unlabeled boxes once any of them have content. */
-.char-field-label {
+/* Header row: persistent eyebrow label on the left, AI wand cluster
+   pinned to the far right. The label stays visible after typing
+   (placeholders vanish on first character) and the wand never floats
+   over the input. */
+.char-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
 }
-.char-field .field {
-  /* reserve space on the right so long content doesn't slide under the wand */
-  padding-right: 40px;
-}
-.char-field.char-field-has-pager .field {
-  padding-right: 128px; /* wand + pager cluster */
+.char-field-label {
+  margin: 0;
 }
 .char-field-ai {
-  position: absolute;
-  /* Account for the eyebrow label height so the wand sits inside the
-     input, not next to the label. ~22px of label + margin. */
-  top: 30px;
-  right: 8px;
-  z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  flex: 0 0 auto;
 }
-/* On single-line inputs the wand should be vertically centered on
-   the input only — not on the whole (label + input) block. */
-.char-field:not(.char-field-multiline) .char-field-ai {
-  top: auto;
-  bottom: 8px;
-  transform: none;
-}
-/* Drop the wand's own extra margin when it lives inside the float slot */
 .char-field-ai .ai-wand {
   margin-left: 0;
   vertical-align: top;

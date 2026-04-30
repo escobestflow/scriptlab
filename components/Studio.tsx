@@ -5722,16 +5722,18 @@ function CharField({
   rows?: number;
   pager?: React.ReactNode;
 }) {
-  // Reserve extra right-side padding when a pager is present so
-  // the cluster (pager + wand) doesn't cover input text.
-  // The eyebrow label is rendered above the input so the field name
-  // stays visible after the user has filled it in — placeholders
-  // disappear on type, which made the sheet hard to scan once any
-  // of these had real content.
-  const reservedClass = pager ? "char-field-has-pager" : "";
+  // Header row: eyebrow label on the left, AI wand (+ optional history
+  // pager) on the right — kept flush with the label so the wand never
+  // overlaps input text. Field below stretches the full width.
   return (
-    <div className={`char-field ${multiline ? "char-field-multiline" : ""} ${reservedClass}`}>
-      <div className="eyebrow char-field-label">{label}</div>
+    <div className={`char-field ${multiline ? "char-field-multiline" : ""}`}>
+      <div className="char-field-header">
+        <div className="eyebrow char-field-label">{label}</div>
+        <div className="char-field-ai">
+          <AIWandButton onClick={onAI} loading={aiBusy} />
+          {pager}
+        </div>
+      </div>
       {multiline ? (
         <Textarea
           placeholder={label}
@@ -5746,10 +5748,6 @@ function CharField({
           onChange={e => onChange(e.target.value)}
         />
       )}
-      <div className="char-field-ai">
-        <AIWandButton onClick={onAI} loading={aiBusy} />
-        {pager}
-      </div>
     </div>
   );
 }
