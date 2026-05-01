@@ -1363,7 +1363,10 @@ export function Studio({
                 }}
                 aria-label="Pick episode"
               >
-                <span>{activeEpisode ? `Ep ${activeEpisode.number}` : "Episodes"}</span>
+                <span>{(() => {
+                  const ep = activeEpisode ?? activeStoryLayer.episodes?.[0];
+                  return ep ? `Episode ${ep.number}` : "Episodes";
+                })()}</span>
                 <img src="/caret-sm.svg" alt="" className={`drafts-caret ${episodeSheetOpen ? "open" : ""}`} />
               </button>
               <button
@@ -5663,8 +5666,14 @@ function ConceptTab({
           a fly-up sheet with a search filter. Rendered as a non-collapsing
           row: selected writers show inline as pills next to the label, and
           the Select/Edit button is always exposed below (no caret, no
-          duplicate chip list). */}
-      <div className="attr-row">
+          duplicate chip list). On non-pilot TV episodes the whole row is
+          a tap target that fires the lock toast — body button is hidden. */}
+      <div
+        className="attr-row"
+        {...(conceptLocked
+          ? { onClick: lockTap, role: "button", style: { cursor: "pointer" } }
+          : {})}
+      >
         <div className="attr-row-header attr-row-header-static">
           <span className="attr-label">
             Writer Style
@@ -5685,13 +5694,12 @@ function ConceptTab({
               ? d.settings.writerStyles.map(w => (
                   <span key={w} className="attr-pill">{w.toUpperCase()}</span>
                 ))
-              : <span className="attr-placeholder">{isPartnerPreviewing ? "None added" : "Pick writers you want to echo"}</span>}
+              : <span className="attr-placeholder">{(isPartnerPreviewing || conceptLocked) ? "None added" : "Pick writers you want to echo"}</span>}
           </div>
         </div>
         {/* Hide the Select/Edit button when previewing the partner's
-            concept draft — this row is read-only there, and the button
-            would expose a sheet the user can't meaningfully act on. */}
-        {!isPartnerPreviewing && (
+            concept draft or when locked to a non-pilot episode. */}
+        {!isPartnerPreviewing && !conceptLocked && (
           <div className="attr-row-body" style={{ paddingTop: 16 }}>
             <Button
               variant="secondary"
