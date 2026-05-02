@@ -104,11 +104,11 @@ ${logline || "(none yet)"}
 
 ## Concept
 - Summary: ${concept?.summary || "(none)"}
-- Tone: ${concept?.tone || "(none)"}
-- Themes: ${concept?.themes?.join(", ") || "(none)"}
+- Tone: ${concept?.tone || "(none)"}${settings.toneNote?.trim() ? `\n  User direction on tone (high-priority — elaborates on the picker): "${settings.toneNote.trim()}"` : ""}
+- Themes: ${concept?.themes?.join(", ") || "(none)"}${settings.themesNote?.trim() ? `\n  User direction on themes (high-priority — elaborates on the picker): "${settings.themesNote.trim()}"` : ""}
 
 ## Settings
-- Framework: ${settings.framework ?? "unspecified (let the structure fit the concept)"}
+- Framework: ${settings.framework ?? "unspecified (let the structure fit the concept)"}${settings.frameworkNote?.trim() ? `\n  User direction on framework (high-priority — elaborates on the picker): "${settings.frameworkNote.trim()}"` : ""}
 - Genres: ${settings.genres?.join(", ") || "none"}
 - Sub-genres: ${settings.subGenres?.length ? settings.subGenres.join(", ") : "none"}
 - Writer voices to echo (study their craft, do not pastiche): ${settings.writerStyles?.length ? settings.writerStyles.join(", ") : "none"}
@@ -117,7 +117,7 @@ ${logline || "(none yet)"}
 - Unpredictability: ${settings.unpredictability}/10
 - Darkness: ${settings.darkness}/10
 - Pace: ${settings.pace}/10
-- Ending types: ${settings.endingTypes?.join(", ") || "none"}
+- Ending types: ${settings.endingTypes?.join(", ") || "none"}${settings.endingNote?.trim() ? `\n  User direction on ending (high-priority — elaborates on the picker): "${settings.endingNote.trim()}"` : ""}
 ${story.projectType === "short" ? `
 ## Short-film parameters
 - Target duration: ${settings.duration ? `${settings.duration} min` : "unspecified (default 10–15 min)"}
@@ -228,6 +228,22 @@ Do NOT use a full feature-length arc. Use a flexible 3-stage skeleton:
 ${flavor ? `\n${flavor}` : ""}`;
 }
 
+// User-supplied free-text steering for the active story-layer draft. When
+// present, gets injected at the END of beat-generation prompts so it carries
+// the most recency weight against the structural rules above. Empty when
+// the user has not typed any direction.
+function directionBlock(story: Story): string {
+  const sl = getActiveStoryLayerDraft(story);
+  const dir = (sl?.direction ?? "").trim();
+  if (!dir) return "";
+  return `
+
+USER DIRECTION (high-priority guidance from the writer for this beat sheet — follow it; if it conflicts with the structural defaults above, the user direction wins):
+"""
+${dir}
+"""`;
+}
+
 function buildAsk(story: Story, action: ActionRequest): string {
   const c  = getActiveConceptDraft(story);
   const sl = getActiveStoryLayerDraft(story);
@@ -244,7 +260,7 @@ Rules:
 - Use every locked ingredient meaningfully.
 - Weave in at least one snippet where it fits naturally (reference by title in the purpose field).
 - Match the darkness/pace/unpredictability levels.
-- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${shortFilmGuidance(story)}`;
+- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${shortFilmGuidance(story)}${directionBlock(story)}`;
 
     case "swap_ingredient": {
       const id = action.payload.ingredientId;
@@ -829,7 +845,7 @@ Return STRICT JSON:
 Rules:
 - 8–15 beats.
 - Each "summary" is 1–2 sentences; each "purpose" is 1 sentence naming what the beat does for the audience.
-- No prose outside the JSON.`;
+- No prose outside the JSON.${directionBlock(story)}`;
   }
 
   // Short-film path: ignore the feature-style framework field (for shorts
@@ -855,7 +871,7 @@ Return STRICT JSON:
 Rules:
 - Produce ${low}–${high} beats — one per scene the screenplay will end up with.
 - Each "summary" is 1–2 sentences; each "purpose" is 1 sentence naming what the beat does for the audience.
-- No prose outside the JSON.${shortFilmGuidance(story)}`;
+- No prose outside the JSON.${shortFilmGuidance(story)}${directionBlock(story)}`;
   }
 
   return `Derive the Story layer (beat sheet) from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
@@ -876,7 +892,7 @@ Return STRICT JSON:
 Rules:
 - Produce a complete ${framework === "save-the-cat" ? "15-beat" : "full"} structure for a feature unless the source indicates a different scope.
 - Each "summary" is 1–2 sentences; each "purpose" is 1 sentence.
-- No prose outside the JSON.`;
+- No prose outside the JSON.${directionBlock(story)}`;
 }
 
 function syncPrompt_toScript(story: Story, source: "concept" | "characters" | "story"): string {

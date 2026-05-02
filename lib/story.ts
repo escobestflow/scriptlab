@@ -57,6 +57,15 @@ export interface StorySettings {
    *  Pressure → Shift skeleton. Mirrors `framework`'s null-as-unset
    *  pattern. */
   shortStructure?: ShortStructure | null;
+  /** Free-text direction the user provides alongside each picker —
+   *  their place to elaborate on tone/themes/framework/ending beyond
+   *  the canned options. Empty string = none. Surfaced in the story
+   *  bible next to the relevant picker so every downstream layer
+   *  generation reads them as elaboration on the user's choices. */
+  toneNote?: string;
+  themesNote?: string;
+  frameworkNote?: string;
+  endingNote?: string;
 }
 
 export interface Reference {
@@ -248,6 +257,12 @@ export interface StoryLayerDraft {
   episodes?: Episode[];
   ingredients: Ingredient[];
   snippets: Snippet[];
+  /** Optional free-text direction the user provides to steer beat/scene
+   *  generation. Read by prompt builders for `generate_beats` and
+   *  `sync_*_to_story`. Persisted on the draft so the value survives
+   *  navigation; carried into branched drafts (so re-syncs can re-use it)
+   *  and into partner-preview clones. */
+  direction?: string;
 }
 
 export interface ScriptLayerDraft {
@@ -772,6 +787,7 @@ export function copyPartnerLayerDraft(
         episodes: src.episodes ? src.episodes.map(e => ({ ...e })) : undefined,
         ingredients: [...src.ingredients],
         snippets: [...src.snippets],
+        direction: src.direction,
       };
       return {
         ...myStory,
@@ -1304,6 +1320,7 @@ export function copyPartnerProjectDraft(
     episodes: srcStory.episodes ? srcStory.episodes.map(e => ({ ...e })) : undefined,
     ingredients: [...srcStory.ingredients],
     snippets: [...srcStory.snippets],
+    direction: srcStory.direction,
   };
   const newScript: ScriptLayerDraft = {
     id: genId("scd"),

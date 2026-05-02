@@ -5841,6 +5841,14 @@ function ConceptTab({
             </Button>
           </div>
         )}
+        <Textarea
+          value={d.settings.toneNote ?? ""}
+          onChange={e => updateDraft({ settings: { ...d.settings, toneNote: e.target.value } })}
+          placeholder="Add direction (optional) — elaborate on the tone you want, in your own words"
+          rows={3}
+          style={{ marginTop: 12, marginBottom: 0 }}
+          readOnly={ro()}
+        />
       </AttrRow>
 
       {/* Themes — 20 presets + custom input */}
@@ -5902,6 +5910,14 @@ function ConceptTab({
             </Button>
           </div>
         )}
+        <Textarea
+          value={d.settings.themesNote ?? ""}
+          onChange={e => updateDraft({ settings: { ...d.settings, themesNote: e.target.value } })}
+          placeholder="Add direction (optional) — elaborate on the themes you want, in your own words"
+          rows={3}
+          style={{ marginTop: 12, marginBottom: 0 }}
+          readOnly={ro()}
+        />
       </AttrRow>
 
       {/* Story Framework — beat-skeleton framework the AI uses when generating
@@ -5963,6 +5979,14 @@ function ConceptTab({
             </button>
           ))}
         </div>
+        <Textarea
+          value={d.settings.frameworkNote ?? ""}
+          onChange={e => updateDraft({ settings: { ...d.settings, frameworkNote: e.target.value } })}
+          placeholder="Add direction (optional) — elaborate on the structure you want, in your own words"
+          rows={3}
+          style={{ marginTop: 12, marginBottom: 0 }}
+          readOnly={ro()}
+        />
       </AttrRow>
 
       {/* Ending */}
@@ -5999,6 +6023,14 @@ function ConceptTab({
             </Selector>
           ))}
         </div>
+        <Textarea
+          value={d.settings.endingNote ?? ""}
+          onChange={e => updateDraft({ settings: { ...d.settings, endingNote: e.target.value } })}
+          placeholder="Add direction (optional) — elaborate on the ending you want, in your own words"
+          rows={3}
+          style={{ marginTop: 12, marginBottom: 0 }}
+          readOnly={ro()}
+        />
       </AttrRow>
 
       {/* Writer-style picker — fly-up sheet with a filterable roster of
@@ -6805,6 +6837,9 @@ function StoryTab({
   }
 
   const hasBeats = beats.length > 0;
+  const activeStoryDraft = getActiveStoryLayerDraft(story);
+  const direction = activeStoryDraft.direction ?? "";
+  const [directionSheetOpen, setDirectionSheetOpen] = useState(false);
 
   return (
     <>
@@ -6821,17 +6856,69 @@ function StoryTab({
 
       <div className={draggingIdx != null ? "beats-dragging" : ""}>
         {!hasBeats && (
-          <EmptyLayerState
-            icon={<img src="/story-icon.svg" width={49} height={41} alt="" />}
-            title="No scenes yet"
-            caption="Start building your story structure — add your first scene."
-            addLabel="Add scene"
-            onAdd={() => openNewScene(0)}
-            onGenerate={generateAllBeats}
-            generating={genBusy}
-            generateLabel="Write all with AI"
-            generatingLabel="Writing…"
-          />
+          <>
+            <EmptyLayerState
+              icon={<img src="/story-icon.svg" width={49} height={41} alt="" />}
+              title="No scenes yet"
+              caption="Start building your story structure — add your first scene."
+              addLabel="Add scene"
+              onAdd={() => openNewScene(0)}
+              onGenerate={generateAllBeats}
+              generating={genBusy}
+              generateLabel="Write all with AI"
+              generatingLabel="Writing…"
+            />
+
+            {/* Direction card — only in the Story-tab empty state. Lets the
+                user provide free-text guidance that the AI weights when
+                generating scenes. Persists on the active story-layer draft;
+                read by the prompt builder via getActiveStoryLayerDraft. */}
+            <div className="card import-script-card" style={{ marginTop: 47 }}>
+              <span className="eyebrow">Have direction in mind?</span>
+              <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
+                Tell the AI how you want the scenes to play out — general or
+                specific. Your guidance steers scene generation when you tap
+                "Write all with AI."
+              </div>
+              <Button
+                variant="secondary"
+                size="lg"
+                block
+                onClick={() => setDirectionSheetOpen(true)}
+                icon={
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                }
+              >
+                {direction.trim() ? "Edit Direction" : "Add Direction"}
+              </Button>
+              {direction.trim() && (
+                <div
+                  className="caption"
+                  style={{
+                    marginTop: 10,
+                    fontStyle: "italic",
+                    overflow: "hidden",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical" as const,
+                  }}
+                >
+                  &ldquo;{direction}&rdquo;
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {beats.map((beat, i) => {
@@ -6963,6 +7050,39 @@ function StoryTab({
           />
         </>
       )}
+
+      {/* Direction sheet — opens from the empty-state card above. Holds a
+          single textarea bound to the active story-layer draft's direction
+          field. Autosaves on each keystroke; close button is the only exit. */}
+      <div
+        className={`sheet-backdrop ${directionSheetOpen ? "open" : ""}`}
+        onClick={() => setDirectionSheetOpen(false)}
+      />
+      <div className={`sheet sheet-tall ${directionSheetOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">Direction</div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setDirectionSheetOpen(false)}
+          >
+            Close
+          </Button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <Textarea
+            value={direction}
+            onChange={e =>
+              setStory(s => updateStoryLayerDraft(s, { direction: e.target.value }))
+            }
+            placeholder="Describe how you want the scenes to play out — general or specific. The AI will use this as guidance when writing scenes."
+            rows={10}
+            showClear={false}
+            autoFocus={directionSheetOpen}
+          />
+        </div>
+      </div>
     </>
   );
 }

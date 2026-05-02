@@ -117,6 +117,10 @@ function normalizeSettings(s: any): StorySettings {
       ? s.duration : undefined,
     shortStructure: ALLOWED_SHORT_STRUCTURES.has(s?.shortStructure)
       ? (s.shortStructure as StorySettings["shortStructure"]) : null,
+    toneNote: typeof s?.toneNote === "string" ? s.toneNote : "",
+    themesNote: typeof s?.themesNote === "string" ? s.themesNote : "",
+    frameworkNote: typeof s?.frameworkNote === "string" ? s.frameworkNote : "",
+    endingNote: typeof s?.endingNote === "string" ? s.endingNote : "",
   };
 }
 
@@ -163,6 +167,7 @@ function normalizeStoryLayerDraft(d: any, number = 1, ts?: string): StoryLayerDr
     episodes: d?.episodes ?? undefined,
     ingredients: d?.ingredients ?? [],
     snippets: d?.snippets ?? [],
+    direction: typeof d?.direction === "string" ? d.direction : "",
   };
 }
 
