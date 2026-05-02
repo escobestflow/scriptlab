@@ -5935,6 +5935,13 @@ html[data-theme="dark"] .partner-preview-empty-notice {
                 0 8px 24px -8px rgba(0, 0, 0, 0.18);
     transform: translate(-50%, -50%) scale(0.96);
     opacity: 0;
+    /* Closed sheets stay centered (instead of bottom-anchored as on
+       mobile) so the open animation reads as a fade-in modal rather
+       than a slide. But that means closed sheets still occupy the
+       center of the viewport — disable hit-testing so they don't
+       intercept clicks on whatever is underneath (project cards,
+       the rest of the page chrome, etc.). */
+    pointer-events: none;
     transform-origin: center center;
     transition: transform 240ms var(--ease), opacity 200ms var(--ease);
     padding-bottom: 0;
@@ -5942,6 +5949,7 @@ html[data-theme="dark"] .partner-preview-empty-notice {
   .sheet.open {
     transform: translate(-50%, -50%) scale(1);
     opacity: 1;
+    pointer-events: auto;
   }
   /* Drag handle is a mobile affordance — hide it in modal form. */
   .sheet-handle { display: none; }
