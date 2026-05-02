@@ -79,6 +79,93 @@ const IconZap = () => (
   <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 );
 
+/* ======= Desktop layout ======= */
+// Desktop view kicks in at 1440px. The hook syncs an `.is-desktop` class
+// on <body> so CSS @media rules can opt-in/out and JS can read the same
+// breakpoint without re-implementing the matchMedia query in every consumer.
+function useIsDesktop(): boolean {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1440px)");
+    const apply = (matches: boolean) => {
+      setIsDesktop(matches);
+      document.body.classList.toggle("is-desktop", matches);
+    };
+    apply(mql.matches);
+    const onChange = (e: MediaQueryListEvent) => apply(e.matches);
+    mql.addEventListener("change", onChange);
+    return () => {
+      mql.removeEventListener("change", onChange);
+      document.body.classList.remove("is-desktop");
+    };
+  }, []);
+  return isDesktop;
+}
+
+// Sidebar is rendered always; CSS hides it below 1440px. Buttons mirror
+// the mobile tabbar primary destinations (Projects / Ideas) plus the
+// hamburger menu surface that lives in the top-left on mobile. No Record
+// here — the mobile FAB is intentionally desktop-suppressed.
+function DesktopSidebar({
+  activeMain,
+  inStudio,
+  onProjects,
+  onIdeas,
+  onMenu,
+  userInitial,
+}: {
+  activeMain: MainTab | null;
+  inStudio: boolean;
+  onProjects: () => void;
+  onIdeas: () => void;
+  onMenu: () => void;
+  userInitial: string | null;
+}) {
+  const projectsActive = !inStudio && activeMain === "projects";
+  const ideasActive = !inStudio && activeMain === "moments";
+  return (
+    <aside className="desktop-sidebar" aria-label="Primary">
+      <div className="desktop-sidebar-brand">
+        <img src="/logo.svg" alt="Unfold" className="desktop-sidebar-logo" />
+      </div>
+      <nav className="desktop-sidebar-nav">
+        <button
+          className={`desktop-sidebar-item ${projectsActive ? "active" : ""}`}
+          onClick={onProjects}
+        >
+          <span className="desktop-sidebar-icon">
+            <img
+              src={projectsActive ? "/project-icon-active.svg" : "/project-icon-inactive.svg"}
+              alt=""
+            />
+          </span>
+          <span className="desktop-sidebar-label">Projects</span>
+        </button>
+        <button
+          className={`desktop-sidebar-item ${ideasActive ? "active" : ""}`}
+          onClick={onIdeas}
+        >
+          <span className="desktop-sidebar-icon">
+            <img
+              src={ideasActive ? "/ideas-icon-active.svg" : "/ideas-icon-inactive.svg"}
+              alt=""
+            />
+          </span>
+          <span className="desktop-sidebar-label">Ideas</span>
+        </button>
+      </nav>
+      <div className="desktop-sidebar-foot">
+        <button className="desktop-sidebar-item" onClick={onMenu} aria-label="Open menu">
+          <span className="desktop-sidebar-avatar">
+            {userInitial ?? <IconUser />}
+          </span>
+          <span className="desktop-sidebar-label">Account</span>
+        </button>
+      </div>
+    </aside>
+  );
+}
+
 export default function Page() {
   const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   // Writer profile — cumulative creative-preference + voice model used to
@@ -104,6 +191,7 @@ export default function Page() {
   const useDraftPopup = draftPickerStyle === "popup";
   const [recording, setRecording] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const isDesktop = useIsDesktop();
   // Post-login transition completion gate. We keep the cinematic
   // transition mounted while projects are still loading OR while the
   // transition's internal timeline is still running, whichever finishes
@@ -1065,9 +1153,21 @@ export default function Page() {
     );
   }
 
+  const userEmailTrimmed = (user?.email ?? "").trim();
+  const userInitial = userEmailTrimmed ? userEmailTrimmed.charAt(0).toUpperCase() : null;
+
   return (
    <WriterProfileContext.Provider value={profileAPI}>
     <div className="app">
+      <DesktopSidebar
+        activeMain={view.kind === "main" ? mainTab : null}
+        inStudio={view.kind === "studio"}
+        onProjects={() => { setView({ kind: "main" }); setMainTab("projects"); }}
+        onIdeas={() => { setView({ kind: "main" }); setMainTab("moments"); }}
+        onMenu={() => setMenuOpen(true)}
+        userInitial={userInitial}
+      />
+      <div className="app-content">
       {renderContent()}
 
       {/* Tab bar — hidden when inside a project */}
@@ -1701,6 +1801,7 @@ export default function Page() {
           </Button>
         </div>
       </div>
+      </div>{/* /.app-content */}
     </div>
     {/* Post-login transition overlay, rendered on top of the real app
         until the full fade → shrink → fade-out sequence completes. Its
@@ -2121,6 +2222,7 @@ function ProjectsTab({
         </div>
       )}
 
+      <div className="project-grid">
       {projects.map(p => {
         // Card renders straight from the user's own row. For the
         // invitee, accept_invite now seeds their row with a full
@@ -2220,6 +2322,7 @@ function ProjectsTab({
           </button>
         );
       })}
+      </div>
     </>
   );
 }

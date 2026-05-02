@@ -1851,7 +1851,7 @@ export function Studio({
             <>
               <div
                 style={{ padding: "8px 22px 40px" }}
-                className={previewActive ? "partner-preview-locked" : undefined}
+                className={`tab-content-wrap tab-content-wrap-${section}${previewActive ? " partner-preview-locked" : ""}`}
                 aria-hidden={previewActive ? true : undefined}
               >
           {section === "concept" && (

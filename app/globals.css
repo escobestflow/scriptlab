@@ -5688,3 +5688,234 @@ html[data-theme="dark"] .partner-preview-empty-notice {
   width: 100%;
 }
 
+/* =====================================================================
+   ============================ DESKTOP ===============================
+   =====================================================================
+   Single 1440px breakpoint flips the app into a sidebar-plus-content
+   layout. Mobile is unaffected — every rule below is scoped to either
+   `.desktop-sidebar` (which is `display: none` by default) or to a
+   `@media (min-width: 1440px)` block. No mobile selectors are touched.
+   No new functional surfaces are introduced — the sidebar mirrors the
+   mobile tabbar's primary destinations (Projects / Ideas) plus the
+   hamburger menu. Record is intentionally suppressed at desktop.
+   ===================================================================== */
+
+/* Sidebar is rendered always but hidden by default. Desktop @media
+   below promotes it to flex. */
+.desktop-sidebar { display: none; }
+
+@media (min-width: 1440px) {
+
+  /* ── App shell — sidebar | content ─────────────────────────────── */
+  .app {
+    flex-direction: row;
+    max-width: none;
+    align-items: stretch;
+  }
+
+  /* The mobile main-view topbar (logo + hamburger) is replaced by the
+     persistent sidebar at desktop. Hide the topbar shell so the content
+     scroll port starts at the top of the viewport. */
+  .topbar-dark { display: none; }
+
+  /* Mobile tabbar + record FAB — sidebar covers Projects/Ideas, Record
+     is intentionally desktop-suppressed per spec. */
+  .tabbar { display: none; }
+
+  /* Right pane — scrolling content area. Becomes the new positioning
+     ancestor so the menu-panel drops down inside this pane (instead of
+     sliding across the sidebar). */
+  .app-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Sidebar — 220px, paper-white surface with hairline divider. */
+  .desktop-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 220px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    padding: 22px 14px 18px;
+    gap: 8px;
+  }
+  .desktop-sidebar-brand {
+    padding: 6px 10px 22px;
+  }
+  .desktop-sidebar-logo {
+    width: 86px;
+    height: 18.5px;
+  }
+  html[data-theme="dark"] .desktop-sidebar-logo { filter: invert(1); }
+  .desktop-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .desktop-sidebar-foot {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .desktop-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink-mute);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-align: left;
+    transition: background 200ms var(--ease), color 200ms var(--ease);
+  }
+  .desktop-sidebar-item:hover {
+    background: var(--bg-secondary);
+    color: var(--ink);
+  }
+  .desktop-sidebar-item.active {
+    background: var(--bg-secondary);
+    color: var(--ink);
+  }
+  .desktop-sidebar-icon {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .desktop-sidebar-icon img { width: 100%; height: 100%; }
+  html[data-theme="dark"] .desktop-sidebar-icon img { filter: invert(1); }
+  .desktop-sidebar-avatar {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-strong);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+  .desktop-sidebar-avatar svg {
+    width: 14px; height: 14px;
+    stroke: var(--ink); stroke-width: 1.6; fill: none;
+  }
+  .desktop-sidebar-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Scroll port ───────────────────────────────────────────────────
+     Pad bottom no longer needs to clear the absolute tabbar (now hidden),
+     and the top doesn't need to leave room for the dark topbar (now
+     hidden) — but the scroll port owns its own top padding for breathing
+     room. Inner content is clamped to a comfortable max-width so prose
+     and rows don't sprawl across an ultrawide. */
+  .screen-scroll {
+    padding: 28px 40px 60px;
+  }
+  .page-enter {
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  /* Menu-panel — drops down inside the right pane (sidebar isn't
+     covered). */
+  .menu-panel {
+    left: 0;
+  }
+
+  /* ── Projects list — 3-column grid ─────────────────────────────── */
+  .project-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+  .project-grid .project-card {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 0;
+    padding: 14px;
+    min-height: 0;
+  }
+  .project-grid .project-cover {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+  }
+  .project-grid .project-body {
+    padding: 4px 4px 2px;
+    gap: 6px;
+  }
+  .project-grid .project-summary {
+    -webkit-line-clamp: 2;
+  }
+
+  /* Invitation cards retain the horizontal layout from mobile — they
+     live above the grid wrapper and aren't affected by the grid rules. */
+
+  /* ── Studio shell — sticky header + body width ─────────────────── */
+  /* Centre the studio sticky-header content (title, draft dropdown,
+     tabs) inside the desktop content pane. The sticky behavior +
+     section structure stays identical to mobile; we only widen the
+     usable inner column. */
+  .studio-header-sticky {
+    /* The header lives inside .screen-scroll which already centres a
+       1120px max-width wrap on desktop; no extra centring needed here.
+       Loosen the inner max so the tabs row can stretch to the wrap's
+       full width without feeling pinched. */
+  }
+  .studio-tabs-row {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* Tab-content wrapper — Concept tab specifically becomes a balanced
+     2-column layout. Other tabs (Characters / Story / Script) stay
+     single-column at desktop because their content (cards, scenes,
+     screenplay text) doesn't reflow well into narrow columns. */
+  .tab-content-wrap-concept {
+    column-count: 2;
+    column-gap: 24px;
+    column-fill: balance;
+  }
+  /* Prevent attribute rows from breaking across columns. */
+  .tab-content-wrap-concept .attr-row {
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* Header-level chrome spans both columns so it reads as a single
+     full-width band above the attribute grid. */
+  .tab-content-wrap-concept > .layer-bar,
+  .tab-content-wrap-concept > .tip-card,
+  .tab-content-wrap-concept > .partner-preview-empty-notice,
+  .tab-content-wrap-concept > .toast {
+    column-span: all;
+    -webkit-column-span: all;
+  }
+
+  /* Cap reading width on text-heavy tabs so single-column content
+     doesn't sprawl across the full 1080px content pane. */
+  .tab-content-wrap-characters,
+  .tab-content-wrap-story,
+  .tab-content-wrap-script {
+    max-width: 880px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
