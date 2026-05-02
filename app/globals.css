@@ -5917,5 +5917,39 @@ html[data-theme="dark"] .partner-preview-empty-notice {
     margin-left: auto;
     margin-right: auto;
   }
+
+  /* ── Sheets render as centered modal overlays at desktop widths.
+     Mobile geometry (bottom-anchored, slide-up, drag handle) is
+     untouched — these rules only apply inside this @media block. */
+  .sheet {
+    left: 50%;
+    right: auto;
+    top: 50%;
+    bottom: auto;
+    width: min(560px, calc(100vw - 48px));
+    max-height: 80vh;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.32),
+                0 8px 24px -8px rgba(0, 0, 0, 0.18);
+    transform: translate(-50%, -50%) scale(0.96);
+    opacity: 0;
+    transform-origin: center center;
+    transition: transform 240ms var(--ease), opacity 200ms var(--ease);
+    padding-bottom: 0;
+  }
+  .sheet.open {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  /* Drag handle is a mobile affordance — hide it in modal form. */
+  .sheet-handle { display: none; }
+  /* The tall-sheet min-height fights the modal max-height cap; let
+     content drive height instead. */
+  .sheet.open.sheet-tall { min-height: 0; }
+  /* Read-through sheet wants to feel large but still fit the modal
+     envelope — give it a comfortable floor without overshooting. */
+  .read-through-sheet.sheet.open { min-height: 60vh; }
 }
 
