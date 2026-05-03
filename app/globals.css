@@ -2419,60 +2419,6 @@ html[data-theme="dark"] .studio-tab.active { color: var(--ink); }
 }
 
 /* ======= CHARACTER EDITOR SECTION SPACING ======= */
-/* Sync banner */
-.sync-banner {
-  position: relative;
-  background: var(--sync-bg);
-  border: 1px solid var(--sync-border);
-  border-radius: 12px;
-  padding: 12px 36px 12px 14px; /* right padding leaves room for the close X */
-  margin-bottom: 12px;
-}
-.sync-banner-text {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-/* Triangle alert glyph that leads the banner. Picks up the amber sync
-   color so light + dark themes both render correctly. flex-shrink: 0
-   keeps the icon from squishing on narrow screens; the slight top nudge
-   visually centers it against the first line of body text. */
-.sync-banner-icon {
-  flex: 0 0 auto;
-  margin-top: 1px;
-  color: var(--sync);
-}
-.sync-banner-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-.sync-banner-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--sync);
-  border-radius: 50%;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: background 160ms var(--ease), opacity 160ms var(--ease);
-}
-.sync-banner-close:hover { opacity: 1; }
-.sync-banner-close:active {
-  background: rgba(0, 0, 0, 0.05);
-  opacity: 1;
-}
-
 /* Character card styles */
 .character-card {
   overflow: hidden;
@@ -2704,6 +2650,26 @@ html[data-theme="dark"] .attr-pill {
 }
 .attr-caret.open {
   transform: rotate(180deg);
+}
+/* Direction-note preview shown under the pills when an AttrRow is
+   collapsed and the user has typed free-form direction (e.g. the Tone /
+   Themes / Framework / Ending "elaborate in your own words" textarea).
+   Visually subordinate to the pills above — quoted, italic, soft color —
+   and click-targets the row to expand into the editor. */
+.attr-row-note-preview {
+  padding: 0 20px 16px 80px;
+  margin-top: -10px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-style: italic;
+  line-height: 1.45;
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .attr-row-body {
   padding: 4px 16px 16px;

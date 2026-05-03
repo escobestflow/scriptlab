@@ -890,18 +890,36 @@ export function Studio({
   // first thing they see.
   async function importScriptFromFile(file: File) {
     if (importing) return;
-    setImporting(true);
-    setImportStep(null);
+    let text = "";
     try {
-      const text = await extractTextFromFile(file);
-      if (!text.trim()) {
-        throw new Error(
+      text = await extractTextFromFile(file);
+    } catch (e: any) {
+      if (typeof window !== "undefined") {
+        window.alert(`Script import failed:\n\n${e instanceof Error ? e.message : String(e)}`);
+      }
+      return;
+    }
+    if (!text.trim()) {
+      if (typeof window !== "undefined") {
+        window.alert(
           "No text could be extracted from this file. If it's a PDF, " +
           "its text layer may be image-based (scanned) — try re-exporting " +
           "from your screenwriting app as a text-based PDF or .txt."
         );
       }
+      return;
+    }
+    await importScriptFromText(text);
+  }
 
+  // Shared screenplay-import pipeline. Same 4 steps as the file path,
+  // just starting from raw text — used by both the file-upload entry
+  // point and the new "Paste a script" option in the import sheet.
+  async function importScriptFromText(text: string) {
+    if (importing) return;
+    setImporting(true);
+    setImportStep(null);
+    try {
       // ── Step 1: Scenes (word-for-word) ─────────────────────────
       setImportStep("script");
       const scenes = await importExtractScenes(story, text, profile);
@@ -975,6 +993,63 @@ export function Studio({
       const msg = e instanceof Error ? e.message : String(e);
       if (typeof window !== "undefined") {
         window.alert(`Script import failed:\n\n${msg}`);
+      }
+    } finally {
+      setImporting(false);
+      setImportStep(null);
+    }
+  }
+
+  // Description-based import. The user pastes a free-form story
+  // description (not a screenplay) and we fan out concept → story →
+  // characters → script in that order. Treat the pasted text as the
+  // Concept summary, then let each downstream sync derive its layer
+  // from the concept.
+  //
+  // Order matters here: characters is run after story so the cast is
+  // shaped by both the concept and the beats it produced. Script runs
+  // last so it has every other layer to draw on.
+  //
+  // Reuses the same `importing` / `importStep` state as file import so
+  // the spinner UX is identical and the loading caption switches as
+  // each step lands.
+  async function importStoryFromDescription(text: string) {
+    if (importing) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setImporting(true);
+    setImportStep(null);
+    try {
+      // Seed the active Concept draft's `summary` with the pasted text
+      // so every downstream sync_concept_to_* prompt has it as the
+      // primary source-of-truth field. Other concept fields (logline,
+      // tone, themes, endingTypes) are left for the final Concept
+      // refresh to fill.
+      const seeded = updateConceptDraft(story, {
+        concept: { ...getActiveConceptDraft(story).concept, summary: trimmed },
+      });
+
+      setImportStep("story");
+      let next = await syncLayer(seeded, "concept", "story", profile);
+
+      setImportStep("characters");
+      next = await syncLayer(next, "concept", "characters", profile);
+
+      setImportStep("script");
+      next = await syncLayer(next, "concept", "script", profile);
+
+      // Final pass: refresh the Concept layer (logline/tone/themes/
+      // endingTypes) from the freshly-written script so all four
+      // layers cohere, mirroring the tail of the file-import path.
+      setImportStep("concept");
+      next = await syncLayer(next, "script", "concept", profile);
+
+      setStory(() => next);
+      setSection("script");
+    } catch (e: any) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") {
+        window.alert(`Description import failed:\n\n${msg}`);
       }
     } finally {
       setImporting(false);
@@ -1907,6 +1982,8 @@ export function Studio({
               onOpenReadThrough={() => setReadThroughOpen(true)}
               runGenerateAll={runGenerateAll}
               onImportScript={importScriptFromFile}
+              onImportPastedScript={importScriptFromText}
+              onImportStoryDescription={importStoryFromDescription}
               importing={importing}
               importStep={importStep}
               onAddScene={() => {
@@ -3607,31 +3684,6 @@ function ReadIcon() {
   );
 }
 
-function AlertIcon({ className }: { className?: string }) {
-  // Triangle-with-exclamation glyph for the out-of-sync banner. Inherits
-  // its color from the parent (currentColor) so the same icon works in
-  // both light and dark themes — the banner sets `color: var(--sync)`
-  // via .sync-banner-icon below.
-  return (
-    <svg
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
-}
-
 /* ============================================ */
 /* ========== LAYER UPDATE TRAY =============== */
 /* ============================================ */
@@ -4481,6 +4533,7 @@ function AttrRow({
   copyAction,
   readOnly,
   noToggle,
+  note,
 }: {
   label: string;
   values?: string[];
@@ -4491,6 +4544,11 @@ function AttrRow({
   dot?: boolean;
   ai?: () => void;
   aiLoading?: boolean;
+  /** Free-form direction text to display under the pills when the row
+   *  is collapsed. Used by Tone/Themes/Framework/Ending to surface the
+   *  user's "elaborate in your own words" note as a preview, so they
+   *  don't need to expand the row to recall what they wrote. */
+  note?: string;
   /** When set, renders a small copy button after the label — used by
    *  partner-preview mode to cherry-pick individual fields from the
    *  partner's concept draft into the user's own active draft. */
@@ -4513,12 +4571,32 @@ function AttrRow({
   const hasValues = values && values.length > 0;
   const suppressControls = (readOnly || !!noToggle) && !hasValues;
   const isLockedDisplay = !!noToggle;
+  // Header is non-interactive only when the row is read-only with no
+  // values to display. Otherwise it's a clickable target. Rendered as
+  // <div role="button"> rather than <button> so the inner AIWandButton
+  // (and the partner-copy button) aren't nested inside another button —
+  // browsers split nested buttons inconsistently, causing intermittent
+  // clicks on the inner control.
+  const interactive = isLockedDisplay || !suppressControls;
+  const headerClick = () => {
+    if (!interactive) return;
+    if (isLockedDisplay) { noToggle!(); return; }
+    onToggle();
+  };
   return (
     <div className="attr-row">
-      <button
+      <div
         className="attr-row-header"
-        onClick={isLockedDisplay ? noToggle : onToggle}
-        disabled={!isLockedDisplay && suppressControls}
+        role={interactive ? "button" : undefined}
+        tabIndex={interactive ? 0 : undefined}
+        aria-disabled={!interactive || undefined}
+        onClick={headerClick}
+        onKeyDown={interactive ? (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            headerClick();
+          }
+        } : undefined}
       >
         <span className="attr-label">
           {label}
@@ -4549,7 +4627,15 @@ function AttrRow({
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         )}
-      </button>
+      </div>
+      {!expanded && note && note.trim() && (
+        <div
+          className="attr-row-note-preview"
+          onClick={interactive ? headerClick : undefined}
+        >
+          {note}
+        </div>
+      )}
       {expanded && !isLockedDisplay && (
         <div className="attr-row-body">
           {readOnly ? (
@@ -4933,15 +5019,30 @@ function TextAttrRow({
     //  3. Cross-episode lock (noToggle): header tap fires noToggle to
     //     show a toast. Renders the value (if any) as a read-only
     //     pill so the user can see what's set; caret hidden.
+    // Rendered as <div role="button"> rather than <button> so the
+    // inner AIWandButton (and pager/copy buttons) aren't nested
+    // inside another button — browsers split nested buttons
+    // inconsistently, causing intermittent inner-control clicks.
+    const interactive = isLockedDisplay || !readOnly;
+    const headerClick = () => {
+      if (!interactive) return;
+      if (isLockedDisplay) { noToggle!(); return; }
+      setFocused(true);
+    };
     return (
       <div className="attr-row">
-        <button
+        <div
           className="attr-row-header"
-          onClick={() => {
-            if (isLockedDisplay) { noToggle!(); return; }
-            if (!readOnly) setFocused(true);
-          }}
-          disabled={!isLockedDisplay && readOnly}
+          role={interactive ? "button" : undefined}
+          tabIndex={interactive ? 0 : undefined}
+          aria-disabled={!interactive || undefined}
+          onClick={headerClick}
+          onKeyDown={interactive ? (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              headerClick();
+            }
+          } : undefined}
         >
           <span className="attr-label">
             {label}
@@ -4965,7 +5066,7 @@ function TextAttrRow({
               <polyline points="6 9 12 15 18 9"/>
             </svg>
           )}
-        </button>
+        </div>
       </div>
     );
   }
@@ -5797,6 +5898,7 @@ function ConceptTab({
         copyAction={previewCopy("tone")}
         readOnly={ro()}
         noToggle={lockTap}
+        note={d.settings.toneNote}
       >
         <div className="chip-row" style={{ marginBottom: 10 }}>
           {TONE_PRESETS.map(t => (
@@ -5864,6 +5966,7 @@ function ConceptTab({
         copyAction={previewCopy("themes")}
         readOnly={ro()}
         noToggle={lockTap}
+        note={d.settings.themesNote}
       >
         {d.concept.themes.length > 0 && (
           <div className="chip-row" style={{ marginBottom: 10 }}>
@@ -5938,6 +6041,7 @@ function ConceptTab({
         onToggle={() => toggle("structure")}
         readOnly={ro()}
         noToggle={lockTap}
+        note={d.settings.frameworkNote}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {([
@@ -6002,6 +6106,7 @@ function ConceptTab({
         copyAction={previewCopy("endingTypes")}
         readOnly={ro()}
         noToggle={lockTap}
+        note={d.settings.endingNote}
       >
         <div className="chip-row">
           {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
@@ -7102,6 +7207,8 @@ function ScriptTab({
   onOpenUpdateTray,
   onOpenReadThrough,
   onImportScript,
+  onImportPastedScript,
+  onImportStoryDescription,
   importing,
   importStep,
   onAddScene,
@@ -7124,6 +7231,15 @@ function ScriptTab({
   /** Import a .txt/.pdf screenplay; deterministically populates
    *  Script + Characters + Story layers from the file contents. */
   onImportScript: (file: File) => Promise<void>;
+  /** Import a screenplay the user has pasted as plain text. Same
+   *  4-step pipeline as `onImportScript` — just skips the file→text
+   *  extraction step. */
+  onImportPastedScript: (text: string) => Promise<void>;
+  /** Import a free-form story description (not a screenplay) the user
+   *  has pasted. Seeds the Concept summary and runs concept → story →
+   *  characters → script in order so every layer is generated from
+   *  the description. */
+  onImportStoryDescription: (text: string) => Promise<void>;
   importing: boolean;
   /** Which layer is currently being written (drives progress label). */
   importStep: LayerKey | null;
@@ -7159,17 +7275,9 @@ function ScriptTab({
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
   const conceptDraft = getActiveConceptDraft(story);
-  const syncState = getLayerSyncState(story);
   const writtenCount = beats.filter(b => b.status === "written").length;
-  // Only surface the sync banner once there's an actual script to be out of
-  // date — i.e., at least one scene has been written.
   const hasProducedScript = writtenCount > 0;
-  const isOutOfSync = syncState.scriptOutOfSync && hasProducedScript;
   const hasBeats = beats.length > 0;
-
-  function dismissSync() {
-    setStory(s => markLayerSynced(s, "script"));
-  }
 
   // "Write all scenes with AI" — kicks off the same background-loop
   // machinery Easy mode uses. The scrim from runGenerateAll covers
@@ -7241,38 +7349,11 @@ function ScriptTab({
 
       {/* Top-of-content Tip — only surfaces once at least one scene
           has been written. On an empty Script the empty state already
-          carries the primary teaching; this tip would pile on. Suppressed
-          while the out-of-sync banner is up: the alert is more important
-          and stacking both at the top of the tab is noisy. */}
-      {hasProducedScript && !isOutOfSync && (
+          carries the primary teaching; this tip would pile on. */}
+      {hasProducedScript && (
         <Tip id="script-scenes-from-outline" persist={false}>
           Every scene in the Story tab becomes prose here — the tighter your outline, the smoother the draft.
         </Tip>
-      )}
-
-      {/* Out-of-sync banner — only after a script has been produced.
-          Leads with an alert triangle so the surface reads as a warning
-          rather than a passive note (the previous dot was easy to miss
-          alongside the tip). */}
-      {isOutOfSync && (
-        <div className="sync-banner" role="alert">
-          <button
-            className="sync-banner-close"
-            onClick={dismissSync}
-            aria-label="Dismiss"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
-          <div className="sync-banner-text">
-            <AlertIcon className="sync-banner-icon" />
-            <span>
-              Upstream content was updated.
-              <br />Your script may need to be refreshed.
-            </span>
-          </div>
-        </div>
       )}
 
       {/* Previously rendered a "{writtenCount}/{beats.length} scenes
@@ -7447,7 +7528,9 @@ function ScriptTab({
           copy-pasted), and Characters (verbatim dialogue cues). No
           AI interpretation — 100% fidelity to the uploaded file. */}
       <ImportScriptCard
-        onImport={onImportScript}
+        onImportFile={onImportScript}
+        onImportPastedScript={onImportPastedScript}
+        onImportStoryDescription={onImportStoryDescription}
         importing={importing}
         importStep={importStep}
       />
@@ -7486,89 +7569,244 @@ function ScriptTab({
 // ── Import Script card ─────────────────────────────────────────────
 
 function ImportScriptCard({
-  onImport,
+  onImportFile,
+  onImportPastedScript,
+  onImportStoryDescription,
   importing,
   importStep,
 }: {
-  onImport: (file: File) => Promise<void>;
+  onImportFile: (file: File) => Promise<void>;
+  onImportPastedScript: (text: string) => Promise<void>;
+  onImportStoryDescription: (text: string) => Promise<void>;
   importing: boolean;
   importStep: LayerKey | null;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  // Sheet visibility. The card's main button no longer fires a file
+  // picker directly — instead it opens this sheet, which exposes the
+  // three import paths (file upload, pasted screenplay, pasted story
+  // description). Closes automatically once an import kicks off.
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  function openPicker() {
+  // Two pasted-text buffers — one per pasteable mode. Kept independent
+  // so switching between the two textareas doesn't clobber the user's
+  // in-progress paste.
+  const [pastedScript, setPastedScript] = useState("");
+  const [pastedDescription, setPastedDescription] = useState("");
+
+  // Which paste mode is currently revealed. `null` = both rows are
+  // collapsed and the user sees just the three top-level buttons.
+  const [pasteMode, setPasteMode] = useState<"script" | "description" | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function openFilePicker() {
     if (importing) return;
-    inputRef.current?.click();
+    fileInputRef.current?.click();
   }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    // Clear the input so the same file can be re-selected later (onChange
-    // won't fire if the value didn't change).
-    if (inputRef.current) inputRef.current.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (!file) return;
-    await onImport(file);
+    setSheetOpen(false);
+    await onImportFile(file);
   }
 
-  const label = importing
+  async function submitPastedScript() {
+    if (importing) return;
+    const t = pastedScript.trim();
+    if (!t) return;
+    setSheetOpen(false);
+    setPastedScript("");
+    setPasteMode(null);
+    await onImportPastedScript(t);
+  }
+
+  async function submitPastedDescription() {
+    if (importing) return;
+    const t = pastedDescription.trim();
+    if (!t) return;
+    setSheetOpen(false);
+    setPastedDescription("");
+    setPasteMode(null);
+    await onImportStoryDescription(t);
+  }
+
+  const ctaLabel = importing
     ? (importStep
         ? `Writing ${LAYER_LABEL[importStep]}…`
-        : "Reading file…")
+        : "Importing…")
     : "Import a script";
 
+  // Leading upload glyph for the main CTA — tray-with-up-arrow that
+  // reads as "import". Suppressed while importing so the spinner takes
+  // the icon slot.
+  const uploadGlyph = (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+
   return (
-    <div className="card import-script-card" style={{ marginTop: 47 }}>
-      <span className="eyebrow">Have a finished script?</span>
-      <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
-        Upload a .txt or .pdf screenplay. Unfold will split it into
-        scenes word-for-word, then fill in Story beats, Characters, and
-        a fresh Concept draft — preserving your title, format, and
-        genres.
-      </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={IMPORT_ACCEPT}
-        onChange={handleFile}
-        style={{ display: "none" }}
-      />
-      <Button
-        variant="secondary"
-        size="lg"
-        block
-        onClick={openPicker}
-        disabled={importing}
-        /* Leading upload glyph — tray-with-up-arrow icon that reads as
-           "upload/import". Suppressed while importing so the spinner
-           takes the icon slot and we don't have two leading marks
-           competing. The Button's `icon` prop handles spacing. */
-        icon={
-          !importing ? (
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-          ) : undefined
-        }
-      >
-        {importing && <span className="import-spinner" aria-hidden="true" />}
-        {label}
-      </Button>
-      {importing && (
-        <div className="caption" style={{ marginTop: 10, textAlign: "center" }}>
-          Reading your script and splitting it into scenes…
+    <>
+      <div className="card import-script-card" style={{ marginTop: 47 }}>
+        <span className="eyebrow">Have something to start from?</span>
+        <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
+          Upload a screenplay file, paste a script, or paste a story
+          description. Unfold fills in scenes, beats, characters, and a
+          fresh Concept draft — preserving your title, format, and genres.
         </div>
-      )}
-    </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={IMPORT_ACCEPT}
+          onChange={handleFile}
+          style={{ display: "none" }}
+        />
+        <Button
+          variant="secondary"
+          size="lg"
+          block
+          onClick={() => setSheetOpen(true)}
+          disabled={importing}
+          icon={!importing ? uploadGlyph : undefined}
+        >
+          {importing && <span className="import-spinner" aria-hidden="true" />}
+          {ctaLabel}
+        </Button>
+        {importing && (
+          <div className="caption" style={{ marginTop: 10, textAlign: "center" }}>
+            Reading your script and splitting it into scenes…
+          </div>
+        )}
+      </div>
+
+      {/* Import sheet — three options stacked. File-upload button opens
+          a native picker; the two paste rows expand inline when tapped
+          and reveal a textarea + submit button. Tapping the same row
+          again collapses it. */}
+      <div
+        className={`sheet-backdrop ${sheetOpen ? "open" : ""}`}
+        onClick={() => setSheetOpen(false)}
+      />
+      <div className={`sheet sheet-tall ${sheetOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">Import</div>
+          <Button variant="secondary" size="sm" onClick={() => setSheetOpen(false)}>
+            Close
+          </Button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+          <div className="caption" style={{ marginBottom: 16 }}>
+            Choose how you want to bring in your existing material.
+          </div>
+
+          {/* Option 1 — Upload file */}
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={openFilePicker}
+            disabled={importing}
+            icon={uploadGlyph}
+            style={{ marginBottom: 12 }}
+          >
+            Upload script files
+          </Button>
+          <div className="caption" style={{ marginTop: -6, marginBottom: 18 }}>
+            .txt or .pdf screenplay. Split into scenes word-for-word.
+          </div>
+
+          {/* Option 2 — Paste a screenplay */}
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={() => setPasteMode(m => m === "script" ? null : "script")}
+            disabled={importing}
+            style={{ marginBottom: pasteMode === "script" ? 10 : 12 }}
+          >
+            Paste a script
+          </Button>
+          {pasteMode === "script" && (
+            <div style={{ marginBottom: 18 }}>
+              <Textarea
+                value={pastedScript}
+                onChange={e => setPastedScript(e.target.value)}
+                placeholder="Paste the full screenplay here. Standard format with INT./EXT. scene slugs works best."
+                rows={10}
+                style={{ width: "100%", marginBottom: 10 }}
+                disabled={importing}
+              />
+              <Button
+                variant="primary"
+                size="lg"
+                block
+                disabled={importing || !pastedScript.trim()}
+                onClick={submitPastedScript}
+              >
+                Import this script
+              </Button>
+            </div>
+          )}
+          {pasteMode !== "script" && (
+            <div className="caption" style={{ marginTop: -6, marginBottom: 18 }}>
+              Plain-text screenplay — same processing as the file path.
+            </div>
+          )}
+
+          {/* Option 3 — Paste a story description */}
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={() => setPasteMode(m => m === "description" ? null : "description")}
+            disabled={importing}
+            style={{ marginBottom: pasteMode === "description" ? 10 : 12 }}
+          >
+            Paste a story description
+          </Button>
+          {pasteMode === "description" && (
+            <div style={{ marginBottom: 18 }}>
+              <Textarea
+                value={pastedDescription}
+                onChange={e => setPastedDescription(e.target.value)}
+                placeholder="Describe the story in detail — characters, world, what happens scene by scene. Unfold will turn it into beats, characters, and a screenplay."
+                rows={10}
+                style={{ width: "100%", marginBottom: 10 }}
+                disabled={importing}
+              />
+              <Button
+                variant="primary"
+                size="lg"
+                block
+                disabled={importing || !pastedDescription.trim()}
+                onClick={submitPastedDescription}
+              >
+                Import this description
+              </Button>
+            </div>
+          )}
+          {pasteMode !== "description" && (
+            <div className="caption" style={{ marginTop: -6 }}>
+              Free-form description, not a screenplay. Generates beats,
+              characters, and a script from your text.
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -7661,23 +7899,33 @@ function SceneEditForm({
     onUpdate({ characterIds: next });
   }
 
-  // Clean Up With AI — same /api/generate `clean_beat` action the old
-  // create form used; this version patches the result back into the
-  // beat directly via onUpdate so the auto-save flow handles
-  // persistence. Gated on `summary` having content (the AI rewrites
-  // freeform notes into a clean name + summary).
+  // AI wand on the Description field. Two modes:
+  //   - If the user typed something, route to `clean_beat` — tightens up
+  //     freeform notes into a clean name + summary.
+  //   - If the field is empty, route to `generate_beat` — invents a fresh
+  //     scene from project context. Uses the beat's per-scene Weirdness
+  //     dial when set, neutral defaults otherwise.
+  // Both actions return the same { name, summary } shape so the patch
+  // path downstream is identical.
   async function cleanUp() {
-    if (!beat.summary.trim() || cleaning) return;
+    if (cleaning) return;
     setCleaning(true);
     try {
+      const action = beat.summary.trim()
+        ? { type: "clean_beat" as const, payload: { rawText: beat.summary } }
+        : {
+            type: "generate_beat" as const,
+            payload: {
+              weirdness: beat.weirdness ?? 5,
+              darkness: 5,
+              humor: 3,
+              length: 5,
+            },
+          };
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          story,
-          action: { type: "clean_beat", payload: { rawText: beat.summary } },
-          profile,
-        }),
+        body: JSON.stringify({ story, action, profile }),
       });
       if (!res.ok || !res.body) return;
       const reader = res.body.getReader();
