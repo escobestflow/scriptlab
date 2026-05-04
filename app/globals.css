@@ -140,6 +140,21 @@ button { cursor: pointer; }
   overflow: clip;
 }
 
+/* Right-pane wrapper. Sits as a flex child of `.app` and must own a
+   flex column itself so the inner `.screen-scroll` (which uses
+   `flex: 1; overflow-y: auto`) gets a constrained height to scroll
+   inside. Without `min-height: 0`, the column refuses to shrink below
+   its content and `.screen-scroll` overflows `.app`'s `overflow: clip`,
+   making Projects/Ideas un-scrollable on mobile. The desktop @media
+   block layers `position: relative; overflow: hidden` on top for the
+   menu-panel positioning context. */
+.app-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 /* ======= TOP BAR ======= */
 
 .topbar {
