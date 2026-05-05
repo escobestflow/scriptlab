@@ -5942,3 +5942,43 @@ html[data-theme="dark"] .partner-preview-empty-notice {
   .read-through-sheet.sheet.open { min-height: 60vh; }
 }
 
+/* =====================================================================
+   ===========================  V2 REDESIGN  ===========================
+   =====================================================================
+   Email-gated redesign. Everything inside `html[data-design="v2"]`
+   only applies when the signed-in user's email is on the
+   NEXT_PUBLIC_V2_EMAILS allowlist. Everyone else (and signed-out
+   viewers) see v1, untouched.
+
+   Anti-flash: app/layout.tsx runs a pre-hydration script that reads
+   the cached email from localStorage and sets data-design BEFORE
+   React mounts, so v2 users get v2 on first paint. lib/auth.tsx
+   refreshes the attribute + cache on every auth state change.
+
+   Working order: tokens → component-specific overrides → per-screen
+   pixel pushing. Keep the JSX untouched whenever possible — most
+   redesign work should land here as scoped class overrides, not React
+   refactors.
+   ===================================================================== */
+
+html[data-design="v2"] {
+  /* ── Tokens ──────────────────────────────────────────────────────
+     Override the core CSS variables here once the new palette / type
+     scale lands. Until then, v2 inherits v1 tokens — flipping the flag
+     produces no visual change yet. */
+  /* Example (uncomment + replace with real values from Figma):
+     --ink: #111;
+     --bg: #fafafa;
+     --border: #e8e8e8;
+     --radius: 14px;
+  */
+}
+
+/* ── Component overrides — add as you migrate each screen ──────────
+   Pattern:
+     html[data-design="v2"] .project-card { ... }
+     html[data-design="v2"] .attr-row { ... }
+   Specificity (0,2,1) beats bare class selectors (0,1,0) without
+   needing !important, so v1 rules stay clean. */
+
+

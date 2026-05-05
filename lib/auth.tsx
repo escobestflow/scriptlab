@@ -31,6 +31,34 @@ const AuthContext = createContext<AuthState>({
   signOut: async () => {},
 });
 
+// V2 redesign allowlist. Read from NEXT_PUBLIC_V2_EMAILS, normalized
+// to lowercase. The same list is also inlined into the pre-hydration
+// script in app/layout.tsx so the first paint applies the right design
+// without waiting for auth — this runtime copy keeps things in sync
+// when the user signs in/out mid-session.
+const V2_EMAILS: string[] = (process.env.NEXT_PUBLIC_V2_EMAILS ?? "")
+  .split(",")
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean);
+
+function applyDesignForEmail(email: string | null | undefined) {
+  if (typeof document === "undefined") return;
+  const lower = (email ?? "").toLowerCase();
+  const design = lower && V2_EMAILS.includes(lower) ? "v2" : "v1";
+  document.documentElement.dataset.design = design;
+  // Cache the email so the next page load's pre-hydration script can
+  // pick the correct design before React mounts (anti-flash). Cleared
+  // on sign-out below so the next user on the same device starts on
+  // v1, never briefly seeing the previous user's v2.
+  try {
+    if (lower) {
+      localStorage.setItem("scriptlab:user-email", lower);
+    } else {
+      localStorage.removeItem("scriptlab:user-email");
+    }
+  } catch {}
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -42,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      applyDesignForEmail(session?.user?.email);
     });
 
     // Listen for auth changes
@@ -50,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        applyDesignForEmail(session?.user?.email);
       }
     );
 
@@ -88,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
+    applyDesignForEmail(null);
   }
 
   return (
