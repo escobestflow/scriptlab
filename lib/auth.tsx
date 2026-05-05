@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "./supabase";
 import { isBetaAllowed } from "./betaAccess";
+import { isV2User } from "./v2Access";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthState {
@@ -38,20 +39,17 @@ const AuthContext = createContext<AuthState>({
   signOut: async () => {},
 });
 
-// V2 redesign allowlist. Read from NEXT_PUBLIC_V2_EMAILS, normalized
-// to lowercase. The same list is also inlined into the pre-hydration
+// V2 design / feature allowlist lives in lib/v2Access.ts so both the
+// client (this file) and the server (api routes) can share one source
+// of truth. The same list is also inlined into the pre-hydration
 // script in app/layout.tsx so the first paint applies the right design
-// without waiting for auth — this runtime copy keeps things in sync
+// without waiting for auth — this runtime call keeps things in sync
 // when the user signs in/out mid-session.
-const V2_EMAILS: string[] = (process.env.NEXT_PUBLIC_V2_EMAILS ?? "")
-  .split(",")
-  .map(e => e.trim().toLowerCase())
-  .filter(Boolean);
 
 function applyDesignForEmail(email: string | null | undefined) {
   if (typeof document === "undefined") return;
   const lower = (email ?? "").toLowerCase();
-  const design = lower && V2_EMAILS.includes(lower) ? "v2" : "v1";
+  const design = isV2User(lower) ? "v2" : "v1";
   document.documentElement.dataset.design = design;
   // Cache the email so the next page load's pre-hydration script can
   // pick the correct design before React mounts (anti-flash). Cleared
