@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Story } from "@/lib/story";
 import { ActionRequest, modelForAction, costFromUsage } from "@/lib/prompt";
 import { buildPrompt } from "@/lib/contextBuilder";
+import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import type { WriterProfile } from "@/lib/writerProfile";
 
 export const runtime = "nodejs";
@@ -16,6 +17,15 @@ export const dynamic = "force-dynamic";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: Request) {
+  // Beta gate. AuthProvider injects X-User-Email on every /api/* fetch
+  // — empty string when signed out. Block calls from anyone not on
+  // NEXT_PUBLIC_ALLOWED_EMAILS so backend AI costs are gated even if
+  // the client-side gate is bypassed.
+  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+    return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
+      status: BETA_FORBIDDEN_RESPONSE.status,
+    });
+  }
   try {
     const { story, action, profile } = (await req.json()) as {
       story: Story;

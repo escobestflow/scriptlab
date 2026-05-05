@@ -47,6 +47,7 @@ import {
 } from "@/lib/email/projectBundle";
 import { renderProjectPdfBuffer } from "@/lib/email/projectPdf";
 import { serializeFountain } from "@/lib/fountain";
+import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import type { Story } from "@/lib/story";
 
 interface AttachmentFlags {
@@ -63,6 +64,12 @@ interface SendRequest {
 }
 
 export async function POST(req: Request) {
+  // Beta gate — see app/api/generate/route.ts for the rationale.
+  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+    return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
+      status: BETA_FORBIDDEN_RESPONSE.status,
+    });
+  }
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     return json({ error: "RESEND_API_KEY not set on the server" }, 500);

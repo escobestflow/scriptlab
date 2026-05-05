@@ -5981,4 +5981,11 @@ html[data-design="v2"] {
    Specificity (0,2,1) beats bare class selectors (0,1,0) without
    needing !important, so v1 rules stay clean. */
 
+/* Smoke test: Projects-tab header in red for v2-only viewers. Confirms
+   the flag is wired end-to-end before any real redesign work lands.
+   Remove once the v2 redesign of the Projects tab is underway. */
+html[data-design="v2"] .projects-tab-heading {
+  color: #e23d3d;
+}
+
 

@@ -167,7 +167,7 @@ function DesktopSidebar({
 }
 
 export default function Page() {
-  const { user, loading: authLoading, signInWithGoogle, signOut } = useAuth();
+  const { user, loading: authLoading, betaRejectedEmail, signInWithGoogle, signOut } = useAuth();
   // Writer profile — cumulative creative-preference + voice model used to
   // bias every AI generation. Persisted per user in Supabase, mirrored to
   // localStorage for instant first-paint. See lib/writerProfile.ts.
@@ -723,17 +723,53 @@ export default function Page() {
   const showSplash = !splashDone || (!authLoading && !user);
   if (showSplash) {
     return (
-      <SplashLoader
-        authLoading={authLoading}
-        signedIn={!!user}
-        signInWithGoogle={signInWithGoogle}
-        onDismiss={() => {
-          if (typeof window !== "undefined") {
-            try { window.sessionStorage.setItem("unfoldSplashSeen", "1"); } catch {}
-          }
-          setSplashDone(true);
-        }}
-      />
+      <>
+        <SplashLoader
+          authLoading={authLoading}
+          signedIn={!!user}
+          signInWithGoogle={signInWithGoogle}
+          onDismiss={() => {
+            if (typeof window !== "undefined") {
+              try { window.sessionStorage.setItem("unfoldSplashSeen", "1"); } catch {}
+            }
+            setSplashDone(true);
+          }}
+        />
+        {/* Beta-allowlist rejection overlay — surfaces above the splash
+            when AuthProvider booted a non-allowlisted user. Sits on top
+            of every splash element and tells them the email isn't on
+            the list. The splash's "Sign in with Google" button still
+            works behind it (z:6 splash button vs. z:10000 overlay) but
+            it's covered by the overlay until the user dismisses. */}
+        {betaRejectedEmail && (
+          <div
+            role="alert"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 10000,
+              background: "rgba(0,0,0,0.85)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 32px",
+              color: "#fff",
+              textAlign: "center",
+              fontFamily: "'Lato', sans-serif",
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 14, letterSpacing: "-0.02em" }}>
+              Beta access required
+            </div>
+            <div style={{ fontSize: 14, lineHeight: 1.5, opacity: 0.85, maxWidth: 360 }}>
+              <strong style={{ fontWeight: 600 }}>{betaRejectedEmail}</strong> isn't
+              on the beta allowlist yet. Reach out to the project owner to request
+              access.
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -2204,7 +2240,7 @@ function ProjectsTab({
       )}
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: hasInvites ? 10 : 40 }}>
-        <div className="display">Projects</div>
+        <div className="display projects-tab-heading">Projects</div>
         <Button
           variant="secondary"
           size="sm"

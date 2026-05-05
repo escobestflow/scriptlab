@@ -2,12 +2,18 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "./supabase";
+import { isBetaAllowed } from "./betaAccess";
 import type { User, Session } from "@supabase/supabase-js";
 
 interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  /** True when the most recent sign-in attempt resolved with an email
+   *  not on the beta allowlist. The auth screen reads this to surface
+   *  a "Beta access required" message. Cleared whenever the user
+   *  re-attempts sign-in or fully signs out. */
+  betaRejectedEmail: string | null;
   signInWithGoogle: () => Promise<void>;
   /** Dev-only email/password path. Used by /dev-login so verification
    *  tooling (and anyone without Google SSO configured) can bootstrap
@@ -25,6 +31,7 @@ const AuthContext = createContext<AuthState>({
   user: null,
   session: null,
   loading: true,
+  betaRejectedEmail: null,
   signInWithGoogle: async () => {},
   signInWithEmail: async () => "not-initialised",
   signUpWithEmail: async () => "not-initialised",
@@ -63,28 +70,82 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [betaRejectedEmail, setBetaRejectedEmail] = useState<string | null>(null);
+
+  // Beta gate: if the user signs in with an email that isn't on the
+  // allowlist, immediately sign them out and surface the rejected
+  // email so the auth screen can render a friendly message. Existing
+  // allowlisted users see no change. The server gate on every paid
+  // API route protects the backend from anyone who bypasses this
+  // client check (curl, modified bundle, etc).
+  async function enforceBetaGate(sess: Session | null): Promise<Session | null> {
+    const email = sess?.user?.email ?? null;
+    if (!sess || !email) return sess;
+    if (isBetaAllowed(email)) {
+      setBetaRejectedEmail(null);
+      return sess;
+    }
+    setBetaRejectedEmail(email);
+    await supabase.auth.signOut();
+    return null;
+  }
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const gated = await enforceBetaGate(session);
+      setSession(gated);
+      setUser(gated?.user ?? null);
       setLoading(false);
-      applyDesignForEmail(session?.user?.email);
+      applyDesignForEmail(gated?.user?.email);
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      async (_event, session) => {
+        const gated = await enforceBetaGate(session);
+        setSession(gated);
+        setUser(gated?.user ?? null);
         setLoading(false);
-        applyDesignForEmail(session?.user?.email);
+        applyDesignForEmail(gated?.user?.email);
       }
     );
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Server-side beta gate: every /api/* call gets an X-User-Email
+  // header so the protected routes (generate, tts, etc.) can verify
+  // the caller is on the allowlist before incurring AI costs.
+  // Implemented as a fetch wrapper rather than 14 call-site refactors —
+  // single source of truth, no missed paths. Wrapper falls through to
+  // the original fetch for any non-/api request, so unrelated network
+  // traffic (Supabase RPCs, Google Fonts, etc.) is untouched.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+      // Only inject for in-app API routes — leave Supabase, fonts,
+      // analytics, and any future cross-origin calls alone.
+      if (url.startsWith("/api/")) {
+        const email = user?.email ?? "";
+        const headers = new Headers(init?.headers);
+        if (email && !headers.has("x-user-email")) {
+          headers.set("X-User-Email", email);
+        }
+        return originalFetch(input, { ...init, headers });
+      }
+      return originalFetch(input, init);
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [user?.email]);
 
   async function signInWithGoogle() {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -122,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, betaRejectedEmail, signInWithGoogle, signInWithEmail, signUpWithEmail, signOut }}>
       {children}
     </AuthContext.Provider>
   );

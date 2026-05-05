@@ -9,6 +9,7 @@
 // (same Anthropic API key as /api/generate).
 
 import Anthropic from "@anthropic-ai/sdk";
+import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,6 +31,12 @@ Output rules:
 - Return ONLY the numbered prompts. No preamble, no explanations, no trailing summary.`;
 
 export async function POST(req: Request) {
+  // Beta gate — see app/api/generate/route.ts for the rationale.
+  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+    return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
+      status: BETA_FORBIDDEN_RESPONSE.status,
+    });
+  }
   try {
     const { notes } = (await req.json()) as { notes: string[] };
     if (!Array.isArray(notes) || notes.length === 0) {

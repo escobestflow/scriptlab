@@ -3,6 +3,8 @@
 // gpt-4o-mini-tts model. The client caches the response in IndexedDB keyed
 // by (text, voice, instructions) so re-plays are free.
 
+import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,12 @@ export const dynamic = "force-dynamic";
 const MAX_CHARS = 4000;
 
 export async function POST(req: Request) {
+  // Beta gate — see app/api/generate/route.ts for the rationale.
+  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+    return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
+      status: BETA_FORBIDDEN_RESPONSE.status,
+    });
+  }
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "OPENAI_API_KEY not set" }), {

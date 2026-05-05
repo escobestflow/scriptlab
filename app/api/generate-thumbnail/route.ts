@@ -5,11 +5,18 @@
 
 import sharp from "sharp";
 import { buildImagePrompt } from "@/lib/thumbnailPrompt";
+import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // Beta gate — see app/api/generate/route.ts for the rationale.
+  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+    return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
+      status: BETA_FORBIDDEN_RESPONSE.status,
+    });
+  }
   const apiKey = process.env.OPENAI_API_KEY;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
