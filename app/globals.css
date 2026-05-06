@@ -5981,11 +5981,210 @@ html[data-design="v2"] {
    Specificity (0,2,1) beats bare class selectors (0,1,0) without
    needing !important, so v1 rules stay clean. */
 
-/* Smoke test: Projects-tab header in red for v2-only viewers. Confirms
-   the flag is wired end-to-end before any real redesign work lands.
-   Remove once the v2 redesign of the Projects tab is underway. */
+/* ── V2 Design System tokens — colors ────────────────────────────
+   Semantic naming. Apply via `var(--ds-color-*)` in any v2 rule.
+   Color tokens are breakpoint-agnostic (same value mobile + desktop). */
+html[data-design="v2"] {
+  /* Neutrals */
+  --ds-color-black:             #000000;
+  --ds-color-white:             #FFFFFF;
+  --ds-color-unfold-gold:       #AC9175;
+  --ds-color-ai-yellow:         #FFD60A;
+
+  /* Grays */
+  --ds-color-gray-fill:         #FBF9F9;
+  --ds-color-gray-outline:      #E4E3E4;
+  --ds-color-gray-chip-outline: #EDEDED;
+  --ds-color-gray-chip-fill:    #F4F4F4;
+  --ds-color-gray-chip-label:   #888888;
+  --ds-color-gray-dark-fill:    #626262;
+
+  /* Accent pairs — "on-dark" is the saturated swatch you'd put on a
+     dark surface; "on-light" is the soft tint you'd put on a light
+     surface. Each accent comes as a pair so layouts can pick the right
+     contrast without re-deriving values. */
+  --ds-color-accent-green-on-dark:   #8CC1AE;
+  --ds-color-accent-green-on-light:  #D8EEE8;
+  --ds-color-accent-red-on-dark:     #F2B5B5;
+  --ds-color-accent-red-on-light:    #F6D5D1;
+  --ds-color-accent-blue-on-dark:    #9EC2DA;
+  --ds-color-accent-blue-on-light:   #C7E1F4;
+  --ds-color-accent-yellow-on-dark:  #E8E69C;
+  --ds-color-accent-yellow-on-light: #F5F0CB;
+  --ds-color-accent-purple-on-dark:  #9EA0DA;
+  --ds-color-accent-purple-on-light: #D9D8EE;
+  --ds-color-accent-orange-on-dark:  #D8AF6D;
+  --ds-color-accent-orange-on-light: #F6E8D1;
+
+  /* Display + body font stacks. Poynter Oldstyle Display is a Font
+     Bureau commercial face — replace these fallbacks with @font-face
+     declarations or a typography vendor link once licensing is wired. */
+  --ds-font-display: "Poynter Oldstyle Display", "Poynter OldStyle Display", Georgia, "Times New Roman", serif;
+  --ds-font-body:    "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ── V2 Design System tokens — type ──────────────────────────────
+   Each token is a utility class. Apply by adding the class name in
+   JSX (e.g. <div className="ds-type-body">). Mobile-first: base
+   declarations are mobile values; the @media (min-width: 1440px)
+   block overrides only the properties that differ on desktop.
+
+   "Auto" line-height in the spec → CSS `line-height: normal` (~1.2).
+   Letter spacing percentages → `em` units (3% = 0.03em).
+   "Black" weight = 900, Bold = 700, Semi-bold = 600, Medium = 500,
+   Regular/Roman = 400. */
+
+/* Display tokens — Poynter Oldstyle Display */
+html[data-design="v2"] .ds-type-tab-header {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 39px;
+  line-height: normal;
+  letter-spacing: 0.03em;
+}
+html[data-design="v2"] .ds-type-project-page-title {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: normal;
+  letter-spacing: 0;
+}
+/* Smaller variant of project-page-title — provisional name pending
+   user confirmation; spec listed two tokens with the same name. */
+html[data-design="v2"] .ds-type-project-card-title {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: normal;
+  letter-spacing: 0;
+}
+html[data-design="v2"] .ds-type-empty {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 37px;
+  letter-spacing: 0;
+}
+
+/* Body / UI tokens — Lato */
+html[data-design="v2"] .ds-type-project-card-pill-label {
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 8px;
+  line-height: normal;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+html[data-design="v2"] .ds-type-main-tab-nav-active {
+  font-family: var(--ds-font-body);
+  font-weight: 900;
+  font-size: 8px;
+  line-height: normal;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+html[data-design="v2"] .ds-type-main-tab-nav-inactive {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: normal;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+html[data-design="v2"] .ds-type-project-tab-nav-active {
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 7px;
+  line-height: normal;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+html[data-design="v2"] .ds-type-project-tab-nav-inactive {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 7px;
+  line-height: normal;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+html[data-design="v2"] .ds-type-attribute-title {
+  font-family: var(--ds-font-body);
+  font-weight: 600;
+  font-size: 13px;
+  line-height: normal;
+  letter-spacing: 0;
+}
+html[data-design="v2"] .ds-type-body {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: normal;
+  letter-spacing: 0;
+}
+html[data-design="v2"] .ds-type-selected-option-label {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 9px;
+  line-height: normal;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+html[data-design="v2"] .ds-type-button-label {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: normal;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* Desktop overrides — only properties that differ from mobile. The
+   1440px breakpoint matches the existing layout's mobile↔desktop
+   split (sidebar appears at 1440+) so type and layout flip together. */
+@media (min-width: 1440px) {
+  html[data-design="v2"] .ds-type-tab-header {
+    font-size: 50px;
+  }
+  html[data-design="v2"] .ds-type-project-page-title {
+    font-size: 65px;
+  }
+  html[data-design="v2"] .ds-type-project-card-title {
+    font-size: 24px;
+  }
+  html[data-design="v2"] .ds-type-empty {
+    font-size: 44px;
+    /* line-height stays 37px per spec */
+  }
+  html[data-design="v2"] .ds-type-project-card-pill-label {
+    font-size: 10px;
+  }
+  html[data-design="v2"] .ds-type-main-tab-nav-active {
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  html[data-design="v2"] .ds-type-main-tab-nav-inactive {
+    font-weight: 400;
+    /* size stays 14 */
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  html[data-design="v2"] .ds-type-project-tab-nav-active {
+    font-size: 12px;
+    letter-spacing: 0.09em;
+  }
+  html[data-design="v2"] .ds-type-project-tab-nav-inactive {
+    font-size: 12px;
+    letter-spacing: 0.09em;
+  }
+  /* attribute-title, body, selected-option-label, button-label —
+     identical mobile + desktop, no overrides needed. */
+}
+
+/* Smoke test: Projects-tab header in red for v2-only viewers.
+   Stays around to confirm the v2 flag is reaching the user — will
+   be removed once the Projects tab is properly redesigned. */
 html[data-design="v2"] .projects-tab-heading {
   color: #e23d3d;
 }
-
-
