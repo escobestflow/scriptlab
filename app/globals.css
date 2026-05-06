@@ -6441,12 +6441,11 @@ html[data-design="v2"] .project-card .project-body {
   flex-direction: column;
   gap: 4px;
 }
+/* Typography (font-family, weight, size, line-height, letter-spacing)
+   comes from the .ds-type-project-card-title utility class on the JSX
+   — 20px mobile / 24px desktop. This rule only handles layout +
+   color; if it set type properties they'd fight the token. */
 html[data-design="v2"] .project-card .project-title {
-  font-family: var(--ds-font-display);
-  font-weight: 400;
-  font-size: 24px;
-  line-height: 1.05;
-  letter-spacing: 0;
   color: var(--ds-color-white);
   margin: 0;
   /* Truncate long titles to one line so the layout stays predictable. */

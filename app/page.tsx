@@ -2432,7 +2432,7 @@ function ProjectsTab({
               )}
             </div>
             <div className="project-body">
-              <div className="project-title">{p.title || "Untitled"}</div>
+              <div className="project-title ds-type-project-card-title">{p.title || "Untitled"}</div>
               <div className="project-meta">{metaLine}</div>
               <div className="project-genre">
                 {/* .attr-pill matches the collapsed-state genre chips in
