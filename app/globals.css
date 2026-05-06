@@ -5981,6 +5981,56 @@ html[data-design="v2"] {
    Specificity (0,2,1) beats bare class selectors (0,1,0) without
    needing !important, so v1 rules stay clean. */
 
+/* ── V2 Design System fonts — Poynter Oldstyle Display ──────────
+   Registered globally (NOT scoped to data-design="v2") because
+   @font-face is a top-level rule that registers the family name
+   into the document; the scoping happens via the `--ds-font-display`
+   variable below, which is only set under v2.
+
+   Three families ship: the default width, Condensed, and Narrow. The
+   current type tokens reference only the default; the other two are
+   registered now so future tokens (or per-element overrides) can opt
+   in to a tighter cut without another round-trip.
+
+   `font-display: swap` shows the serif fallback first and swaps in
+   Poynter once the file loads. Browsers fetch each face lazily on
+   first use, so even seven .ttf files don't impact first paint. */
+@font-face {
+  font-family: "Poynter Oldstyle Display";
+  font-weight: 400; font-style: normal; font-display: swap;
+  src: url("/fonts/PoynterOSDisp-Roman.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Poynter Oldstyle Display";
+  font-weight: 600; font-style: normal; font-display: swap;
+  src: url("/fonts/PoynterOSDisp-Semibold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Poynter Oldstyle Display Condensed";
+  font-weight: 400; font-style: normal; font-display: swap;
+  src: url("/fonts/PoynterOSDispCond-Roman.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Poynter Oldstyle Display Condensed";
+  font-weight: 600; font-style: normal; font-display: swap;
+  src: url("/fonts/PoynterOSDispCond-Semibold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Poynter Oldstyle Display Condensed";
+  font-weight: 700; font-style: normal; font-display: swap;
+  src: url("/fonts/PoynterOSDispCond-Bold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Poynter Oldstyle Display Narrow";
+  font-weight: 600; font-style: normal; font-display: swap;
+  src: url("/fonts/PoynterOSDispNarrow-Semibold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Poynter Oldstyle Display Narrow";
+  font-weight: 700; font-style: normal; font-display: swap;
+  src: url("/fonts/PoynterOSDispNarrow-Bold.ttf") format("truetype");
+}
+
 /* ── V2 Design System tokens — colors ────────────────────────────
    Semantic naming. Apply via `var(--ds-color-*)` in any v2 rule.
    Color tokens are breakpoint-agnostic (same value mobile + desktop). */
@@ -6016,11 +6066,15 @@ html[data-design="v2"] {
   --ds-color-accent-orange-on-dark:  #D8AF6D;
   --ds-color-accent-orange-on-light: #F6E8D1;
 
-  /* Display + body font stacks. Poynter Oldstyle Display is a Font
-     Bureau commercial face — replace these fallbacks with @font-face
-     declarations or a typography vendor link once licensing is wired. */
-  --ds-font-display: "Poynter Oldstyle Display", "Poynter OldStyle Display", Georgia, "Times New Roman", serif;
-  --ds-font-body:    "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Display + body font stacks. Poynter Oldstyle Display is wired up
+     via @font-face declarations at the top of this file — three
+     widths (default / Condensed / Narrow) registered, all serving
+     locally from /public/fonts/. Each stack has Georgia / Times as
+     a graceful serif fallback while the .ttf is downloading. */
+  --ds-font-display:           "Poynter Oldstyle Display", Georgia, "Times New Roman", serif;
+  --ds-font-display-condensed: "Poynter Oldstyle Display Condensed", "Poynter Oldstyle Display", Georgia, serif;
+  --ds-font-display-narrow:    "Poynter Oldstyle Display Narrow", "Poynter Oldstyle Display", Georgia, serif;
+  --ds-font-body:              "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /* ── V2 Design System tokens — type ──────────────────────────────

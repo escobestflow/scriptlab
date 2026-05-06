@@ -118,21 +118,42 @@ matches the surface, not the content.
 
 ## Font sourcing — Poynter Oldstyle Display
 
-**Status: not yet wired up.** The display font stack falls back to
-Georgia / Times / serif until the actual font files are loaded.
+**Status: wired up, self-hosted.** Files live in `/public/fonts/`,
+served from the same origin. `@font-face` declarations are at the
+top of `globals.css` (search for "V2 Design System fonts").
 
-To wire it up, three options:
-1. **Adobe Fonts** (Typekit). Add the kit `<link>` to
-   `app/layout.tsx`'s `<head>`.
-2. **Cloud.typography** (Hoefler & Co.). Same — `<link>` in head.
-3. **Self-host**. Drop `.woff2` files in `public/fonts/`, add an
-   `@font-face` declaration in `globals.css` matching the
-   `--ds-font-display` family name.
+### Registered families
 
-Whichever path, the `font-family` string in `--ds-font-display`
-already references `"Poynter Oldstyle Display"` — once the font is
-loaded under that family name it picks up automatically, no other
-code changes required.
+| Family name | Available weights | Files |
+|---|---|---|
+| `Poynter Oldstyle Display` | 400 (Roman), 600 (Semibold) | `PoynterOSDisp-Roman.ttf`, `PoynterOSDisp-Semibold.ttf` |
+| `Poynter Oldstyle Display Condensed` | 400, 600, 700 | `PoynterOSDispCond-{Roman,Semibold,Bold}.ttf` |
+| `Poynter Oldstyle Display Narrow` | 600, 700 | `PoynterOSDispNarrow-{Semibold,Bold}.ttf` |
+
+### CSS variables
+
+| Var | Family |
+|---|---|
+| `--ds-font-display` | Default width — used by every current display token |
+| `--ds-font-display-condensed` | Condensed — for tokens that need tighter horizontal rhythm |
+| `--ds-font-display-narrow` | Narrow — for the tightest cut |
+
+To use the Condensed or Narrow widths, override `font-family` on a
+specific element or define a new utility class:
+```css
+html[data-design="v2"] .ds-type-some-tight-headline {
+  font-family: var(--ds-font-display-condensed);
+  font-weight: 600;
+  /* ... */
+}
+```
+
+### File-format note
+
+Files are `.ttf` (~50KB each). `.woff2` would be ~30% smaller — if
+the Font Bureau license includes web formats, it's worth swapping.
+Until then, `.ttf` is fine; browsers cache aggressively and only
+fetch faces actually used on the page.
 
 ---
 
