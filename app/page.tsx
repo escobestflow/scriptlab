@@ -1207,12 +1207,24 @@ export default function Page() {
           <div className="topbar-center">
             <img src="/logo.svg" alt="Unfold" className="brand-logo-img" />
           </div>
-          {isV2 && mainTab === "projects" ? (
+          {isV2 ? (
             <button
               type="button"
               className="v2-topbar-add"
-              onClick={openCreateModal}
-              aria-label="New project"
+              onClick={() => {
+                if (mainTab === "projects") {
+                  openCreateModal();
+                } else {
+                  // Ideas tab: open the new-idea modal. Same setters
+                  // the in-tab onNew uses, kept inline here so a top-
+                  // level handler isn't needed (these state setters are
+                  // already in scope at the Page level).
+                  setNewIdeaText("");
+                  setNewIdeaType("scene");
+                  setNewIdeaOpen(true);
+                }
+              }}
+              aria-label={mainTab === "projects" ? "New project" : "New idea"}
             >
               <img src="/v2/icons/icon-add.svg" alt="" width={13} height={13} />
             </button>

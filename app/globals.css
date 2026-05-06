@@ -6258,12 +6258,35 @@ html[data-design="v2"] .ds-type-button-label {
    replacement, hide v1 elements with `display:none`). Add button in
    the topbar is rendered conditionally in JSX (.v2-topbar-add). */
 
-/* Topbar — flip dark surface to light/transparent. The .topbar-dark
-   class still applies on the same element; v2 overrides only the
-   visual treatment, not the structure. */
+/* Topbar — overlay the top of the page rather than sit in flow.
+   v1 had .topbar { position: relative } which carved out vertical
+   space above .screen-scroll, cutting content off at the topbar's
+   bottom edge during scroll. v2 absolute-positions the topbar so
+   the scroll container extends all the way to y=0 and content
+   passes BEHIND the topbar as it scrolls. The wordmark fade-out at
+   140px (set elsewhere) reveals the underlying content cleanly.
+   Backdrop blur softens whatever's scrolling under the topbar so
+   the buttons stay legible. */
 html[data-design="v2"] .topbar.topbar-dark {
-  background: transparent;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--ds-color-app-background) 70%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   color: var(--ds-color-black);
+}
+/* Pad the scroll port so first content (page heading) clears the
+   topbar at scroll 0. 72px = topbar's content height (14 padding-top
+   + 44 button + 14 padding-bottom). No env() here — `.app` already
+   has padding-top: env(safe-area-inset-top), and the topbar's own
+   padding-top adds env() inside itself, so the topbar's bottom edge
+   sits exactly at safe-area + 72. The scroll port starts at
+   safe-area; this 72px push lines content's first row up with the
+   topbar's bottom edge. */
+html[data-design="v2"] .screen-scroll {
+  padding-top: 72px;
 }
 html[data-design="v2"] .topbar .topbar-btn {
   background: var(--ds-color-white);
@@ -6603,7 +6626,7 @@ html[data-design="v2"] .search-bar {
   height: 56px;
   background: var(--ds-color-gray-lightest);
   border: 1px solid var(--ds-color-gray-outline);
-  border-radius: 999px;
+  border-radius: 13px;
   padding: 0 20px;
   margin-bottom: 18px;
   gap: 12px;
@@ -6662,6 +6685,16 @@ html[data-design="v2"] .card.moment-item {
   margin-bottom: 12px;
   border: none;
   box-shadow: none;
+  outline: none;
+}
+/* Strip the swipe-card wrapper's red bleed + any radius mismatch on
+   v2 idea rows. v1's .swipe-card (Ideas-tab swipe-to-delete wrapper)
+   paints #d63333 underneath the row to mask the gap during drag.
+   On v2 we want the row to read as a clean fill with no edge color
+   leaking, so neutralize the wrapper's bg + match its radius. */
+html[data-design="v2"] .swipe-card {
+  background: transparent;
+  border-radius: 14px;
 }
 html[data-design="v2"] .moment-type {
   /* ds-type-body class supplies 13px / 400 / Lato; override casing
