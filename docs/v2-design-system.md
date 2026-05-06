@@ -92,6 +92,8 @@ Letter-spacing percentages → em (3% = 0.03em).
 | `--ds-color-unfold-gold` | `#AC9175` | |
 | `--ds-color-ai-yellow` | `#FFD60A` | |
 | `--ds-color-app-background` | `#F8F7F7` | Painted on `body` at viewports < 1440px. Desktop value TBD. |
+| `--ds-color-record-red` | `#CE2D1E` | Record button fill. |
+| `--ds-color-gray-lightest` | `#FCFBFB` | Search bar fill, filter pill fill. |
 | `--ds-color-gray-fill` | `#FBF9F9` | |
 | `--ds-color-gray-outline` | `#E4E3E4` | |
 | `--ds-color-gray-chip-outline` | `#EDEDED` | |

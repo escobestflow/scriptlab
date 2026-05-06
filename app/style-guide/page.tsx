@@ -101,8 +101,8 @@ const TYPE_TOKENS: TypeToken[] = [
   { cls: "ds-type-project-card-title",         sample: "Cache",                                      mobile: "20 / 400 / 0",               desktop: "24 / 400 / 0", mobilePx: 20, usedIn: "Project card title in the home grid." },
   { cls: "ds-type-attribute-title",            sample: "Logline",                                    mobile: "13 / 600 / 0",                                            mobilePx: 13, usedIn: "Attribute row labels on project detail." },
   { cls: "ds-type-body",                       sample: "Body copy — the default text for descriptions, idea cards, search inputs.", mobile: "13 / 400 / 0", mobilePx: 13, usedIn: "Idea-card text, search input, project-card meta." },
-  { cls: "ds-type-button-label",               sample: "ALL",                                        mobile: "12 / 400 / 0.07em / UPPER",                              mobilePx: 12, usedIn: "Filter pill labels in the Ideas tab." },
-  { cls: "ds-type-selected-option-label",      sample: "PRIMARY",                                    mobile: "9 / 500 / 0.03em / UPPER",                                mobilePx: 9,  usedIn: "Selected-option chip labels (not yet wired)." },
+  { cls: "ds-type-button-label",               sample: "ALL",                                        mobile: "12 / 400 / 0.07em / UPPER",                              mobilePx: 12, usedIn: "Generic button labels." },
+  { cls: "ds-type-selected-option-label",      sample: "SITUATION",                                  mobile: "9 / 500 / 0.03em / UPPER",                                mobilePx: 9,  usedIn: "Filter pill labels in the Ideas tab." },
   { cls: "ds-type-project-card-pill-label",    sample: "THRILLER",                                   mobile: "8 / 700 / 0.03em / UPPER",   desktop: "10 / 700 / 0.03em / UPPER", mobilePx: 8, usedIn: "Genre pills on project cards." },
   { cls: "ds-type-main-tab-nav-active",        sample: "PROJECTS",                                   mobile: "8 / 900 / 0.07em / UPPER",   desktop: "14 / 700 / 0", mobilePx: 8, usedIn: "Active tab in bottom tab bar." },
   { cls: "ds-type-main-tab-nav-inactive",      sample: "IDEAS",                                      mobile: "8 / 500 / 0.07em / UPPER",   desktop: "14 / 400 / 0", mobilePx: 8, usedIn: "Inactive tab in bottom tab bar." },
@@ -146,14 +146,16 @@ const COLORS: ColorToken[] = [
   { name: "color-black",             hex: "#000000", usedIn: "Primary ink. Buttons, headings, body text." },
   { name: "color-white",             hex: "#FFFFFF", usedIn: "Card surfaces. Ink on dark backgrounds." },
   { name: "color-app-background",    hex: "#F8F7F7", usedIn: "Page background on mobile." },
+  { name: "color-gray-lightest",     hex: "#FCFBFB", usedIn: "Search bar fill, filter pill fill." },
   { name: "color-gray-fill",         hex: "#FBF9F9", usedIn: "Subtle section fills." },
-  { name: "color-gray-chip-fill",    hex: "#F4F4F4", usedIn: "Search bar fill, tag chip fill." },
+  { name: "color-gray-chip-fill",    hex: "#F4F4F4", usedIn: "Tag chip fill." },
   { name: "color-gray-chip-outline", hex: "#EDEDED", usedIn: "Inactive filter pill border." },
-  { name: "color-gray-outline",      hex: "#E4E3E4", usedIn: "Strong borders, dividers." },
+  { name: "color-gray-outline",      hex: "#E4E3E4", usedIn: "Strong borders, dividers, search-bar outline." },
   { name: "color-gray-chip-label",   hex: "#888888", usedIn: "Subtle gray text — chip labels, timestamps." },
   { name: "color-gray-dark-fill",    hex: "#626262", usedIn: "Project-card placeholder fill." },
   { name: "color-unfold-gold",       hex: "#AC9175", usedIn: "Brand accent — premium / paid affordances." },
   { name: "color-ai-yellow",         hex: "#FFD60A", usedIn: "AI / generative actions (wand, sparkle)." },
+  { name: "color-record-red",        hex: "#CE2D1E", usedIn: "Record button fill." },
   { name: "color-accent-green-on-light",  hex: "#D8EEE8", usedIn: "Genre pill: Thriller." },
   { name: "color-accent-green-on-dark",   hex: "#8CC1AE" },
   { name: "color-accent-blue-on-light",   hex: "#C7E1F4", usedIn: "Genre pill: Drama, Mystery." },
@@ -285,10 +287,10 @@ function ComponentsSection() {
         usedIn="Ideas tab — single-select filter row. Active fill is black; inactive is white with a gray outline."
       >
         <div className="sg-comp-row sg-comp-row-wrap">
-          <span className="filter-pill ds-type-button-label active">All</span>
-          <span className="filter-pill ds-type-button-label">Situation</span>
-          <span className="filter-pill ds-type-button-label">Conversation</span>
-          <span className="filter-pill ds-type-button-label">Memory</span>
+          <span className="filter-pill ds-type-selected-option-label active">All</span>
+          <span className="filter-pill ds-type-selected-option-label">Situation</span>
+          <span className="filter-pill ds-type-selected-option-label">Conversation</span>
+          <span className="filter-pill ds-type-selected-option-label">Memory</span>
         </div>
       </ComponentRow>
 

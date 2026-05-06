@@ -2977,7 +2977,7 @@ function MomentsTab({
         {MOMENT_FILTERS.map(f => (
           <button
             key={f}
-            className={`filter-pill ds-type-button-label ${filter === f ? "active" : ""}`}
+            className={`filter-pill ds-type-selected-option-label ${filter === f ? "active" : ""}`}
             onClick={() => setFilter(f)}
           >
             {f}

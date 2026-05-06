@@ -6040,11 +6040,13 @@ html[data-design="v2"] {
   --ds-color-white:             #FFFFFF;
   --ds-color-unfold-gold:       #AC9175;
   --ds-color-ai-yellow:         #FFD60A;
+  --ds-color-record-red:        #CE2D1E;
 
   /* Surfaces */
   --ds-color-app-background:    #F8F7F7;
 
   /* Grays */
+  --ds-color-gray-lightest:     #FCFBFB;
   --ds-color-gray-fill:         #FBF9F9;
   --ds-color-gray-outline:      #E4E3E4;
   --ds-color-gray-chip-outline: #EDEDED;
@@ -6594,15 +6596,17 @@ html[data-design="v2"] .ideas-tab-heading + .ds-btn {
   display: none;
 }
 
-/* Search bar — flatter, light-gray fill, no border. Sits in the
-   --ds-color-gray-chip-fill tone so it reads as a subtle inset on
-   the page's --ds-color-app-background surface. */
+/* Search bar — 56px tall pill, lightest-gray fill, gray-outline
+   1px border. Sits inside .screen-scroll's 20px horizontal padding
+   so the bar's edges land 20px from the screen on mobile. */
 html[data-design="v2"] .search-bar {
-  background: var(--ds-color-gray-chip-fill);
-  border: none;
+  height: 56px;
+  background: var(--ds-color-gray-lightest);
+  border: 1px solid var(--ds-color-gray-outline);
   border-radius: 999px;
-  padding: 10px 16px;
+  padding: 0 20px;
   margin-bottom: 18px;
+  gap: 12px;
 }
 html[data-design="v2"] .search-bar svg {
   width: 16px;
@@ -6626,16 +6630,19 @@ html[data-design="v2"] .filter-row {
   margin-bottom: 24px;
 }
 
-/* Filter pill — inactive default (white fill, gray-chip outline,
-   gray-chip-label text) and active (black fill, white text).
-   Typography comes from the .ds-type-button-label class on the
-   button (12px / 400 / 0.07em / UPPER). Local rule only sets shape +
-   color so the token wins on type. */
+/* Filter pill — 25px tall, lightest-gray fill, chip-outline border
+   on inactive; active flips to black/white. Typography comes from
+   the .ds-type-selected-option-label class on the button (9px /
+   500 / 0.03em / UPPER). Local rule only handles shape + color so
+   the token wins on type. */
 html[data-design="v2"] .filter-pill {
-  padding: 8px 14px;
+  height: 25px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
   border-radius: 999px;
   border: 1px solid var(--ds-color-gray-chip-outline);
-  background: var(--ds-color-white);
+  background: var(--ds-color-gray-lightest);
   color: var(--ds-color-gray-chip-label);
 }
 html[data-design="v2"] .filter-pill.active {
