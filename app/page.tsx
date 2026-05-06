@@ -2168,6 +2168,51 @@ function formatProjectAge(iso: string): string {
   return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/**
+ * V2 project-card grid pattern.
+ *
+ * Returns an array (one entry per card, in render order) of "small"
+ * (half-width, sits in a 2-up row) or "hero" (full-width, spans the
+ * grid). Rule: rows alternate between a small-row (2 cards) and a
+ * hero (1 card). When both starting orders produce a valid sum, we
+ * prefer "small-row first" — that yields the user-specified shape
+ * for N = 1..5 with no hardcoding:
+ *
+ *   N=1: [hero]                            (small-first can't fit; flip)
+ *   N=2: [small, small]                    (small-first fits exactly)
+ *   N=3: [small, small, hero]
+ *   N=4: [hero, small, small, hero]        (small-first overshoots; flip)
+ *   N=5: [small, small, hero, small, small]
+ *   N=6: [small, small, hero, small, small, hero]
+ *   N=7: [hero, small, small, hero, small, small, hero]   (small-first overshoots)
+ *   N=8: [small, small, hero, small, small, hero, small, small]
+ *   ... continues alternating, flipping only when parity demands it.
+ */
+function projectGridPattern(n: number): ("small" | "hero")[] {
+  if (n <= 0) return [];
+
+  function build(startWithSmall: boolean): ("small" | "hero")[] | null {
+    const out: ("small" | "hero")[] = [];
+    let remaining = n;
+    let isSmall = startWithSmall;
+    while (remaining > 0) {
+      if (isSmall) {
+        if (remaining < 2) return null;       // can't fit a 2-card small row
+        out.push("small", "small");
+        remaining -= 2;
+      } else {
+        out.push("hero");
+        remaining -= 1;
+      }
+      isSmall = !isSmall;
+    }
+    return out;
+  }
+  // Prefer small-first. Fall back to hero-first when small-first
+  // doesn't sum exactly to n (e.g. N=1, 4, 7, 10, ...).
+  return build(true) ?? build(false) ?? [];
+}
+
 function ProjectsTab({
   projects, onOpen, onNew,
   pendingInvites, onAcceptInvite, onDeclineInvite,
@@ -2288,6 +2333,12 @@ function ProjectsTab({
         </div>
       )}
 
+      {(() => {
+        // Compute hero/small placement once for the whole grid so each
+        // card knows its role from the total count, not its position
+        // alone. See projectGridPattern() for the full rule table.
+        const cardLayout = projectGridPattern(projects.length);
+        return (
       <div className="project-grid">
       {projects.map((p, idx) => {
         // Card renders straight from the user's own row. For the
@@ -2359,13 +2410,12 @@ function ProjectsTab({
         //     hidden on v1 via CSS so v1 layout is unchanged.
         //   - data-genre on the pill so v2 CSS can pick the accent
         //     color per-genre without inspecting text content.
-        //   - is-hero class on every 3rd card so the v2 grid spans
-        //     it full-width (default rhythm — adjust if the user
-        //     wants a different cadence).
+        //   - is-hero class driven by cardLayout (computed above from
+        //     projects.length). See projectGridPattern() for the rule.
         const pd = p.projectDrafts?.find(d => d.id === p.activeProjectDraftId) ?? p.projectDrafts?.[0];
         const draftNumber = pd?.number ?? 1;
         const metaLine = `Draft ${draftNumber} • Updated ${formatProjectAge(p.updatedAt)}`;
-        const isHero = (idx + 1) % 3 === 0;
+        const isHero = cardLayout[idx] === "hero";
         return (
           <button
             key={p.id}
@@ -2406,6 +2456,8 @@ function ProjectsTab({
         );
       })}
       </div>
+        );
+      })()}
     </>
   );
 }

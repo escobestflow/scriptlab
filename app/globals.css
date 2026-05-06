@@ -6370,19 +6370,31 @@ html[data-design="v2"] .tabbar .tab.active {
    Cover-as-gray-box is intentional per current iteration — actual
    project art will come back once the layout is locked. */
 
-/* Card shell — rounded, fixed aspect, no body padding (children
-   absolutely positioned). v1 v2 both render the same JSX, but v2
-   restructures the layout via display + position so v1 ordering
-   doesn't bleed in. */
+/* Grid container — 2 columns on mobile, 20px gap. v1 stacks cards
+   as full-width flex children on mobile (no grid rule until the
+   1440px desktop breakpoint), so v2 has to establish the grid
+   itself for mobile to get the 2-up + hero pattern. */
+html[data-design="v2"] .project-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+/* Card shell — rounded, fixed 208px height (per spec, no
+   aspect-ratio so heroes and small cards share the same vertical
+   rhythm). v1 v2 both render the same JSX, but v2 restructures the
+   layout via display + position so v1 ordering doesn't bleed in. */
 html[data-design="v2"] .project-card {
   position: relative;
   display: block;
   padding: 0;
+  margin: 0;
   border: none;
   border-radius: 18px;
   overflow: hidden;
   background: var(--ds-color-gray-dark-fill);
-  aspect-ratio: 1 / 1;
+  height: 208px;
+  min-height: 0;
   text-align: left;
   cursor: pointer;
   /* Drop the v1 hover-lift / shadow if present — v2 is flatter. */
@@ -6392,12 +6404,11 @@ html[data-design="v2"] .project-card:active {
   opacity: 0.85;
 }
 
-/* Hero variant — every 3rd card spans the full grid width. The
-   default project-grid is 2-col on mobile; span 2 makes a hero
-   row. Aspect ratio relaxes so the hero doesn't get absurdly tall. */
+/* Hero variant — full-width row. Same 208px height as small cards
+   so the page rhythm stays consistent. Placement is computed in
+   page.tsx via projectGridPattern() based on total card count. */
 html[data-design="v2"] .project-card.is-hero {
   grid-column: 1 / -1;
-  aspect-ratio: 16 / 11;
 }
 
 /* Cover — currently a flat gray placeholder. Hide the v1 thumbnail
