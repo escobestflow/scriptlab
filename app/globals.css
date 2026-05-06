@@ -7085,40 +7085,50 @@ html[data-design="v2"] .studio-header-sticky > .caption {
   display: none;
 }
 
-/* Sticky header collapses to just the tab pill in v2. Drop v1's
-   white background + sticky positioning since we're no longer
-   pinning a stripe under the nav. */
+/* Sticky header collapses to almost nothing in v2 — the tab pill
+   is now position:fixed (not nested inside this), and the title +
+   draft trigger are also position:fixed in the topbar. Just zero
+   it out so it occupies no extra layout space. */
 html[data-design="v2"] .studio-header-sticky {
-  position: relative;
-  top: 0;
+  position: static;
   background: transparent;
   padding: 0;
-  margin-top: -28px;          /* overlap the bottom of the hero strip */
-  z-index: 12;
+  margin: 0;
+  height: 0;
 }
 
-/* Hero strip — repurpose the thumbnail container as a wide banner.
-   Break out of .studio-scroll's 20px horizontal padding so the
-   strip stretches edge-to-edge. */
+/* Hero — persistent at top of page, never scrolls. Pinned via
+   position: fixed at top:127 from the viewport, height 130. The
+   wide project image fills the container via object-fit: cover and
+   is vertically centered (object-position: center) so it crops the
+   middle band of the source. Constrained to the .app box's
+   max-width (520px) so on desktop preview it doesn't escape the
+   centered app shell. */
 html[data-design="v2"] .studio-thumb-scroll {
-  display: block;
+  position: fixed;
+  top: 127px;
+  left: 0;
+  right: 0;
+  max-width: 520px;
+  margin: 0 auto;
+  height: 130px;
   padding: 0;
-  margin: 0 -20px;
-  width: calc(100% + 40px);
-  height: 200px;
   border-radius: 0;
+  z-index: 10;
 }
 html[data-design="v2"] .studio-thumb-button {
   width: 100%;
   height: 100%;
-  border-radius: 18px;
+  border-radius: 0;
   margin: 0;
+  padding: 0;
   overflow: hidden;
 }
 html[data-design="v2"] .project-header-thumb {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   border-radius: 0;
 }
 html[data-design="v2"] .project-header-thumb-placeholder {
@@ -7131,21 +7141,39 @@ html[data-design="v2"] .project-header-thumb-placeholder {
   font-family: var(--ds-font-display);
   font-size: 80px;
   color: var(--ds-color-white);
+  border-radius: 0;
 }
 
-/* Section tabs — white floating pill that overlaps the bottom of
-   the hero strip. Negative side margins so the pill sits inside the
-   already-padded scroll container without extra outer space. */
+/* Section tabs — persistent overlay slightly above the hero's
+   bottom edge. Pinned via position: fixed; 71px tall pill, 20px
+   gutters from viewport edges, 20px corner radius. The hero is
+   y=127..257; the tab pill sits at y=222..293 → overlaps the hero
+   by ~35px (visually "slightly overlayed" per spec). Same
+   max-width:520px clamp as the hero for desktop. */
 html[data-design="v2"] .studio-tabs-row {
-  margin: 0 -8px;
+  position: fixed;
+  top: 222px;
+  left: 20px;
+  right: 20px;
+  max-width: 480px;
+  margin: 0 auto;
+  z-index: 11;
 }
 html[data-design="v2"] .studio-tab-bar {
   background: var(--ds-color-white);
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
-  padding: 12px 8px;
-  height: auto;
+  padding: 0 8px;
+  height: 71px;
   border: 1px solid var(--ds-color-gray-outline);
+}
+
+/* Scroll container — content needs to clear the fixed tab pill
+   (bottom edge at y=293) before becoming visible. 312px = tab
+   bottom + 19px breathing room. v1's padding-top: 44px is
+   overridden here. */
+html[data-design="v2"] .studio-scroll {
+  padding-top: 312px;
 }
 html[data-design="v2"] .studio-tab {
   flex-direction: column;
