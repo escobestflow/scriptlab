@@ -7291,3 +7291,247 @@ html[data-design="v2"] .attr-row-body {
   padding: 4px 16px 16px;
 }
 
+/* ── V2 Characters tab — populated cards ───────────────────────
+   Per screenshot: avatar (~64px square) on the left, name +
+   role pill + description stacked on the right. White card. */
+html[data-design="v2"] .card.character-card {
+  background: var(--ds-color-white);
+  border: 1px solid var(--ds-color-gray-outline);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: none;
+  min-height: 0;
+  overflow: visible;
+}
+html[data-design="v2"] .character-header {
+  gap: 14px;
+  align-items: flex-start;
+}
+html[data-design="v2"] .character-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  background: var(--ds-color-gray-dark-fill);
+  color: var(--ds-color-white);
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 28px;
+  align-self: flex-start;
+}
+/* Name — Poynter, ~18px, fits comfortably with the role pill on
+   the next line. Override v1's 15px / 900 inline style by targeting
+   the first text-bearing child of the header's flex column. */
+html[data-design="v2"] .character-header > div:nth-child(2) > div:first-child {
+  font-family: var(--ds-font-display) !important;
+  font-weight: 400 !important;
+  font-size: 18px !important;
+  line-height: 1.1;
+  letter-spacing: 0;
+  color: var(--ds-color-black);
+  margin-bottom: 6px;
+}
+/* Role pill — capitalized accent fill, dark text. v1 already has a
+   .character-role chip-ish element but its position varies. We
+   target the children of .character-header that look chip-like. */
+html[data-design="v2"] .character-header .character-role,
+html[data-design="v2"] .character-header [data-role] {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: var(--ds-color-black);
+  text-transform: uppercase;
+  background: var(--ds-color-gray-chip-fill);
+}
+html[data-design="v2"] .character-header [data-role="protagonist"] { background: var(--ds-color-accent-green-on-light); }
+html[data-design="v2"] .character-header [data-role="antagonist"]  { background: var(--ds-color-accent-orange-on-light); }
+html[data-design="v2"] .character-header [data-role="supporting"]  { background: var(--ds-color-accent-blue-on-light); }
+html[data-design="v2"] .character-header [data-role="mentor"]      { background: var(--ds-color-accent-purple-on-light); }
+
+/* ── V2 Cast action row (populated state) ─────────────────────── */
+html[data-design="v2"] .v2-cast-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 14px;
+}
+html[data-design="v2"] .v2-cast-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 4px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ds-color-black);
+  transition: opacity 160ms var(--ease, ease);
+}
+html[data-design="v2"] .v2-cast-action:disabled { opacity: 0.5; cursor: default; }
+html[data-design="v2"] .v2-cast-action-primary { /* solid black bubble + white glyph */ }
+html[data-design="v2"] .v2-cast-action-primary .v2-cast-action-glyph {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ds-color-black);
+  color: var(--ds-color-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
+html[data-design="v2"] .v2-cast-action-secondary {
+  border-color: var(--ds-color-gray-outline);
+  background: var(--ds-color-white);
+}
+html[data-design="v2"] .v2-cast-action-secondary .v2-cast-action-glyph {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ds-color-ai-yellow);
+  color: var(--ds-color-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+html[data-design="v2"] .v2-cast-action-label {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+/* ── V2 Characters empty state ─────────────────────────────────
+   Repurposes the existing .empty-layer-state so the JSX stays
+   shared. Layout flips to a 2-col split on mobile: text + buttons
+   left, silhouette pedestal right. Title gets the Poynter display
+   treatment, buttons get the v2 treatment (primary black,
+   secondary white outline). */
+html[data-design="v2"] .empty-layer-state {
+  position: relative;
+  background: var(--ds-color-white);
+  border: 1px solid var(--ds-color-gray-outline);
+  border-radius: 18px;
+  padding: 28px 22px;
+  margin-top: 18px;
+  text-align: left;
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px;
+  grid-template-rows: auto;
+  column-gap: 10px;
+  /* Reset v1 flex defaults — empty-layer-state was a centered
+     column originally. */
+  flex-direction: row;
+  min-height: 280px;
+}
+/* Silhouette pedestal — pinned to the bottom-right of the card. */
+html[data-design="v2"] .empty-layer-state .empty-layer-icon {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: end;
+  justify-self: end;
+  margin: 0;
+  width: 140px;
+}
+html[data-design="v2"] .empty-layer-icon-v2 {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+/* Hide v1's small icon img inside the wrapper when v2's image is
+   the icon — only one or the other should render. The JSX
+   conditional in CharactersTab passes the correct one based on
+   isV2, so this is defensive. */
+html[data-design="v2"] .empty-layer-state .empty-layer-icon > img:not(.empty-layer-icon-v2) {
+  display: none;
+}
+
+html[data-design="v2"] .empty-layer-state .empty-layer-title {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--ds-color-black);
+  margin: 0 0 12px;
+  grid-column: 1;
+  grid-row: 1;
+}
+html[data-design="v2"] .empty-layer-state .empty-layer-caption {
+  font-family: var(--ds-font-body);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ds-color-gray-chip-label);
+  margin: 0 0 22px;
+  grid-column: 1;
+  grid-row: 2;
+}
+html[data-design="v2"] .empty-layer-state .empty-layer-actions {
+  grid-column: 1;
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+}
+/* Override Button styling inside the v2 empty state so the two
+   CTAs read as the same compact treatment used elsewhere in v2:
+   primary = black-glyph + label, secondary = yellow-glyph + label. */
+html[data-design="v2"] .empty-layer-actions .ds-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 14px 0 4px;
+  border-radius: 999px;
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--ds-color-gray-outline);
+  color: var(--ds-color-black);
+  box-shadow: none;
+}
+html[data-design="v2"] .empty-layer-actions .ds-btn .ds-btn-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ds-color-black);
+  color: var(--ds-color-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  flex: 0 0 auto;
+}
+html[data-design="v2"] .empty-layer-actions .ds-btn-primary .ds-btn-icon {
+  background: var(--ds-color-ai-yellow);
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .empty-layer-actions .ds-btn-primary {
+  /* The "Create With AI" button — secondary visual now (outline
+     pill with yellow glyph) per screenshot. */
+  background: transparent;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .empty-layer-actions .ds-btn-secondary {
+  /* The "Add a Character" button — primary visual (black bubble). */
+  background: transparent;
+}
+

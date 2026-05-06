@@ -40,6 +40,7 @@ import { createProjectFromDraft } from "@/lib/storage";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
 import { useProfileCapture } from "@/lib/writerProfileStore";
+import { useIsV2 } from "@/lib/v2Access";
 import type { WriterProfile } from "@/lib/writerProfile";
 import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
@@ -6263,6 +6264,7 @@ function CharactersTab({
 }) {
   const d = getActiveCharactersDraft(story);
   const { profile } = useProfileCapture();
+  const isV2 = useIsV2();
   // Partner-preview mode: when we're rendering the partner's characters
   // draft read-only, expose a per-card "copy to my draft" button so the
   // user can cherry-pick individual cast rows without wholesale cloning
@@ -6321,6 +6323,37 @@ function CharactersTab({
     <>
       <LayerBar layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
 
+      {/* V2 inline action row — sits to the right of the LayerBar's
+          "Character Draft N ▾" trigger when the cast is populated.
+          "+ Add character" + "⚡ Auto create" matching the screenshot.
+          Only renders for v2 + populated; v1 keeps its existing
+          flow (sticky bottom bar / empty-state CTAs).
+          Hidden when partner-previewing — those buttons mutate state
+          and we shouldn't offer that on a read-only view. */}
+      {isV2 && hasCharacters && !previewActive && (
+        <div className="v2-cast-actions">
+          <button
+            type="button"
+            className="v2-cast-action v2-cast-action-primary"
+            onClick={openNewCharacter}
+            aria-label="Add character"
+          >
+            <span className="v2-cast-action-glyph">+</span>
+            <span className="v2-cast-action-label ds-type-button-label">Add Character</span>
+          </button>
+          <button
+            type="button"
+            className="v2-cast-action v2-cast-action-secondary"
+            onClick={generateAllCharacters}
+            disabled={genBusy}
+            aria-label="Auto create characters"
+          >
+            <span className="v2-cast-action-glyph v2-cast-action-glyph-bolt">⚡</span>
+            <span className="v2-cast-action-label ds-type-button-label">{genBusy ? "Creating…" : "Auto Create"}</span>
+          </button>
+        </div>
+      )}
+
       {/* Top-of-content Tip — only surfaces after the user has added
           their first character. On an empty tab the EmptyLayerState
           below is already teaching the main move; a second teaching
@@ -6333,14 +6366,22 @@ function CharactersTab({
 
       {!hasCharacters && (
         <EmptyLayerState
-          icon={<img src="/character-icon.svg" width={41} height={44} alt="" />}
-          title="No characters yet"
-          caption="Create your first character to bring your story to life."
-          addLabel="Add character"
+          icon={
+            isV2
+              ? <img src="/v2/empty-state-characters.png" alt="" className="empty-layer-icon-v2" />
+              : <img src="/character-icon.svg" width={41} height={44} alt="" />
+          }
+          title={isV2 ? "Define Your Characters" : "No characters yet"}
+          caption={
+            isV2
+              ? "Create the characters who carry the plot. Define their roles and motivations as your world takes shape."
+              : "Create your first character to bring your story to life."
+          }
+          addLabel={isV2 ? "Add a Character" : "Add character"}
           onAdd={openNewCharacter}
           onGenerate={generateAllCharacters}
           generating={genBusy}
-          generateLabel="Create all with AI"
+          generateLabel={isV2 ? "Create With AI" : "Create all with AI"}
           generatingLabel="Creating…"
         />
       )}
