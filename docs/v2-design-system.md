@@ -71,7 +71,7 @@ Letter-spacing percentages → em (3% = 0.03em).
 |---|---|---|
 | `ds-type-project-card-pill-label` | 8 / 700 / 0.03em / UPPER | 10 |
 | `ds-type-main-tab-nav-active` | 8 / 900 / 0.07em / UPPER | 14 / 700 / 0 / case-as-typed |
-| `ds-type-main-tab-nav-inactive` | 14 / 500 / 0.07em / UPPER | 14 / 400 / 0 / case-as-typed |
+| `ds-type-main-tab-nav-inactive` | 8 / 500 / 0.07em / UPPER | 14 / 400 / 0 / case-as-typed |
 | `ds-type-project-tab-nav-active` | 7 / 700 / 0.07em / UPPER | 12 / 0.09em |
 | `ds-type-project-tab-nav-inactive` | 7 / 500 / 0.07em / UPPER | 12 / 0.09em |
 | `ds-type-attribute-title` | 13 / 600 / 0 | (same) |

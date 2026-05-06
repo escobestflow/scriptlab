@@ -6143,7 +6143,7 @@ html[data-design="v2"] .ds-type-main-tab-nav-active {
 html[data-design="v2"] .ds-type-main-tab-nav-inactive {
   font-family: var(--ds-font-body);
   font-weight: 500;
-  font-size: 14px;
+  font-size: 8px;
   line-height: normal;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -6223,7 +6223,7 @@ html[data-design="v2"] .ds-type-button-label {
   }
   html[data-design="v2"] .ds-type-main-tab-nav-inactive {
     font-weight: 400;
-    /* size stays 14 */
+    font-size: 14px;
     letter-spacing: 0;
     text-transform: none;
   }
@@ -6367,21 +6367,32 @@ html[data-design="v2"] .tabbar .tab .icon img[src*="ideas-icon-inactive"] {
 }
 
 /* Tabbar labels — apply ds-type-main-tab-nav-* type tokens. Mobile
-   spec: active = 8 / Black 900 / 0.07em / UPPER, inactive = 14 /
-   Medium 500 / 0.07em / UPPER. The v1 .tab CSS sets the layout; we
-   just override the typography. */
+   spec: both states 8 / 0.07em / UPPER, weight differs (active 900,
+   inactive 500). Desktop bumps to 14 / case-as-typed / 0 letter
+   spacing, weights flip to 700 / 400. The v1 .tab CSS sets the
+   layout; we just override typography + color. */
 html[data-design="v2"] .tabbar .tab {
   font-family: var(--ds-font-body);
   font-weight: 500;
-  font-size: 14px;
+  font-size: 8px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--ds-color-gray-chip-label);
 }
 html[data-design="v2"] .tabbar .tab.active {
   font-weight: 900;
-  font-size: 8px;
   color: var(--ds-color-black);
+}
+@media (min-width: 1440px) {
+  html[data-design="v2"] .tabbar .tab {
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  html[data-design="v2"] .tabbar .tab.active {
+    font-weight: 700;
+  }
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────
@@ -6681,19 +6692,22 @@ html[data-design="v2"] .moment-tag {
 }
 
 /* ── V2 Style Guide page ────────────────────────────────────────
-   Layout for /style-guide. Uses the v2 tokens it documents — every
-   font-family / size / color references --ds-*. Mobile stacks
-   single-column; at 1440px+ the section content moves to a 2-col
-   grid and the TOC pins to the side. */
+   Flat single-column stack. No nested cards, no demo frames. Each
+   row is just the live sample at its true visual weight followed by
+   the spec + usage in fine print, separated by a thin divider.
+
+   Eats its own dog food: every typeface / color / component on the
+   page renders from the v2 tokens it documents. */
 
 html[data-design="v2"] .sg-page {
   min-height: 100vh;
   background: var(--ds-color-app-background);
   color: var(--ds-color-black);
-  padding: 0 24px 80px;
   font-family: var(--ds-font-body);
+  padding: 0 24px 80px;
 }
 
+/* Topbar — minimal, just Back. Sticky over backdrop blur. */
 html[data-design="v2"] .sg-topbar {
   position: sticky;
   top: 0;
@@ -6706,7 +6720,6 @@ html[data-design="v2"] .sg-topbar {
   background: color-mix(in srgb, var(--ds-color-app-background) 85%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  border-bottom: 1px solid var(--ds-color-gray-outline);
 }
 html[data-design="v2"] .sg-back {
   display: inline-flex;
@@ -6719,288 +6732,166 @@ html[data-design="v2"] .sg-back {
   text-decoration: none;
   padding: 8px 12px 8px 0;
 }
-html[data-design="v2"] .sg-back:hover { opacity: 0.7; }
+html[data-design="v2"] .sg-back:hover { opacity: 0.6; }
+
+/* Outer stack — content max-width caps reading length on desktop. */
+html[data-design="v2"] .sg-stack {
+  max-width: 720px;
+  margin: 0 auto;
+}
 
 /* Hero */
-html[data-design="v2"] .sg-hero {
-  padding: 56px 0 36px;
-  border-bottom: 1px solid var(--ds-color-gray-outline);
-  margin-bottom: 48px;
+html[data-design="v2"] .sg-hero-block {
+  padding: 64px 0 56px;
 }
-html[data-design="v2"] .sg-hero-eyebrow {
+html[data-design="v2"] .sg-eyebrow {
   font-family: var(--ds-font-body);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ds-color-gray-chip-label);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
-html[data-design="v2"] .sg-hero-title {
+html[data-design="v2"] .sg-h1 {
   font-family: var(--ds-font-display);
   font-weight: 400;
-  font-size: 64px;
+  font-size: 56px;
   line-height: 0.95;
   letter-spacing: -0.01em;
   color: var(--ds-color-black);
-  margin: 0 0 18px;
+  margin: 0 0 16px;
 }
-html[data-design="v2"] .sg-hero-sub {
+html[data-design="v2"] .sg-lede {
   font-family: var(--ds-font-body);
   font-size: 14px;
   line-height: 1.55;
   color: var(--ds-color-gray-chip-label);
-  max-width: 560px;
+  max-width: 480px;
   margin: 0;
 }
 
-/* Anchor TOC */
-html[data-design="v2"] .sg-toc {
-  display: flex;
-  gap: 18px;
-  padding: 14px 0;
-  margin-bottom: 32px;
-  border-bottom: 1px solid var(--ds-color-gray-outline);
-  position: sticky;
-  top: 56px;
-  background: color-mix(in srgb, var(--ds-color-app-background) 92%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  z-index: 4;
-}
-html[data-design="v2"] .sg-toc a {
-  font-family: var(--ds-font-body);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--ds-color-gray-chip-label);
-  text-decoration: none;
-  padding: 4px 0;
-  border-bottom: 1.5px solid transparent;
-  transition: color 160ms var(--ease, ease), border-color 160ms var(--ease, ease);
-}
-html[data-design="v2"] .sg-toc a:hover {
-  color: var(--ds-color-black);
-  border-bottom-color: var(--ds-color-black);
-}
-
-/* Sections */
-html[data-design="v2"] .sg-section {
-  padding: 32px 0 64px;
-  scroll-margin-top: 120px;
-}
-html[data-design="v2"] .sg-section-header {
-  margin-bottom: 28px;
-}
-html[data-design="v2"] .sg-section-title {
+/* Section heading — Poynter, sits above its list with a divider. */
+html[data-design="v2"] .sg-h2 {
   font-family: var(--ds-font-display);
   font-weight: 400;
   font-size: 36px;
   line-height: 1;
-  margin: 0 0 8px;
+  letter-spacing: 0;
   color: var(--ds-color-black);
-}
-html[data-design="v2"] .sg-section-caption {
-  font-family: var(--ds-font-body);
-  font-size: 13px;
-  color: var(--ds-color-gray-chip-label);
-  max-width: 520px;
-  margin: 0;
-  line-height: 1.5;
+  margin: 56px 0 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ds-color-gray-outline);
+  scroll-margin-top: 80px;
 }
 
-/* Generic cards */
-html[data-design="v2"] .sg-card {
-  background: var(--ds-color-white);
-  border: 1px solid var(--ds-color-gray-outline);
-  border-radius: 14px;
-  padding: 18px;
+/* List — flat stack of rows with thin dividers between. */
+html[data-design="v2"] .sg-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
 }
-html[data-design="v2"] .sg-card-meta {
+html[data-design="v2"] .sg-row {
+  padding: 28px 0;
+  border-bottom: 1px solid var(--ds-color-gray-outline);
+}
+html[data-design="v2"] .sg-row:last-child {
+  border-bottom: none;
+}
+
+/* Meta line — token name + spec + usage. Stacked tightly. */
+html[data-design="v2"] .sg-meta {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-family: var(--ds-font-body);
-  font-size: 12px;
-  line-height: 1.4;
+  gap: 4px;
+  margin-top: 14px;
   color: var(--ds-color-gray-chip-label);
 }
-html[data-design="v2"] .sg-token-name {
+html[data-design="v2"] .sg-token {
   font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", "Menlo", monospace;
   font-size: 11px;
   color: var(--ds-color-black);
-  background: var(--ds-color-gray-chip-fill);
-  padding: 4px 8px;
-  border-radius: 6px;
-  align-self: flex-start;
-  word-break: break-all;
+  letter-spacing: 0;
 }
 html[data-design="v2"] .sg-spec {
-  display: flex;
-  gap: 12px;
-  align-items: baseline;
-}
-html[data-design="v2"] .sg-spec-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-family: var(--ds-font-body);
+  font-size: 12px;
   color: var(--ds-color-gray-chip-label);
-  width: 56px;
-  flex-shrink: 0;
 }
-html[data-design="v2"] .sg-usage {
+html[data-design="v2"] .sg-where {
   font-family: var(--ds-font-body);
   font-size: 12px;
   color: var(--ds-color-gray-chip-label);
   line-height: 1.5;
-  margin-top: 4px;
 }
 
-/* Type-token grid */
-html[data-design="v2"] .sg-grid {
-  display: grid;
-  gap: 16px;
-}
-html[data-design="v2"] .sg-grid-type {
-  grid-template-columns: 1fr;
-}
+/* Type rows — sample text on its own, no frame. */
 html[data-design="v2"] .sg-type-sample {
-  background: var(--ds-color-gray-fill);
-  border: 1px dashed var(--ds-color-gray-outline);
-  border-radius: 10px;
-  padding: 22px 20px;
   color: var(--ds-color-black);
-  /* Some sample text might be very large — keep it within the card. */
-  overflow: hidden;
-  text-overflow: ellipsis;
   word-break: break-word;
-  /* Center display tokens; let body tokens flow left-aligned. */
-}
-html[data-design="v2"] .sg-type-sample-display {
-  text-align: center;
-  min-height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-html[data-design="v2"] .sg-type-sample-body {
-  text-align: left;
+  /* Long body samples can wrap to multiple lines — that's fine. */
 }
 
-/* Color-token grid */
-html[data-design="v2"] .sg-color-groups {
+/* Color rows — swatch left, meta right. No card border. */
+html[data-design="v2"] .sg-row-color {
   display: flex;
-  flex-direction: column;
-  gap: 36px;
-}
-html[data-design="v2"] .sg-color-group-title {
-  font-family: var(--ds-font-display);
-  font-size: 20px;
-  font-weight: 400;
-  margin-bottom: 4px;
-  color: var(--ds-color-black);
-}
-html[data-design="v2"] .sg-color-group-caption {
-  font-family: var(--ds-font-body);
-  font-size: 12px;
-  color: var(--ds-color-gray-chip-label);
-  margin-bottom: 14px;
-  line-height: 1.5;
-  max-width: 520px;
-}
-html[data-design="v2"] .sg-grid-color {
-  grid-template-columns: 1fr;
-}
-html[data-design="v2"] .sg-card-color {
-  flex-direction: row;
   align-items: stretch;
-  padding: 14px;
   gap: 16px;
+  padding: 18px 0;
 }
 html[data-design="v2"] .sg-swatch {
   flex-shrink: 0;
-  width: 72px;
-  border-radius: 10px;
+  width: 56px;
+  border-radius: 8px;
 }
-html[data-design="v2"] .sg-card-color .sg-card-meta {
+html[data-design="v2"] .sg-row-color .sg-meta {
   flex: 1;
   min-width: 0;
+  margin-top: 0;
+  justify-content: center;
+  gap: 3px;
 }
 html[data-design="v2"] .sg-hex {
   font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", "Menlo", monospace;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--ds-color-black);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 
-/* Components grid */
-html[data-design="v2"] .sg-components {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 1fr;
+/* Component rows — same flat treatment. Label first, then live demo,
+   then usage. */
+html[data-design="v2"] .sg-row-component .sg-meta {
+  margin-top: 0;
+  margin-bottom: 16px;
 }
-html[data-design="v2"] .sg-card-component {
-  padding: 20px;
-}
-html[data-design="v2"] .sg-card-component-title {
+html[data-design="v2"] .sg-comp-label {
   font-family: var(--ds-font-display);
-  font-size: 22px;
   font-weight: 400;
+  font-size: 22px;
   color: var(--ds-color-black);
+  letter-spacing: 0;
 }
-html[data-design="v2"] .sg-card-component-demo {
-  background: var(--ds-color-gray-fill);
-  border: 1px dashed var(--ds-color-gray-outline);
-  border-radius: 10px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100px;
+html[data-design="v2"] .sg-comp-demo {
+  /* Plain layout host — components render directly on the page bg. */
 }
 html[data-design="v2"] .sg-comp-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: nowrap;
 }
 html[data-design="v2"] .sg-comp-row-wrap {
   flex-wrap: wrap;
-  justify-content: flex-start;
+}
+html[data-design="v2"] .sg-frame-cards {
+  /* Wrapper for project-card demos — uses grid so the hero card
+     spans correctly via .is-hero `grid-column: 1/-1`. */
   width: 100%;
 }
-html[data-design="v2"] .sg-comp-row-genre .attr-pill { color: var(--ds-color-black); }
-html[data-design="v2"] .sg-comp-card-frame {
-  width: 100%;
-  max-width: 360px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
-html[data-design="v2"] .sg-comp-card-frame .project-card {
+html[data-design="v2"] .sg-frame-cards .project-card {
   margin: 0;
 }
-
-/* Menu-morph mini-demo */
-html[data-design="v2"] .sg-menu-demo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-}
-html[data-design="v2"] .sg-menu-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ds-color-gray-chip-label);
-}
-html[data-design="v2"] .sg-menu-toggle-host {
+html[data-design="v2"] .sg-menu-host {
   display: inline-flex;
   width: 44px;
   height: 44px;
@@ -7012,16 +6903,8 @@ html[data-design="v2"] .sg-menu-toggle-host {
   color: var(--ds-color-black);
 }
 
-/* Footer */
-html[data-design="v2"] .sg-footer {
-  margin-top: 80px;
-  padding: 32px 0;
-  border-top: 1px solid var(--ds-color-gray-outline);
-  text-align: center;
-  color: var(--ds-color-gray-chip-label);
-}
-
-/* Desktop layout — sidebar TOC, 2-column section grids */
+/* Desktop refinements — same flat stack, just larger hero + a
+   widened max-width so type samples have room to breathe. */
 @media (min-width: 1440px) {
   html[data-design="v2"] .sg-page {
     padding: 0 80px 120px;
@@ -7031,38 +6914,14 @@ html[data-design="v2"] .sg-footer {
     padding: 0 80px;
     height: 64px;
   }
-  html[data-design="v2"] .sg-hero {
-    padding: 96px 0 56px;
-    margin-bottom: 64px;
-  }
-  html[data-design="v2"] .sg-hero-title {
-    font-size: 96px;
-  }
-  html[data-design="v2"] .sg-hero-sub {
-    font-size: 16px;
-    max-width: 640px;
-  }
-  html[data-design="v2"] .sg-toc {
-    top: 64px;
-  }
-  html[data-design="v2"] .sg-toc a { font-size: 13px; }
-  html[data-design="v2"] .sg-section {
-    padding: 48px 0 96px;
-    scroll-margin-top: 140px;
-  }
-  html[data-design="v2"] .sg-section-title { font-size: 56px; }
-  html[data-design="v2"] .sg-grid-type {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
-  }
-  html[data-design="v2"] .sg-grid-color {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;
-  }
-  html[data-design="v2"] .sg-components {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
-  }
+  html[data-design="v2"] .sg-stack { max-width: 880px; }
+  html[data-design="v2"] .sg-hero-block { padding: 96px 0 72px; }
+  html[data-design="v2"] .sg-h1 { font-size: 88px; }
+  html[data-design="v2"] .sg-lede { font-size: 15px; max-width: 560px; }
+  html[data-design="v2"] .sg-h2 { font-size: 48px; margin-top: 80px; }
+  html[data-design="v2"] .sg-row { padding: 36px 0; }
+  html[data-design="v2"] .sg-row-color { padding: 22px 0; }
+  html[data-design="v2"] .sg-comp-label { font-size: 28px; }
 }
 
 /* Genre-keyed pill colors — applied wherever a .attr-pill carries a
