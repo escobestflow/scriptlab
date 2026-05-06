@@ -67,8 +67,10 @@ export async function POST(req: Request) {
           prompt,
           n: 1,
           size: "1536x768",    // 2:1 landscape — valid for gpt-image-2 (edges %16, ratio ≤ 3:1)
-          response_format: "b64_json",
           quality: "high",
+          // NOTE: no response_format. gpt-image-2 always returns
+          // base64 in data[0].b64_json — passing response_format
+          // causes a 400 "Unknown parameter".
         }
       : {
           model: "dall-e-3",
