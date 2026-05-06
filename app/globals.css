@@ -6264,19 +6264,34 @@ html[data-design="v2"] .topbar.topbar-dark {
   color: var(--ds-color-black);
 }
 html[data-design="v2"] .topbar .topbar-btn {
-  /* Wrap the new menu icon, not the old hamburger spans. */
   background: var(--ds-color-white);
 }
-/* Hide v1's three-line hamburger and paint the new menu glyph in
-   its place. ::before on the parent button so the existing button
-   element stays clickable. */
-html[data-design="v2"] .topbar .menu-toggle { display: none; }
-html[data-design="v2"] .topbar .topbar-btn::before {
-  content: url("/v2/icons/menu-icon.svg");
-  display: block;
+/* Reuse v1's three-span menu-toggle (it already animates into an X
+   via the .open class) — just rescale the bars to match the v2
+   icon proportions: 17×13 box, bar widths 8 / 17 / 12, 1.5px thick.
+   Keeps the morph animation identical to v1 with no JS changes. */
+html[data-design="v2"] .topbar .menu-toggle {
   width: 17px;
   height: 13px;
-  line-height: 0;
+}
+html[data-design="v2"] .topbar .menu-toggle span {
+  height: 1.5px;
+  border-radius: 1.5px;
+  background: var(--ds-color-black);
+}
+html[data-design="v2"] .topbar .menu-toggle span:nth-child(1) { top: 0;    width: 8px; }
+html[data-design="v2"] .topbar .menu-toggle span:nth-child(2) { top: 5.75px; width: 17px; }
+html[data-design="v2"] .topbar .menu-toggle span:nth-child(3) { top: 11.5px; width: 12px; }
+/* Open state: all bars converge to the center, top + bottom grow to
+   full width and rotate into the X. Middle fades + squashes (v1's
+   rule already covers this — we don't need to repeat opacity here). */
+html[data-design="v2"] .topbar .menu-toggle.open span:nth-child(1) {
+  top: 5.75px;
+  width: 17px;
+}
+html[data-design="v2"] .topbar .menu-toggle.open span:nth-child(3) {
+  top: 5.75px;
+  width: 17px;
 }
 
 /* Wordmark — replace the brand-logo-img with the lowercase Poynter
