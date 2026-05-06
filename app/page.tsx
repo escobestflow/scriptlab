@@ -26,6 +26,7 @@ import {
   type ProjectMembers,
 } from "@/lib/invites";
 import { useAuth } from "@/lib/auth";
+import { useIsV2 } from "@/lib/v2Access";
 import { Studio } from "@/components/Studio";
 import SplashLoader from "@/components/SplashLoader";
 import PostLoginTransition from "@/components/PostLoginTransition";
@@ -168,6 +169,7 @@ function DesktopSidebar({
 
 export default function Page() {
   const { user, loading: authLoading, betaRejectedEmail, signInWithGoogle, signOut } = useAuth();
+  const isV2 = useIsV2();
   // Writer profile — cumulative creative-preference + voice model used to
   // bias every AI generation. Persisted per user in Supabase, mirrored to
   // localStorage for instant first-paint. See lib/writerProfile.ts.
@@ -1152,7 +1154,18 @@ export default function Page() {
           <div className="topbar-center">
             <img src="/logo.svg" alt="Unfold" className="brand-logo-img" />
           </div>
-          <div style={{ width: 44 }} />
+          {isV2 && mainTab === "projects" ? (
+            <button
+              type="button"
+              className="v2-topbar-add"
+              onClick={openCreateModal}
+              aria-label="New project"
+            >
+              <img src="/v2/icons/icon-add.svg" alt="" width={13} height={13} />
+            </button>
+          ) : (
+            <div style={{ width: 44 }} />
+          )}
         </div>
         <div className="screen-scroll" key={mainTab}>
           <div className="page-enter">
@@ -2240,7 +2253,7 @@ function ProjectsTab({
       )}
 
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: hasInvites ? 10 : 40 }}>
-        <div className="display projects-tab-heading">Projects</div>
+        <div className="display projects-tab-heading ds-type-tab-header">Projects</div>
         <Button
           variant="secondary"
           size="sm"

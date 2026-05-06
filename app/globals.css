@@ -6250,9 +6250,116 @@ html[data-design="v2"] .ds-type-button-label {
   }
 }
 
-/* Smoke test: Projects-tab header in red for v2-only viewers.
-   Stays around to confirm the v2 flag is reaching the user — will
-   be removed once the Projects tab is properly redesigned. */
-html[data-design="v2"] .projects-tab-heading {
-  color: #e23d3d;
+/* ── V2 Projects-tab home screen — mobile redesign ─────────────
+   Translation of the home/Projects screenshot. CSS-only swaps where
+   possible (icons via `content: url(...)`, wordmark via ::before
+   replacement, hide v1 elements with `display:none`). Add button in
+   the topbar is rendered conditionally in JSX (.v2-topbar-add). */
+
+/* Topbar — flip dark surface to light/transparent. The .topbar-dark
+   class still applies on the same element; v2 overrides only the
+   visual treatment, not the structure. */
+html[data-design="v2"] .topbar.topbar-dark {
+  background: transparent;
+  color: var(--ds-color-black);
 }
+html[data-design="v2"] .topbar .topbar-btn {
+  /* Wrap the new menu icon, not the old hamburger spans. */
+  background: var(--ds-color-white);
+}
+/* Hide v1's three-line hamburger and paint the new menu glyph in
+   its place. ::before on the parent button so the existing button
+   element stays clickable. */
+html[data-design="v2"] .topbar .menu-toggle { display: none; }
+html[data-design="v2"] .topbar .topbar-btn::before {
+  content: url("/v2/icons/menu-icon.svg");
+  display: block;
+  width: 17px;
+  height: 13px;
+  line-height: 0;
+}
+
+/* Wordmark — replace the brand-logo-img with the lowercase Poynter
+   serif "unfold" wordmark spec'd in the redesign. Uses the display
+   font stack directly since no token covers the wordmark yet — open
+   question: do we want a `type-wordmark` token? */
+html[data-design="v2"] .topbar .topbar-center .brand-logo-img { display: none; }
+html[data-design="v2"] .topbar .topbar-center::before {
+  content: "unfold";
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0;
+  color: var(--ds-color-black);
+}
+
+/* New "+" add button in the topbar — only rendered in v2 (see
+   page.tsx). Black circular background matching screenshot. */
+html[data-design="v2"] .v2-topbar-add {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--ds-color-black);
+  color: var(--ds-color-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 160ms var(--ease, ease);
+}
+html[data-design="v2"] .v2-topbar-add:active { opacity: 0.7; }
+
+/* Hide the in-content "New Project" button on v2 — the add affordance
+   has moved to the topbar. Targets the Button by its sibling
+   relationship to the projects-tab-heading (Button renders a
+   <button class="ds-btn ...">). */
+html[data-design="v2"] .projects-tab-heading + .ds-btn {
+  display: none;
+}
+
+/* Tabbar — white background, swap to v2 icons, apply main-tab-nav
+   type tokens to labels. Uses content: url() to replace the <img>
+   src without touching the JSX. */
+html[data-design="v2"] .tabbar {
+  background: var(--ds-color-white);
+}
+html[data-design="v2"] .tabbar .tab.active .icon img,
+html[data-design="v2"] .tabbar .tab .icon img {
+  /* width/height already set by v1; v2 just swaps the painted asset. */
+}
+html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="project-icon-active"] {
+  content: url("/v2/icons/icon-projects-active.svg");
+}
+html[data-design="v2"] .tabbar .tab .icon img[src*="project-icon-inactive"] {
+  content: url("/v2/icons/icon-projects-inactive.svg");
+}
+html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="ideas-icon-active"] {
+  content: url("/v2/icons/icon-ideas-active.svg");
+}
+html[data-design="v2"] .tabbar .tab .icon img[src*="ideas-icon-inactive"] {
+  content: url("/v2/icons/icon-ideas-inactive.svg");
+}
+
+/* Tabbar labels — apply ds-type-main-tab-nav-* type tokens. Mobile
+   spec: active = 8 / Black 900 / 0.07em / UPPER, inactive = 14 /
+   Medium 500 / 0.07em / UPPER. The v1 .tab CSS sets the layout; we
+   just override the typography. */
+html[data-design="v2"] .tabbar .tab {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 14px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .tabbar .tab.active {
+  font-weight: 900;
+  font-size: 8px;
+  color: var(--ds-color-black);
+}
+
+/* Smoke test removed — the v2 redesign of Projects is now in
+   progress, the red header was its own visual confirmation. */
+

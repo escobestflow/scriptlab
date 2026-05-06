@@ -7,6 +7,8 @@
 // Empty / unset = no v2 users. Useful for local dev when you don't
 // want to bother seeding the list.
 
+import { useAuth } from "./auth";
+
 export const V2_EMAILS: string[] = (process.env.NEXT_PUBLIC_V2_EMAILS ?? "")
   .split(",")
   .map(e => e.trim().toLowerCase())
@@ -18,4 +20,14 @@ export const V2_EMAILS: string[] = (process.env.NEXT_PUBLIC_V2_EMAILS ?? "")
 export function isV2User(email: string | null | undefined): boolean {
   if (!email) return false;
   return V2_EMAILS.includes(email.toLowerCase());
+}
+
+/** Client-side hook for opt-in JSX branches that need to render v2
+ *  markup. Pulls the current user's email out of the auth context and
+ *  re-evaluates whenever auth state changes — same source of truth as
+ *  the html[data-design] attribute, so CSS scoping and JSX branching
+ *  stay in sync without extra subscriptions. */
+export function useIsV2(): boolean {
+  const { user } = useAuth();
+  return isV2User(user?.email);
 }
