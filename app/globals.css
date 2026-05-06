@@ -6294,18 +6294,13 @@ html[data-design="v2"] .topbar .menu-toggle.open span:nth-child(3) {
   width: 17px;
 }
 
-/* Wordmark — replace the brand-logo-img with the lowercase Poynter
-   serif "unfold" wordmark spec'd in the redesign. Uses the display
-   font stack directly since no token covers the wordmark yet — open
-   question: do we want a `type-wordmark` token? */
-html[data-design="v2"] .topbar .topbar-center .brand-logo-img { display: none; }
-html[data-design="v2"] .topbar .topbar-center::before {
-  content: "unfold";
-  font-family: var(--ds-font-display);
-  font-weight: 400;
-  font-size: 22px;
-  letter-spacing: 0;
-  color: var(--ds-color-black);
+/* Wordmark — show the existing /logo.svg image (already black in
+   the source SVG) and undo v1's `topbar-dark` invert so it renders
+   as black on the v2 transparent topbar. The previous Poynter-text
+   ::before fallback is removed since we have the real SVG. */
+html[data-design="v2"] .topbar .topbar-center .brand-logo-img {
+  display: block;
+  filter: none;
   /* Fade out once the page scrolls past 140px (driven by the
      data-scrolled-past-140 attribute on <html>, set by the scroll
      listener in app/page.tsx). Fades back in when scrolling back
@@ -6313,7 +6308,7 @@ html[data-design="v2"] .topbar .topbar-center::before {
   opacity: 1;
   transition: opacity 220ms var(--ease, ease);
 }
-html[data-design="v2"][data-scrolled-past-140] .topbar .topbar-center::before {
+html[data-design="v2"][data-scrolled-past-140] .topbar .topbar-center .brand-logo-img {
   opacity: 0;
 }
 
@@ -6349,21 +6344,31 @@ html[data-design="v2"] .projects-tab-heading + .ds-btn {
 html[data-design="v2"] .tabbar {
   background: var(--ds-color-white);
 }
-html[data-design="v2"] .tabbar .tab.active .icon img,
-html[data-design="v2"] .tabbar .tab .icon img {
-  /* width/height already set by v1; v2 just swaps the painted asset. */
-}
+/* Tab icons — paint the v2 SVG via content: url() (no JSX change
+   needed) and lock dimensions per spec:
+     - Projects (active + inactive): 20×17
+     - Ideas    (active + inactive): 14.58×20
+   Override v1's `.tab .icon img { width:100%; height:100% }` since
+   we now have explicit per-icon sizing. */
 html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="project-icon-active"] {
   content: url("/v2/icons/icon-projects-active.svg");
+  width: 20px;
+  height: 17px;
 }
 html[data-design="v2"] .tabbar .tab .icon img[src*="project-icon-inactive"] {
   content: url("/v2/icons/icon-projects-inactive.svg");
+  width: 20px;
+  height: 17px;
 }
 html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="ideas-icon-active"] {
   content: url("/v2/icons/icon-ideas-active.svg");
+  width: 14.58px;
+  height: 20px;
 }
 html[data-design="v2"] .tabbar .tab .icon img[src*="ideas-icon-inactive"] {
   content: url("/v2/icons/icon-ideas-inactive.svg");
+  width: 14.58px;
+  height: 20px;
 }
 
 /* Tabbar labels — apply ds-type-main-tab-nav-* type tokens. Mobile
