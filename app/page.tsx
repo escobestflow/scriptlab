@@ -2923,7 +2923,7 @@ function MomentsTab({
   return (
     <>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 }}>
-        <div className="display">Ideas</div>
+        <div className="display ideas-tab-heading ds-type-tab-header">Ideas</div>
         <Button
           variant="secondary"
           size="sm"
@@ -2938,7 +2938,8 @@ function MomentsTab({
       <div className="search-bar">
         <IconSearch />
         <input
-          placeholder="Search ideas"
+          className="ds-type-body"
+          placeholder="Search"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
@@ -2951,7 +2952,7 @@ function MomentsTab({
         {MOMENT_FILTERS.map(f => (
           <button
             key={f}
-            className={`filter-pill ${filter === f ? "active" : ""}`}
+            className={`filter-pill ds-type-button-label ${filter === f ? "active" : ""}`}
             onClick={() => setFilter(f)}
           >
             {f}
@@ -2998,14 +2999,14 @@ function MomentsTab({
             onClick={() => onEdit(m)}
             style={{ cursor: "pointer" }}
           >
-            <div className="moment-type">{m.type}</div>
-            <div className="moment-text">{m.text}</div>
+            <div className="moment-type ds-type-body">{m.type}</div>
+            <div className="moment-text ds-type-body">{m.text}</div>
             {m.tags.length > 0 && (
               <div className="moment-tags">
                 {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
               </div>
             )}
-            <div className="moment-time">{formatTime(m.createdAt)}</div>
+            <div className="moment-time ds-type-body">{formatTime(m.createdAt)}</div>
           </div>
         </SwipeToDelete>
       ))}

@@ -6565,6 +6565,121 @@ html[data-design="v2"] .project-card .attr-pill {
   background: var(--ds-color-gray-chip-fill);
   color: var(--ds-color-black);
 }
+/* ── V2 Ideas tab ──────────────────────────────────────────────
+   Search bar restyle (light gray fill, no border, full-width pill),
+   filter chips repainted (active: black/white, inactive: white with
+   gray outline + gray text), idea cards repositioned so type and
+   timestamp share the top row. Same JSX as v1, all overrides
+   scoped to v2. */
+
+/* Hide the in-content "New Idea" button — add affordance moved to
+   the topbar "+" (same pattern as Projects). */
+html[data-design="v2"] .ideas-tab-heading + .ds-btn {
+  display: none;
+}
+
+/* Search bar — flatter, light-gray fill, no border. Sits in the
+   --ds-color-gray-chip-fill tone so it reads as a subtle inset on
+   the page's --ds-color-app-background surface. */
+html[data-design="v2"] .search-bar {
+  background: var(--ds-color-gray-chip-fill);
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+}
+html[data-design="v2"] .search-bar svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .search-bar input {
+  /* ds-type-body class on the input handles font; only color
+     overrides land here. */
+  background: transparent;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .search-bar input::placeholder {
+  color: var(--ds-color-gray-chip-label);
+}
+
+/* Filter row — sticky background needs to match the v2 page bg so
+   pills don't pin against a white slab as content scrolls under. */
+html[data-design="v2"] .filter-row {
+  background: var(--ds-color-app-background);
+  margin-bottom: 24px;
+}
+
+/* Filter pill — inactive default (white fill, gray-chip outline,
+   gray-chip-label text) and active (black fill, white text).
+   Typography comes from the .ds-type-button-label class on the
+   button (12px / 400 / 0.07em / UPPER). Local rule only sets shape +
+   color so the token wins on type. */
+html[data-design="v2"] .filter-pill {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--ds-color-gray-chip-outline);
+  background: var(--ds-color-white);
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .filter-pill.active {
+  background: var(--ds-color-black);
+  color: var(--ds-color-white);
+  border-color: var(--ds-color-black);
+}
+
+/* Idea card — white rounded panel, type label + timestamp share
+   the top row (timestamp absolutely positioned to the top-right),
+   body text underneath. */
+html[data-design="v2"] .card.moment-item {
+  position: relative;
+  background: var(--ds-color-white);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  border: none;
+  box-shadow: none;
+}
+html[data-design="v2"] .moment-type {
+  /* ds-type-body class supplies 13px / 400 / Lato; override casing
+     (v1 had it ALL CAPS) and color — sentence case with leading cap
+     via text-transform: capitalize so "scene" → "Scene", "joke" →
+     "Joke" without touching the data layer. */
+  text-transform: capitalize;
+  letter-spacing: 0;
+  color: var(--ds-color-gray-chip-label);
+  font-weight: 400;
+  margin: 0;
+  /* Reserve room on the right edge for the absolutely-positioned
+     timestamp so a long single-word type doesn't overlap it. */
+  padding-right: 80px;
+}
+html[data-design="v2"] .moment-time {
+  /* ds-type-body class supplies typography; absolute pin to the
+     top-right of the card mirrors the screenshot. */
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  margin: 0;
+  color: var(--ds-color-gray-chip-label);
+  font-weight: 400;
+}
+html[data-design="v2"] .moment-text {
+  /* ds-type-body class supplies typography. Margin-top puts a clean
+     gap between the top row (type + time) and the body. */
+  color: var(--ds-color-black);
+  margin: 12px 0 0;
+  font-weight: 400;
+}
+html[data-design="v2"] .moment-tags {
+  margin-top: 10px;
+}
+html[data-design="v2"] .moment-tag {
+  background: var(--ds-color-gray-chip-fill);
+  color: var(--ds-color-gray-chip-label);
+  border: 1px solid var(--ds-color-gray-chip-outline);
+}
+
 html[data-design="v2"] .project-card .attr-pill[data-genre="thriller"]   { background: var(--ds-color-accent-green-on-light); }
 html[data-design="v2"] .project-card .attr-pill[data-genre="drama"]      { background: var(--ds-color-accent-blue-on-light); }
 html[data-design="v2"] .project-card .attr-pill[data-genre="comedy"]     { background: var(--ds-color-accent-yellow-on-light); }
