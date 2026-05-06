@@ -79,6 +79,16 @@ const IconExport = () => (
 const IconZap = () => (
   <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
 );
+const IconPalette = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <circle cx="7.5" cy="10" r="1.1" fill="currentColor"/>
+    <circle cx="11" cy="6.5" r="1.1" fill="currentColor"/>
+    <circle cx="15" cy="7.5" r="1.1" fill="currentColor"/>
+    <circle cx="17" cy="11.5" r="1.1" fill="currentColor"/>
+    <path d="M12 21a3 3 0 0 1-1.5-5.6 2 2 0 0 0 1-1.7c0-1.5 1.5-2.7 3.2-2.4 2 .4 3.5 2.2 3.5 4.3"/>
+  </svg>
+);
 
 /* ======= Desktop layout ======= */
 // Desktop view kicks in at 1440px. The hook syncs an `.is-desktop` class
@@ -1322,6 +1332,21 @@ export default function Page() {
                   label: "AI Connections",
                   onClick: () => setMenuOpen(false),
                 },
+                // V2-only: Style Guide page. Surfaces every type / color
+                // token + redesigned component in one place so the design
+                // system stays inspectable as we build.
+                ...(isV2
+                  ? [{
+                      icon: <IconPalette />,
+                      label: "Style Guide",
+                      onClick: () => {
+                        setMenuOpen(false);
+                        if (typeof window !== "undefined") {
+                          window.location.href = "/style-guide";
+                        }
+                      },
+                    }]
+                  : []),
               ];
               return items.map((item, i) => (
                 <button
