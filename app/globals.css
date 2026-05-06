@@ -6370,14 +6370,14 @@ html[data-design="v2"] .tabbar .tab.active {
    Cover-as-gray-box is intentional per current iteration — actual
    project art will come back once the layout is locked. */
 
-/* Grid container — 2 columns on mobile, 20px gap. v1 stacks cards
-   as full-width flex children on mobile (no grid rule until the
-   1440px desktop breakpoint), so v2 has to establish the grid
-   itself for mobile to get the 2-up + hero pattern. */
+/* Grid container — 2 columns on mobile, 10px gap (both row + col).
+   v1 stacks cards as full-width flex children on mobile (no grid
+   rule until the 1440px desktop breakpoint), so v2 has to establish
+   the grid itself for mobile to get the 2-up + hero pattern. */
 html[data-design="v2"] .project-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
+  gap: 10px;
 }
 
 /* Card shell — rounded, fixed 208px height (per spec, no
