@@ -6411,10 +6411,18 @@ html[data-design="v2"] .project-card.is-hero {
   grid-column: 1 / -1;
 }
 
-/* Cover — currently a flat gray placeholder. Hide the v1 thumbnail
-   img + initial-letter fallback so the gray fill is consistent
-   regardless of whether the project has a thumbnail. Re-enable
-   `.project-cover-img` later when project art comes back. */
+/* Cover — wide source image (rendered at ~2:1 by gpt-image-2 or
+   ~16:9 by dall-e-3, stored as 512x288 16:9 JPEG). The same source
+   is reused at every placement: in a 1:1 small card the image fills
+   the height (208px) and is centered horizontally with the sides
+   cropping; in a wide hero card the image fills the width and the
+   minor vertical mismatch crops top/bottom. Card itself has
+   `overflow: hidden`, so excess is clipped cleanly.
+
+   Gray fallback fill stays in place (visible while the JPEG is
+   loading, or for projects without a thumbnail). Initial-letter
+   fallback hidden — when there's no thumbnail, the gray bg + text
+   overlay alone reads as an empty cover. */
 html[data-design="v2"] .project-card .project-cover {
   position: absolute;
   inset: 0;
@@ -6422,10 +6430,38 @@ html[data-design="v2"] .project-card .project-cover {
   border-radius: 0;
   margin: 0;
   padding: 0;
+  /* Center the (potentially overflowing) wide image horizontally
+     and vertically. fit:cover via height: 100% + width: auto on
+     the img keeps aspect ratio intact. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
-html[data-design="v2"] .project-card .project-cover-img,
+html[data-design="v2"] .project-card .project-cover-img {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: none;
+  object-fit: cover;
+}
 html[data-design="v2"] .project-card .project-cover-initial {
   display: none;
+}
+
+/* Bottom gradient for text legibility — without it, white type on a
+   bright/midtone area of the photograph drops below WCAG. The
+   gradient sits between the cover and the body via z-index. */
+html[data-design="v2"] .project-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0) 35%,
+    rgba(0, 0, 0, 0.55) 90%,
+    rgba(0, 0, 0, 0.7) 100%);
 }
 
 /* Body — anchored to bottom-left of the card, white ink. */

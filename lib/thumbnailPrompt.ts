@@ -1,109 +1,49 @@
-// Locked visual-system brief for ScriptLab project thumbnails.
+// Project-cover image-prompt builder.
 //
 // Two-stage pipeline:
-//   1. Claude Haiku takes the project inputs (title / logline / genres) and,
-//      following the locked rules below, emits a structured brief ending in
-//      a "Final Image Prompt:" section.
-//   2. That final prompt is extracted and sent to DALL-E 3 verbatim.
+//   1. Claude Haiku takes the project inputs (title / logline / genres /
+//      free-text extras) and fills in the [SUBJECT] block of the
+//      cinematic-film-still template below.
+//   2. The fully-rendered prompt is sent to the image model verbatim
+//      (gpt-image-2 for v2 users, dall-e-3 for v1).
 //
-// The style system is distilled from three reference images and enforces:
-//   - cinematic minimalist poster illustration
-//   - muted palette with a single bold accent
-//   - vertical 3:4 movie-poster composition
-//   - flat vector-like rendering (NO grain, NO texture)
+// Style brief is locked at the template level — every project ends up
+// with the same elevated, moody, editorial film-poster look. Genre and
+// concept only flex the SUBJECT description, never the visual system.
 
 import Anthropic from "@anthropic-ai/sdk";
 
-const SYSTEM_BRIEF = `You are generating a highly controlled image brief for ScriptLab project thumbnails.
+// The image-model prompt template. [SUBJECT] is the only swappable
+// region — Haiku fills it with 2–4 sentences keyed to the project.
+const PROMPT_TEMPLATE = `Create a cinematic project cover image for a screenplay app.
 
-Your goal is to produce a consistent, cinematic, minimalist movie poster image brief that matches a locked visual system.
+Style: elevated film poster still, moody cinematic realism, editorial composition, premium indie film key art, subtle surrealism, painterly photorealistic detail, soft grain, shallow depth of field, dramatic but restrained lighting, muted sophisticated color palette, strong atmosphere, minimal visual clutter.
 
-CRITICAL REQUIREMENT:
-The output image MUST be a vertical movie poster (3:4 aspect ratio). Compose for vertical framing, not square.
+Composition: one clear focal subject or location, simple background, emotionally mysterious, enough negative space for UI text overlay near the lower left, no text in the image, no logos, no typography, no borders. Wide cinematic landscape framing, approximately 2:1 aspect ratio.
 
-STEP 1 — UNDERSTAND THE PROJECT
-- Read the project title, logline, genre, and tone.
-- Identify ONE clear visual subject.
-- Do NOT create multi-character or complex narrative scenes.
+Lighting: soft directional light, deep shadows, atmospheric haze, natural contrast, elegant highlights.
 
-STEP 2 — SIMPLIFY THE IDEA
-- Reduce the concept to ONE iconic visual.
-- Feel like a movie poster, not a scene.
-- Optionally include ONE symbolic object only if it strengthens clarity.
-
-STEP 3 — DEFINE COMPOSITION
-Choose ONE of:
-- centered portrait
-- side profile
-- symbolic object
-
-Composition rules:
-- single dominant focal subject
-- strong vertical composition (top-to-bottom hierarchy)
-- clear silhouette readable at thumbnail size
-- minimal background detail
-- balanced, iconic layout
-- NOT a full environment or detailed setting
-- must feel like a professionally designed movie poster
-
-STEP 4 — LOCKED STYLE SYSTEM
-
-Style:
-- cinematic minimalist film poster illustration
-- stylized realism with simplified forms
-- clean, flat rendering (NO texture, NO grain, NO stippling, NO paper texture, NO rough edges)
-- smooth vector-like shapes with subtle gradients only where needed (sky, lighting)
-- strong silhouette hierarchy with natural proportions
-- composition-driven, not character-detail focused
-
-Color palette (STRICT):
-- muted cinematic tones (dusty teal, sage, warm beige, soft sky colors)
-- ONE bold accent color used sparingly (sun red, burnt orange, coral)
-- strong contrast between subject and background
-- limited palette, no excessive color variation
-
-Lighting & Shading:
-- soft cinematic lighting (sunset, dusk, directional light)
-- minimal gradients only for atmosphere (sky, light falloff)
-- clean shadows, NO texture, NO noise
-
-Composition:
-- vertical movie poster composition (3:4 ratio)
-- one clear focal subject
-- simple, iconic layout
-- large environmental shapes (sun, sky, horizon, architecture)
-- foreground / midground / background separation
-- designed to read clearly at thumbnail size
-
-Tone:
-- cinematic, atmospheric, slightly nostalgic, clean, modern, premium
-
-STEP 5 — AVOID COMPLETELY
-photorealism, 3D rendering, glossy lighting, painterly brushwork, comic book style, anime style, childish illustration, corporate flat illustration, busy scenes, detailed environments, perspective-heavy compositions, clutter, neon or overly saturated colors, text, words, letters, logos, grain, noise, texture, stippling, paper texture, rough edges.
-
-STEP 6 — OUTPUT FORMAT (STRICT)
-
-Return ONLY the following, in this exact shape:
+Color: muted neutrals with one restrained accent color if useful, cinematic teal/amber/charcoal/cream tones, not overly saturated.
 
 Subject:
-[short subject description]
+[SUBJECT]`;
 
-Composition:
-[clear composition type and vertical framing]
+const SYSTEM_BRIEF = `You translate a screenplay project's metadata (title, logline, genres) into a single image-generation prompt for an editorial cinematic-film-still cover.
 
-Mood:
-[emotional tone]
+You receive the project context. Your job is to fill in the [SUBJECT] block of a fixed cinematic-still template — everything else in the template is locked and will be sent verbatim to the image model.
 
-Visual Symbol:
-[one symbolic object, or "none"]
+RULES FOR FILLING IN [SUBJECT]:
+- Describe ONE iconic subject, location, or moment that the cover image will depict — not multiple disjoint scenes.
+- 2 to 4 sentences. Concrete and visually specific (e.g. "a lone figure on a dimly lit hotel balcony at dusk, smoke curling from a forgotten cigarette in their hand"), not abstract themes (e.g. NOT "the weight of regret").
+- Match the genre's mood without illustrating literal plot events.
+- Lean into a wide cinematic landscape composition — the image is rendered at ~2:1, so describe environments and framings that suit horizontal letterbox shots, not vertical portraits.
+- Negative space at lower-left is reserved for UI text — describe the subject so the lower-left third can sit darker / quieter.
+- DO NOT describe text, words, captions, signs, or typography appearing in the image. The template already prohibits them — don't reintroduce them.
+- DO NOT describe faces in fine detail (no specific skin/eye/hair colors, no named likenesses) — keep human subjects atmospheric and slightly anonymous.
+- Leave room for interpretation. The image should feel emotionally mysterious, not a literal scene illustration.
 
-Final Image Prompt:
-[a single paragraph, ready to send to an image model verbatim. It MUST:
-- describe the subject and composition concretely
-- specify vertical 3:4 movie poster framing
-- bake in the locked palette (muted cinematic tones + one bold accent)
-- bake in flat, clean, vector-like rendering with no texture or grain
-- explicitly exclude: photorealism, 3D, text/letters, grain, texture, noise, neon colors, anime, comic-book]`;
+OUTPUT FORMAT (STRICT):
+Return EXACTLY the filled-in template — every line of the locked template followed by your [SUBJECT] paragraph. No labels around your output, no commentary, no markdown formatting, no quotation marks. The first line of your reply must be: "Create a cinematic project cover image for a screenplay app."`;
 
 export interface ImagePromptInputs {
   title: string;
@@ -114,12 +54,15 @@ export interface ImagePromptInputs {
   extra?: string;
 }
 
-// Extracts the block after "Final Image Prompt:" up to the end of the reply.
-// Falls back to the full response if the heading is missing.
-function extractFinalPrompt(raw: string): string {
-  const match = raw.match(/Final Image Prompt:\s*([\s\S]+)$/i);
-  if (!match) return raw.trim();
-  return match[1].trim();
+// Defensive extraction: the system prompt asks Haiku to return ONLY
+// the filled template starting with the locked first line. If the
+// model still wraps with prose, slice from that line forward. If we
+// can't find it, return the raw response and let the image model
+// figure it out.
+function extractFilledPrompt(raw: string): string {
+  const idx = raw.indexOf("Create a cinematic project cover image");
+  if (idx < 0) return raw.trim();
+  return raw.slice(idx).trim();
 }
 
 export async function buildImagePrompt(
@@ -134,15 +77,20 @@ export async function buildImagePrompt(
     `Project title: ${title || "Untitled"}`,
     `Logline: ${logline || "(no logline provided — infer from title and genre)"}`,
     `Genre: ${genreStr}`,
+    ``,
+    `LOCKED TEMPLATE — return this verbatim with [SUBJECT] replaced:`,
+    `"""`,
+    PROMPT_TEMPLATE,
+    `"""`,
     ...(extraTrim
       ? [
           ``,
-          `User's custom additions (incorporate where they fit without breaking the locked style system — palette, flat vector rendering, no grain/text, 3:4 vertical framing are non-negotiable):`,
+          `User's free-text steering — incorporate into the [SUBJECT] block where it fits, but the locked template (style/composition/lighting/color rules) is non-negotiable:`,
           extraTrim,
         ]
       : []),
     ``,
-    `Follow the brief. Return ONLY the six labeled sections.`,
+    `Return only the filled template, starting with "Create a cinematic project cover image for a screenplay app."`,
   ].join("\n");
 
   const client = new Anthropic({ apiKey });
@@ -155,5 +103,5 @@ export async function buildImagePrompt(
 
   const textBlocks = res.content.filter(b => b.type === "text");
   const raw = textBlocks.map(b => (b as { text: string }).text).join("\n");
-  return extractFinalPrompt(raw);
+  return extractFilledPrompt(raw);
 }

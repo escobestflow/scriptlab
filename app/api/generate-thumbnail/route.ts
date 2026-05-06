@@ -1,12 +1,17 @@
 // Generates a project thumbnail via a two-stage pipeline:
-//   1. Claude Haiku builds a locked-style cinematic-minimalist movie-poster prompt.
-//   2. Image model renders it at vertical native resolution.
-//        - V2 users: gpt-image-2 @ 1024x1536, quality=high (~$0.19/image,
-//          OpenAI's SOTA Apr 2026 model — better instruction following,
-//          text rendering, photorealism).
-//        - V1 users: dall-e-3 @ 1024x1792, quality=standard (~$0.04/image,
-//          legacy model, kept until v2 is the global default).
-//   3. Sharp center-crops/resizes to 192x256 (3:4) JPEG (~15-25KB) for localStorage.
+//   1. Claude Haiku fills in the cinematic-still prompt template
+//      (see lib/thumbnailPrompt.ts) with a project-specific [SUBJECT].
+//   2. Image model renders it at WIDE landscape aspect — the same
+//      image is reused at every placement (small + hero cards) so
+//      generation only ever runs once per project.
+//        - V2 users: gpt-image-2 @ 1536x768 (2:1), quality=high
+//          (~$0.19/image, OpenAI's SOTA Apr 2026 model).
+//        - V1 users: dall-e-3 @ 1792x1024 (~16:9), quality=standard
+//          (~$0.04/image, legacy model).
+//   3. Sharp center-crops/resizes to 512x288 (16:9) JPEG (~50–80KB)
+//      for localStorage + Supabase storage. Wider source = small
+//      crop on the side margins; the 16:9 store retains enough pixel
+//      density for retina hero displays at ~750x208 logical.
 //
 // V2 routing reads X-User-Email (auto-injected by AuthProvider's fetch
 // wrapper) and checks against NEXT_PUBLIC_V2_EMAILS via isV2User. No
@@ -53,13 +58,15 @@ export async function POST(req: Request) {
 
     // Stage 2: route by design tier. V2 users get gpt-image-2 (better
     // quality, ~5× the cost); v1 stays on dall-e-3 (legacy, cheaper).
+    // Wide landscape framing for both models — the same source image
+    // is reused at every placement on the dashboard.
     const isV2 = isV2User(req.headers.get("x-user-email"));
     const imageBody = isV2
       ? {
           model: "gpt-image-2",
           prompt,
           n: 1,
-          size: "1024x1536",   // 2:3 portrait — valid for gpt-image-2 (edges %16, ratio ≤ 3:1)
+          size: "1536x768",    // 2:1 landscape — valid for gpt-image-2 (edges %16, ratio ≤ 3:1)
           response_format: "b64_json",
           quality: "high",
         }
@@ -67,7 +74,7 @@ export async function POST(req: Request) {
           model: "dall-e-3",
           prompt,
           n: 1,
-          size: "1024x1792",   // dall-e-3's tallest native portrait
+          size: "1792x1024",   // dall-e-3's widest native landscape (~16:9)
           response_format: "b64_json",
           quality: "standard",
         };
@@ -98,10 +105,13 @@ export async function POST(req: Request) {
       });
     }
 
-    // Compress: 1024x1792 PNG → 192x256 JPEG 3:4 (cover-cropped).
+    // Compress: wide source PNG → 512x288 (16:9) JPEG. Source aspect
+    // is ~2:1 (gpt-image-2) or ~16:9 (dall-e-3); fit:cover with
+    // attention-driven cropping picks the most salient horizontal
+    // slice and drops the side margins on the v2 (2:1) source.
     const pngBuffer = Buffer.from(b64, "base64");
     const jpegBuffer = await sharp(pngBuffer)
-      .resize(192, 256, { fit: "cover", position: "attention" })
+      .resize(512, 288, { fit: "cover", position: "attention" })
       .jpeg({ quality: 80 })
       .toBuffer();
 
