@@ -7176,3 +7176,118 @@ html[data-design="v2"] .studio-tab.active::after {
   margin-top: 2px;
 }
 
+/* ── V2 attribute rows (Concept tab + others) ──────────────────
+   Each row reads as a wide white card: label on the left, value
+   pills / body text in the middle, caret on the right. AI wand
+   button (where applicable) sits inline with the label.
+
+   Same JSX as v1 (.attr-row > .attr-row-header > .attr-label /
+   .attr-values / .attr-caret). v2 only touches typography, color,
+   shape — no layout restructure. */
+
+html[data-design="v2"] .attr-row {
+  background: var(--ds-color-white);
+  border: 1px solid var(--ds-color-gray-outline);
+  border-radius: 14px;
+  box-shadow: none;
+  margin-bottom: 10px;
+  min-height: 0;
+  overflow: visible;
+}
+html[data-design="v2"] .attr-row-header {
+  padding: 14px 16px;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Label — applies the attribute-title token (13 / 600). The token
+   class isn't in the JSX yet, so set the same values here directly
+   so v2 picks up regardless. */
+html[data-design="v2"] .attr-label {
+  font-family: var(--ds-font-body);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--ds-color-black);
+  margin: 0;
+  min-width: 80px;
+}
+
+/* Pills — bigger radius, lighter fill, matches the screenshot.
+   Token class .ds-type-project-card-pill-label sits beside this for
+   typography (8 / 700 / 0.03em / UPPER) but we override locally
+   since the existing .attr-pill already carries inline type values
+   (9 / 500). v2 nudges them toward the redesign target. */
+html[data-design="v2"] .attr-pill {
+  height: 24px;
+  padding: 0 10px;
+  background: var(--ds-color-gray-chip-fill);
+  border: 1px solid var(--ds-color-gray-chip-outline);
+  border-radius: 6px;
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: var(--ds-color-gray-chip-label);
+  text-transform: uppercase;
+  max-width: 220px;
+}
+
+/* Placeholder text ("Select sub-genres", "Add a logline", etc.) */
+html[data-design="v2"] .attr-placeholder {
+  font-family: var(--ds-font-body);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ds-color-gray-chip-label);
+  margin: 0;
+  letter-spacing: 0;
+}
+
+/* Caret — small, soft gray. */
+html[data-design="v2"] .attr-caret {
+  width: 14px;
+  height: 14px;
+  color: var(--ds-color-gray-chip-label);
+}
+
+/* AI wand — small rounded square with the AI yellow accent and a
+   black bolt glyph. Replaces v1's blue gradient pill. */
+html[data-design="v2"] .ai-wand {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--ds-color-ai-yellow);
+  color: var(--ds-color-black);
+  margin-left: 0;
+  margin-right: 4px;
+  box-shadow: none;
+  vertical-align: 0;
+}
+html[data-design="v2"] .ai-wand:hover {
+  background: var(--ds-color-ai-yellow);
+  transform: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-color-ai-yellow) 35%, transparent);
+}
+html[data-design="v2"] .ai-wand:active {
+  background: var(--ds-color-ai-yellow);
+  transform: scale(0.97);
+}
+
+/* Direction-note preview (used by Tone / Themes / Framework /
+   Ending under the pills when the user has typed free-form
+   direction). Match v2's softer look. */
+html[data-design="v2"] .attr-row-note-preview {
+  color: var(--ds-color-gray-chip-label);
+  font-family: var(--ds-font-body);
+  font-size: 12px;
+  font-style: italic;
+  padding: 0 16px 14px 96px;
+}
+
+/* Body content of an open row — drop the v1 grey divider above
+   the body so the open state reads as a continuous card. */
+html[data-design="v2"] .attr-row-body {
+  border-top: none;
+  padding: 4px 16px 16px;
+}
+
