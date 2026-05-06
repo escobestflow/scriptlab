@@ -6982,3 +6982,197 @@ html[data-design="v2"] .attr-pill[data-genre="romance"]    { background: var(--d
 html[data-design="v2"] .attr-pill[data-genre="action"]     { background: var(--ds-color-accent-orange-on-light); }
 html[data-design="v2"] .attr-pill[data-genre="mystery"]    { background: var(--ds-color-accent-blue-on-light); }
 
+/* ── V2 Studio shell — populated-mode foundation ────────────────
+   Restyles the project-detail layout to match the v2 design:
+     - Top bar: back left, centered title + draft trigger stacked,
+       edit/settings right
+     - Hero: full-width strip at the top of the scroll area, image
+       fills the strip via the existing project-cover-img setup
+     - Section tabs: white floating pill that overlaps the hero's
+       bottom edge
+
+   CSS-only (no JSX changes). Title + draft trigger live in the
+   `.studio-header-sticky` JSX block; we visually relocate them to
+   the top bar via `position: fixed` so they sit in the right place
+   without touching the JSX tree. The .studio-header-sticky element
+   itself collapses to just hosting the tab pill.
+
+   Empty-state Characters layout (different hero crop, title-on-hero,
+   silhouette pedestal) is a separate pass — needs the silhouette
+   asset dropped in /public/v2/empty-state-characters.{png,svg} +
+   JSX conditional rendering. */
+
+/* Top nav — flat, transparent, small white circle buttons. */
+html[data-design="v2"] .studio-nav-fixed {
+  height: calc(env(safe-area-inset-top, 0px) + 56px);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  padding-bottom: 8px;
+  background: transparent;
+  border-bottom: none;
+}
+html[data-design="v2"] .studio-nav-fixed > button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--ds-color-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .studio-nav-fixed > button:active {
+  background: var(--ds-color-gray-fill);
+}
+html[data-design="v2"] .studio-nav-fixed > button svg {
+  width: 18px;
+  height: 18px;
+  stroke: var(--ds-color-black);
+}
+html[data-design="v2"] .studio-nav-fixed > button img {
+  filter: none;
+}
+
+/* Title + draft trigger — visually relocate from inside
+   .studio-header-sticky (which is in the scroll container) to the
+   top nav center. position: fixed pins them above the page so they
+   don't move with scroll. */
+html[data-design="v2"] .studio-header-sticky > .project-header-title-btn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--ds-color-black);
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  white-space: nowrap;
+  border: none;
+}
+html[data-design="v2"] .studio-header-sticky > .drafts-dropdown-trigger {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 36px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  font-family: var(--ds-font-body);
+  font-size: 12px;
+  color: var(--ds-color-gray-chip-label);
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+html[data-design="v2"] .studio-header-sticky > .drafts-dropdown-trigger .drafts-caret {
+  width: 8px;
+  height: 8px;
+  filter: brightness(0.7);
+}
+
+/* Save button + TV episode row + caption — hide for now. v2 doesn't
+   yet have a designated home for these; surface them again once
+   we've placed them. */
+html[data-design="v2"] .studio-header-sticky > .project-save-btn,
+html[data-design="v2"] .studio-header-sticky > .project-drafts-row,
+html[data-design="v2"] .studio-header-sticky > .caption {
+  display: none;
+}
+
+/* Sticky header collapses to just the tab pill in v2. Drop v1's
+   white background + sticky positioning since we're no longer
+   pinning a stripe under the nav. */
+html[data-design="v2"] .studio-header-sticky {
+  position: relative;
+  top: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: -28px;          /* overlap the bottom of the hero strip */
+  z-index: 12;
+}
+
+/* Hero strip — repurpose the thumbnail container as a wide banner.
+   Break out of .studio-scroll's 20px horizontal padding so the
+   strip stretches edge-to-edge. */
+html[data-design="v2"] .studio-thumb-scroll {
+  display: block;
+  padding: 0;
+  margin: 0 -20px;
+  width: calc(100% + 40px);
+  height: 200px;
+  border-radius: 0;
+}
+html[data-design="v2"] .studio-thumb-button {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  margin: 0;
+  overflow: hidden;
+}
+html[data-design="v2"] .project-header-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+}
+html[data-design="v2"] .project-header-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: var(--ds-color-gray-dark-fill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ds-font-display);
+  font-size: 80px;
+  color: var(--ds-color-white);
+}
+
+/* Section tabs — white floating pill that overlaps the bottom of
+   the hero strip. Negative side margins so the pill sits inside the
+   already-padded scroll container without extra outer space. */
+html[data-design="v2"] .studio-tabs-row {
+  margin: 0 -8px;
+}
+html[data-design="v2"] .studio-tab-bar {
+  background: var(--ds-color-white);
+  border-radius: 18px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  padding: 12px 8px;
+  height: auto;
+  border: 1px solid var(--ds-color-gray-outline);
+}
+html[data-design="v2"] .studio-tab {
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 4px;
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 7px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .studio-tab.active {
+  font-weight: 700;
+  color: var(--ds-color-black);
+}
+/* Drop v1's underline indicator and use a small dot beneath the
+   active label instead, matching the screenshot. */
+html[data-design="v2"] .studio-tab .studio-tab-label::after {
+  display: none;
+}
+html[data-design="v2"] .studio-tab.active::after {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ds-color-black);
+  margin-top: 2px;
+}
+
