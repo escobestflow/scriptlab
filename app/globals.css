@@ -6306,6 +6306,15 @@ html[data-design="v2"] .topbar .topbar-center::before {
   font-size: 22px;
   letter-spacing: 0;
   color: var(--ds-color-black);
+  /* Fade out once the page scrolls past 140px (driven by the
+     data-scrolled-past-140 attribute on <html>, set by the scroll
+     listener in app/page.tsx). Fades back in when scrolling back
+     to the top. */
+  opacity: 1;
+  transition: opacity 220ms var(--ease, ease);
+}
+html[data-design="v2"][data-scrolled-past-140] .topbar .topbar-center::before {
+  opacity: 0;
 }
 
 /* New "+" add button in the topbar — only rendered in v2 (see

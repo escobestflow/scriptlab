@@ -170,6 +170,14 @@ function DesktopSidebar({
 export default function Page() {
   const { user, loading: authLoading, betaRejectedEmail, signInWithGoogle, signOut } = useAuth();
   const isV2 = useIsV2();
+
+  // V2 main-view header: fades the centered "unfold" wordmark out
+  // once the user scrolls past 140px. Implemented as a single
+  // passive scroll listener that toggles a data attribute on <html>
+  // so CSS handles the transition. Re-binds on mainTab / view.kind
+  // changes because .screen-scroll has key={mainTab} and is replaced
+  // when entering Studio. Custom attribute name (not generic
+  // "scrolled") so it doesn't collide with future scroll-state work. */
   // Writer profile — cumulative creative-preference + voice model used to
   // bias every AI generation. Persisted per user in Supabase, mirrored to
   // localStorage for instant first-paint. See lib/writerProfile.ts.
@@ -247,6 +255,41 @@ export default function Page() {
   // sessions.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
+
+  // V2 wordmark fade — toggle data-scrolled-past-140 on <html> when
+  // the active main scroller (.screen-scroll) crosses 140px. CSS
+  // owns the actual transition. Re-runs when the scroll container
+  // is replaced (mainTab key swap, or leaving main view).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (view.kind !== "main") return;
+    // Wait one frame so the freshly-mounted .screen-scroll exists in
+    // the DOM. Without this, the querySelector right after a tab
+    // swap returns null and the listener attaches to nothing.
+    let cleanup: (() => void) | null = null;
+    const raf = requestAnimationFrame(() => {
+      const scroller = document.querySelector(".screen-scroll") as HTMLElement | null;
+      if (!scroller) return;
+      const onScroll = () => {
+        const past = scroller.scrollTop > 140;
+        if (past) {
+          document.documentElement.setAttribute("data-scrolled-past-140", "");
+        } else {
+          document.documentElement.removeAttribute("data-scrolled-past-140");
+        }
+      };
+      scroller.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      cleanup = () => {
+        scroller.removeEventListener("scroll", onScroll);
+        document.documentElement.removeAttribute("data-scrolled-past-140");
+      };
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      cleanup?.();
+    };
+  }, [view.kind, mainTab]);
   // New project creation modal
   const [createOpen, setCreateOpen] = useState(false);
   const [createStep, setCreateStep] = useState(0);
