@@ -2151,6 +2151,23 @@ function EmptyPosterStack() {
   );
 }
 
+// "Updated 2d Ago" copy in the v2 project-card meta line. Falls back
+// to "Just Now" / "Xm Ago" / "Xh Ago" / "Xd Ago" / absolute date.
+// Title-cased to match the screenshot ("Updated 2d Ago", not "...ago").
+function formatProjectAge(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "—";
+  const ms = Date.now() - t;
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "Just Now";
+  if (m < 60) return `${m}m Ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h Ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d Ago`;
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function ProjectsTab({
   projects, onOpen, onNew,
   pendingInvites, onAcceptInvite, onDeclineInvite,
@@ -2272,7 +2289,7 @@ function ProjectsTab({
       )}
 
       <div className="project-grid">
-      {projects.map(p => {
+      {projects.map((p, idx) => {
         // Card renders straight from the user's own row. For the
         // invitee, accept_invite now seeds their row with a full
         // copy of the creator's data (logline, thumbnail, drafts, …)
@@ -2337,8 +2354,24 @@ function ProjectsTab({
         const leftChar = pickLetter(leftName, leftEmail);
         const rightChar = pickLetter(rightName, rightEmail);
 
+        // V2 card additions:
+        //   - meta line ("Draft N • Updated Xd Ago") — always rendered;
+        //     hidden on v1 via CSS so v1 layout is unchanged.
+        //   - data-genre on the pill so v2 CSS can pick the accent
+        //     color per-genre without inspecting text content.
+        //   - is-hero class on every 3rd card so the v2 grid spans
+        //     it full-width (default rhythm — adjust if the user
+        //     wants a different cadence).
+        const pd = p.projectDrafts?.find(d => d.id === p.activeProjectDraftId) ?? p.projectDrafts?.[0];
+        const draftNumber = pd?.number ?? 1;
+        const metaLine = `Draft ${draftNumber} • Updated ${formatProjectAge(p.updatedAt)}`;
+        const isHero = (idx + 1) % 3 === 0;
         return (
-          <button key={p.id} className="project-card" onClick={() => onOpen(p.id)}>
+          <button
+            key={p.id}
+            className={`project-card${isHero ? " is-hero" : ""}`}
+            onClick={() => onOpen(p.id)}
+          >
             <div className="project-cover">
               {p.thumbnail ? (
                 <img src={p.thumbnail} alt="" className="project-cover-img" />
@@ -2350,11 +2383,12 @@ function ProjectsTab({
             </div>
             <div className="project-body">
               <div className="project-title">{p.title || "Untitled"}</div>
+              <div className="project-meta">{metaLine}</div>
               <div className="project-genre">
                 {/* .attr-pill matches the collapsed-state genre chips in
                     the Concept tab on the Project Detail page. */}
                 {c.settings.genres?.length > 0 && c.settings.genres.map((g: string) => (
-                  <span key={g} className="attr-pill">{g.toUpperCase()}</span>
+                  <span key={g} className="attr-pill" data-genre={g}>{g.toUpperCase()}</span>
                 ))}
               </div>
               <div className="project-summary">{c.logline || "No logline yet"}</div>

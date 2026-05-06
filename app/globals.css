@@ -6360,6 +6360,135 @@ html[data-design="v2"] .tabbar .tab.active {
   color: var(--ds-color-black);
 }
 
-/* Smoke test removed — the v2 redesign of Projects is now in
-   progress, the red header was its own visual confirmation. */
+/* ── V2 Project cards — overlay-style with gray placeholder ─────
+   Same JSX as v1 (button.project-card with .project-cover and
+   .project-body). v2 reshapes the visual: cover becomes a gray
+   placeholder, body floats over the bottom-left, logline is hidden
+   in favor of a meta line ("Draft N • Updated Xd Ago"), genre pill
+   gets an accent fill keyed by data-genre.
+
+   Cover-as-gray-box is intentional per current iteration — actual
+   project art will come back once the layout is locked. */
+
+/* Card shell — rounded, fixed aspect, no body padding (children
+   absolutely positioned). v1 v2 both render the same JSX, but v2
+   restructures the layout via display + position so v1 ordering
+   doesn't bleed in. */
+html[data-design="v2"] .project-card {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--ds-color-gray-dark-fill);
+  aspect-ratio: 1 / 1;
+  text-align: left;
+  cursor: pointer;
+  /* Drop the v1 hover-lift / shadow if present — v2 is flatter. */
+  box-shadow: none;
+}
+html[data-design="v2"] .project-card:active {
+  opacity: 0.85;
+}
+
+/* Hero variant — every 3rd card spans the full grid width. The
+   default project-grid is 2-col on mobile; span 2 makes a hero
+   row. Aspect ratio relaxes so the hero doesn't get absurdly tall. */
+html[data-design="v2"] .project-card.is-hero {
+  grid-column: 1 / -1;
+  aspect-ratio: 16 / 11;
+}
+
+/* Cover — currently a flat gray placeholder. Hide the v1 thumbnail
+   img + initial-letter fallback so the gray fill is consistent
+   regardless of whether the project has a thumbnail. Re-enable
+   `.project-cover-img` later when project art comes back. */
+html[data-design="v2"] .project-card .project-cover {
+  position: absolute;
+  inset: 0;
+  background: var(--ds-color-gray-dark-fill);
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+}
+html[data-design="v2"] .project-card .project-cover-img,
+html[data-design="v2"] .project-card .project-cover-initial {
+  display: none;
+}
+
+/* Body — anchored to bottom-left of the card, white ink. */
+html[data-design="v2"] .project-card .project-body {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2;
+  padding: 0;
+  color: var(--ds-color-white);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+html[data-design="v2"] .project-card .project-title {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.05;
+  letter-spacing: 0;
+  color: var(--ds-color-white);
+  margin: 0;
+  /* Truncate long titles to one line so the layout stays predictable. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+html[data-design="v2"] .project-card .project-meta {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: var(--ds-color-white);
+  opacity: 0.85;
+  margin-bottom: 6px;
+}
+/* Logline hidden on v2 — replaced by the meta line above. */
+html[data-design="v2"] .project-card .project-summary {
+  display: none;
+}
+
+/* Genre pill — colored fill keyed by data-genre, dark text inside.
+   Falls back to the chip-fill gray when a genre value isn't in the
+   accent map (defensive — the type union is closed but new values
+   could ship later). */
+html[data-design="v2"] .project-card .project-genre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 0;
+  max-height: none;
+  overflow: visible;
+}
+html[data-design="v2"] .project-card .attr-pill {
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: none;
+  background: var(--ds-color-gray-chip-fill);
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .project-card .attr-pill[data-genre="thriller"]   { background: var(--ds-color-accent-green-on-light); }
+html[data-design="v2"] .project-card .attr-pill[data-genre="drama"]      { background: var(--ds-color-accent-blue-on-light); }
+html[data-design="v2"] .project-card .attr-pill[data-genre="comedy"]     { background: var(--ds-color-accent-yellow-on-light); }
+html[data-design="v2"] .project-card .attr-pill[data-genre="horror"]     { background: var(--ds-color-accent-purple-on-light); }
+html[data-design="v2"] .project-card .attr-pill[data-genre="sci-fi"]     { background: var(--ds-color-accent-purple-on-light); }
+html[data-design="v2"] .project-card .attr-pill[data-genre="romance"]    { background: var(--ds-color-accent-red-on-light); }
+html[data-design="v2"] .project-card .attr-pill[data-genre="action"]     { background: var(--ds-color-accent-orange-on-light); }
+html[data-design="v2"] .project-card .attr-pill[data-genre="mystery"]    { background: var(--ds-color-accent-blue-on-light); }
 
