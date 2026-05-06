@@ -6444,15 +6444,27 @@ html[data-design="v2"] .project-card .project-body {
 /* Typography (font-family, weight, size, line-height, letter-spacing)
    comes from the .ds-type-project-card-title utility class on the JSX
    — 20px mobile / 24px desktop. This rule only handles layout +
-   color; if it set type properties they'd fight the token. */
+   color; if it set type properties they'd fight the token.
+   Long titles wrap to up to 2 lines, growing upward — the parent
+   .project-body is `position: absolute; bottom: 16px`, so the title
+   (first child) pushes UP as it wraps, not down into the meta/genre
+   line beneath it. Clamped at 2 lines to prevent a runaway long
+   title from climbing over the cover. */
 html[data-design="v2"] .project-card .project-title {
   color: var(--ds-color-white);
   margin: 0;
-  /* Truncate long titles to one line so the layout stays predictable. */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   max-width: 100%;
+  /* Explicitly undo v1's `white-space: nowrap` and `text-overflow:
+     ellipsis` from the base .project-title rule — those silently
+     persist through the cascade because we don't otherwise touch
+     them and would prevent any wrapping. */
+  white-space: normal;
+  text-overflow: clip;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 html[data-design="v2"] .project-card .project-meta {
   font-family: var(--ds-font-body);

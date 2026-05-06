@@ -2436,8 +2436,10 @@ function ProjectsTab({
               <div className="project-meta">{metaLine}</div>
               <div className="project-genre">
                 {/* .attr-pill matches the collapsed-state genre chips in
-                    the Concept tab on the Project Detail page. */}
-                {c.settings.genres?.length > 0 && c.settings.genres.map((g: string) => (
+                    the Concept tab on the Project Detail page. Cap at 2
+                    so the bottom-left overlay stays compact even when a
+                    project carries more genres in its data. */}
+                {c.settings.genres?.length > 0 && c.settings.genres.slice(0, 2).map((g: string) => (
                   <span key={g} className="attr-pill" data-genre={g}>{g.toUpperCase()}</span>
                 ))}
               </div>
