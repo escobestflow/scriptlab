@@ -85,30 +85,31 @@ Letter-spacing percentages → em (3% = 0.03em).
 
 ## Color tokens
 
-| Var | Hex |
-|---|---|
-| `--ds-color-black` | `#000000` |
-| `--ds-color-white` | `#FFFFFF` |
-| `--ds-color-unfold-gold` | `#AC9175` |
-| `--ds-color-ai-yellow` | `#FFD60A` |
-| `--ds-color-gray-fill` | `#FBF9F9` |
-| `--ds-color-gray-outline` | `#E4E3E4` |
-| `--ds-color-gray-chip-outline` | `#EDEDED` |
-| `--ds-color-gray-chip-fill` | `#F4F4F4` |
-| `--ds-color-gray-chip-label` | `#888888` |
-| `--ds-color-gray-dark-fill` | `#626262` |
-| `--ds-color-accent-green-on-dark` | `#8CC1AE` |
-| `--ds-color-accent-green-on-light` | `#D8EEE8` |
-| `--ds-color-accent-red-on-dark` | `#F2B5B5` |
-| `--ds-color-accent-red-on-light` | `#F6D5D1` |
-| `--ds-color-accent-blue-on-dark` | `#9EC2DA` |
-| `--ds-color-accent-blue-on-light` | `#C7E1F4` |
-| `--ds-color-accent-yellow-on-dark` | `#E8E69C` |
-| `--ds-color-accent-yellow-on-light` | `#F5F0CB` |
-| `--ds-color-accent-purple-on-dark` | `#9EA0DA` |
-| `--ds-color-accent-purple-on-light` | `#D9D8EE` |
-| `--ds-color-accent-orange-on-dark` | `#D8AF6D` |
-| `--ds-color-accent-orange-on-light` | `#F6E8D1` |
+| Var | Hex | Notes |
+|---|---|---|
+| `--ds-color-black` | `#000000` | |
+| `--ds-color-white` | `#FFFFFF` | |
+| `--ds-color-unfold-gold` | `#AC9175` | |
+| `--ds-color-ai-yellow` | `#FFD60A` | |
+| `--ds-color-app-background` | `#F8F7F7` | Painted on `body` at viewports < 1440px. Desktop value TBD. |
+| `--ds-color-gray-fill` | `#FBF9F9` | |
+| `--ds-color-gray-outline` | `#E4E3E4` | |
+| `--ds-color-gray-chip-outline` | `#EDEDED` | |
+| `--ds-color-gray-chip-fill` | `#F4F4F4` | |
+| `--ds-color-gray-chip-label` | `#888888` | |
+| `--ds-color-gray-dark-fill` | `#626262` | |
+| `--ds-color-accent-green-on-dark` | `#8CC1AE` | |
+| `--ds-color-accent-green-on-light` | `#D8EEE8` | |
+| `--ds-color-accent-red-on-dark` | `#F2B5B5` | |
+| `--ds-color-accent-red-on-light` | `#F6D5D1` | |
+| `--ds-color-accent-blue-on-dark` | `#9EC2DA` | |
+| `--ds-color-accent-blue-on-light` | `#C7E1F4` | |
+| `--ds-color-accent-yellow-on-dark` | `#E8E69C` | |
+| `--ds-color-accent-yellow-on-light` | `#F5F0CB` | |
+| `--ds-color-accent-purple-on-dark` | `#9EA0DA` | |
+| `--ds-color-accent-purple-on-light` | `#D9D8EE` | |
+| `--ds-color-accent-orange-on-dark` | `#D8AF6D` | |
+| `--ds-color-accent-orange-on-light` | `#F6E8D1` | |
 
 Accent pairs: `on-dark` is the saturated swatch for dark surfaces;
 `on-light` is the soft tint for light surfaces. Pick the one that

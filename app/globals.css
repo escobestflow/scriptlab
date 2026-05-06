@@ -6041,6 +6041,9 @@ html[data-design="v2"] {
   --ds-color-unfold-gold:       #AC9175;
   --ds-color-ai-yellow:         #FFD60A;
 
+  /* Surfaces */
+  --ds-color-app-background:    #F8F7F7;
+
   /* Grays */
   --ds-color-gray-fill:         #FBF9F9;
   --ds-color-gray-outline:      #E4E3E4;
@@ -6234,6 +6237,17 @@ html[data-design="v2"] .ds-type-button-label {
   }
   /* attribute-title, body, selected-option-label, button-label —
      identical mobile + desktop, no overrides needed. */
+}
+
+/* App-shell mobile background. Bounded to viewports below the
+   1440px desktop breakpoint so desktop keeps falling through to
+   v1's body background until a desktop app-background value is
+   spec'd. The body element is the painted surface in this app —
+   `.app` itself is `background: transparent`. */
+@media (max-width: 1439.98px) {
+  html[data-design="v2"] body {
+    background: var(--ds-color-app-background);
+  }
 }
 
 /* Smoke test: Projects-tab header in red for v2-only viewers.
