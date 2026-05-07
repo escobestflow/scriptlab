@@ -270,21 +270,34 @@ export default function Page() {
   // tint in sync with the actual surface the user is looking at.
   // Static <meta name="theme-color"> in head only picks up at first
   // paint; iOS caches the sampled tint and won't re-evaluate after
-  // the splash dismisses unless we explicitly mutate the meta tag.
-  // Three states:
-  //   - splash up (black background)        → #000000
-  //   - app, v2 viewer (--ds-color-app-bg)  → #F8F7F7
-  //   - app, v1 viewer (--body-bg light)    → #FDFEFE
+  // splash dismisses. Mutating `.content` is also not enough on
+  // iOS — the meta tag itself has to be REMOVED and a fresh one
+  // appended.
+  //
+  // The page is "black" any time a full-bleed black overlay is up:
+  //   - Splash (!splashDone) — full black with the unfold mark
+  //   - PostLoginTransition (!hydrated post-splash) — black
+  //     collapsing into the topbar
+  // After hydration, the light-background app is visible and we
+  // flip theme-color to match the page bg per design version.
   useEffect(() => {
     if (typeof document === "undefined") return;
-    const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
-    if (!meta) return;
     const showSplash = !splashDone || (!authLoading && !user);
-    const next = showSplash
+    const blackOverlay = showSplash || !hydrated;
+    const next = blackOverlay
       ? "#000000"
       : isV2 ? "#F8F7F7" : "#FDFEFE";
-    if (meta.content !== next) meta.content = next;
-  }, [splashDone, authLoading, user, isV2]);
+    // Remove every existing theme-color meta (Next.js can render
+    // more than one — viewport export + SSR — and we want a clean
+    // single source of truth). Append a fresh one so iOS treats it
+    // as a new declaration and re-tints the URL bar / status bar.
+    const existing = document.querySelectorAll('meta[name="theme-color"]');
+    existing.forEach(el => el.remove());
+    const m = document.createElement("meta");
+    m.setAttribute("name", "theme-color");
+    m.setAttribute("content", next);
+    document.head.appendChild(m);
+  }, [splashDone, authLoading, user, isV2, hydrated]);
 
   // V2 wordmark fade — toggle data-scrolled-past-140 on <html> when
   // the active main scroller (.screen-scroll) crosses 140px. CSS
