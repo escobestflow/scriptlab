@@ -4808,7 +4808,7 @@ function EmptyLayerState({
     <div className="empty-layer-state">
       <div className="empty-layer-icon">{icon}</div>
       <div className="empty-layer-title">{title}</div>
-      <div className="empty-layer-caption">{caption}</div>
+      <div className="empty-layer-caption ds-type-body-sm">{caption}</div>
       {/* Stacked (primary / secondary) compact CTAs — the sticky bar
           that appears post-first-item keeps the larger, single-button
           treatment; the empty state uses a quieter pair so the icon +

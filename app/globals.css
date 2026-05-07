@@ -6210,6 +6210,13 @@ html[data-design="v2"] .ds-type-draft-dropdown {
   letter-spacing: 0.03em;
   /* Mobile: case-as-typed. Desktop overrides flip to UPPER below. */
 }
+html[data-design="v2"] .ds-type-body-sm {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 10px;
+  line-height: 14px;
+  letter-spacing: 0.03em;
+}
 
 /* Desktop overrides — only properties that differ from mobile. The
    1440px breakpoint matches the existing layout's mobile↔desktop
@@ -6257,6 +6264,10 @@ html[data-design="v2"] .ds-type-draft-dropdown {
     font-size: 11px;
     letter-spacing: 0.09em;
     text-transform: uppercase;
+  }
+  html[data-design="v2"] .ds-type-body-sm {
+    font-size: 11px;
+    line-height: normal;
   }
 }
 
@@ -7292,7 +7303,8 @@ html[data-design="v2"]:has(.empty-layer-state) .studio-thumb-scroll {
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  height: 208px;
+  /* Empty-state hero is 212 (was 208 + 4 per spec). */
+  height: 212px;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -7490,8 +7502,9 @@ html[data-design="v2"] .studio-tab.active .studio-tab-bg {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 73px;
-  height: 71px;
+  /* +2 each dimension per spec — was 73×71. */
+  width: 75px;
+  height: 73px;
   border-radius: 11px;
   background: transparent;
   box-shadow:
@@ -7512,7 +7525,8 @@ html[data-design="v2"] .studio-tab.active .studio-tab-bg {
 html[data-design="v2"] .studio-tab::before {
   content: "";
   position: absolute;
-  top: 14px;
+  /* Icon top 14 → 15 per spec — nudges glyph 1px down. */
+  top: 15px;
   left: 50%;
   transform: translateX(-50%);
   width: 16px;
@@ -7527,11 +7541,12 @@ html[data-design="v2"] .studio-tab::before {
   z-index: 1;
 }
 
-/* Label always 20px from the bar's bottom — the dot's presence
-   under it doesn't shift this anchor. */
+/* Label sits 17px from the bar's bottom (was 20 → -3 per spec, label
+   shifted 3px down). The dot's presence under it doesn't shift this
+   anchor. */
 html[data-design="v2"] .studio-tab .studio-tab-label {
   position: absolute;
-  bottom: 20px;
+  bottom: 17px;
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -7830,11 +7845,16 @@ html[data-design="v2"] .v2-cast-action-label {
         the asset) via negative top margin + higher z-index */
 html[data-design="v2"] .empty-layer-state {
   position: relative;
-  background: var(--ds-color-white);
+  /* Fill swapped to gray-lightest (#FCFBFB) — softer than pure white
+     against the page bg, lets the silhouette image's white floor
+     extend cleanly into the card. */
+  background: var(--ds-color-gray-lightest);
   border: 1px solid var(--ds-color-gray-outline);
-  border-radius: 18px;
-  /* margin-top dropped 18 → 11 per spec (white box up 7px). */
-  margin-top: 11px;
+  /* Corner radius bumped 18 → 42 per spec — softer, more pillowy
+     read against the rectangular hero above. */
+  border-radius: 42px;
+  /* margin-top: 18 → 11 → 22 (down 11px from the 11 baseline). */
+  margin-top: 22px;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -7857,10 +7877,10 @@ html[data-design="v2"] .empty-layer-state .empty-layer-icon {
   position: relative;
   z-index: 1;
   width: 100vw;
-  /* margin-top dropped 60 → 45 per spec (graphic up 15px). The title
-     compensates with +15 on its negative margin so the text stack
-     doesn't shift up with the image. */
-  margin-top: 45px;
+  /* margin-top history: 60 → 45 (graphic up 15) → 77 (graphic down
+     32 per latest spec). Title margin compensates each shift so the
+     text stack stays put across these tweaks. */
+  margin-top: 77px;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
   display: block;
@@ -7894,24 +7914,24 @@ html[data-design="v2"] .empty-layer-state .empty-layer-title {
   line-height: 1;
   letter-spacing: 0;
   color: var(--ds-color-black);
-  /* Title (and the caption + actions stacked below it via flow)
-     lifts 140px higher than the previous comp per spec. Image
-     margin-top was reduced 60 → 45 in a follow-up tweak (graphic
-     up 15), so this compensates: -130 (original overlap) - 140
-     (title shift up) - 45 (current image flow shift down) = -315. */
-  margin: -315px 0 12px;
-  padding: 0 22px;
+  /* Title compensates for the image's margin-top so the text stack
+     stays put across image-position tweaks. Math:
+       -130 (original overlap) - 140 (title shift up) - 77 (current
+       image flow shift down) = -347. */
+  margin: -347px 0 12px;
+  /* Inner padding-left: 7 puts the text at viewport-x = 30 per spec
+     (card sits at viewport-x = 22 via tab-content-wrap padding, plus
+     the 1px card border). */
+  padding: 0 7px;
 }
 html[data-design="v2"] .empty-layer-state .empty-layer-caption {
   position: relative;
   z-index: 2;
-  font-family: var(--ds-font-body);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.5;
-  color: var(--ds-color-gray-chip-label);
+  /* Type comes from the .ds-type-body-sm utility applied in JSX —
+     no inline font properties here. Just color, layout, padding. */
+  color: var(--ds-color-black);
   margin: 0 0 22px;
-  padding: 0 22px;
+  padding: 0 7px;
 }
 html[data-design="v2"] .empty-layer-state .empty-layer-actions {
   position: relative;
@@ -7921,7 +7941,7 @@ html[data-design="v2"] .empty-layer-state .empty-layer-actions {
   align-items: flex-start;
   gap: 10px;
   margin: 0;
-  padding: 0 22px 22px;
+  padding: 0 7px 22px;
 }
 /* Override Button styling inside the v2 empty state so the two
    CTAs read as the same compact treatment used elsewhere in v2:
