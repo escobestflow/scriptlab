@@ -6272,27 +6272,38 @@ html[data-design="v2"] .ds-type-button-label {
    passes BEHIND the topbar as it scrolls. The wordmark fade-out at
    140px (set elsewhere) reveals the underlying content cleanly.
    Backdrop blur softens whatever's scrolling under the topbar so
-   the buttons stay legible. */
+   the buttons stay legible.
+
+   Padding: 30px left + 30px right places the menu button 30px
+   from the viewport's left and the add button 30px from the right
+   (flex space-between on the parent). 8px below the safe-area
+   inset for the button top edge; align-items: flex-start anchors
+   buttons to the top of the content area rather than centering. */
 html[data-design="v2"] .topbar.topbar-dark {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  padding-bottom: 8px;
+  padding-left: 30px;
+  padding-right: 30px;
+  align-items: flex-start;
   background: color-mix(in srgb, var(--ds-color-app-background) 70%, transparent);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   color: var(--ds-color-black);
 }
 /* Pad the scroll port so first content (page heading) clears the
-   topbar at scroll 0. 72px = topbar's content height (14 padding-top
-   + 44 button + 14 padding-bottom). No env() here — `.app` already
-   has padding-top: env(safe-area-inset-top), and the topbar's own
-   padding-top adds env() inside itself, so the topbar's bottom edge
-   sits exactly at safe-area + 72. The scroll port starts at
-   safe-area; this 72px push lines content's first row up with the
-   topbar's bottom edge. */
+   topbar at scroll 0. 55px = topbar's content height post-spec
+   update (8 padding-top + 39 button + 8 padding-bottom). No env()
+   here — `.app` already has padding-top: env(safe-area-inset-top),
+   and the topbar's own padding-top adds env() inside itself, so
+   the topbar's bottom edge sits exactly at safe-area + 55. The
+   scroll port starts at safe-area; this 55px push lines content's
+   first row up with the topbar's bottom edge. */
 html[data-design="v2"] .screen-scroll {
-  padding-top: 72px;
+  padding-top: 55px;
 }
 html[data-design="v2"] .topbar .topbar-btn {
   background: var(--ds-color-white);
@@ -7008,11 +7019,20 @@ html[data-design="v2"] .attr-pill[data-genre="mystery"]    { background: var(--d
    asset dropped in /public/v2/empty-state-characters.{png,svg} +
    JSX conditional rendering. */
 
-/* Top nav — flat, transparent, small white circle buttons. */
+/* Top nav — flat, transparent, small circle buttons. Padding
+   places the back button 30px from the viewport's left edge and
+   the edit button 30px from the right (via flex space-between
+   on the parent). 8px gap between the safe-area-bottom and the
+   buttons' top edges; align-items: flex-start so the buttons
+   sit AT the top of the content area rather than centering in
+   any extra height. */
 html[data-design="v2"] .studio-nav-fixed {
-  height: calc(env(safe-area-inset-top, 0px) + 56px);
+  height: calc(env(safe-area-inset-top, 0px) + 8px + 39px + 8px);
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
   padding-bottom: 8px;
+  padding-left: 30px;
+  padding-right: 30px;
+  align-items: flex-start;
   background: transparent;
   border-bottom: none;
 }
@@ -7129,7 +7149,9 @@ html[data-design="v2"] .studio-header-sticky {
    centered app shell. */
 html[data-design="v2"] .studio-thumb-scroll {
   position: fixed;
-  top: 87px;
+  /* env-top + 8 (status-bar gap) + 39 (button height) + 20 (gap
+     from buttons to image) = env + 67 */
+  top: calc(env(safe-area-inset-top, 0px) + 67px);
   left: 0;
   right: 0;
   max-width: 520px;
@@ -7182,7 +7204,8 @@ html[data-design="v2"] .project-header-thumb-placeholder {
    right gutter. */
 html[data-design="v2"] .studio-tabs-row {
   position: fixed;
-  top: 182px;
+  /* hero top (env+67) + hero height (130) - overlap (35) = env+162 */
+  top: calc(env(safe-area-inset-top, 0px) + 162px);
   left: 20px;
   right: 20px;
   width: auto;
@@ -7212,7 +7235,9 @@ html[data-design="v2"] .studio-tab-bar {
    without the property; same removal that was made earlier on
    the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
-  padding-top: 272px;
+  /* tab-pill top (env+162) + tab-pill height (71) + 19px breathing
+     = env+252 */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 252px);
   -webkit-overflow-scrolling: auto;
 }
 html[data-design="v2"] .studio-tab {
