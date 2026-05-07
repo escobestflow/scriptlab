@@ -2402,6 +2402,7 @@ function SectionTabs({
           <button
             key={t.key}
             className={`studio-tab ${section === t.key ? "active" : ""}`}
+            data-section={t.key}
             onClick={() => setSection(t.key)}
           >
             <span className="studio-tab-label">{t.label}</span>

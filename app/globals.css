@@ -7011,24 +7011,41 @@ html[data-design="v2"] .studio-nav-fixed {
   border-bottom: none;
 }
 html[data-design="v2"] .studio-nav-fixed > button {
-  width: 40px;
-  height: 40px;
+  width: 39px;
+  height: 39px;
   border-radius: 50%;
-  background: var(--ds-color-white);
+  background: var(--ds-color-gray-lightest);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--ds-color-black);
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
+  border: none;
 }
 html[data-design="v2"] .studio-nav-fixed > button:active {
   background: var(--ds-color-gray-fill);
 }
-html[data-design="v2"] .studio-nav-fixed > button svg {
-  width: 18px;
-  height: 18px;
-  stroke: var(--ds-color-black);
+
+/* Back button — hide the v1 inline SVG (chevron) + the "BACK"
+   text span; paint the new /v2/icons/icon-back.svg via ::before. */
+html[data-design="v2"] .studio-nav-fixed > [aria-label="Back"] svg,
+html[data-design="v2"] .studio-nav-fixed > [aria-label="Back"] span {
+  display: none;
 }
-html[data-design="v2"] .studio-nav-fixed > button img {
+html[data-design="v2"] .studio-nav-fixed > [aria-label="Back"]::before {
+  content: url("/v2/icons/icon-back.svg");
+  display: block;
+  width: 8px;
+  height: 14px;
+  line-height: 0;
+}
+
+/* Edit button (v1's "Settings" aria-label) — swap the v1 settings
+   img for the new project-edit pencil icon. */
+html[data-design="v2"] .studio-nav-fixed > [aria-label="Settings"] img {
+  content: url("/v2/icons/icon-project-edit.svg");
+  width: 17px;
+  height: 17px;
   filter: none;
 }
 
@@ -7193,6 +7210,44 @@ html[data-design="v2"] .studio-tab.active {
   font-weight: 700;
   color: var(--ds-color-black);
 }
+
+/* Section-tab icons (16×19) — painted via CSS mask so we can flip
+   color between active (black) and inactive (chip-label gray)
+   without juggling separate active/inactive SVG files. The
+   data-section attribute on the JSX picks the right asset. */
+html[data-design="v2"] .studio-tab::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 19px;
+  background-color: var(--ds-color-gray-chip-label);
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
+html[data-design="v2"] .studio-tab.active::before {
+  background-color: var(--ds-color-black);
+}
+html[data-design="v2"] .studio-tab[data-section="concept"]::before {
+  mask-image: url("/v2/icons/icon-concept.svg");
+  -webkit-mask-image: url("/v2/icons/icon-concept.svg");
+}
+html[data-design="v2"] .studio-tab[data-section="characters"]::before {
+  mask-image: url("/v2/icons/icon-characters.svg");
+  -webkit-mask-image: url("/v2/icons/icon-characters.svg");
+}
+html[data-design="v2"] .studio-tab[data-section="story"]::before {
+  mask-image: url("/v2/icons/icon-story.svg");
+  -webkit-mask-image: url("/v2/icons/icon-story.svg");
+}
+html[data-design="v2"] .studio-tab[data-section="script"]::before {
+  mask-image: url("/v2/icons/icon-script.svg");
+  -webkit-mask-image: url("/v2/icons/icon-script.svg");
+}
+
 /* Drop v1's underline indicator and use a small dot beneath the
    active label instead, matching the screenshot. */
 html[data-design="v2"] .studio-tab .studio-tab-label::after {
