@@ -78,6 +78,7 @@ Letter-spacing percentages → em (3% = 0.03em).
 | `ds-type-body` | 13 / 400 / 0 | (same) |
 | `ds-type-selected-option-label` | 9 / 500 / 0.03em / UPPER | (same) |
 | `ds-type-button-label` | 12 / 400 / 0.07em / UPPER | (same) |
+| `ds-type-draft-dropdown` | 10 / 500 / 0.03em / case-as-typed | 11 / 500 / 0.09em / UPPER |
 
 `UPPER` = `text-transform: uppercase`.
 

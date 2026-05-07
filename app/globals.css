@@ -6202,6 +6202,14 @@ html[data-design="v2"] .ds-type-button-label {
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
+html[data-design="v2"] .ds-type-draft-dropdown {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 10px;
+  line-height: normal;
+  letter-spacing: 0.03em;
+  /* Mobile: case-as-typed. Desktop overrides flip to UPPER below. */
+}
 
 /* Desktop overrides — only properties that differ from mobile. The
    1440px breakpoint matches the existing layout's mobile↔desktop
@@ -6245,6 +6253,11 @@ html[data-design="v2"] .ds-type-button-label {
   }
   /* attribute-title, body, selected-option-label, button-label —
      identical mobile + desktop, no overrides needed. */
+  html[data-design="v2"] .ds-type-draft-dropdown {
+    font-size: 11px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
 }
 
 /* App-shell mobile background. Bounded to viewports below the
@@ -7128,12 +7141,15 @@ html[data-design="v2"] .studio-header-sticky > .project-header-title-btn {
 }
 html[data-design="v2"] .studio-header-sticky > .drafts-dropdown-trigger {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 36px);
+  /* 10px lower than the previous env+36 to give the project title
+     more breathing room above the draft dropdown text. */
+  top: calc(env(safe-area-inset-top, 0px) + 46px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 25;
-  font-family: var(--ds-font-body);
-  font-size: 12px;
+  /* Typography supplied by the .ds-type-draft-dropdown class on the
+     JSX (10px / 500 / 0.03em mobile; 11px / 500 / 0.09em / UPPER
+     desktop). Color overrides only here. */
   color: var(--ds-color-gray-chip-label);
   background: transparent;
   border: none;

@@ -1466,7 +1466,7 @@ export function Studio({
             </div>
           ) : (
             <button
-              className="drafts-dropdown-trigger"
+              className="drafts-dropdown-trigger ds-type-draft-dropdown"
               onClick={() => setDraftsDropdownOpen(v => !v)}
             >
               <span>Draft {activeProjectDraft.number}</span>
@@ -2651,7 +2651,7 @@ function LayerDraftPicker({
         className="layer-draft-trigger"
         onClick={() => setOpen(v => !v)}
       >
-        <span className="layer-draft-label">{label} Draft {active.number}</span>
+        <span className="layer-draft-label ds-type-draft-dropdown">{label} Draft {active.number}</span>
         <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
       {/* Save-draft button rendering rule: only show when autosave is
