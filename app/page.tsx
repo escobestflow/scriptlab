@@ -316,8 +316,12 @@ export default function Page() {
       if (!scroller) return;
       const onScroll = () => {
         const t = scroller.scrollTop;
-        // 0px → 1, 30px+ → 0, linear in between.
-        const fade = Math.max(0, Math.min(1, (30 - t) / 30));
+        // Fade window starts at 30px and ends at 60px:
+        //   ≤ 30  → 1 (fully visible — the first 30px of scroll is
+        //           "free" and the wordmark / page heading hold)
+        //   30→60 → 1..0 linear (the actual fade)
+        //   ≥ 60  → 0 (gone)
+        const fade = Math.max(0, Math.min(1, (60 - t) / 30));
         document.documentElement.style.setProperty("--v2-scroll-fade", String(fade));
       };
       scroller.addEventListener("scroll", onScroll, { passive: true });

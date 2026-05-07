@@ -392,6 +392,14 @@ export function Studio({
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current || !thumbRef.current) return;
+    // V2: hero stays fully opaque always (it's a persistent fixed
+    // overlay in the v2 design, not a scrolling thumb). Reset any
+    // residual inline opacity from a prior render and skip the v1
+    // fade math.
+    if (typeof document !== "undefined" && document.documentElement.dataset.design === "v2") {
+      thumbRef.current.style.opacity = "";
+      return;
+    }
     const y = scrollRef.current.scrollTop;
     thumbRef.current.style.opacity = `${Math.max(0, 1 - y / 60)}`;
   }, []);

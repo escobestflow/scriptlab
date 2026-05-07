@@ -7264,10 +7264,34 @@ html[data-design="v2"] .studio-tab-bar {
    without the property; same removal that was made earlier on
    the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
-  /* tab-pill top (env+162) + tab-pill height (71) + 19px breathing
-     = env+252 */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 252px);
+  /* tab-pill top (env+162) + tab-pill height (71) + layer-bar
+     height (44) + 14px breathing = env+291. Content starts below
+     the layer-bar so the layer-bar covers any content scrolled up
+     past it (z-index ordering: layer-bar > content < tab pill). */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 291px);
   -webkit-overflow-scrolling: auto;
+}
+
+/* Layer draft dropdown bar — fixed-position persistent strip 15px
+   higher than v1's previous resting position. Light fill (matches
+   the page bg so it reads as a continuation of the surface rather
+   than a separate slab). z-index 9 sits beneath the tab pill (11)
+   but above the in-flow scroll content (auto), so as the user
+   scrolls the cards pass behind the layer-bar.
+   Position: tab-pill bottom (env+233) + 4px breathing = env+237. */
+html[data-design="v2"] .layer-bar {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 237px);
+  left: 0;
+  right: 0;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 10px 30px;
+  z-index: 9;
+  background: var(--ds-color-app-background);
+  /* Drop the v1 SVG draft-bar-bg + the sticky offset math. */
+  background-image: none;
+  min-height: 44px;
 }
 html[data-design="v2"] .studio-tab {
   flex-direction: column;
@@ -7750,5 +7774,35 @@ html[data-design="v2"] .post-login-tagline {
    For v2 we want the native black, so unset the filter. */
 html[data-design="v2"] .post-login-logo {
   filter: none;
+}
+
+/* ── V2 main menu panel (invert from dark to light) ───────────
+   The menu panel that drops down from the topbar is dark in v1
+   (#0b0b0f bg, white text). For v2, flip to the light surface
+   and dark ink so it matches the rest of the app. */
+html[data-design="v2"] .menu-panel {
+  background: var(--ds-color-app-background);
+}
+html[data-design="v2"] .menu-panel-item {
+  color: var(--ds-color-black);
+  border-bottom-color: var(--ds-color-gray-outline);
+}
+html[data-design="v2"] .menu-panel-item svg {
+  stroke: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .menu-panel-item:hover,
+html[data-design="v2"] .menu-panel-item:active {
+  color: var(--ds-color-black);
+  background: var(--ds-color-gray-fill);
+}
+/* Account row + utility row pick up the same inversion. */
+html[data-design="v2"] .menu-panel-account-row,
+html[data-design="v2"] .menu-panel-utility {
+  color: var(--ds-color-black);
+  border-bottom-color: var(--ds-color-gray-outline);
+}
+html[data-design="v2"] .menu-panel-account-row svg,
+html[data-design="v2"] .menu-panel-utility svg {
+  stroke: var(--ds-color-gray-chip-label);
 }
 
