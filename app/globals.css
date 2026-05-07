@@ -6433,6 +6433,58 @@ html[data-design="v2"] .projects-tab-heading + .ds-btn {
   display: none;
 }
 
+/* V2 first-run empty state — the door graphic
+   (`/v2/unfold-mobile-bg-final-final.png`, 853×1844 portrait) is
+   the SCREEN BACKGROUND. Doorway sits in the upper portion; the
+   light "floor" below extends down through the page so the title /
+   subtitle / CTA stack naturally overlays the floor area. No inline
+   <img> element is rendered in v2 — JSX gates it on `isV2`. */
+html[data-design="v2"] .projects-empty {
+  background-image: url("/v2/unfold-mobile-bg-final-final.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Stretch to the visible viewport between top nav + tab bar so the
+     bg image fills the screen. dvh handles iOS dynamic toolbars. */
+  min-height: 100dvh;
+  /* Bottom padding clears the fixed tab bar so the CTA isn't hidden;
+     flex-end anchors the content stack to the lower portion of the
+     screen, sitting on top of the floor area of the asset. */
+  padding: 0 20px 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  text-align: center;
+}
+/* Title: Poynter Oldstyle Display, single-line at mobile widths.
+   Spec'd `ds-type-empty` is 34px which wraps "Your story starts here"
+   onto two lines on a 360-px viewport — the comp shows it on one
+   line, so we step down to 28 mobile / 36 desktop. */
+html[data-design="v2"] .projects-empty-title {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: 0;
+  margin: 0 0 8px;
+}
+/* Subtitle copy on v2 — Lato body weight + the gray-chip-label token
+   (the existing `--ink-mute` would inherit v1 colorways). */
+html[data-design="v2"] .projects-empty-sub {
+  color: var(--ds-color-gray-chip-label);
+  font-family: var(--font-ui, inherit);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.55;
+  margin: 6px 0 26px;
+}
+@media (min-width: 1440px) {
+  html[data-design="v2"] .projects-empty-title {
+    font-size: 36px;
+  }
+}
+
 /* Tabbar — white background, swap to v2 icons, apply main-tab-nav
    type tokens to labels. Uses content: url() to replace the <img>
    src without touching the JSX. */
@@ -7205,10 +7257,17 @@ html[data-design="v2"] .studio-header-sticky {
    middle band of the source. Constrained to the .app box's
    max-width (520px) so on desktop preview it doesn't escape the
    centered app shell. */
+/* Project image — POPULATED-state geometry (default for every
+   layer that has content: Concept always, plus Characters / Story /
+   Script when they have entries). Full-bleed: 134 tall, no
+   horizontal gutters, no corner radius. The empty-state override
+   below switches to an inset, taller, rounded variant so the
+   layered empty-state composition reads correctly.
+
+   Per spec: 4px taller and 1px higher than the previous geometry
+   (was env+67, height 130). Now env+66, height 134, bottom env+200. */
 html[data-design="v2"] .studio-thumb-scroll {
   position: fixed;
-  /* Per spec: 4px taller and 1px higher than the previous geometry
-     (was env+67, height 130). Now env+66, height 134, bottom env+200. */
   top: calc(env(safe-area-inset-top, 0px) + 66px);
   left: 0;
   right: 0;
@@ -7219,16 +7278,41 @@ html[data-design="v2"] .studio-thumb-scroll {
   border-radius: 0;
   z-index: 10;
 }
+/* Project image — EMPTY-state geometry (Characters / Story / Script
+   when their layer has no entries). 208 tall, 20px viewport gutters,
+   12px corner radius — works with the empty-card hero composition
+   below it. Selector uses `:has(.empty-layer-state)` so the override
+   only applies when an empty-state container is in the DOM (active
+   tab is in empty state); the moment the user adds a character /
+   beat / scene the override falls away and the hero snaps back to
+   the populated full-bleed look. */
+html[data-design="v2"]:has(.empty-layer-state) .studio-thumb-scroll {
+  left: 20px;
+  right: 20px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+  height: 208px;
+  border-radius: 12px;
+  overflow: hidden;
+}
 html[data-design="v2"] .studio-thumb-button {
   /* Both classes (.studio-thumb-scroll + .studio-thumb-button) live
      on the same JSX element. Sizing is owned by .studio-thumb-scroll
-     (130px fixed). Setting width/height: 100% here would resolve
-     against the viewport (since position: fixed) and blow the hero
-     up to fullscreen — only neutralize button chrome here. */
+     (134 fixed in populated state). Setting width/height: 100% here
+     would resolve against the viewport (since position: fixed) — only
+     neutralize button chrome here. */
   border-radius: 0;
   margin: 0;
   padding: 0;
   overflow: hidden;
+}
+/* In empty state the hero gets viewport gutters via left:20/right:20.
+   v1's `.studio-thumb-button { width: 100% }` overrides those, so reset
+   width to auto and pick up the 12px radius from the hero rule. */
+html[data-design="v2"]:has(.empty-layer-state) .studio-thumb-button {
+  width: auto;
+  border-radius: 12px;
 }
 html[data-design="v2"] .project-header-thumb {
   width: 100%;
@@ -7272,6 +7356,36 @@ html[data-design="v2"] .studio-tabs-row {
   margin: 0 auto;
   z-index: 11;
 }
+/* Empty-state override: tab pill drops 120px so it sits ON the
+   empty-layer card area rather than over the (now taller) hero
+   image. position: fixed + z-index 11 already mean it floats above
+   the scroll content and isn't itself scrollable. */
+html[data-design="v2"]:has(.empty-layer-state) .studio-tabs-row {
+  top: calc(env(safe-area-inset-top, 0px) + 297px);
+}
+/* Empty-state tab pill — kill the white pill background + shadow
+   so the tab labels read as floating glyphs ON the empty card
+   rather than being framed by their own white surface. The active-
+   tab white selection box (.studio-tab.active .studio-tab-bg)
+   stays untouched so the active state still reads. */
+html[data-design="v2"]:has(.empty-layer-state) .studio-tab-bar {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+/* Empty-state layer-bar — re-anchor so the "<Layer> Draft N ▾"
+   text sits ~10px above the empty card's title. Math: empty title
+   top ≈ env+431; flex-end + padding-bottom 12 puts the draft text
+   bottom at (top + 94) - 12 = top + 82; we want text bottom at
+   env+421 (= 431 - 10), so layer-bar top = 421 - 82 = env+339,
+   rounded to env+345 to absorb the few-px offset between the flex
+   content edge and the rendered text baseline. Bar background
+   drops to transparent so it doesn't paint a gray slab over the
+   white empty card it now overlaps. */
+html[data-design="v2"]:has(.empty-layer-state) .layer-bar {
+  top: calc(env(safe-area-inset-top, 0px) + 345px);
+  background: transparent;
+}
 html[data-design="v2"] .studio-tab-bar {
   background: var(--ds-color-white);
   border-radius: 20px;
@@ -7298,8 +7412,13 @@ html[data-design="v2"] .studio-scroll {
      env+310, so first content (concept attribute card / character
      row) starts inside the layer-bar's vertical area. The
      layer-bar still sits above (z-index 9 > scroll content) and
-     visually masks anything that scrolls behind it. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 260px);
+     visually masks anything that scrolls behind it.
+     Bumped through env+260 → +263 → +268 → +300 → +285 → +277 →
+     +276 — the +300 fully cleared the layer-bar (which ends at
+     env+296) but read too low; pulled back 24 total so first-row
+     content sits inside the layer-bar's bottom band as a deliberate
+     visual tuck rather than a hard gap. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 276px);
   -webkit-overflow-scrolling: auto;
 }
 
@@ -7322,7 +7441,9 @@ html[data-design="v2"] .layer-bar {
   right: 0;
   max-width: 520px;
   margin: 0 auto;
-  padding: 0 30px 15px;
+  /* padding-bottom dropped 15 → 12 to nudge the draft trigger text
+     down 3px within the bar (flex-end + smaller bottom padding). */
+  padding: 0 30px 12px;
   z-index: 9;
   background: var(--ds-color-app-background);
   /* Drop the v1 SVG draft-bar-bg. */
@@ -7698,32 +7819,53 @@ html[data-design="v2"] .v2-cast-action-label {
    left, silhouette pedestal right. Title gets the Poynter display
    treatment, buttons get the v2 treatment (primary black,
    secondary white outline). */
+/* Three-layer composition (back → front):
+     1. .empty-layer-state — white card with rounded corners
+     2. .empty-layer-icon — silhouette graphic, full viewport width
+                            (escapes the card AND the surrounding
+                            tab-content-wrap padding via negative
+                            horizontal margins)
+     3. .empty-layer-title / -caption / -actions — text + CTAs that
+        overlay the lower portion of the image (the "floor" band of
+        the asset) via negative top margin + higher z-index */
 html[data-design="v2"] .empty-layer-state {
   position: relative;
   background: var(--ds-color-white);
   border: 1px solid var(--ds-color-gray-outline);
   border-radius: 18px;
-  padding: 28px 22px;
-  margin-top: 18px;
+  /* margin-top dropped 18 → 11 per spec (white box up 7px). */
+  margin-top: 11px;
   text-align: left;
+  display: flex;
+  flex-direction: column;
   align-items: stretch;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px;
-  grid-template-rows: auto;
-  column-gap: 10px;
-  /* Reset v1 flex defaults — empty-layer-state was a centered
-     column originally. */
-  flex-direction: row;
-  min-height: 280px;
+  /* Image escapes the card horizontally — overflow must stay visible. */
+  overflow: visible;
+  /* No outer padding — every inner row sets its own padding so the
+     image can reach the card content-box edge cleanly. */
+  padding: 0;
+  min-height: 0;
 }
-/* Silhouette pedestal — pinned to the bottom-right of the card. */
+/* Silhouette hero — full viewport width. calc(50% - 50vw) computes
+   the negative margin needed to push from the card's inner content
+   edge out to the viewport edge, regardless of the wrapping
+   tab-content-wrap padding. z-index: 1 puts it above the card body
+   but below the text rows below. margin-top: 60 drops the graphic
+   60px from the card's top edge so the white card "peeks" above the
+   image (per spec). */
 html[data-design="v2"] .empty-layer-state .empty-layer-icon {
-  grid-column: 2;
-  grid-row: 1 / -1;
-  align-self: end;
-  justify-self: end;
-  margin: 0;
-  width: 140px;
+  position: relative;
+  z-index: 1;
+  width: 100vw;
+  /* margin-top dropped 60 → 45 per spec (graphic up 15px). The title
+     compensates with +15 on its negative margin so the text stack
+     doesn't shift up with the image. */
+  margin-top: 45px;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  display: block;
+  align-self: stretch;
+  pointer-events: none;
 }
 html[data-design="v2"] .empty-layer-icon-v2 {
   width: 100%;
@@ -7738,35 +7880,48 @@ html[data-design="v2"] .empty-layer-state .empty-layer-icon > img:not(.empty-lay
   display: none;
 }
 
+/* Title + caption + actions all sit on z-index 2 so they layer ON
+   TOP of the image. The title carries a negative top margin that
+   pulls the whole stack up into the image's lower band — the asset
+   has the silhouettes + pedestal in the upper two-thirds and an
+   empty "floor" in the bottom third where text reads cleanly. */
 html[data-design="v2"] .empty-layer-state .empty-layer-title {
+  position: relative;
+  z-index: 2;
   font-family: var(--ds-font-display);
   font-weight: 400;
   font-size: 32px;
   line-height: 1;
   letter-spacing: 0;
   color: var(--ds-color-black);
-  margin: 0 0 12px;
-  grid-column: 1;
-  grid-row: 1;
+  /* Title (and the caption + actions stacked below it via flow)
+     lifts 140px higher than the previous comp per spec. Image
+     margin-top was reduced 60 → 45 in a follow-up tweak (graphic
+     up 15), so this compensates: -130 (original overlap) - 140
+     (title shift up) - 45 (current image flow shift down) = -315. */
+  margin: -315px 0 12px;
+  padding: 0 22px;
 }
 html[data-design="v2"] .empty-layer-state .empty-layer-caption {
+  position: relative;
+  z-index: 2;
   font-family: var(--ds-font-body);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.5;
   color: var(--ds-color-gray-chip-label);
   margin: 0 0 22px;
-  grid-column: 1;
-  grid-row: 2;
+  padding: 0 22px;
 }
 html[data-design="v2"] .empty-layer-state .empty-layer-actions {
-  grid-column: 1;
-  grid-row: 3;
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
   margin: 0;
+  padding: 0 22px 22px;
 }
 /* Override Button styling inside the v2 empty state so the two
    CTAs read as the same compact treatment used elsewhere in v2:

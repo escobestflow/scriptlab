@@ -98,6 +98,7 @@ insert into public.beta_allowlist (email, note) values
   ('anasalazar1206@gmail.com',     'beta cohort 1'),
   ('bogboss1599@gmail.com',        'beta cohort 1'),
   ('carolinehilton97@gmail.com',   'beta cohort 1'),
+  ('claude-dev@unfold.dev',        'claude dev preview — local testing'),
   ('ldeoliveiranyc@gmail.com',     'beta cohort 1'),
   ('leylakhotanzad@gmail.com',     'beta cohort 1'),
   ('luis@unfold.dev',              'beta cohort 1'),

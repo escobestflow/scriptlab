@@ -1341,7 +1341,7 @@ export default function Page() {
             >
               <div className="red-dot" />
             </button>
-            <div className="record-label">REC</div>
+            <div className="record-label">{isV2 ? "RECORD" : "REC"}</div>
           </div>
 
           <button
@@ -2365,8 +2365,12 @@ function ProjectsTab({
   if (projects.length === 0 && !hasInvites) {
     return (
       <div className="projects-empty">
-        <EmptyPosterStack />
-        <h1 className="projects-empty-title">Your story starts here</h1>
+        {/* v1: rotating poster-stack illustration. v2: the door graphic is
+             painted as the screen background via CSS, no inline element. */}
+        {!isV2 && <EmptyPosterStack />}
+        <h1 className="projects-empty-title">
+          Your story starts here
+        </h1>
         <p className="projects-empty-sub">
           Begin with an idea, shape the world around it,<br />and watch your story unfold.
         </p>
