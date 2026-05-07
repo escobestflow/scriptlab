@@ -2355,6 +2355,7 @@ function ProjectsTab({
   partnerEmails: Record<string, string>;
 }) {
   const hasInvites = pendingInvites.length > 0;
+  const isV2 = useIsV2();
 
   // First-run empty state — only when there are also no pending
   // invites. A brand-new user whose first interaction is an invite
@@ -2428,7 +2429,7 @@ function ProjectsTab({
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: hasInvites ? 10 : 40 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: (hasInvites ? 10 : 40) - (isV2 ? 15 : 0) }}>
         <div className="display projects-tab-heading ds-type-tab-header">Projects</div>
         <Button
           variant="secondary"
@@ -2927,6 +2928,7 @@ function MomentsTab({
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All");
+  const isV2 = useIsV2();
 
   // Dev-only: "Convert all notes to AI prompt". When the Note filter is
   // active, a button above the list posts every filtered note to
@@ -2993,7 +2995,7 @@ function MomentsTab({
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 - (isV2 ? 15 : 0) }}>
         <div className="display ideas-tab-heading ds-type-tab-header">Ideas</div>
         <Button
           variant="secondary"

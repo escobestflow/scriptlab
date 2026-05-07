@@ -6308,8 +6308,14 @@ html[data-design="v2"] .topbar.topbar-dark {
 html[data-design="v2"] .screen-scroll {
   padding-top: 55px;
 }
+/* Menu button (left side of topbar) — 39x39 circle, gray-lightest
+   fill, soft drop shadow per design-system spec. Same treatment as
+   the studio nav back/edit buttons for consistency. */
 html[data-design="v2"] .topbar .topbar-btn {
-  background: var(--ds-color-white);
+  width: 39px;
+  height: 39px;
+  background: var(--ds-color-gray-lightest);
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
 }
 /* Reuse v1's three-span menu-toggle (it already animates into an X
    via the .open class) — just rescale the bars to match the v2
@@ -6374,8 +6380,8 @@ html[data-design="v2"][data-scrolled-past-140] .topbar .topbar-center .brand-log
 /* New "+" add button in the topbar — only rendered in v2 (see
    page.tsx). Black circular background matching screenshot. */
 html[data-design="v2"] .v2-topbar-add {
-  width: 44px;
-  height: 44px;
+  width: 39px;
+  height: 39px;
   border-radius: 50%;
   background: var(--ds-color-black);
   color: var(--ds-color-white);
