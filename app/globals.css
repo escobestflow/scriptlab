@@ -108,6 +108,12 @@ html[data-theme="dark"] {
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; height: 100%; overscroll-behavior-y: none; }
+/* Explicit html background — iOS Safari paints the area above the
+   body (overscroll gap, status-bar inset) with this. Without it,
+   iOS falls back to system black on notched / dynamic-island
+   devices, producing a hard black bar at the top. */
+html { background: var(--body-bg, #FDFEFE); color-scheme: light; }
+html[data-design="v2"] { background: var(--ds-color-app-background); }
 
 body {
   background: var(--body-bg);
