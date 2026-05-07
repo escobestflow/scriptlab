@@ -2413,6 +2413,11 @@ function SectionTabs({
             data-section={t.key}
             onClick={() => setSection(t.key)}
           >
+            {/* Selection box — 73×71 centered behind the icon/label
+                of the active tab. Always rendered, hidden via CSS
+                except on .active so we don't have to track another
+                conditional in JSX. */}
+            <span className="studio-tab-bg" aria-hidden="true" />
             <span className="studio-tab-label">{t.label}</span>
             {dot && <span className="sync-dot" />}
           </button>

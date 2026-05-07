@@ -7353,12 +7353,41 @@ html[data-design="v2"] .studio-tab.active {
   color: var(--ds-color-black);
 }
 
+/* Selection box — 73×71 rounded surface centered behind the
+   icon/label of the active tab. Always present in the JSX but
+   hidden via display: none unless the tab is .active. z-index 0
+   so it sits beneath the icon (::before) / label / dot — the
+   icon and label have explicit z-indexes set below to win the
+   stacking. Inset 0.7px gray-outline stroke + 0,2,13,0,10% drop
+   shadow + 0,4,14,0,5% inner shadow per spec. */
+html[data-design="v2"] .studio-tab .studio-tab-bg {
+  display: none;
+}
+html[data-design="v2"] .studio-tab.active .studio-tab-bg {
+  display: block;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 73px;
+  height: 71px;
+  border-radius: 11px;
+  background: transparent;
+  box-shadow:
+    inset 0 0 0 0.7px var(--ds-color-gray-outline),
+    0 2px 13px 0 rgba(0, 0, 0, 0.10),
+    inset 0 4px 14px 0 rgba(0, 0, 0, 0.05);
+  z-index: 0;
+  pointer-events: none;
+}
+
 /* Section-tab icons (16×19) — painted via CSS mask so we can flip
    color between active (black) and inactive (chip-label gray)
    without juggling separate active/inactive SVG files. The
    data-section attribute on the JSX picks the right asset.
    Pinned 14px from the top of the tab so it sits well above the
-   label (which is anchored at bottom: 20). */
+   label (which is anchored at bottom: 20). z-index keeps the
+   icon above the .studio-tab-bg surface. */
 html[data-design="v2"] .studio-tab::before {
   content: "";
   position: absolute;
@@ -7374,6 +7403,7 @@ html[data-design="v2"] .studio-tab::before {
   -webkit-mask-repeat: no-repeat;
   mask-position: center;
   -webkit-mask-position: center;
+  z-index: 1;
 }
 
 /* Label always 20px from the bar's bottom — the dot's presence
@@ -7384,6 +7414,7 @@ html[data-design="v2"] .studio-tab .studio-tab-label {
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
+  z-index: 1;
 }
 html[data-design="v2"] .studio-tab.active::before {
   background-color: var(--ds-color-black);
@@ -7422,6 +7453,7 @@ html[data-design="v2"] .studio-tab.active::after {
   height: 4px;
   border-radius: 50%;
   background: var(--ds-color-black);
+  z-index: 1;
 }
 
 /* ── V2 attribute rows (Concept tab + others) ──────────────────
