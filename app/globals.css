@@ -7079,9 +7079,12 @@ html[data-design="v2"] .attr-pill[data-genre="mystery"]    { background: var(--d
    align-items: flex-start anchors buttons to the top of the
    content area rather than centering. */
 html[data-design="v2"] .studio-nav-fixed {
-  height: calc(env(safe-area-inset-top, 0px) + 8px + 40px + 8px);
+  /* 9px taller than the previous 8+40+8 slab — keep buttons at the
+     same env+8 top, push the extra height onto the bottom padding
+     so the slab grows downward. Total: env + 8 + 40 + 17 = env+65. */
+  height: calc(env(safe-area-inset-top, 0px) + 8px + 40px + 17px);
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
-  padding-bottom: 8px;
+  padding-bottom: 17px;
   padding-left: 30px;
   padding-right: 30px;
   align-items: flex-start;
@@ -7291,24 +7294,27 @@ html[data-design="v2"] .studio-tab-bar {
    without the property; same removal that was made earlier on
    the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
-  /* tab-pill bottom (env+248) + 4px gap → layer-bar top env+252;
-     layer-bar height 94; 14px breathing → content at env+360. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 360px);
+  /* layer-bar top env+202; layer-bar height 94 → bottom env+296;
+     14px breathing → content at env+310. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 310px);
   -webkit-overflow-scrolling: auto;
 }
 
-/* Layer draft dropdown bar — fixed-position persistent strip just
-   below the tab pill. Light fill (matches the page bg so it reads
-   as a continuation of the surface rather than a separate slab).
-   z-index 9 sits beneath the tab pill (11) but above the in-flow
-   scroll content (auto), so as the user scrolls the cards pass
-   behind the layer-bar.
-   Position: tab-pill bottom (env+248) + 4px breathing = env+252.
+/* Layer draft dropdown bar — fixed-position persistent strip.
+   Light fill (matches the page bg so it reads as a continuation
+   of the surface rather than a separate slab). z-index 9 sits
+   beneath the tab pill (11) but above the in-flow scroll content
+   (auto), so as the user scrolls the cards pass behind the
+   layer-bar.
+
+   Top: env+202 — moved up 50px from the previous env+252 per
+   spec. Now overlaps the tab pill (tab-pill bottom env+248);
+   z-index ordering keeps the tab pill above the layer-bar.
    Height bumped to 94px. align-items: flex-end + padding-bottom 15
    so the draft trigger text sits 15px from the bar's bottom edge. */
 html[data-design="v2"] .layer-bar {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 252px);
+  top: calc(env(safe-area-inset-top, 0px) + 202px);
   left: 0;
   right: 0;
   max-width: 520px;
@@ -7321,10 +7327,17 @@ html[data-design="v2"] .layer-bar {
   min-height: 94px;
   align-items: flex-end;
 }
+/* Tabs are sized by the parent .studio-tab-bar (height 71). The
+   tab itself is `position: relative` from v1, which we use here
+   to anchor the absolute children. Label and dot are absolutely
+   positioned so the label's distance from the bar's bottom edge
+   (20px) never shifts when the dot appears under it. The icon
+   stays at top via flex-start of an inset positioned ::before. */
 html[data-design="v2"] .studio-tab {
-  flex-direction: column;
-  gap: 6px;
-  padding: 8px 4px;
+  /* Drop the flex-column layout — children are absolutely
+     positioned now, so a flow layout would only fight them. */
+  display: block;
+  padding: 0;
   font-family: var(--ds-font-body);
   font-weight: 500;
   font-size: 7px;
@@ -7340,10 +7353,15 @@ html[data-design="v2"] .studio-tab.active {
 /* Section-tab icons (16×19) — painted via CSS mask so we can flip
    color between active (black) and inactive (chip-label gray)
    without juggling separate active/inactive SVG files. The
-   data-section attribute on the JSX picks the right asset. */
+   data-section attribute on the JSX picks the right asset.
+   Pinned 14px from the top of the tab so it sits well above the
+   label (which is anchored at bottom: 20). */
 html[data-design="v2"] .studio-tab::before {
   content: "";
-  display: block;
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 16px;
   height: 19px;
   background-color: var(--ds-color-gray-chip-label);
@@ -7353,6 +7371,16 @@ html[data-design="v2"] .studio-tab::before {
   -webkit-mask-repeat: no-repeat;
   mask-position: center;
   -webkit-mask-position: center;
+}
+
+/* Label always 20px from the bar's bottom — the dot's presence
+   under it doesn't shift this anchor. */
+html[data-design="v2"] .studio-tab .studio-tab-label {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 html[data-design="v2"] .studio-tab.active::before {
   background-color: var(--ds-color-black);
@@ -7374,18 +7402,23 @@ html[data-design="v2"] .studio-tab[data-section="script"]::before {
   -webkit-mask-image: url("/v2/icons/icon-script.svg");
 }
 
-/* Drop v1's underline indicator and use a small dot beneath the
-   active label instead, matching the screenshot. */
+/* Drop v1's underline indicator and use a small dot 8px from the
+   bar's bottom edge instead. Absolutely positioned so it never
+   shifts the label above it — when the tab becomes inactive, the
+   dot disappears via display: none and nothing else moves. */
 html[data-design="v2"] .studio-tab .studio-tab-label::after {
   display: none;
 }
 html[data-design="v2"] .studio-tab.active::after {
   content: "";
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 4px;
   height: 4px;
   border-radius: 50%;
   background: var(--ds-color-black);
-  margin-top: 2px;
 }
 
 /* ── V2 attribute rows (Concept tab + others) ──────────────────
