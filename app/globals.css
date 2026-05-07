@@ -6321,12 +6321,12 @@ html[data-design="v2"] .topbar.topbar-dark {
 html[data-design="v2"] .screen-scroll {
   padding-top: 55px;
 }
-/* Menu button (left side of topbar) — 39x39 circle, gray-lightest
+/* Menu button (left side of topbar) — 40x40 circle, gray-lightest
    fill, soft drop shadow per design-system spec. Same treatment as
    the studio nav back/edit buttons for consistency. */
 html[data-design="v2"] .topbar .topbar-btn {
-  width: 39px;
-  height: 39px;
+  width: 40px;
+  height: 40px;
   background: var(--ds-color-gray-lightest);
   box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
 }
@@ -6399,8 +6399,8 @@ html[data-design="v2"] .ideas-tab-heading {
 /* New "+" add button in the topbar — only rendered in v2 (see
    page.tsx). Black circular background matching screenshot. */
 html[data-design="v2"] .v2-topbar-add {
-  width: 39px;
-  height: 39px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--ds-color-black);
   color: var(--ds-color-white);
@@ -6410,7 +6410,18 @@ html[data-design="v2"] .v2-topbar-add {
   border: none;
   padding: 0;
   cursor: pointer;
+  /* Hide instantly when the main menu is open (CSS rule below
+     uses :has() to detect the open state). The transition only
+     plays on the appear-side; disappearance is immediate. */
   transition: opacity 160ms var(--ease, ease);
+}
+
+/* Hide the topbar add button immediately whenever the main-menu
+   panel is open. :has() walks the document for an .open menu;
+   when found, suppress every .v2-topbar-add. No fade — pure
+   display: none for an instant collapse. */
+html[data-design="v2"]:has(.menu-panel.open) .v2-topbar-add {
+  display: none;
 }
 html[data-design="v2"] .v2-topbar-add:active { opacity: 0.7; }
 
@@ -7061,26 +7072,25 @@ html[data-design="v2"] .attr-pill[data-genre="mystery"]    { background: var(--d
    asset dropped in /public/v2/empty-state-characters.{png,svg} +
    JSX conditional rendering. */
 
-/* Top nav — flat, transparent, small circle buttons. Padding
-   places the back button 30px from the viewport's left edge and
-   the edit button 30px from the right (via flex space-between
-   on the parent). 8px gap between the safe-area-bottom and the
-   buttons' top edges; align-items: flex-start so the buttons
-   sit AT the top of the content area rather than centering in
-   any extra height. */
+/* Top nav — opaque slab so content scrolling up behind it gets
+   masked cleanly (page bg matches the slab, so no visual seam).
+   30px gutter on each side for the back / edit buttons; 8px gap
+   between the safe-area bottom and the button top edges;
+   align-items: flex-start anchors buttons to the top of the
+   content area rather than centering. */
 html[data-design="v2"] .studio-nav-fixed {
-  height: calc(env(safe-area-inset-top, 0px) + 8px + 39px + 8px);
+  height: calc(env(safe-area-inset-top, 0px) + 8px + 40px + 8px);
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
   padding-bottom: 8px;
   padding-left: 30px;
   padding-right: 30px;
   align-items: flex-start;
-  background: transparent;
+  background: var(--ds-color-app-background);
   border-bottom: none;
 }
 html[data-design="v2"] .studio-nav-fixed > button {
-  width: 39px;
-  height: 39px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: var(--ds-color-gray-lightest);
   display: inline-flex;
@@ -7194,14 +7204,14 @@ html[data-design="v2"] .studio-header-sticky {
    centered app shell. */
 html[data-design="v2"] .studio-thumb-scroll {
   position: fixed;
-  /* env-top + 8 (status-bar gap) + 39 (button height) + 20 (gap
-     from buttons to image) = env + 67 */
-  top: calc(env(safe-area-inset-top, 0px) + 67px);
+  /* Per spec: 4px taller and 1px higher than the previous geometry
+     (was env+67, height 130). Now env+66, height 134, bottom env+200. */
+  top: calc(env(safe-area-inset-top, 0px) + 66px);
   left: 0;
   right: 0;
   max-width: 520px;
   margin: 0 auto;
-  height: 130px;
+  height: 134px;
   padding: 0;
   border-radius: 0;
   z-index: 10;
@@ -7249,8 +7259,9 @@ html[data-design="v2"] .project-header-thumb-placeholder {
    right gutter. */
 html[data-design="v2"] .studio-tabs-row {
   position: fixed;
-  /* hero top (env+67) + hero height (130) - overlap (35) = env+162 */
-  top: calc(env(safe-area-inset-top, 0px) + 162px);
+  /* 15px lower than the prior env+162 per spec — tab bar bottom
+     edge now sits at env+248 (env+177 + 71px height). */
+  top: calc(env(safe-area-inset-top, 0px) + 177px);
   left: 20px;
   right: 20px;
   width: auto;
@@ -7280,34 +7291,35 @@ html[data-design="v2"] .studio-tab-bar {
    without the property; same removal that was made earlier on
    the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
-  /* tab-pill top (env+162) + tab-pill height (71) + layer-bar
-     height (44) + 14px breathing = env+291. Content starts below
-     the layer-bar so the layer-bar covers any content scrolled up
-     past it (z-index ordering: layer-bar > content < tab pill). */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 291px);
+  /* tab-pill bottom (env+248) + 4px gap → layer-bar top env+252;
+     layer-bar height 94; 14px breathing → content at env+360. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 360px);
   -webkit-overflow-scrolling: auto;
 }
 
-/* Layer draft dropdown bar — fixed-position persistent strip 15px
-   higher than v1's previous resting position. Light fill (matches
-   the page bg so it reads as a continuation of the surface rather
-   than a separate slab). z-index 9 sits beneath the tab pill (11)
-   but above the in-flow scroll content (auto), so as the user
-   scrolls the cards pass behind the layer-bar.
-   Position: tab-pill bottom (env+233) + 4px breathing = env+237. */
+/* Layer draft dropdown bar — fixed-position persistent strip just
+   below the tab pill. Light fill (matches the page bg so it reads
+   as a continuation of the surface rather than a separate slab).
+   z-index 9 sits beneath the tab pill (11) but above the in-flow
+   scroll content (auto), so as the user scrolls the cards pass
+   behind the layer-bar.
+   Position: tab-pill bottom (env+248) + 4px breathing = env+252.
+   Height bumped to 94px. align-items: flex-end + padding-bottom 15
+   so the draft trigger text sits 15px from the bar's bottom edge. */
 html[data-design="v2"] .layer-bar {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 237px);
+  top: calc(env(safe-area-inset-top, 0px) + 252px);
   left: 0;
   right: 0;
   max-width: 520px;
   margin: 0 auto;
-  padding: 10px 30px;
+  padding: 0 30px 15px;
   z-index: 9;
   background: var(--ds-color-app-background);
-  /* Drop the v1 SVG draft-bar-bg + the sticky offset math. */
+  /* Drop the v1 SVG draft-bar-bg. */
   background-image: none;
-  min-height: 44px;
+  min-height: 94px;
+  align-items: flex-end;
 }
 html[data-design="v2"] .studio-tab {
   flex-direction: column;
@@ -7391,7 +7403,7 @@ html[data-design="v2"] .attr-row {
   border-radius: 14px;
   box-shadow: none;
   margin-bottom: 10px;
-  min-height: 0;
+  min-height: 56px;
   overflow: visible;
 }
 html[data-design="v2"] .attr-row-header {
