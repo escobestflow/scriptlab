@@ -274,17 +274,18 @@ export default function Page() {
   // iOS — the meta tag itself has to be REMOVED and a fresh one
   // appended.
   //
-  // The page is "black" any time a full-bleed black overlay is up:
-  //   - Splash (!splashDone) — full black with the unfold mark
-  //   - PostLoginTransition (!hydrated post-splash) — black
-  //     collapsing into the topbar
-  // After hydration, the light-background app is visible and we
-  // flip theme-color to match the page bg per design version.
+  // V2: splash + app share the --ds-color-app-background (#F8F7F7)
+  // surface end-to-end, so theme-color is constant #F8F7F7. No
+  // black phase to handle.
+  //
+  // V1: splash + PostLoginTransition are black; app is light
+  // (#FDFEFE). theme-color flips from #000 → #FDFEFE once both
+  // (a) splash dismissed AND (b) hydrated.
   useEffect(() => {
     if (typeof document === "undefined") return;
     const showSplash = !splashDone || (!authLoading && !user);
-    const blackOverlay = showSplash || !hydrated;
-    const next = blackOverlay
+    const v1BlackPhase = !isV2 && (showSplash || !hydrated);
+    const next = v1BlackPhase
       ? "#000000"
       : isV2 ? "#F8F7F7" : "#FDFEFE";
     // Remove every existing theme-color meta (Next.js can render

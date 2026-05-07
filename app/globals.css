@@ -7666,3 +7666,60 @@ html[data-design="v2"] .empty-layer-actions .ds-btn-secondary {
   background: transparent;
 }
 
+/* ── V2 inverted splash loader ────────────────────────────────
+   For v2 viewers, the SplashLoader background flips from #000 to
+   --ds-color-app-background (#F8F7F7) so the status / URL bars
+   sample a light surface and stay light end-to-end. The unfold
+   wordmark + tagline flip white→black to stay readable. The
+   vignette radial-shadow asset is dark (no stop-color → defaults
+   to black) and looks like a smudge on a light bg — hidden in v2.
+
+   `!important` on the bg because SplashLoader sets it inline via
+   style={{ background: "#000000" }}; CSS specificity alone can't
+   override an inline rule.
+
+   Pre-hydration script in app/layout.tsx sets data-design BEFORE
+   the splash renders, so first-paint already gets the v2 colors. */
+html[data-design="v2"] [data-splash-root] {
+  background: var(--ds-color-app-background) !important;
+}
+/* Logo wordmark — flip white→black via CSS fill override (the
+   inline `fill="#FFFFFF"` on each path loses to a CSS rule with
+   higher specificity, no !important needed). */
+html[data-design="v2"] [data-splash-root] .unfold-logo path {
+  fill: var(--ds-color-black);
+}
+/* Tagline ("Let your story") and skip-intro CTA — flip text color
+   to black. */
+html[data-design="v2"] [data-splash-root] .unfold-tagline {
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] [data-splash-root] .splash-skip-btn {
+  color: rgba(0, 0, 0, 0.55);
+}
+html[data-design="v2"] [data-splash-root] .splash-skip-btn:hover,
+html[data-design="v2"] [data-splash-root] .splash-skip-btn:active {
+  color: var(--ds-color-black);
+}
+/* Vignette — dark radial shadow looks wrong on light bg. Hide for
+   v2. (Can be replaced with a light-themed asset later.) */
+html[data-design="v2"] [data-splash-root] .vignette-overlay {
+  display: none;
+}
+
+/* PostLoginTransition (the splash → home handoff) — flip its black
+   collapsing bar + white tagline + inverted-white logo to the v2
+   light surface so there's no black flash between splash and app. */
+html[data-design="v2"] .post-login-bg {
+  background: var(--ds-color-app-background);
+}
+html[data-design="v2"] .post-login-tagline {
+  color: var(--ds-color-black);
+}
+/* /logo.svg ships with black fills natively. v1 PostLoginTransition
+   applies filter: invert(1) to whiten the logo on its dark bar.
+   For v2 we want the native black, so unset the filter. */
+html[data-design="v2"] .post-login-logo {
+  filter: none;
+}
+
