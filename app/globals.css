@@ -7117,8 +7117,11 @@ html[data-design="v2"] .studio-thumb-scroll {
   z-index: 10;
 }
 html[data-design="v2"] .studio-thumb-button {
-  width: 100%;
-  height: 100%;
+  /* Both classes (.studio-thumb-scroll + .studio-thumb-button) live
+     on the same JSX element. Sizing is owned by .studio-thumb-scroll
+     (130px fixed). Setting width/height: 100% here would resolve
+     against the viewport (since position: fixed) and blow the hero
+     up to fullscreen — only neutralize button chrome here. */
   border-radius: 0;
   margin: 0;
   padding: 0;
