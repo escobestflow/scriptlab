@@ -266,6 +266,26 @@ export default function Page() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // iOS theme-color updater — keeps the Safari URL-bar / status-bar
+  // tint in sync with the actual surface the user is looking at.
+  // Static <meta name="theme-color"> in head only picks up at first
+  // paint; iOS caches the sampled tint and won't re-evaluate after
+  // the splash dismisses unless we explicitly mutate the meta tag.
+  // Three states:
+  //   - splash up (black background)        → #000000
+  //   - app, v2 viewer (--ds-color-app-bg)  → #F8F7F7
+  //   - app, v1 viewer (--body-bg light)    → #FDFEFE
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+    if (!meta) return;
+    const showSplash = !splashDone || (!authLoading && !user);
+    const next = showSplash
+      ? "#000000"
+      : isV2 ? "#F8F7F7" : "#FDFEFE";
+    if (meta.content !== next) meta.content = next;
+  }, [splashDone, authLoading, user, isV2]);
+
   // V2 wordmark fade — toggle data-scrolled-past-140 on <html> when
   // the active main scroller (.screen-scroll) crosses 140px. CSS
   // owns the actual transition. Re-runs when the scroll container
