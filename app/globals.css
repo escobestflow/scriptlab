@@ -6366,15 +6366,21 @@ html[data-design="v2"] .topbar .topbar-center .brand-logo-img {
   width: 86px;
   height: 18.54px;
   filter: none;
-  /* Fade out once the page scrolls past 140px (driven by the
-     data-scrolled-past-140 attribute on <html>, set by the scroll
-     listener in app/page.tsx). Fades back in when scrolling back
-     to the top. */
-  opacity: 1;
-  transition: opacity 220ms var(--ease, ease);
+  /* Continuous scroll-driven fade. --v2-scroll-fade is set by the
+     scroll listener in app/page.tsx as a 0..1 value across the
+     first 30px of scroll: at scrollTop=0 it's 1 (fully opaque), at
+     30px or beyond it's 0 (hidden). Tracks the user's finger
+     directly — no transition smoothing on this side. */
+  opacity: var(--v2-scroll-fade, 1);
 }
-html[data-design="v2"][data-scrolled-past-140] .topbar .topbar-center .brand-logo-img {
-  opacity: 0;
+
+/* Page-title headings (Projects / Ideas) fade on the same scroll
+   range as the wordmark. The headings scroll with content but the
+   opacity is tied to the same 0..30 px window so they fade at the
+   same pace. */
+html[data-design="v2"] .projects-tab-heading,
+html[data-design="v2"] .ideas-tab-heading {
+  opacity: var(--v2-scroll-fade, 1);
 }
 
 /* New "+" add button in the topbar — only rendered in v2 (see

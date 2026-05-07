@@ -300,33 +300,31 @@ export default function Page() {
     document.head.appendChild(m);
   }, [splashDone, authLoading, user, isV2, hydrated]);
 
-  // V2 wordmark fade — toggle data-scrolled-past-140 on <html> when
-  // the active main scroller (.screen-scroll) crosses 140px. CSS
-  // owns the actual transition. Re-runs when the scroll container
-  // is replaced (mainTab key swap, or leaving main view).
+  // V2 home scroll fade — drives both the unfold wordmark and the
+  // page-title heading (Projects / Ideas) on a 0..30px scroll range
+  // via a single CSS variable on <html>. At scrollTop=0 the var is
+  // 1 (fully opaque); by scrollTop>=30 it's 0 (faded out). CSS
+  // applies the variable as opacity on the relevant elements.
+  // Continuous (per scroll event) — no transition timing on the
+  // CSS side; the value tracks the user's finger.
   useEffect(() => {
     if (typeof document === "undefined") return;
     if (view.kind !== "main") return;
-    // Wait one frame so the freshly-mounted .screen-scroll exists in
-    // the DOM. Without this, the querySelector right after a tab
-    // swap returns null and the listener attaches to nothing.
     let cleanup: (() => void) | null = null;
     const raf = requestAnimationFrame(() => {
       const scroller = document.querySelector(".screen-scroll") as HTMLElement | null;
       if (!scroller) return;
       const onScroll = () => {
-        const past = scroller.scrollTop > 140;
-        if (past) {
-          document.documentElement.setAttribute("data-scrolled-past-140", "");
-        } else {
-          document.documentElement.removeAttribute("data-scrolled-past-140");
-        }
+        const t = scroller.scrollTop;
+        // 0px → 1, 30px+ → 0, linear in between.
+        const fade = Math.max(0, Math.min(1, (30 - t) / 30));
+        document.documentElement.style.setProperty("--v2-scroll-fade", String(fade));
       };
       scroller.addEventListener("scroll", onScroll, { passive: true });
       onScroll();
       cleanup = () => {
         scroller.removeEventListener("scroll", onScroll);
-        document.documentElement.removeAttribute("data-scrolled-past-140");
+        document.documentElement.style.removeProperty("--v2-scroll-fade");
       };
     });
     return () => {
