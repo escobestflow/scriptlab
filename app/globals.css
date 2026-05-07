@@ -7121,7 +7121,7 @@ html[data-design="v2"] .studio-header-sticky {
 }
 
 /* Hero — persistent at top of page, never scrolls. Pinned via
-   position: fixed at top:127 from the viewport, height 130. The
+   position: fixed at top:87 from the viewport, height 130. The
    wide project image fills the container via object-fit: cover and
    is vertically centered (object-position: center) so it crops the
    middle band of the source. Constrained to the .app box's
@@ -7129,7 +7129,7 @@ html[data-design="v2"] .studio-header-sticky {
    centered app shell. */
 html[data-design="v2"] .studio-thumb-scroll {
   position: fixed;
-  top: 127px;
+  top: 87px;
   left: 0;
   right: 0;
   max-width: 520px;
@@ -7173,14 +7173,19 @@ html[data-design="v2"] .project-header-thumb-placeholder {
 /* Section tabs — persistent overlay slightly above the hero's
    bottom edge. Pinned via position: fixed; 71px tall pill, 20px
    gutters from viewport edges, 20px corner radius. The hero is
-   y=127..257; the tab pill sits at y=222..293 → overlaps the hero
+   y=87..217; the tab pill sits at y=182..253 → overlaps the hero
    by ~35px (visually "slightly overlayed" per spec). Same
-   max-width:520px clamp as the hero for desktop. */
+   max-width:520px clamp as the hero for desktop.
+   `width: auto` is required to override v1's
+   `.studio-tabs-row { width: 100% }`, which would otherwise force
+   full viewport width and push the pill's right edge past the
+   right gutter. */
 html[data-design="v2"] .studio-tabs-row {
   position: fixed;
-  top: 222px;
+  top: 182px;
   left: 20px;
   right: 20px;
+  width: auto;
   max-width: 480px;
   margin: 0 auto;
   z-index: 11;
@@ -7195,11 +7200,20 @@ html[data-design="v2"] .studio-tab-bar {
 }
 
 /* Scroll container — content needs to clear the fixed tab pill
-   (bottom edge at y=293) before becoming visible. 312px = tab
+   (bottom edge at y=253) before becoming visible. 272px = tab
    bottom + 19px breathing room. v1's padding-top: 44px is
-   overridden here. */
+   overridden here.
+
+   Also drops v1's `-webkit-overflow-scrolling: touch`. That legacy
+   iOS-12-era property is famous for hiding `position: fixed`
+   descendants during momentum scrolling — exactly the bug seen
+   when scrolling the project detail content with the v2 fixed
+   hero + tab pill. Modern iOS does momentum scrolling by default
+   without the property; same removal that was made earlier on
+   the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
-  padding-top: 312px;
+  padding-top: 272px;
+  -webkit-overflow-scrolling: auto;
 }
 html[data-design="v2"] .studio-tab {
   flex-direction: column;
