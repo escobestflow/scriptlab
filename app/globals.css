@@ -7079,12 +7079,12 @@ html[data-design="v2"] .attr-pill[data-genre="mystery"]    { background: var(--d
    align-items: flex-start anchors buttons to the top of the
    content area rather than centering. */
 html[data-design="v2"] .studio-nav-fixed {
-  /* 9px taller than the previous 8+40+8 slab — keep buttons at the
-     same env+8 top, push the extra height onto the bottom padding
-     so the slab grows downward. Total: env + 8 + 40 + 17 = env+65. */
-  height: calc(env(safe-area-inset-top, 0px) + 8px + 40px + 17px);
+  /* 10px taller than the original 8+40+8 slab — keep buttons at
+     the same env+8 top, push the extra height onto the bottom
+     padding so the slab grows downward. Total: env+8+40+18 = env+66. */
+  height: calc(env(safe-area-inset-top, 0px) + 8px + 40px + 18px);
   padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
-  padding-bottom: 17px;
+  padding-bottom: 18px;
   padding-left: 30px;
   padding-right: 30px;
   align-items: flex-start;
@@ -7294,9 +7294,12 @@ html[data-design="v2"] .studio-tab-bar {
    without the property; same removal that was made earlier on
    the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
-  /* layer-bar top env+202; layer-bar height 94 → bottom env+296;
-     14px breathing → content at env+310. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 310px);
+  /* Per spec — content begins 50px higher than the previous
+     env+310, so first content (concept attribute card / character
+     row) starts inside the layer-bar's vertical area. The
+     layer-bar still sits above (z-index 9 > scroll content) and
+     visually masks anything that scrolls behind it. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 260px);
   -webkit-overflow-scrolling: auto;
 }
 
