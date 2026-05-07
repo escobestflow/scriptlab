@@ -6271,14 +6271,17 @@ html[data-design="v2"] .ds-type-button-label {
    the scroll container extends all the way to y=0 and content
    passes BEHIND the topbar as it scrolls. The wordmark fade-out at
    140px (set elsewhere) reveals the underlying content cleanly.
-   Backdrop blur softens whatever's scrolling under the topbar so
-   the buttons stay legible.
 
    Padding: 30px left + 30px right places the menu button 30px
    from the viewport's left and the add button 30px from the right
    (flex space-between on the parent). 8px below the safe-area
    inset for the button top edge; align-items: flex-start anchors
-   buttons to the top of the content area rather than centering. */
+   buttons to the top of the content area rather than centering.
+
+   Background fully transparent in v2 — no backdrop blur, no
+   tinted slab. The topbar reads as just three free-floating
+   elements (menu / wordmark / add) over the underlying scroll
+   content. */
 html[data-design="v2"] .topbar.topbar-dark {
   position: absolute;
   top: 0;
@@ -6289,9 +6292,9 @@ html[data-design="v2"] .topbar.topbar-dark {
   padding-left: 30px;
   padding-right: 30px;
   align-items: flex-start;
-  background: color-mix(in srgb, var(--ds-color-app-background) 70%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   color: var(--ds-color-black);
 }
 /* Pad the scroll port so first content (page heading) clears the
@@ -6338,10 +6341,24 @@ html[data-design="v2"] .topbar .menu-toggle.open span:nth-child(3) {
 
 /* Wordmark — show the existing /logo.svg image (already black in
    the source SVG) and undo v1's `topbar-dark` invert so it renders
-   as black on the v2 transparent topbar. The previous Poynter-text
-   ::before fallback is removed since we have the real SVG. */
+   as black on the v2 transparent topbar.
+
+   Pinned at env+18 from the viewport top so the wordmark sits 18px
+   below the status bar regardless of notch. .topbar-center is
+   absolute so we can place it precisely without disturbing the
+   menu/add flex layout. */
+html[data-design="v2"] .topbar .topbar-center {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 18px);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0;
+}
 html[data-design="v2"] .topbar .topbar-center .brand-logo-img {
   display: block;
+  width: 86px;
+  height: 18.54px;
   filter: none;
   /* Fade out once the page scrolls past 140px (driven by the
      data-scrolled-past-140 attribute on <html>, set by the scroll
