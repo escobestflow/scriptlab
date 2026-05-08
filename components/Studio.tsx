@@ -5075,10 +5075,11 @@ function AIWandButton({ onClick, loading }: { onClick: () => void; loading: bool
           <path d="M12 3a9 9 0 1 0 9 9" />
         </svg>
       ) : (
-        // Lightning-bolt glyph from Noun Project (Damar Creative).
-        <svg viewBox="0 0 100 110" width="12" height="12" fill="currentColor" aria-hidden="true">
-          <path d="m41.785 60.52h-13.055c-0.52344-0.0078-1.0547-0.14844-1.5352-0.43359-1.4141-0.84766-1.8789-2.6836-1.0273-4.1016l31.906-53.211c0.60547-1.0117 1.7852-1.6094 3.0195-1.4141 1.6289 0.25391 2.7461 1.7773 2.4961 3.4102l-5.375 34.715h13.055c0.52344 0.0078 1.0547 0.14844 1.5352 0.43359 1.4141 0.84766 1.8789 2.6836 1.0273 4.1016l-31.906 53.211c-0.60547 1.0117-1.7852 1.6094-3.0195 1.4141-1.6289-0.25391-2.7461-1.7773-2.4961-3.4102z" />
-        </svg>
+        // V2: paired-bolt glyph (yellow inner + dark outline) shipped
+        // as `/icon-ai-button.svg`. Carries its own colors so we
+        // don't tint via CSS. v1 still inherits the inline lightning
+        // glyph below via the v1 path of `.ai-wand`.
+        <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
       )}
     </button>
   );

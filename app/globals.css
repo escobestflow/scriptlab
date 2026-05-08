@@ -7811,27 +7811,37 @@ html[data-design="v2"] .attr-caret {
   color: var(--ds-color-gray-chip-label);
 }
 
-/* AI wand — small rounded square with the AI yellow accent and a
-   black bolt glyph. Replaces v1's blue gradient pill. */
+/* AI wand — 27×27 chip with a soft fill, .7px gray inset stroke,
+   and a tiny drop shadow. The glyph is the paired-bolt SVG shipped
+   at `/icon-ai-button.svg` (carries its own colors — yellow inner
+   + dark outline — so this rule sets no `color`). */
 html[data-design="v2"] .ai-wand {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--ds-color-ai-yellow);
-  color: var(--ds-color-black);
+  width: 27px;
+  height: 27px;
+  border-radius: 5px;
+  background: var(--ds-color-gray-lightest);
   margin-left: 0;
   margin-right: 4px;
-  box-shadow: none;
+  /* inset .7px gray-outline + 0 0 4 0 black 9% drop shadow */
+  box-shadow:
+    inset 0 0 0 0.7px var(--ds-color-gray-outline),
+    0 0 4px 0 rgba(0, 0, 0, 0.09);
   vertical-align: 0;
 }
 html[data-design="v2"] .ai-wand:hover {
-  background: var(--ds-color-ai-yellow);
+  background: var(--ds-color-gray-lightest);
   transform: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ds-color-ai-yellow) 35%, transparent);
+  /* Keep the inset stroke + slightly stronger drop shadow on hover. */
+  box-shadow:
+    inset 0 0 0 0.7px var(--ds-color-gray-outline),
+    0 0 6px 0 rgba(0, 0, 0, 0.14);
 }
 html[data-design="v2"] .ai-wand:active {
-  background: var(--ds-color-ai-yellow);
+  background: var(--ds-color-gray-lightest);
   transform: scale(0.97);
+}
+html[data-design="v2"] .ai-wand img {
+  display: block;
 }
 
 /* Direction-note preview (used by Tone / Themes / Framework /
