@@ -7428,10 +7428,13 @@ html[data-design="v2"] .studio-thumb-empty-divider {
 }
 html[data-design="v2"] .studio-thumb-empty-draft {
   /* Reset the populated `.drafts-dropdown-trigger` chrome (gray
-     text, light caret) so the trigger reads as white-on-image. */
+     text, light caret, -13px margin-top that pulls it up under
+     the title) so the trigger reads as white-on-image and respects
+     the 7px gap below the divider. */
   background: transparent;
   border: none;
   padding: 0;
+  margin: 0;
   color: var(--ds-color-white);
   cursor: pointer;
   display: inline-flex;
