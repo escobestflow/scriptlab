@@ -8028,10 +8028,10 @@ html[data-design="v2"] .studio-empty-overlay {
      room above the title. */
   padding: 0 30px 22px;
   background-repeat: no-repeat;
-  /* Graphic vertical: was center top → center 8px (down 8) → center
-     0 (back up 8 per latest spec). Stays anchored to the overlay
-     top now. */
-  background-position: center 0;
+  /* Graphic vertical history: center top → center 8px → center 0 →
+     center -8 (moves the silhouette 8px above the overlay's top
+     edge so the pedestal/floor reads higher in the visible area). */
+  background-position: center -8px;
   background-size: 100% auto;
   pointer-events: auto;
   /* Mount fade — 200ms opacity ramp paired with the layer-bar's
