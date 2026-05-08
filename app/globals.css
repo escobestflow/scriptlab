@@ -7535,6 +7535,10 @@ html[data-design="v2"] .studio-tab-bar {
      icon / label positioning stable when the bar grows from 71
      (populated pill) to 480 (empty plate). */
   align-items: flex-start;
+  /* v1 sets `overflow: hidden` which clips the active-tab selection
+     box. Override so the box can peek 2px above the bar's top edge
+     per spec. */
+  overflow: visible;
   /* Animate the populated-pill ↔ empty-plate morph: height + radius
      ease over 320ms whenever .studio-empty-overlay mounts/unmounts. */
   transition: height 320ms var(--ease), border-radius 320ms var(--ease);
@@ -7647,11 +7651,18 @@ html[data-design="v2"] .studio-tab.active .studio-tab-bg {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  /* +2 each dimension per spec — was 73×71. */
+  /* Was 75×73. Bumped to 75×75 (+2 height) so the box, when
+     centered against the 71-tall tab, overflows 2px both top and
+     bottom — the top overflow gives the spec'd "peek" above the
+     tab bar's top edge. Tab bar's `overflow: visible` override
+     above lets that overflow render. */
   width: 75px;
-  height: 73px;
+  height: 75px;
   border-radius: 11px;
-  background: transparent;
+  /* White fill (was transparent) so the peek above the bar reads
+     as a solid white tab cap rather than showing the project
+     image through the box's lower z-index region. */
+  background: var(--ds-color-white);
   box-shadow:
     inset 0 0 0 0.7px var(--ds-color-gray-outline),
     0 2px 13px 0 rgba(0, 0, 0, 0.10),
