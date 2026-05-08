@@ -6233,7 +6233,7 @@ html[data-design="v2"] .ds-type-empty-header {
   letter-spacing: 0;
 }
 html[data-design="v2"] .ds-type-project-page-title-empty {
-  font-family: var(--ds-font-body);
+  font-family: var(--ds-font-display);
   font-weight: 400;
   font-size: 25px;
   line-height: 29px;
@@ -8025,13 +8025,12 @@ html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
   background-image: url("/v2/empty-state-characters.png");
 }
 
-/* Draft picker CTA — anchored 53px from the overlay top (was 48,
-   +5 per spec) with an 11px gap to the title below. Resets the
-   v1 sticky / picker chrome on the nested `.layer-draft-picker`
-   (background svg, position: sticky, negative margins) so the
-   trigger reads as a plain inline block. */
+/* Draft picker CTA — anchored 65px from the overlay top (was 53,
+   +12 per spec). Resets the v1 sticky / picker chrome on the
+   nested `.layer-draft-picker` (background svg, position: sticky,
+   negative margins) so the trigger reads as a plain inline block. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
-  margin: 53px 0 11px;
+  margin: 65px 0 11px;
   flex: 0 0 auto;
 }
 html[data-design="v2"] .studio-empty-overlay .layer-draft-picker {
@@ -8061,11 +8060,13 @@ html[data-design="v2"] .layer-draft-trigger .drafts-caret {
 /* Title — typography comes from `.ds-type-empty-header` utility on
    the JSX (Poynter display / 400 / 34 / lh 1 / ls 0). This rule
    only owns color, margin, width. 14px gap to the body copy below
-   per spec; width 170 wraps into 2 lines on mobile. */
+   per spec; width 178 (was 170) wraps into 2 lines on mobile.
+   margin-top: -3 lifts the title 3px up from the natural flow
+   under the draft trigger, per latest spec. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
   color: var(--ds-color-black);
-  margin: 0 0 14px;
-  width: 170px;
+  margin: -3px 0 14px;
+  width: 178px;
 }
 
 /* Caption — type comes from `.ds-type-body-sm` utility on the JSX.

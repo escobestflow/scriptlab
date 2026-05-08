@@ -8512,8 +8512,9 @@ function SettingsTab({
               src={story.thumbnail}
               alt=""
               style={{
-                width: 160,
-                aspectRatio: "3 / 4",
+                width: "100%",
+                maxWidth: 320,
+                aspectRatio: "16 / 9",
                 borderRadius: 13,
                 objectFit: "cover",
                 display: "block",
