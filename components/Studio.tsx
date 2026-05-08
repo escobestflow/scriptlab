@@ -4865,9 +4865,11 @@ function EmptyLayerState({
         <div className="empty-overlay-caption ds-type-body-sm">{caption}</div>
         {hasActions && (
           // Carries `.empty-layer-actions` too so the v2 button-pair
-          // styling (compact pill + black/yellow glyph) keeps applying
-          // unchanged. The `.empty-overlay-actions` class layers
-          // overlay-specific positioning on top.
+          // styling (glyph + label, no pill) keeps applying. The
+          // `.empty-overlay-actions` class layers overlay-specific
+          // positioning on top. `ds-type-cta` is on each Button so
+          // the new type token (Lato Medium 9/auto/0.08em UPPER on
+          // mobile, 11 on desktop) drives the label.
           <div className="empty-layer-actions empty-overlay-actions">
             {onAdd && (
               <Button
@@ -4876,6 +4878,7 @@ function EmptyLayerState({
                 onClick={onAdd}
                 disabled={!!generating}
                 icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+                className="ds-type-cta"
               >
                 {addLabel}
               </Button>
@@ -4887,7 +4890,7 @@ function EmptyLayerState({
                 onClick={onGenerate}
                 disabled={!!generating}
                 icon={<AISparkleIcon />}
-                className="empty-state-ai-btn"
+                className="empty-state-ai-btn ds-type-cta"
               >
                 {generating ? generatingLabel : generateLabel}
               </Button>

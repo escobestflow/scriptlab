@@ -6217,6 +6217,14 @@ html[data-design="v2"] .ds-type-body-sm {
   line-height: 14px;
   letter-spacing: 0.03em;
 }
+html[data-design="v2"] .ds-type-cta {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 9px;
+  line-height: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
 /* Desktop overrides — only properties that differ from mobile. The
    1440px breakpoint matches the existing layout's mobile↔desktop
@@ -6268,6 +6276,9 @@ html[data-design="v2"] .ds-type-body-sm {
   html[data-design="v2"] .ds-type-body-sm {
     font-size: 11px;
     line-height: normal;
+  }
+  html[data-design="v2"] .ds-type-cta {
+    font-size: 11px;
   }
 }
 
@@ -7379,12 +7390,12 @@ html[data-design="v2"] .studio-tabs-row {
      tab bar's height/radius morph. */
   transition: top 320ms var(--ease);
 }
-/* Empty-state tab-pill position — drops 120px so the icons/labels
-   sit at the TOP of the now-expanded tab-bar plate. position:
-   fixed + z-index 11 already mean it floats above the scroll
-   content and isn't itself scrollable. */
+/* Empty-state tab-pill position — drops 127px (was 120, +7 per
+   spec) so the icons/labels sit at the TOP of the now-expanded
+   tab-bar plate. position: fixed + z-index 11 already mean it
+   floats above the scroll content and isn't itself scrollable. */
 html[data-design="v2"]:has(.studio-empty-overlay) .studio-tabs-row {
-  top: calc(env(safe-area-inset-top, 0px) + 297px);
+  top: calc(env(safe-area-inset-top, 0px) + 304px);
 }
 /* Empty-state TALL PLATE — the tab bar's white surface IS the
    visible "card" for the empty state (replaces the v1
@@ -7887,9 +7898,11 @@ html[data-design="v2"] .studio-empty-overlay {
   /* padding-left: 30 puts foreground content at viewport-x = 30
      per spec. padding-top accounts for the draft CTA + breathing
      room above the title. */
-  padding: 12px 30px 22px;
+  padding: 0 30px 22px;
   background-repeat: no-repeat;
-  background-position: center top;
+  /* center 8px = silhouette graphic shifted 8px down within the
+     overlay per spec. */
+  background-position: center 8px;
   background-size: 100% auto;
   pointer-events: auto;
   /* Mount fade — 200ms opacity ramp paired with the layer-bar's
@@ -7907,12 +7920,13 @@ html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
   background-image: url("/v2/empty-state-characters.png");
 }
 
-/* Draft picker CTA — sits at the top of the overlay. Resets the
-   v1 sticky/picker chrome (background svg, position: sticky,
-   negative margins) so the picker reads as a plain inline block
-   inside the overlay. Same reset as `.layer-bar .layer-draft-picker`. */
+/* Draft picker CTA — anchored 48px from the overlay top with an
+   11px gap to the title below per spec. Resets the v1 sticky /
+   picker chrome on the nested `.layer-draft-picker` (background
+   svg, position: sticky, negative margins) so the trigger reads
+   as a plain inline block. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
-  margin: 0 0 18px;
+  margin: 48px 0 11px;
   flex: 0 0 auto;
 }
 html[data-design="v2"] .studio-empty-overlay .layer-draft-picker {
@@ -7926,9 +7940,8 @@ html[data-design="v2"] .studio-empty-overlay .layer-draft-picker {
   z-index: auto;
 }
 
-/* Title — Poynter display, large, black. Same type as the prior
-   empty-layer-state title; positioning now flows naturally inside
-   the overlay (no negative-margin tricks). */
+/* Title — Poynter display, large, black. 14px gap to the body
+   copy below per spec. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
   font-family: var(--ds-font-display);
   font-weight: 400;
@@ -7936,13 +7949,16 @@ html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
   line-height: 1;
   letter-spacing: 0;
   color: var(--ds-color-black);
-  margin: 0 0 12px;
+  margin: 0 0 14px;
 }
 
-/* Caption — type comes from `.ds-type-body-sm` utility on the JSX. */
+/* Caption — type comes from `.ds-type-body-sm` utility on the JSX.
+   Width capped at 183 per spec so the line wraps tighter under
+   the title. 20px gap to the action buttons below. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-caption {
   color: var(--ds-color-black);
-  margin: 0 0 22px;
+  width: 183px;
+  margin: 0 0 20px;
 }
 
 /* Actions — stacked vertically, left aligned. The button-pair
@@ -7958,22 +7974,18 @@ html[data-design="v2"] .studio-empty-overlay .empty-overlay-actions {
   padding: 0;
 }
 /* Override Button styling inside the v2 empty state so the two
-   CTAs read as the same compact treatment used elsewhere in v2:
-   primary = black-glyph + label, secondary = yellow-glyph + label. */
+   CTAs read as glyph + label with no pill outline. Type is owned
+   by the `.ds-type-cta` utility class added on the JSX side; this
+   rule only handles box / color / glyph layout. */
 html[data-design="v2"] .empty-layer-actions .ds-btn {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   height: 36px;
   padding: 0 14px 0 4px;
-  border-radius: 999px;
-  font-family: var(--ds-font-body);
-  font-weight: 400;
-  font-size: 12px;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  border-radius: 0;
   background: transparent;
-  border: 1px solid var(--ds-color-gray-outline);
+  border: none;
   color: var(--ds-color-black);
   box-shadow: none;
 }
