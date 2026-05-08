@@ -6232,6 +6232,13 @@ html[data-design="v2"] .ds-type-empty-header {
   line-height: 1;
   letter-spacing: 0;
 }
+html[data-design="v2"] .ds-type-project-page-title-empty {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 25px;
+  line-height: 29px;
+  letter-spacing: -0.03em;
+}
 
 /* Desktop overrides — only properties that differ from mobile. The
    1440px breakpoint matches the existing layout's mobile↔desktop
@@ -6286,6 +6293,10 @@ html[data-design="v2"] .ds-type-empty-header {
   }
   html[data-design="v2"] .ds-type-cta {
     font-size: 11px;
+  }
+  html[data-design="v2"] .ds-type-project-page-title-empty {
+    font-size: 50px;
+    line-height: normal;
   }
 }
 
@@ -7370,6 +7381,85 @@ html[data-design="v2"] .project-header-thumb-placeholder {
   font-size: 80px;
   color: var(--ds-color-white);
   border-radius: 0;
+}
+
+/* ── V2 empty-state title overlay on the project image ─────────
+   Painted on top of the project image when the active layer is in
+   empty state. Holds three stacked elements with the spacings
+   spec'd by the user:
+     • title text (uses `.ds-type-project-page-title-empty` token)
+     • 20×1 white divider, 2px below the title
+     • white project-draft dropdown trigger, 7px below the divider
+   The container is anchored to the project image's top-left + 30
+   inset on both axes. Always rendered (in v2); opacity fades from
+   0 → 1 when `:has(.studio-empty-overlay)` matches and back to 0
+   when it doesn't, cross-dissolving with the top-nav title rule
+   below. */
+html[data-design="v2"] .studio-thumb-empty-title {
+  position: fixed;
+  /* Project image in empty state: top env+66, left 20px (per the
+     :has(.studio-empty-overlay) thumb override). 30px inset
+     padding on top + left. */
+  top: calc(env(safe-area-inset-top, 0px) + 66px + 30px);
+  left: 50px; /* 20 (image left) + 30 (padding) */
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  color: var(--ds-color-white);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+}
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-thumb-empty-title {
+  opacity: 1;
+  pointer-events: auto;
+}
+html[data-design="v2"] .studio-thumb-empty-title-text {
+  color: inherit;
+}
+html[data-design="v2"] .studio-thumb-empty-divider {
+  width: 20px;
+  height: 1px;
+  background: var(--ds-color-white);
+  margin: 2px 0 7px;
+  flex: 0 0 auto;
+}
+html[data-design="v2"] .studio-thumb-empty-draft {
+  /* Reset the populated `.drafts-dropdown-trigger` chrome (gray
+     text, light caret) so the trigger reads as white-on-image. */
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--ds-color-white);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+html[data-design="v2"] .studio-thumb-empty-draft .drafts-caret {
+  /* The shared caret-sm.svg now ships at full opacity so we can
+     hit pure white via filter: brightness(0) invert(1). */
+  width: 9px;
+  height: 6px;
+  filter: brightness(0) invert(1);
+  opacity: 1;
+}
+
+/* Cross-fade — when the empty overlay is in the DOM, fade the
+   top-nav project title + draft trigger out so the image-overlay
+   versions read cleanly without competing duplicates. */
+html[data-design="v2"] .project-header-title,
+html[data-design="v2"] .studio-header-sticky > .drafts-dropdown-trigger,
+html[data-design="v2"] .studio-header-sticky > .project-drafts-row {
+  transition: opacity 200ms var(--ease);
+}
+html[data-design="v2"]:has(.studio-empty-overlay) .project-header-title,
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-header-sticky > .drafts-dropdown-trigger,
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-header-sticky > .project-drafts-row {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Section tabs — persistent overlay slightly above the hero's

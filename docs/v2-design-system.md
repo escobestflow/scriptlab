@@ -65,6 +65,7 @@ Letter-spacing percentages → em (3% = 0.03em).
 | `ds-type-project-card-title` | 20 / 400 / 0 | 24 |
 | `ds-type-empty` | 34 / 400 / 0 / lh 37px | 44 (lh stays 37) |
 | `ds-type-empty-header` | 34 / 400 / 0 / lh 1 | (same) |
+| `ds-type-project-page-title-empty` | 25 / 400 / -0.03em / lh 29px | 50 / 400 / -0.03em / lh auto |
 
 ### UI (Lato)
 

@@ -332,6 +332,7 @@ export function Studio({
     return () => clearTimeout(t);
   }, [showSuccess]);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
+  const isV2 = useIsV2();
   // TV-only: dropdown to switch the active episode. Sheet mirrors the
   // project-drafts treatment — same trigger style, same bottom-sheet.
   // Tapping an episode sets `activeEpisodeId` globally (so the Story tab
@@ -1411,6 +1412,31 @@ export function Studio({
             </div>
           )}
         </button>
+
+        {/* V2 empty-state title + project-draft trigger painted ON the
+            project image. Mirrors the studio-header-sticky title +
+            drafts trigger, but in white over the image. Rendered only
+            in v2 — v1 has no empty-state composition for this. CSS
+            controls fade-in/out via opacity transitions keyed off
+            `:has(.studio-empty-overlay)` so the cross-dissolve with
+            the top-nav title happens automatically when a layer's
+            empty/populated state changes. */}
+        {isV2 && (
+          <div className="studio-thumb-empty-title">
+            <div className="studio-thumb-empty-title-text ds-type-project-page-title-empty">
+              {story.title || "Untitled"}
+            </div>
+            <div className="studio-thumb-empty-divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="studio-thumb-empty-draft drafts-dropdown-trigger ds-type-draft-dropdown"
+              onClick={() => setDraftsDropdownOpen(v => !v)}
+            >
+              <span>Draft {activeProjectDraft.number}</span>
+              <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+            </button>
+          </div>
+        )}
 
         {/* Title + drafts dropdown + tabs — sticky, sticks below nav */}
         <div className="studio-header-sticky" ref={headerRef}>
