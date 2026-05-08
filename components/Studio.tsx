@@ -1433,7 +1433,7 @@ export function Studio({
               onClick={() => setDraftsDropdownOpen(v => !v)}
             >
               <span>Draft {activeProjectDraft.number}</span>
-              <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+              <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
             </button>
           </div>
         )}
@@ -1477,7 +1477,7 @@ export function Studio({
                   const ep = activeEpisode ?? activeStoryLayer.episodes?.[0];
                   return ep ? `Episode ${ep.number}` : "Episodes";
                 })()}</span>
-                <img src="/caret-sm.svg" alt="" className={`drafts-caret ${episodeSheetOpen ? "open" : ""}`} />
+                <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${episodeSheetOpen ? "open" : ""}`} />
               </button>
               <button
                 className="drafts-dropdown-trigger"
@@ -1487,7 +1487,7 @@ export function Studio({
                 }}
               >
                 <span>Draft {activeProjectDraft.number}</span>
-                <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+                <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
               </button>
             </div>
           ) : (
@@ -1496,7 +1496,7 @@ export function Studio({
               onClick={() => setDraftsDropdownOpen(v => !v)}
             >
               <span>Draft {activeProjectDraft.number}</span>
-              <img src="/caret-sm.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+              <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
             </button>
           )}
 
@@ -1542,7 +1542,7 @@ export function Studio({
                   onClick={() => setDraftsDropdownOpen(false)}
                 >
                   <span>Draft {activeProjectDraft.number}</span>
-                  <img src="/caret-sm.svg" alt="" className="drafts-caret open" />
+                  <img src="/icon-draft-dropdown-caret.svg" alt="" className="drafts-caret open" />
                 </button>
               </div>
               <div className="project-draft-menu-actions">
@@ -2683,7 +2683,7 @@ function LayerDraftPicker({
         onClick={() => setOpen(v => !v)}
       >
         <span className="layer-draft-label ds-type-draft-dropdown">{label} Draft {active.number}</span>
-        <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
+        <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
       {/* Save-draft button rendering rule: only show when autosave is
           TOGGLED ON in the main menu AND the active draft has local
@@ -3291,7 +3291,7 @@ function LayerBar({
           aria-label="Update other layers"
         >
           <span>Update Other Layers</span>
-          <img src="/caret-sm.svg" alt="" className="drafts-caret" />
+          <img src="/icon-draft-dropdown-caret.svg" alt="" className="drafts-caret" />
         </button>
       )}
     </div>
@@ -3405,7 +3405,7 @@ function PartnerDraftPicker({
           {initialFor(partnerEmail)}
         </span>
         <span className="layer-draft-label">{label} Draft {activeNumber}</span>
-        <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
+        <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
 
       {typeof document !== "undefined" && createPortal(
@@ -3564,7 +3564,7 @@ function PartnerProjectDraftTrigger({
           {initialFor(partnerEmail)}
         </span>
         <span>Draft {activePD?.number ?? 1}</span>
-        <img src="/caret-sm.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
+        <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${open ? "open" : ""}`} />
       </button>
 
       {typeof document !== "undefined" && createPortal(
