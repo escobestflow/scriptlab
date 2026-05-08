@@ -4873,7 +4873,7 @@ function EmptyLayerState({
           <div className="empty-layer-actions empty-overlay-actions">
             {onAdd && (
               <Button
-                variant="secondary"
+                variant="primary"
                 size="sm"
                 onClick={onAdd}
                 disabled={!!generating}
@@ -4885,7 +4885,7 @@ function EmptyLayerState({
             )}
             {onGenerate && (
               <Button
-                variant="primary"
+                variant="secondary"
                 size="sm"
                 onClick={onGenerate}
                 disabled={!!generating}

@@ -8012,6 +8012,14 @@ html[data-design="v2"] .empty-layer-actions .ds-btn-primary .ds-btn-icon {
   border: none;
   box-shadow: none;
 }
+/* Source SVGs ship with dark fills (icon-add-cta.svg = black,
+   icon-ai-cta.svg = #505050) so they read as black/dark glyphs on
+   a white surface. Primary buttons are black, so we invert the
+   glyph to white via filter rather than shipping a second light
+   variant of each asset. */
+html[data-design="v2"] .empty-layer-actions .ds-btn-primary .ds-btn-icon img {
+  filter: invert(1);
+}
 html[data-design="v2"] .empty-layer-actions .ds-btn-primary,
 html[data-design="v2"] .empty-layer-actions .ds-btn-secondary {
   background: transparent;
