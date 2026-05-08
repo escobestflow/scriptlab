@@ -8011,9 +8011,10 @@ html[data-design="v2"] .v2-cast-action-label {
    override + layer-bar/scroll hide rules above. */
 html[data-design="v2"] .studio-empty-overlay {
   position: fixed;
-  /* Anchored just below the tab pill's icon/label band:
-     env+297 (tab pill top) + 71 (icon section) = env+368. */
-  top: calc(env(safe-area-inset-top, 0px) + 368px);
+  /* Anchored below the tab pill's icon/label band: env+297 (tab
+     pill top) + 71 (icon section) = env+368, plus a 10px nudge
+     per spec → env+378. */
+  top: calc(env(safe-area-inset-top, 0px) + 378px);
   left: 0;
   right: 0;
   width: 100vw;
