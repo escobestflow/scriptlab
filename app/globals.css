@@ -7308,32 +7308,29 @@ html[data-design="v2"] .studio-header-sticky {
 html[data-design="v2"] .studio-thumb-scroll {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 66px);
-  left: 0;
-  right: 0;
+  /* Center-anchored layout: left:50% + translateX(-50%) pins the
+     box's horizontal center to the viewport center, so animating
+     `width` grows / shrinks both edges symmetrically (was animating
+     `left` and `right` which the browser was racing — one edge
+     would snap, the other transitioned, producing the jitter the
+     user reported). vw rather than % so the value resolves cleanly
+     against the viewport regardless of any containing-block quirks. */
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  width: 100vw;
   max-width: 520px;
-  margin: 0 auto;
+  margin: 0;
   height: 134px;
   padding: 0;
   border-radius: 0;
   z-index: 10;
-  /* Always overflow: hidden so the cover image stays clipped to the
-     box's rounded corners during the empty ↔ populated morph (was
-     previously toggled inside the :has() override, which caused a
-     paint reflow on the empty → populated direction). */
   overflow: hidden;
-  /* Hint the compositor for the morph properties so each direction
-     animates on the same layer instead of redoing layout per frame —
-     fixes a horizontal jitter that was visible on empty → populated. */
-  will-change: height, left, right, border-radius;
-  /* Animate height + horizontal insets + radius in lockstep. max-width
-     dropped from the transition list (it was 480 → 520 — never a
-     constraint at mobile widths, so animating it adds no visual
-     value but introduces a redundant interpolation). */
+  will-change: width, height, border-radius;
   transition:
+    width 320ms var(--ease),
     height 320ms var(--ease),
-    border-radius 320ms var(--ease),
-    left 320ms var(--ease),
-    right 320ms var(--ease);
+    border-radius 320ms var(--ease);
 }
 /* Project image — EMPTY-state geometry (Characters / Story / Script
    when their layer has no entries). 212 tall, 20px viewport gutters,
@@ -7344,15 +7341,14 @@ html[data-design="v2"] .studio-thumb-scroll {
    adds a character / beat / scene the override falls away and the
    hero snaps back to the populated full-bleed look. */
 html[data-design="v2"]:has(.studio-empty-overlay) .studio-thumb-scroll {
-  left: 20px;
-  right: 20px;
+  /* width = viewport - 40 (20px gutter each side). The base rule's
+     left:50% + translateX(-50%) keeps it centered, so the box
+     shrinks symmetrically from the populated full-bleed width
+     instead of pulling from one side first. */
+  width: calc(100vw - 40px);
   max-width: 480px;
-  margin-left: auto;
-  margin-right: auto;
   height: 212px;
   border-radius: 12px;
-  /* overflow: hidden is now on the base rule (always on) so it
-     doesn't toggle during the morph. */
 }
 html[data-design="v2"] .studio-thumb-button {
   /* Both classes (.studio-thumb-scroll + .studio-thumb-button) live
@@ -7365,11 +7361,10 @@ html[data-design="v2"] .studio-thumb-button {
   padding: 0;
   overflow: hidden;
 }
-/* In empty state the hero gets viewport gutters via left:20/right:20.
-   v1's `.studio-thumb-button { width: 100% }` overrides those, so reset
-   width to auto and pick up the 12px radius from the hero rule. */
+/* Pick up the 12px radius in empty state. Sizing is owned by the
+   `.studio-thumb-scroll` rules now (center-anchored width on the
+   same element); we no longer need a width override here. */
 html[data-design="v2"]:has(.studio-empty-overlay) .studio-thumb-button {
-  width: auto;
   border-radius: 12px;
 }
 html[data-design="v2"] .project-header-thumb {
