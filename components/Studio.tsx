@@ -2473,8 +2473,8 @@ function ProjectHeader({
           <polyline points="15 18 9 12 15 6"/>
         </svg>
       </button>
-      <div style={{ textAlign: "center", flex: 1 }}>
-        <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.01em" }}>
+      <div className="topbar-center" style={{ textAlign: "center", flex: 1, position: "static", transform: "none" }}>
+        <div className="topbar-title" style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.01em" }}>
           {story.title || "Untitled"}
         </div>
         {subtitle && <div className="caption">{subtitle}</div>}
@@ -8503,7 +8503,7 @@ function SettingsTab({
 
   return (
     <>
-      <div className="display" style={{ marginBottom: 18 }}>Settings</div>
+      <div className="display ds-type-tab-header settings-tab-heading" style={{ marginBottom: 18 }}>Settings</div>
 
       <div className="card">
         <span className="eyebrow">Cover</span>
