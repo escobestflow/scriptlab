@@ -7552,11 +7552,11 @@ html[data-design="v2"] .studio-tab-bar .studio-tab {
   height: 71px;
 }
 /* Empty state shifts the entire tab content (icon + label + dot +
-   selection box) up: 9 → -1 (down 9 → up 10 from baseline) per
-   the latest spec. transform: translateY shifts all four anchored
-   elements together rather than per-child top/bottom edits. */
+   selection box). History: 9 → -1 → 9 (back down 10 per latest
+   spec). transform: translateY shifts all four anchored elements
+   together rather than per-child top/bottom edits. */
 html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar .studio-tab {
-  transform: translateY(-1px);
+  transform: translateY(9px);
 }
 
 /* Scroll container — content needs to clear the fixed tab pill
@@ -8029,9 +8029,8 @@ html[data-design="v2"] .studio-empty-overlay {
   padding: 0 30px 22px;
   background-repeat: no-repeat;
   /* Graphic vertical history: center top → center 8px → center 0 →
-     center -8 (moves the silhouette 8px above the overlay's top
-     edge so the pedestal/floor reads higher in the visible area). */
-  background-position: center -8px;
+     center -8 → center -5 (down 3 from -8 per latest spec). */
+  background-position: center -5px;
   background-size: 100% auto;
   pointer-events: auto;
   /* Mount fade — 200ms opacity ramp paired with the layer-bar's
