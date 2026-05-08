@@ -4877,7 +4877,7 @@ function EmptyLayerState({
                 size="sm"
                 onClick={onAdd}
                 disabled={!!generating}
-                icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+                icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
                 className="ds-type-cta"
               >
                 {addLabel}
@@ -4889,7 +4889,7 @@ function EmptyLayerState({
                 size="sm"
                 onClick={onGenerate}
                 disabled={!!generating}
-                icon={<AISparkleIcon />}
+                icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
                 className="empty-state-ai-btn ds-type-cta"
               >
                 {generating ? generatingLabel : generateLabel}

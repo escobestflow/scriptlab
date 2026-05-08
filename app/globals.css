@@ -7989,12 +7989,18 @@ html[data-design="v2"] .empty-layer-actions .ds-btn {
   color: var(--ds-color-black);
   box-shadow: none;
 }
+/* Glyph badge — 25×25 circle preceding the CTA label. The default
+   styling matches the SECONDARY treatment (white circle, .7
+   gray-outline stroke, soft drop shadow); the primary override
+   below switches to a flat black circle with no stroke or shadow.
+   The actual glyph SVG is rendered by the JSX <img> inside. */
 html[data-design="v2"] .empty-layer-actions .ds-btn .ds-btn-icon {
-  width: 28px;
-  height: 28px;
+  width: 25px;
+  height: 25px;
   border-radius: 50%;
-  background: var(--ds-color-black);
-  color: var(--ds-color-white);
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8002,18 +8008,14 @@ html[data-design="v2"] .empty-layer-actions .ds-btn .ds-btn-icon {
   flex: 0 0 auto;
 }
 html[data-design="v2"] .empty-layer-actions .ds-btn-primary .ds-btn-icon {
-  background: var(--ds-color-ai-yellow);
-  color: var(--ds-color-black);
+  background: var(--ds-color-black);
+  border: none;
+  box-shadow: none;
 }
-html[data-design="v2"] .empty-layer-actions .ds-btn-primary {
-  /* The "Create With AI" button — secondary visual now (outline
-     pill with yellow glyph) per screenshot. */
-  background: transparent;
-  color: var(--ds-color-black);
-}
+html[data-design="v2"] .empty-layer-actions .ds-btn-primary,
 html[data-design="v2"] .empty-layer-actions .ds-btn-secondary {
-  /* The "Add a Character" button — primary visual (black bubble). */
   background: transparent;
+  color: var(--ds-color-black);
 }
 
 /* ── V2 inverted splash loader ────────────────────────────────
