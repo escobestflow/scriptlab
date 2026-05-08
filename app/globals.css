@@ -7490,12 +7490,12 @@ html[data-design="v2"] .studio-tabs-row {
      tab bar's height/radius morph. */
   transition: top 320ms var(--ease);
 }
-/* Empty-state tab-pill position — drops 127px (was 120, +7 per
-   spec) so the icons/labels sit at the TOP of the now-expanded
-   tab-bar plate. position: fixed + z-index 11 already mean it
-   floats above the scroll content and isn't itself scrollable. */
+/* Empty-state tab-pill position — env+304 → env+299 (up 5 per spec).
+   Moves the icons/labels (and the tall plate they anchor) 5px
+   higher within the empty-state composition. position: fixed +
+   z-index 11 already mean it floats above the scroll content. */
 html[data-design="v2"]:has(.studio-empty-overlay) .studio-tabs-row {
-  top: calc(env(safe-area-inset-top, 0px) + 304px);
+  top: calc(env(safe-area-inset-top, 0px) + 299px);
 }
 /* Empty-state TALL PLATE — the tab bar's white surface IS the
    visible "card" for the empty state (replaces the v1
