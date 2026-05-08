@@ -7288,22 +7288,30 @@ html[data-design="v2"] .studio-thumb-scroll {
   padding: 0;
   border-radius: 0;
   z-index: 10;
+  /* Animate the populated full-bleed ↔ empty inset+rounded morph
+     in lockstep with the tab bar's plate animation. Same 320ms
+     ease so all four animated properties feel like one motion. */
+  transition:
+    height 320ms var(--ease),
+    border-radius 320ms var(--ease),
+    left 320ms var(--ease),
+    right 320ms var(--ease),
+    max-width 320ms var(--ease);
 }
 /* Project image — EMPTY-state geometry (Characters / Story / Script
-   when their layer has no entries). 208 tall, 20px viewport gutters,
-   12px corner radius — works with the empty-card hero composition
-   below it. Selector uses `:has(.empty-layer-state)` so the override
-   only applies when an empty-state container is in the DOM (active
-   tab is in empty state); the moment the user adds a character /
-   beat / scene the override falls away and the hero snaps back to
-   the populated full-bleed look. */
-html[data-design="v2"]:has(.empty-layer-state) .studio-thumb-scroll {
+   when their layer has no entries). 212 tall, 20px viewport gutters,
+   12px corner radius — works with the empty-overlay hero
+   composition below it. Selector uses `:has(.studio-empty-overlay)`
+   so the override only applies when the empty-state overlay element
+   is in the DOM (active tab is in empty state); the moment the user
+   adds a character / beat / scene the override falls away and the
+   hero snaps back to the populated full-bleed look. */
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-thumb-scroll {
   left: 20px;
   right: 20px;
   max-width: 480px;
   margin-left: auto;
   margin-right: auto;
-  /* Empty-state hero is 212 (was 208 + 4 per spec). */
   height: 212px;
   border-radius: 12px;
   overflow: hidden;
@@ -7322,7 +7330,7 @@ html[data-design="v2"] .studio-thumb-button {
 /* In empty state the hero gets viewport gutters via left:20/right:20.
    v1's `.studio-thumb-button { width: 100% }` overrides those, so reset
    width to auto and pick up the 12px radius from the hero rule. */
-html[data-design="v2"]:has(.empty-layer-state) .studio-thumb-button {
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-thumb-button {
   width: auto;
   border-radius: 12px;
 }
@@ -7367,37 +7375,47 @@ html[data-design="v2"] .studio-tabs-row {
   max-width: 480px;
   margin: 0 auto;
   z-index: 11;
+  /* Animate the row drop (env+177 → env+297) in lockstep with the
+     tab bar's height/radius morph. */
+  transition: top 320ms var(--ease);
 }
-/* Empty-state override: tab pill drops 120px so it sits ON the
-   empty-layer card area rather than over the (now taller) hero
-   image. position: fixed + z-index 11 already mean it floats above
-   the scroll content and isn't itself scrollable. */
-html[data-design="v2"]:has(.empty-layer-state) .studio-tabs-row {
+/* Empty-state tab-pill position — drops 120px so the icons/labels
+   sit at the TOP of the now-expanded tab-bar plate. position:
+   fixed + z-index 11 already mean it floats above the scroll
+   content and isn't itself scrollable. */
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-tabs-row {
   top: calc(env(safe-area-inset-top, 0px) + 297px);
 }
-/* Empty-state tab pill — kill the white pill background + shadow
-   so the tab labels read as floating glyphs ON the empty card
-   rather than being framed by their own white surface. The active-
-   tab white selection box (.studio-tab.active .studio-tab-bg)
-   stays untouched so the active state still reads. */
-html[data-design="v2"]:has(.empty-layer-state) .studio-tab-bar {
-  background: transparent;
-  box-shadow: none;
-  border: none;
+/* Empty-state TALL PLATE — the tab bar's white surface IS the
+   visible "card" for the empty state (replaces the v1
+   .empty-layer-state white box). Stays opaque, just grows: height
+   71 → 480 and radius 20 → 42 to read as a soft-cornered plate
+   that backs the silhouette + copy + CTA stack rendered ABOVE it
+   via .studio-empty-overlay (z-index 12 > tab bar's 11). The
+   transition lives on the base .studio-tab-bar rule so both
+   directions (mount AND unmount of the overlay) interpolate.
+   align-items: flex-start + .studio-tab height-lock are also in
+   the base rule, no overrides needed here. */
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar {
+  height: 480px;
+  border-radius: 42px;
 }
-/* Empty-state layer-bar — re-anchor so the "<Layer> Draft N ▾"
-   text sits ~10px above the empty card's title. Math: empty title
-   top ≈ env+431; flex-end + padding-bottom 12 puts the draft text
-   bottom at (top + 94) - 12 = top + 82; we want text bottom at
-   env+421 (= 431 - 10), so layer-bar top = 421 - 82 = env+339,
-   rounded to env+345 to absorb the few-px offset between the flex
-   content edge and the rendered text baseline. Bar background
-   drops to transparent so it doesn't paint a gray slab over the
-   white empty card it now overlaps. */
-html[data-design="v2"]:has(.empty-layer-state) .layer-bar {
-  top: calc(env(safe-area-inset-top, 0px) + 345px);
-  background: transparent;
+/* Empty-state layer-bar — opacity 0 + pointer-events none rather
+   than `display: none`, so the populated bar fades out (200ms)
+   while the overlay's own draft CTA fades in. */
+html[data-design="v2"] .layer-bar {
+  transition: opacity 200ms var(--ease);
 }
+html[data-design="v2"]:has(.studio-empty-overlay) .layer-bar {
+  opacity: 0;
+  pointer-events: none;
+}
+/* No explicit hide for .studio-scroll content needed: when the
+   layer is empty, its tab-content-wrap renders nothing other than
+   the overlay (the rows / cards / etc. are gated on `hasCharacters`
+   / `hasBeats` etc.). The overlay is `position: fixed` so it's
+   removed from the scroll's flow and its absence-of-flow-content
+   means the scroll has nothing visible to render. */
 html[data-design="v2"] .studio-tab-bar {
   background: var(--ds-color-white);
   border-radius: 20px;
@@ -7405,6 +7423,18 @@ html[data-design="v2"] .studio-tab-bar {
   padding: 0 8px;
   height: 71px;
   border: 1px solid var(--ds-color-gray-outline);
+  /* Tabs anchor to the top of the bar regardless of state — keeps
+     icon / label positioning stable when the bar grows from 71
+     (populated pill) to 480 (empty plate). */
+  align-items: flex-start;
+  /* Animate the populated-pill ↔ empty-plate morph: height + radius
+     ease over 320ms whenever .studio-empty-overlay mounts/unmounts. */
+  transition: height 320ms var(--ease), border-radius 320ms var(--ease);
+}
+/* Lock individual tab to its natural 71 height so the abs-positioned
+   label (bottom: 17) lands just below the icon in either state. */
+html[data-design="v2"] .studio-tab-bar .studio-tab {
+  height: 71px;
 }
 
 /* Scroll container — content needs to clear the fixed tab pill
@@ -7828,120 +7858,104 @@ html[data-design="v2"] .v2-cast-action-label {
   text-transform: uppercase;
 }
 
-/* ── V2 Characters empty state ─────────────────────────────────
-   Repurposes the existing .empty-layer-state so the JSX stays
-   shared. Layout flips to a 2-col split on mobile: text + buttons
-   left, silhouette pedestal right. Title gets the Poynter display
-   treatment, buttons get the v2 treatment (primary black,
-   secondary white outline). */
-/* Three-layer composition (back → front):
-     1. .empty-layer-state — white card with rounded corners
-     2. .empty-layer-icon — silhouette graphic, full viewport width
-                            (escapes the card AND the surrounding
-                            tab-content-wrap padding via negative
-                            horizontal margins)
-     3. .empty-layer-title / -caption / -actions — text + CTAs that
-        overlay the lower portion of the image (the "floor" band of
-        the asset) via negative top margin + higher z-index */
-html[data-design="v2"] .empty-layer-state {
-  position: relative;
-  /* Fill swapped to gray-lightest (#FCFBFB) — softer than pure white
-     against the page bg, lets the silhouette image's white floor
-     extend cleanly into the card. */
-  background: var(--ds-color-gray-lightest);
-  border: 1px solid var(--ds-color-gray-outline);
-  /* Corner radius bumped 18 → 42 per spec — softer, more pillowy
-     read against the rectangular hero above. */
-  border-radius: 42px;
-  /* margin-top: 18 → 11 → 22 (down 11px from the 11 baseline). */
-  margin-top: 22px;
-  text-align: left;
+/* ── V2 Studio empty-state OVERLAY ─────────────────────────────
+   Replaces the old white-card `.empty-layer-state` shape. The
+   overlay is a fixed-position container that floats ABOVE the
+   (now-expanded) tab bar's white plate. Holds:
+     - draft picker CTA (own copy, fades with the populated bar's)
+     - title (Poynter display)
+     - caption (.ds-type-body-sm)
+     - actions (Add / Generate buttons)
+   The silhouette graphic is the container's CSS background-image
+   (no <img> escape tricks). Triggers studio-wide empty-state
+   behavior via :has(.studio-empty-overlay) — see tab bar tall-plate
+   override + layer-bar/scroll hide rules above. */
+html[data-design="v2"] .studio-empty-overlay {
+  position: fixed;
+  /* Anchored just below the tab pill's icon/label band:
+     env+297 (tab pill top) + 71 (icon section) = env+368. */
+  top: calc(env(safe-area-inset-top, 0px) + 368px);
+  left: 0;
+  right: 0;
+  width: 100vw;
+  min-height: 410px;
+  /* Above the tab bar (z 11) but below top nav. */
+  z-index: 12;
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  /* Image escapes the card horizontally — overflow must stay visible. */
-  overflow: visible;
-  /* No outer padding — every inner row sets its own padding so the
-     image can reach the card content-box edge cleanly. */
-  padding: 0;
-  min-height: 0;
+  /* padding-left: 30 puts foreground content at viewport-x = 30
+     per spec. padding-top accounts for the draft CTA + breathing
+     room above the title. */
+  padding: 12px 30px 22px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: 100% auto;
+  pointer-events: auto;
+  /* Mount fade — 200ms opacity ramp paired with the layer-bar's
+     opposite fade so the cross-dissolve reads as one motion. */
+  animation: studio-empty-overlay-fade-in 200ms var(--ease) both;
 }
-/* Silhouette hero — full viewport width. calc(50% - 50vw) computes
-   the negative margin needed to push from the card's inner content
-   edge out to the viewport edge, regardless of the wrapping
-   tab-content-wrap padding. z-index: 1 puts it above the card body
-   but below the text rows below. margin-top: 60 drops the graphic
-   60px from the card's top edge so the white card "peeks" above the
-   image (per spec). */
-html[data-design="v2"] .empty-layer-state .empty-layer-icon {
-  position: relative;
-  z-index: 1;
-  width: 100vw;
-  /* margin-top history: 60 → 45 (graphic up 15) → 77 (graphic down
-     32 per latest spec). Title margin compensates each shift so the
-     text stack stays put across these tweaks. */
-  margin-top: 77px;
-  margin-left: calc(50% - 50vw);
-  margin-right: calc(50% - 50vw);
-  display: block;
-  align-self: stretch;
-  pointer-events: none;
+@keyframes studio-empty-overlay-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-html[data-design="v2"] .empty-layer-icon-v2 {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-/* Hide v1's small icon img inside the wrapper when v2's image is
-   the icon — only one or the other should render. The JSX
-   conditional in CharactersTab passes the correct one based on
-   isV2, so this is defensive. */
-html[data-design="v2"] .empty-layer-state .empty-layer-icon > img:not(.empty-layer-icon-v2) {
-  display: none;
+/* Per-section silhouette — only Characters has a v2 asset today.
+   Story / Script overlays render the same shell without a bg
+   image until silhouette assets exist for those sections. */
+html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
+  background-image: url("/v2/empty-state-characters.png");
 }
 
-/* Title + caption + actions all sit on z-index 2 so they layer ON
-   TOP of the image. The title carries a negative top margin that
-   pulls the whole stack up into the image's lower band — the asset
-   has the silhouettes + pedestal in the upper two-thirds and an
-   empty "floor" in the bottom third where text reads cleanly. */
-html[data-design="v2"] .empty-layer-state .empty-layer-title {
-  position: relative;
-  z-index: 2;
+/* Draft picker CTA — sits at the top of the overlay. Resets the
+   v1 sticky/picker chrome (background svg, position: sticky,
+   negative margins) so the picker reads as a plain inline block
+   inside the overlay. Same reset as `.layer-bar .layer-draft-picker`. */
+html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
+  margin: 0 0 18px;
+  flex: 0 0 auto;
+}
+html[data-design="v2"] .studio-empty-overlay .layer-draft-picker {
+  position: static;
+  top: auto;
+  margin: 0;
+  padding: 0;
+  background: none;
+  background-image: none;
+  min-height: 0;
+  z-index: auto;
+}
+
+/* Title — Poynter display, large, black. Same type as the prior
+   empty-layer-state title; positioning now flows naturally inside
+   the overlay (no negative-margin tricks). */
+html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
   font-family: var(--ds-font-display);
   font-weight: 400;
   font-size: 32px;
   line-height: 1;
   letter-spacing: 0;
   color: var(--ds-color-black);
-  /* Title compensates for the image's margin-top so the text stack
-     stays put across image-position tweaks. Math:
-       -130 (original overlap) - 140 (title shift up) - 77 (current
-       image flow shift down) = -347. */
-  margin: -347px 0 12px;
-  /* Inner padding-left: 7 puts the text at viewport-x = 30 per spec
-     (card sits at viewport-x = 22 via tab-content-wrap padding, plus
-     the 1px card border). */
-  padding: 0 7px;
+  margin: 0 0 12px;
 }
-html[data-design="v2"] .empty-layer-state .empty-layer-caption {
-  position: relative;
-  z-index: 2;
-  /* Type comes from the .ds-type-body-sm utility applied in JSX —
-     no inline font properties here. Just color, layout, padding. */
+
+/* Caption — type comes from `.ds-type-body-sm` utility on the JSX. */
+html[data-design="v2"] .studio-empty-overlay .empty-overlay-caption {
   color: var(--ds-color-black);
   margin: 0 0 22px;
-  padding: 0 7px;
 }
-html[data-design="v2"] .empty-layer-state .empty-layer-actions {
-  position: relative;
-  z-index: 2;
+
+/* Actions — stacked vertically, left aligned. The button-pair
+   styling itself comes from the `.empty-layer-actions .ds-btn`
+   rules below (the actions div carries both class names so those
+   rules still apply). */
+html[data-design="v2"] .studio-empty-overlay .empty-overlay-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
   margin: 0;
-  padding: 0 7px 22px;
+  padding: 0;
 }
 /* Override Button styling inside the v2 empty state so the two
    CTAs read as the same compact treatment used elsewhere in v2:

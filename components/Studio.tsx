@@ -4783,6 +4783,16 @@ function EmptyLayerState({
   generating,
   generateLabel = "Create all",
   generatingLabel = "Creating…",
+  // v2-only props — used by the studio-empty-overlay shape so the
+  // empty layer can render its own draft picker + section-aware
+  // silhouette bg. v1 path ignores all of these and keeps the old
+  // .empty-layer-state structure.
+  section,
+  layer,
+  draftPickerLabel,
+  story,
+  setStory,
+  autosaveEnabled,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -4802,8 +4812,93 @@ function EmptyLayerState({
   /** In-flight label shown while `generating` is true. Defaults
    *  to "Creating…"; Story passes "Writing…" to match. */
   generatingLabel?: string;
+  /** v2: which layer this empty state belongs to. Drives the
+   *  data-section attribute the silhouette CSS bg targets. */
+  section?: LayerKey;
+  /** v2: layer key passed to the embedded LayerDraftPicker so the
+   *  CTA inside the empty overlay can open the correct layer's
+   *  drafts. Same value as `section` in current callers; kept as a
+   *  separate prop for type safety with LayerDraftPicker's contract. */
+  layer?: LayerKey;
+  /** v2: human label for the draft picker — e.g. "Characters" so
+   *  the trigger reads "Characters Draft 1". */
+  draftPickerLabel?: string;
+  /** v2: needed by the embedded LayerDraftPicker to read/write the
+   *  active draft. Passed through from each tab. */
+  story?: Story;
+  setStory?: (u: (s: Story) => Story) => void;
+  /** v2: whether autosave is on — controls the picker's "Save draft"
+   *  button rendering inside the overlay. */
+  autosaveEnabled?: boolean;
 }) {
   const hasActions = !!onAdd || !!onGenerate;
+  const isV2 = useIsV2();
+
+  // ── v2 empty-state OVERLAY shape ────────────────────────────────
+  // Replaces the white card / silhouette-img / negative-margin tricks
+  // of v1. Single fixed-position container. Silhouette becomes a CSS
+  // background-image keyed off data-section. Layer draft picker is
+  // rendered inline (a second instance — the layer-bar's own picker
+  // is hidden via :has() while the overlay is present, so the user
+  // only ever sees one CTA at a time but cross-fade is trivial).
+  if (isV2) {
+    return (
+      <div
+        className="studio-empty-overlay"
+        data-section={section}
+        // Hook for Studio-level CSS to detect "any empty state present"
+        // via :has(.studio-empty-overlay) and morph the tab-bar +
+        // hide layer-bar / scroll content accordingly.
+      >
+        {layer && story && setStory && draftPickerLabel && (
+          <div className="empty-overlay-draft">
+            <LayerDraftPicker
+              layer={layer}
+              label={draftPickerLabel}
+              story={story}
+              setStory={setStory}
+              autosaveEnabled={!!autosaveEnabled}
+            />
+          </div>
+        )}
+        <div className="empty-overlay-title">{title}</div>
+        <div className="empty-overlay-caption ds-type-body-sm">{caption}</div>
+        {hasActions && (
+          // Carries `.empty-layer-actions` too so the v2 button-pair
+          // styling (compact pill + black/yellow glyph) keeps applying
+          // unchanged. The `.empty-overlay-actions` class layers
+          // overlay-specific positioning on top.
+          <div className="empty-layer-actions empty-overlay-actions">
+            {onAdd && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onAdd}
+                disabled={!!generating}
+                icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+              >
+                {addLabel}
+              </Button>
+            )}
+            {onGenerate && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onGenerate}
+                disabled={!!generating}
+                icon={<AISparkleIcon />}
+                className="empty-state-ai-btn"
+              >
+                {generating ? generatingLabel : generateLabel}
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── v1 path — unchanged ─────────────────────────────────────────
   return (
     <div className="empty-layer-state">
       <div className="empty-layer-icon">{icon}</div>
@@ -6380,6 +6475,12 @@ function CharactersTab({
 
       {!hasCharacters && (
         <EmptyLayerState
+          section="characters"
+          layer="characters"
+          draftPickerLabel="Characters"
+          story={story}
+          setStory={setStory}
+          autosaveEnabled={autosaveEnabled}
           icon={
             isV2
               ? <img src="/v2/empty-state-characters.png" alt="" className="empty-layer-icon-v2" />
@@ -7018,6 +7119,12 @@ function StoryTab({
         {!hasBeats && (
           <>
             <EmptyLayerState
+              section="story"
+              layer="story"
+              draftPickerLabel="Story"
+              story={story}
+              setStory={setStory}
+              autosaveEnabled={autosaveEnabled}
               icon={<img src="/story-icon.svg" width={49} height={41} alt="" />}
               title="No scenes yet"
               caption="Start building your story structure — add your first scene."
@@ -7425,6 +7532,12 @@ function ScriptTab({
         // of flow. "Write all" is hidden too — with zero beats there's
         // nothing to generate prose from.
         <EmptyLayerState
+          section="script"
+          layer="script"
+          draftPickerLabel="Script"
+          story={story}
+          setStory={setStory}
+          autosaveEnabled={autosaveEnabled}
           icon={<img src="/script-icon.svg" width={40} height={39} alt="" />}
           title="No scenes yet"
           caption="Sketch scenes in the Story tab, then return here to write them into prose."
