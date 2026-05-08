@@ -7544,12 +7544,12 @@ html[data-design="v2"] .studio-tab-bar {
 html[data-design="v2"] .studio-tab-bar .studio-tab {
   height: 71px;
 }
-/* Empty state nudges the entire tab content (icon + label + dot +
-   selection box) 9px lower per spec. transform: translateY rather
-   than per-child top/bottom edits so all four anchored elements
-   shift together. */
+/* Empty state shifts the entire tab content (icon + label + dot +
+   selection box) up: 9 → -1 (down 9 → up 10 from baseline) per
+   the latest spec. transform: translateY shifts all four anchored
+   elements together rather than per-child top/bottom edits. */
 html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar .studio-tab {
-  transform: translateY(9px);
+  transform: translateY(-1px);
 }
 
 /* Scroll container — content needs to clear the fixed tab pill
@@ -8025,13 +8025,13 @@ html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
   background-image: url("/v2/empty-state-characters.png");
 }
 
-/* Draft picker CTA — anchored 48px from the overlay top with an
-   11px gap to the title below per spec. Resets the v1 sticky /
-   picker chrome on the nested `.layer-draft-picker` (background
-   svg, position: sticky, negative margins) so the trigger reads
-   as a plain inline block. */
+/* Draft picker CTA — anchored 53px from the overlay top (was 48,
+   +5 per spec) with an 11px gap to the title below. Resets the
+   v1 sticky / picker chrome on the nested `.layer-draft-picker`
+   (background svg, position: sticky, negative margins) so the
+   trigger reads as a plain inline block. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
-  margin: 48px 0 11px;
+  margin: 53px 0 11px;
   flex: 0 0 auto;
 }
 html[data-design="v2"] .studio-empty-overlay .layer-draft-picker {
@@ -8080,12 +8080,13 @@ html[data-design="v2"] .studio-empty-overlay .empty-overlay-caption {
 /* Actions — stacked vertically, left aligned. The button-pair
    styling itself comes from the `.empty-layer-actions .ds-btn`
    rules below (the actions div carries both class names so those
-   rules still apply). gap 12 (was 10) per spec. */
+   rules still apply). gap 12 → 2 per spec (Create With AI sits
+   10px closer to the Add a Character button above it). */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
+  gap: 2px;
   margin: 0;
   padding: 0;
 }
