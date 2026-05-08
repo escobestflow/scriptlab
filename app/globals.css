@@ -7443,9 +7443,16 @@ html[data-design="v2"] .studio-tab-bar {
   transition: height 320ms var(--ease), border-radius 320ms var(--ease);
 }
 /* Lock individual tab to its natural 71 height so the abs-positioned
-   label (bottom: 17) lands just below the icon in either state. */
+   label (bottom: 18) lands just below the icon in either state. */
 html[data-design="v2"] .studio-tab-bar .studio-tab {
   height: 71px;
+}
+/* Empty state nudges the entire tab content (icon + label + dot +
+   selection box) 9px lower per spec. transform: translateY rather
+   than per-child top/bottom edits so all four anchored elements
+   shift together. */
+html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar .studio-tab {
+  transform: translateY(9px);
 }
 
 /* Scroll container — content needs to clear the fixed tab pill
@@ -7566,8 +7573,8 @@ html[data-design="v2"] .studio-tab.active .studio-tab-bg {
 html[data-design="v2"] .studio-tab::before {
   content: "";
   position: absolute;
-  /* Icon top 14 → 15 per spec — nudges glyph 1px down. */
-  top: 15px;
+  /* Icon top 14 → 15 → 17 per spec (glyph nudged 2px lower). */
+  top: 17px;
   left: 50%;
   transform: translateX(-50%);
   width: 16px;
@@ -7582,12 +7589,11 @@ html[data-design="v2"] .studio-tab::before {
   z-index: 1;
 }
 
-/* Label sits 17px from the bar's bottom (was 20 → -3 per spec, label
-   shifted 3px down). The dot's presence under it doesn't shift this
-   anchor. */
+/* Label position from the bar's bottom: 20 → 17 (down 3) → 18 (up 1
+   per spec). The dot's presence under it doesn't shift this anchor. */
 html[data-design="v2"] .studio-tab .studio-tab-label {
   position: absolute;
-  bottom: 17px;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
   white-space: nowrap;
@@ -7626,8 +7632,9 @@ html[data-design="v2"] .studio-tab.active::after {
   bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
+  /* Indicator dot 4×4 → 5×5 per spec (1px bigger). */
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--ds-color-black);
   z-index: 1;
@@ -7900,9 +7907,10 @@ html[data-design="v2"] .studio-empty-overlay {
      room above the title. */
   padding: 0 30px 22px;
   background-repeat: no-repeat;
-  /* center 8px = silhouette graphic shifted 8px down within the
-     overlay per spec. */
-  background-position: center 8px;
+  /* Graphic vertical: was center top → center 8px (down 8) → center
+     0 (back up 8 per latest spec). Stays anchored to the overlay
+     top now. */
+  background-position: center 0;
   background-size: 100% auto;
   pointer-events: auto;
   /* Mount fade — 200ms opacity ramp paired with the layer-bar's
@@ -7940,8 +7948,22 @@ html[data-design="v2"] .studio-empty-overlay .layer-draft-picker {
   z-index: auto;
 }
 
+/* v2 layer-draft trigger — text + caret pure black per spec.
+   Applies in BOTH the populated (.layer-bar) and empty (overlay)
+   states so the dropdown CTA reads consistently. The source SVG
+   ships without its prior opacity="0.5" attribute now, so opacity:
+   1 here gives full black (the v1 `.drafts-caret { opacity: 0.55 }`
+   rule still fires in v1, keeping that surface unchanged). */
+html[data-design="v2"] .layer-draft-trigger {
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .layer-draft-trigger .drafts-caret {
+  opacity: 1;
+}
+
 /* Title — Poynter display, large, black. 14px gap to the body
-   copy below per spec. */
+   copy below per spec. Width clamps the headline to 170 so it wraps
+   into 2 lines on mobile rather than running long. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
   font-family: var(--ds-font-display);
   font-weight: 400;
@@ -7950,6 +7972,7 @@ html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
   letter-spacing: 0;
   color: var(--ds-color-black);
   margin: 0 0 14px;
+  width: 170px;
 }
 
 /* Caption — type comes from `.ds-type-body-sm` utility on the JSX.
@@ -7964,12 +7987,12 @@ html[data-design="v2"] .studio-empty-overlay .empty-overlay-caption {
 /* Actions — stacked vertically, left aligned. The button-pair
    styling itself comes from the `.empty-layer-actions .ds-btn`
    rules below (the actions div carries both class names so those
-   rules still apply). */
+   rules still apply). gap 12 (was 10) per spec. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
   padding: 0;
 }
