@@ -97,6 +97,7 @@ type TypeToken = {
 const TYPE_TOKENS: TypeToken[] = [
   { cls: "ds-type-tab-header",                 sample: "Projects",                                  mobile: "39 / 400 / 0.03em",          desktop: "50 / 400 / 0.03em", mobilePx: 39, usedIn: "Page heading on Projects + Ideas tabs." },
   { cls: "ds-type-empty",                      sample: "No projects yet",                            mobile: "34 / 400 / 0 / lh 37px",     desktop: "44 / 400 / 0 / lh 37px", mobilePx: 34, usedIn: "Large empty-state copy." },
+  { cls: "ds-type-empty-header",               sample: "Define Your Characters",                     mobile: "34 / 400 / 0 / lh 1",                                  mobilePx: 34, usedIn: "Layer empty-state header (Define Your Characters, etc.)." },
   { cls: "ds-type-project-page-title",         sample: "Where The Light Bends",                      mobile: "20 / 400 / 0",               desktop: "65 / 400 / 0", mobilePx: 20, usedIn: "Project detail page hero title." },
   { cls: "ds-type-project-card-title",         sample: "Cache",                                      mobile: "20 / 400 / 0",               desktop: "24 / 400 / 0", mobilePx: 20, usedIn: "Project card title in the home grid." },
   { cls: "ds-type-attribute-title",            sample: "Logline",                                    mobile: "13 / 600 / 0",                                            mobilePx: 13, usedIn: "Attribute row labels on project detail." },

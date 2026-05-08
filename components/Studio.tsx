@@ -4861,7 +4861,7 @@ function EmptyLayerState({
             />
           </div>
         )}
-        <div className="empty-overlay-title">{title}</div>
+        <div className="empty-overlay-title ds-type-empty-header">{title}</div>
         <div className="empty-overlay-caption ds-type-body-sm">{caption}</div>
         {hasActions && (
           // Carries `.empty-layer-actions` too so the v2 button-pair

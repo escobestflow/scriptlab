@@ -6225,6 +6225,13 @@ html[data-design="v2"] .ds-type-cta {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+html[data-design="v2"] .ds-type-empty-header {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: 0;
+}
 
 /* Desktop overrides — only properties that differ from mobile. The
    1440px breakpoint matches the existing layout's mobile↔desktop
@@ -7961,15 +7968,11 @@ html[data-design="v2"] .layer-draft-trigger .drafts-caret {
   opacity: 1;
 }
 
-/* Title — Poynter display, large, black. 14px gap to the body
-   copy below per spec. Width clamps the headline to 170 so it wraps
-   into 2 lines on mobile rather than running long. */
+/* Title — typography comes from `.ds-type-empty-header` utility on
+   the JSX (Poynter display / 400 / 34 / lh 1 / ls 0). This rule
+   only owns color, margin, width. 14px gap to the body copy below
+   per spec; width 170 wraps into 2 lines on mobile. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
-  font-family: var(--ds-font-display);
-  font-weight: 400;
-  font-size: 32px;
-  line-height: 1;
-  letter-spacing: 0;
   color: var(--ds-color-black);
   margin: 0 0 14px;
   width: 170px;
