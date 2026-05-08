@@ -8095,11 +8095,11 @@ html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
 
 /* Caption — type comes from `.ds-type-body-sm` utility on the JSX.
    Width capped at 183 per spec so the line wraps tighter under
-   the title. 20px gap to the action buttons below. */
+   the title. 14px gap (was 20, -6 per spec) to the action buttons. */
 html[data-design="v2"] .studio-empty-overlay .empty-overlay-caption {
   color: var(--ds-color-black);
   width: 183px;
-  margin: 0 0 20px;
+  margin: 0 0 14px;
 }
 
 /* Actions — stacked vertically, left aligned. The button-pair
@@ -8153,6 +8153,13 @@ html[data-design="v2"] .empty-layer-actions .ds-btn-primary .ds-btn-icon {
   background: var(--ds-color-black);
   border: none;
   box-shadow: none;
+}
+/* Secondary glyph badge (Create With AI) is 1px bigger than primary
+   per spec — 26×26 vs 25×25. The thin stroke + soft shadow on the
+   white circle reads with a bit more presence at 26. */
+html[data-design="v2"] .empty-layer-actions .ds-btn-secondary .ds-btn-icon {
+  width: 26px;
+  height: 26px;
 }
 /* Source SVGs ship with dark fills (icon-add-cta.svg = black,
    icon-ai-cta.svg = #505050) so they read as black/dark glyphs on
