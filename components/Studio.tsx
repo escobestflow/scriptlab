@@ -7096,6 +7096,7 @@ function StoryTab({
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
 }) {
+  const isV2 = useIsV2();
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
   const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -7156,13 +7157,17 @@ function StoryTab({
               setStory={setStory}
               autosaveEnabled={autosaveEnabled}
               icon={<img src="/story-icon.svg" width={49} height={41} alt="" />}
-              title="No scenes yet"
-              caption="Start building your story structure — add your first scene."
-              addLabel="Add scene"
+              title={isV2 ? "Create the Key Scenes" : "No scenes yet"}
+              caption={
+                isV2
+                  ? "Build your story outline. Add scenes, and key moments to bring your idea to life."
+                  : "Start building your story structure — add your first scene."
+              }
+              addLabel={isV2 ? "Add Scene" : "Add scene"}
               onAdd={() => openNewScene(0)}
               onGenerate={generateAllBeats}
               generating={genBusy}
-              generateLabel="Write all with AI"
+              generateLabel={isV2 ? "Create With AI" : "Write all with AI"}
               generatingLabel="Writing…"
             />
 
