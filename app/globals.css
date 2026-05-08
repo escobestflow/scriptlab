@@ -7317,15 +7317,24 @@ html[data-design="v2"] .studio-thumb-scroll {
   padding: 0;
   border-radius: 0;
   z-index: 10;
-  /* Animate the populated full-bleed ↔ empty inset+rounded morph
-     in lockstep with the tab bar's plate animation. Same 320ms
-     ease so all four animated properties feel like one motion. */
+  /* Always overflow: hidden so the cover image stays clipped to the
+     box's rounded corners during the empty ↔ populated morph (was
+     previously toggled inside the :has() override, which caused a
+     paint reflow on the empty → populated direction). */
+  overflow: hidden;
+  /* Hint the compositor for the morph properties so each direction
+     animates on the same layer instead of redoing layout per frame —
+     fixes a horizontal jitter that was visible on empty → populated. */
+  will-change: height, left, right, border-radius;
+  /* Animate height + horizontal insets + radius in lockstep. max-width
+     dropped from the transition list (it was 480 → 520 — never a
+     constraint at mobile widths, so animating it adds no visual
+     value but introduces a redundant interpolation). */
   transition:
     height 320ms var(--ease),
     border-radius 320ms var(--ease),
     left 320ms var(--ease),
-    right 320ms var(--ease),
-    max-width 320ms var(--ease);
+    right 320ms var(--ease);
 }
 /* Project image — EMPTY-state geometry (Characters / Story / Script
    when their layer has no entries). 212 tall, 20px viewport gutters,
@@ -7343,7 +7352,8 @@ html[data-design="v2"]:has(.studio-empty-overlay) .studio-thumb-scroll {
   margin-right: auto;
   height: 212px;
   border-radius: 12px;
-  overflow: hidden;
+  /* overflow: hidden is now on the base rule (always on) so it
+     doesn't toggle during the morph. */
 }
 html[data-design="v2"] .studio-thumb-button {
   /* Both classes (.studio-thumb-scroll + .studio-thumb-button) live
@@ -7418,6 +7428,10 @@ html[data-design="v2"]:has(.studio-empty-overlay) .studio-thumb-empty-title {
 }
 html[data-design="v2"] .studio-thumb-empty-title-text {
   color: inherit;
+  /* Width clamp per spec — wraps the project title at 160px so long
+     names break across multiple lines instead of running into the
+     project image's right edge. */
+  width: 160px;
 }
 html[data-design="v2"] .studio-thumb-empty-divider {
   width: 20px;
