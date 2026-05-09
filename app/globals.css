@@ -7650,11 +7650,13 @@ html[data-design="v2"] .studio-scroll {
      layer-bar still sits above (z-index 9 > scroll content) and
      visually masks anything that scrolls behind it.
      Bumped through env+260 → +263 → +268 → +300 → +285 → +277 →
-     +276 — the +300 fully cleared the layer-bar (which ends at
-     env+296) but read too low; pulled back 24 total so first-row
+     +276 → +282 — the +300 fully cleared the layer-bar (which ends
+     at env+296) but read too low; pulled back 24 total so first-row
      content sits inside the layer-bar's bottom band as a deliberate
-     visual tuck rather than a hard gap. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 276px);
+     visual tuck rather than a hard gap. Latest +6 paired with the
+     6px-taller layer-bar (94 → 100) so the bottom-of-bar tuck
+     position stays the same relative to the bar. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 282px);
   -webkit-overflow-scrolling: auto;
 }
 
