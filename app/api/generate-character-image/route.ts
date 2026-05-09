@@ -15,35 +15,55 @@ import { isV2User } from "@/lib/v2Access";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Fixed style template. The mid-section is interchangeable with
-// project-genre tone if we want stylistic drift across projects later
-// (e.g. "comedy" → brighter lighting); for now the same template is
-// applied per-project so portraits stay visually consistent.
-function buildCharacterPrompt(description: string, projectGenre?: string): string {
-  // Optional genre flavor — adjusts the lighting/tone phrase if the
-  // project genre suggests something other than thriller. Conservative
-  // for now: only override for explicitly non-thriller genres.
+// Painted character portrait template. The base prompt explicitly
+// pushes the model away from photorealism toward a digital-painting
+// finish so a cast of generated thumbnails reads as illustration, not
+// casting headshots. The genre-specific aesthetic line varies the
+// lighting/background palette so a thriller project looks different
+// from a comedy or romance project, while keeping the painted style
+// consistent across all of them. Project tone (free-text from the
+// Concept tab) is appended verbatim so user-authored vibes ("dreamy,
+// magic-realist", "gritty 70s") leak through.
+function buildCharacterPrompt(
+  description: string,
+  projectGenre?: string,
+  projectTone?: string,
+): string {
+  // Aesthetic line per project genre — phrased in painted-illustration
+  // terms (no "DSLR realism", no "casting headshot"). Default is the
+  // thriller olive-gray palette.
   const aestheticByGenre: Record<string, string> = {
-    comedy: "warm casting headshot, naturalistic daylight, gentle key light from upper front-left, soft shadow falloff, muted warm-neutral background, restrained contrast",
-    romance: "soft cinematic headshot, golden-hour key light from upper front-left, gentle shadow falloff, muted warm cream background, restrained contrast",
-    horror: "high-contrast moody headshot, harsh single-source light from upper front-left, deep shadow falloff, muted near-black background, elevated contrast",
-    "sci-fi": "elevated cinematic headshot, cool clean key light from upper front-left, subtle shadow falloff, muted slate-blue background, restrained contrast",
+    comedy:    "warm character illustration, painterly brush texture, gentle daylight key light from upper front-left, soft shadow falloff, muted warm-neutral background, restrained contrast",
+    romance:   "soft painted character portrait, golden-hour key light from upper front-left, gentle painterly shadow falloff, muted warm cream background, restrained contrast",
+    horror:    "high-contrast moody painted portrait, harsh single-source painterly light from upper front-left, deep shadow falloff, muted near-black background, elevated contrast",
+    "sci-fi":  "elevated painted character portrait, cool clean painterly key light from upper front-left, subtle shadow falloff, muted slate-blue background, restrained contrast",
+    fantasy:   "painted character portrait with subtle storybook quality, warm directional key light from upper front-left, gentle painterly shadow falloff, muted moss-and-amber background, restrained contrast",
+    drama:     "elevated painted character portrait, soft directional key light from upper front-left, gentle painterly shadow falloff, muted warm-neutral background, restrained contrast",
   };
-  const fallback = "elevated psychological thriller aesthetic, painterly photorealistic detail, dramatic low-key lighting, soft directional key light from upper front-left, subtle shadow falloff, muted dark olive-gray background, restrained contrast";
+  const fallback = "elevated psychological thriller aesthetic, painterly brush texture, dramatic low-key lighting, soft directional key light from upper front-left, muted dark olive-gray background, restrained contrast";
   const genreKey = (projectGenre || "").toLowerCase();
   const aesthetic = aestheticByGenre[genreKey] || fallback;
 
-  return `Create a cinematic character portrait for a screenplay writing app.
+  // Optional one-liner appended after the aesthetic line when the
+  // user has written project tone notes on the Concept tab. Helps the
+  // painting absorb authored vibes the genre alone wouldn't capture.
+  const toneLine = (projectTone || "").trim()
+    ? `\nProject tone: ${projectTone!.trim()}.`
+    : "";
 
-Style: moody studio headshot, ${aesthetic}, realistic skin texture, serious neutral expression, premium film casting portrait, editorial but not glamorous.
+  return `Create a cinematic painted character portrait for a screenplay writing app.
 
-Crop and framing: vertical portrait crop, 4:5 aspect ratio, head and upper torso visible, face centered, subject facing directly forward, eyes looking into camera, shoulders squared, top of head fully visible, no extreme close-up, no full body, consistent negative space above the head, chest cropped around mid-torso.
+Style: semi-realistic digital painting, subtle oil-painted finish, cinematic character card art, ${aesthetic}, serious neutral expression, premium film character illustration, editorial but not photographic.${toneLine}
 
-Wardrobe: dark understated clothing, cinematic neutrals, minimal styling, no logos, no bright colors unless specifically requested as a small accent.
+Important style direction: This should NOT look like a real photograph. Avoid hyperrealism, avoid photographic skin texture, avoid sharp camera detail, avoid DSLR realism. Skin, hair, and clothing should feel painted with smooth tonal transitions, visible painterly texture, and slightly stylized facial structure.
 
-Background: plain dark textured studio backdrop, muted charcoal/olive tone, no props, no scenery, no text, no border.
+Crop and framing: vertical portrait crop, 5:6 aspect ratio, head and upper torso visible, face centered, subject facing directly forward, eyes looking into camera, shoulders squared, top of head fully visible, consistent negative space above the head, chest cropped around mid-torso.
 
-Image should feel consistent with a set of character thumbnails in a serious thriller project.
+Wardrobe: dark understated clothing, cinematic neutrals, minimal styling, no logos, no bright colors unless requested as a small accent.
+
+Background: plain dark textured studio backdrop, muted charcoal and olive tone, soft vignette, no props, no scenery, no text, no border.
+
+Image should feel consistent with a set of painted character thumbnails in a serious thriller project.
 
 Character description:
 ${description}`;
@@ -64,7 +84,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { description, genre } = await req.json();
+    const { description, genre, tone } = await req.json();
     if (!description || typeof description !== "string" || !description.trim()) {
       return new Response(JSON.stringify({ error: "description required" }), {
         status: 400,
@@ -72,7 +92,11 @@ export async function POST(req: Request) {
       });
     }
 
-    const prompt = buildCharacterPrompt(description.trim(), typeof genre === "string" ? genre : undefined);
+    const prompt = buildCharacterPrompt(
+      description.trim(),
+      typeof genre === "string" ? genre : undefined,
+      typeof tone === "string" ? tone : undefined,
+    );
     const isV2 = isV2User(req.headers.get("x-user-email"));
 
     // Image gen — vertical 4:5 portrait. gpt-image-2 supports custom
@@ -121,12 +145,12 @@ export async function POST(req: Request) {
       });
     }
 
-    // Compress: source PNG → 480x600 (4:5) JPEG (~30–60KB). Card
-    // displays at ~64x80 logical / ~128x160 retina, so 480x600 has
+    // Compress: source PNG → 500x600 (5:6) JPEG (~30–60KB). Card
+    // displays at 100x120 logical / 200x240 retina, so 500x600 gives
     // plenty of pixel density without bloating storage.
     const pngBuffer = Buffer.from(b64, "base64");
     const jpegBuffer = await sharp(pngBuffer)
-      .resize(480, 600, { fit: "cover", position: "attention" })
+      .resize(500, 600, { fit: "cover", position: "attention" })
       .jpeg({ quality: 80 })
       .toBuffer();
 

@@ -7942,6 +7942,11 @@ html[data-design="v2"] .v2-character-card {
   box-shadow: none;
   margin-top: 14px;
   overflow: hidden;
+  /* Card row sized to the portrait — keeps every card a uniform
+     120px tall regardless of how short or long the description is.
+     The body's 3-line clamp + portrait's fixed height pin both
+     sides of the row to the same height. */
+  height: 120px;
 }
 html[data-design="v2"] .v2-character-card .character-header {
   display: flex;
@@ -7951,20 +7956,21 @@ html[data-design="v2"] .v2-character-card .character-header {
   background: transparent;
   border: none;
   width: 100%;
+  height: 100%;
   text-align: left;
   cursor: pointer;
 }
 html[data-design="v2"] .v2-character-card .v2-character-portrait {
-  width: 110px;
-  height: 110px;
+  width: 100px;
+  height: 120px;
   flex: 0 0 auto;
   object-fit: cover;
   display: block;
   background: var(--ds-color-gray-fill);
-  /* Match the card's outer radius on the portrait's left edge so the
-     image hugs the card; right edge is square so the body content can
-     sit flush against it. */
-  border-radius: 0;
+  /* Floating thumbnail look: 13px-radius rectangle with a small
+     inset from the card edges, not flush. */
+  border-radius: 13px;
+  margin: 8px 0 8px 8px;
 }
 html[data-design="v2"] .v2-character-card .v2-character-portrait-placeholder {
   display: flex;
@@ -7982,14 +7988,13 @@ html[data-design="v2"] .v2-character-card .v2-character-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px 12px 12px 0;
+  padding: 12px 12px 12px 4px;
 }
 html[data-design="v2"] .v2-character-name {
-  font-size: 22px;
-  line-height: 1.1;
+  /* Token .ds-type-project-card-title now drives font-family /
+     weight / size / line-height. We just constrain layout: single
+     line, truncate-with-ellipsis on overflow. */
   margin: 0;
-  /* Truncate single-line names that overflow rather than wrapping
-     the rest of the layout. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8063,8 +8068,9 @@ html[data-design="v2"] .v2-character-lock {
 }
 
 /* Edit-sheet portrait — sits at the top of the character edit form
-   above the Name row. Square preview + a Generate / Regenerate
-   button. Uses the new icon-ai-button.svg glyph in the button. */
+   above the Name row. 5:6 preview matching the card thumbnail +
+   a stacked Generate / Upload button pair. The Generate button
+   uses the icon-ai-button.svg glyph; Upload is plain-label. */
 html[data-design="v2"] .v2-character-form-portrait {
   display: flex;
   align-items: center;
@@ -8072,9 +8078,9 @@ html[data-design="v2"] .v2-character-form-portrait {
   margin: 0 0 18px;
 }
 html[data-design="v2"] .v2-character-form-portrait-img {
-  width: 96px;
-  height: 96px;
-  border-radius: 14px;
+  width: 100px;
+  height: 120px;
+  border-radius: 13px;
   object-fit: cover;
   display: flex;
   align-items: center;
@@ -8088,6 +8094,12 @@ html[data-design="v2"] .v2-character-form-portrait-placeholder {
   font-weight: 400;
   font-size: 36px;
   color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .v2-character-form-portrait-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
 }
 
 /* AI history pager — sits next to the AI wand. v1 used a blue-50 →

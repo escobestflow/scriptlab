@@ -6587,7 +6587,7 @@ function CharactersTab({
             <div className="v2-character-body" style={isV2 ? undefined : { flex: 1, textAlign: "left" }}>
               {isV2 ? (
                 <>
-                  <div className="v2-character-name ds-type-empty-header">
+                  <div className="v2-character-name ds-type-project-card-title">
                     {ch.name || "Unnamed character"}
                   </div>
                   {roleLabel && (
@@ -6840,14 +6840,17 @@ function CharacterEditForm({
     return ch.aiVoice.toUpperCase();
   })();
 
-  // ── Character image generation ─────────────────────────────────
+  // ── Character image: AI generation + upload ────────────────────
   // /api/generate-character-image takes a free-text character
-  // description + the project's primary genre and returns a 4:5
-  // JPEG data URL. Stored on Character.thumbnail. The button is
-  // shown for v2 users only; v1 keeps the avatar-initial fallback
-  // on cards and doesn't surface generation in the edit sheet.
+  // description + the project's primary genre + tone and returns a
+  // 5:6 painted-portrait JPEG data URL. Stored on Character.thumbnail.
+  // The whole portrait block (preview + Generate + Upload) is shown
+  // for v2 users only, and only on the edit sheet — the creation
+  // sheet (`isNew`) keeps the form short until the character has at
+  // least a name + role to inform a generation.
   const isV2Form = useIsV2();
   const [imgBusy, setImgBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   async function generateImage() {
     if (imgBusy) return;
     const description = [
@@ -6867,12 +6870,13 @@ function CharacterEditForm({
     }
     const concept = getActiveConceptDraft(story);
     const primaryGenre = concept.settings?.genres?.[0];
+    const projectTone = concept.concept?.tone;
     setImgBusy(true);
     try {
       const res = await fetch("/api/generate-character-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre }),
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
       });
       const data = await res.json();
       if (data.thumbnail) {
@@ -6887,9 +6891,29 @@ function CharacterEditForm({
     }
   }
 
+  // Upload a local image. Read as data URL → store on
+  // Character.thumbnail, the same shape AI generation produces, so
+  // the rest of the app doesn't need to know which path it came
+  // from. No server-side resize for uploads; we trust the user's
+  // source enough to inline it as-is.
+  function onUploadClick() {
+    fileInputRef.current?.click();
+  }
+  function onUploadChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") onUpdate({ thumbnail: result });
+    };
+    reader.readAsDataURL(file);
+  }
+
   return (
     <div>
-      {isV2Form && (
+      {isV2Form && !isNew && (
         <div className="v2-character-form-portrait">
           {ch.thumbnail ? (
             <img src={ch.thumbnail} alt="" className="v2-character-form-portrait-img" />
@@ -6898,15 +6922,32 @@ function CharacterEditForm({
               {ch.name ? ch.name[0].toUpperCase() : "?"}
             </div>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={generateImage}
-            disabled={imgBusy}
-            icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
-          >
-            {imgBusy ? "Generating…" : ch.thumbnail ? "Regenerate" : "Generate Portrait"}
-          </Button>
+          <div className="v2-character-form-portrait-actions">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={generateImage}
+              disabled={imgBusy}
+              icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
+            >
+              {imgBusy ? "Generating…" : ch.thumbnail ? "Regenerate" : "Generate"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onUploadClick}
+              disabled={imgBusy}
+            >
+              Upload
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={onUploadChange}
+              style={{ display: "none" }}
+            />
+          </div>
         </div>
       )}
       <TextAttrRow
