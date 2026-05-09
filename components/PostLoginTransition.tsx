@@ -180,6 +180,7 @@ export default function PostLoginTransition({ onDone, ready = true }: PostLoginT
             height 800ms cubic-bezier(0.22, 1, 0.36, 1);
         }
         .post-login-transition.phase-shrink .post-login-logo,
+        .post-login-transition.phase-bg-fade .post-login-logo,
         .post-login-transition.phase-fade-out .post-login-logo,
         .post-login-transition.phase-done .post-login-logo {
           /* Match .brand-logo-img inside .topbar-center: vertically
