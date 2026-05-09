@@ -7645,15 +7645,13 @@ html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar .studio-tab {
    the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
   /* Tuning chain:
-       260 → 263 → 268 → 300 → 285 → 277 → 276 → 282 → 302
-     The earlier 282 kept a deliberate 20px "tuck" — the layer-bar
-     overlapped the first content row's top — but on Concept tab
-     (where rows have a thin top edge) that read as the bar
-     CUTTING the row, not tucking it. Bumping to 302 drops the
-     tuck entirely: with the layer-bar now at env+202..env+302,
-     scroll content starts at the bar's bottom edge and the
-     tab-content-wrap's own 8px top padding gives a clean gap. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 302px);
+       260 → 263 → 268 → 300 → 285 → 277 → 276 → 282 → 302 → 299
+     302 dropped the layer-bar tuck entirely (content sat exactly at
+     the bar's bottom edge, with the wrap's 8px top padding as the
+     visible gap). Latest -3 lifts everything 3px higher per spec —
+     content top now sits 3px ABOVE the bar's bottom edge, so the
+     bar covers the first 3px of the rounded card top. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 299px);
   -webkit-overflow-scrolling: auto;
 }
 
@@ -7994,8 +7992,12 @@ html[data-design="v2"] .card.v2-character-card {
   background: var(--ds-color-white);
   border: 0.7px solid var(--ds-color-gray-outline);
   box-shadow: none;
-  margin-top: 14px;
-  margin-bottom: 0;
+  /* Use margin-bottom (not margin-top) so the FIRST card sits flush
+     against the tab-content-wrap top edge — matches Concept tab,
+     whose first attr-row has no top margin either. Per spec both
+     tabs must start at the same scroll-y. */
+  margin-top: 0;
+  margin-bottom: 14px;
   overflow: hidden;
   /* Card row sized to the portrait — keeps every card a uniform
      122px tall regardless of how short or long the description is.
