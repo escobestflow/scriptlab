@@ -7616,18 +7616,7 @@ function StoryTab({
                 <div className="beat-header" style={isV2 ? undefined : { display: "flex", alignItems: "center", gap: 0 }}>
                   <div className="beat-grip" aria-hidden="true">
                     {isV2 ? (
-                      // 6-dot grip (2 columns × 3 rows). The `&#10303;`
-                      // U+283F Braille glyph used in v1 falls back to a
-                      // single vertical-ellipsis on most fonts; SVG
-                      // dots render reliably.
-                      <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
-                        <circle cx="2" cy="2" r="1" />
-                        <circle cx="8" cy="2" r="1" />
-                        <circle cx="2" cy="7" r="1" />
-                        <circle cx="8" cy="7" r="1" />
-                        <circle cx="2" cy="12" r="1" />
-                        <circle cx="8" cy="12" r="1" />
-                      </svg>
+                      <img src="/icon-row-move.svg" alt="" aria-hidden="true" width={6} height={14} />
                     ) : "⠿"}
                   </div>
                   <button

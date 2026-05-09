@@ -8280,23 +8280,29 @@ html[data-design="v2"] .attr-row-body {
 html[data-design="v2"] .v2-beat-row {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: 18px;
   margin-bottom: 14px;
+  /* Pull the row's edges out by 2 from the tab-content-wrap's 22
+     padding so the row sits at viewport±20 per spec. */
+  margin-left: -2px;
+  margin-right: -2px;
+  height: 103px;
 }
 html[data-design="v2"] .v2-beat-number-col {
   position: relative;
-  flex: 0 0 auto;
-  width: 22px;
+  flex: 0 0 21px;
+  width: 21px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* +12 padding-top brings the number badge down to the card's
-     vertical-center area (where the thumbnail's center sits). */
-  padding-top: 22px;
+  /* Vertically center the badge in the row (was padded to align
+     with thumb center; now uses justify-content: center so the
+     badge sits at the row's true vertical midpoint). */
+  justify-content: center;
 }
 html[data-design="v2"] .v2-beat-number-badge {
-  width: 22px;
-  height: 22px;
+  width: 21px;
+  height: 21px;
   border-radius: 50%;
   border: 0.7px solid var(--ds-color-gray-outline);
   background: var(--ds-color-white);
@@ -8333,7 +8339,8 @@ html[data-design="v2"] .v2-beat-row:last-child .v2-beat-number-col::before {
   display: none;
 }
 /* The card itself in v2 — white tile, soft outline, 18px radius
-   matching the character cards. No shadow. */
+   matching the character cards. No shadow. Locked to the row's
+   103px height per spec so every row is a uniform tile. */
 html[data-design="v2"] .card.v2-beat-card {
   flex: 1 1 auto;
   min-width: 0;
@@ -8344,6 +8351,7 @@ html[data-design="v2"] .card.v2-beat-card {
   border: 0.7px solid var(--ds-color-gray-outline);
   box-shadow: none;
   overflow: hidden;
+  height: 103px;
   min-height: 0;
 }
 html[data-design="v2"] .v2-beat-card .beat-header {
@@ -8354,22 +8362,28 @@ html[data-design="v2"] .v2-beat-card .beat-header {
   width: 100%;
   text-align: left;
 }
-/* The drag grip rail — a thin vertical column of 6 dots
-   (drawn via the unicode ⋮⋮ glyph) centered on the card's left
-   edge, inside the card before the thumbnail. */
+/* The drag grip rail — 6×14 SVG icon shipped at /icon-row-move.svg.
+   Column total width is 7 (left pad) + 6 (icon) + 9 (right pad) =
+   22px. The card's full height stretches the column; the icon
+   sits vertically centered. */
 html[data-design="v2"] .v2-beat-card .beat-grip {
-  flex: 0 0 14px;
+  flex: 0 0 auto;
   align-self: stretch;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--ds-color-gray-chip-label);
-  font-size: 14px;
   line-height: 1;
-  /* spacing between the grip and the thumbnail */
-  padding: 0 4px;
+  /* v1 base sets width: 32 — explicitly override to 22 (7 + 6 + 9). */
+  width: 22px;
+  padding: 0 9px 0 7px;
   user-select: none;
   cursor: grab;
+}
+html[data-design="v2"] .v2-beat-card .beat-grip img {
+  display: block;
+  width: 6px;
+  height: 14px;
 }
 html[data-design="v2"] .v2-beat-card .beat-grip:active {
   cursor: grabbing;
@@ -8382,13 +8396,10 @@ html[data-design="v2"] .v2-beat-thumb {
   display: block;
   background: var(--ds-color-gray-fill);
   border-radius: 8px;
-  /* Centered in the card vertically with a small inset from the
-     left so the grip column doesn't run flush into the image.
-     8px top/bottom margin lets the card height land at ~88px
-     (8 + 72 + 8) — matches the reference where the card is
-     roughly the height of the thumb plus a thin gutter. */
+  /* Vertically centered in the 103px card — `align-self: center`
+     splits the leftover height (~31px) evenly above and below. */
   align-self: center;
-  margin: 8px 0;
+  margin: 0;
 }
 html[data-design="v2"] .v2-beat-thumb-placeholder {
   display: flex;
@@ -8403,11 +8414,12 @@ html[data-design="v2"] .v2-beat-card .beat-info {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  /* Tight vertical padding so the card height is governed by the
-     thumbnail + ~3 lines of body, not by extra info gutter. */
-  padding: 8px 16px 8px 12px;
-  align-self: center;
+  /* Title sits 15px from the row's top edge; body follows 5px
+     below the title (gap). align-self defaults to stretch so the
+     info column extends the full card height — padding-top
+     becomes the row-relative title offset. */
+  gap: 5px;
+  padding: 15px 16px 15px 12px;
 }
 /* In v2 the .beat-name and .beat-summary-preview classes are
    carried over from v1, but their typography comes from the
