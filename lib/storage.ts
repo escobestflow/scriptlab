@@ -66,6 +66,9 @@ function normalizeCharacter(c: any): Character {
     createdInEpisodeId: typeof c.createdInEpisodeId === "string" && c.createdInEpisodeId
       ? c.createdInEpisodeId
       : undefined,
+    thumbnail: typeof c.thumbnail === "string" && c.thumbnail
+      ? c.thumbnail
+      : undefined,
   };
 }
 

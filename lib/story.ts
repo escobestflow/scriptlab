@@ -143,6 +143,12 @@ export interface Character {
    *  character predates this rule (legacy projects) — treat as "owned
    *  by the pilot episode" via the storage migration in normalizeCharacter. */
   createdInEpisodeId?: string;
+  /** Cinematic AI-generated character portrait. 4:5 vertical crop,
+   *  stored as a compressed JPEG data URL (~50–80KB). Generated via
+   *  /api/generate-character-image using a fixed style prompt + the
+   *  character's free-text description so portraits stay visually
+   *  consistent across a project's cast. */
+  thumbnail?: string;
 }
 
 export interface Ingredient {

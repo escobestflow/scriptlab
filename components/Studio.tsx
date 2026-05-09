@@ -6534,49 +6534,105 @@ function CharactersTab({
       {/* Character rows — tapping opens the unified character sheet. */}
       {d.characters.map(ch => {
         const lock = lockedFromEpisode(ch);
+        const roleLabel = roleLabels[ch.role] || ch.role || "";
+        // Description for the v2 card: prefer backstory; fall back to
+        // motivations / want so newly-AI-seeded characters still surface
+        // a short blurb on the card.
+        const v2Description =
+          (ch.backstory && ch.backstory.trim())
+          || (ch.motivations && ch.motivations.trim())
+          || (ch.want && ch.want.trim())
+          || "";
         return (
-        <div key={ch.id} className="card character-card">
+        <div key={ch.id} className={`card character-card${isV2 ? " v2-character-card" : ""}`}>
           <button
             className="character-header"
             onClick={() => openCharacter(ch.id)}
           >
-            <div className="character-avatar">
-              {ch.name ? ch.name[0].toUpperCase() : "?"}
-            </div>
-            <div style={{ flex: 1, textAlign: "left" }}>
-              <div style={{ fontSize: 15, fontWeight: 900, display: "flex", alignItems: "center", gap: 6 }}>
-                {ch.name || "Unnamed character"}
-                {lock && (
-                  <span
-                    aria-label={`Created in Episode ${lock.number} — locked`}
-                    title={`Created in Episode ${lock.number} — switch to that episode to edit`}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 3,
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "2px 6px",
-                      borderRadius: 999,
-                      background: "var(--surface-2, #f3f3f4)",
-                      color: "var(--ink-mute)",
-                      letterSpacing: 0.3,
-                    }}
-                  >
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <rect x="4" y="11" width="16" height="10" rx="2" />
-                      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-                    </svg>
-                    EP {lock.number}
-                  </span>
-                )}
+            {isV2 ? (
+              ch.thumbnail ? (
+                <img src={ch.thumbnail} alt="" className="v2-character-portrait" />
+              ) : (
+                <div className="v2-character-portrait v2-character-portrait-placeholder">
+                  {ch.name ? ch.name[0].toUpperCase() : "?"}
+                </div>
+              )
+            ) : (
+              <div className="character-avatar">
+                {ch.name ? ch.name[0].toUpperCase() : "?"}
               </div>
-              <div className="caption">
-                {roleLabels[ch.role] || ch.role || "No role"}
-                {ch.archetype && ` · ${ch.archetype}`}
-              </div>
+            )}
+            <div className="v2-character-body" style={isV2 ? undefined : { flex: 1, textAlign: "left" }}>
+              {isV2 ? (
+                <>
+                  <div className="v2-character-name ds-type-empty-header">
+                    {ch.name || "Unnamed character"}
+                  </div>
+                  {roleLabel && (
+                    <div className={`v2-character-role-pill v2-character-role-${ch.role || "default"}`}>
+                      {roleLabel}
+                    </div>
+                  )}
+                  {v2Description && (
+                    <div className="v2-character-description ds-type-body-sm">
+                      {v2Description}
+                    </div>
+                  )}
+                  {lock && (
+                    <span
+                      className="v2-character-lock"
+                      aria-label={`Created in Episode ${lock.number} — locked`}
+                      title={`Created in Episode ${lock.number} — switch to that episode to edit`}
+                    >
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <rect x="4" y="11" width="16" height="10" rx="2" />
+                        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                      </svg>
+                      EP {lock.number}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 15, fontWeight: 900, display: "flex", alignItems: "center", gap: 6 }}>
+                    {ch.name || "Unnamed character"}
+                    {lock && (
+                      <span
+                        aria-label={`Created in Episode ${lock.number} — locked`}
+                        title={`Created in Episode ${lock.number} — switch to that episode to edit`}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 999,
+                          background: "var(--surface-2, #f3f3f4)",
+                          color: "var(--ink-mute)",
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="4" y="11" width="16" height="10" rx="2" />
+                          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                        </svg>
+                        EP {lock.number}
+                      </span>
+                    )}
+                  </div>
+                  <div className="caption">
+                    {roleLabel || "No role"}
+                    {ch.archetype && ` · ${ch.archetype}`}
+                  </div>
+                </>
+              )}
             </div>
-            <span className="beat-expand">›</span>
+            {isV2 ? (
+              <span className="v2-character-menu" aria-hidden="true">⋯</span>
+            ) : (
+              <span className="beat-expand">›</span>
+            )}
           </button>
           {previewActive && (
             <button
@@ -6762,8 +6818,75 @@ function CharacterEditForm({
     return ch.aiVoice.toUpperCase();
   })();
 
+  // ── Character image generation ─────────────────────────────────
+  // /api/generate-character-image takes a free-text character
+  // description + the project's primary genre and returns a 4:5
+  // JPEG data URL. Stored on Character.thumbnail. The button is
+  // shown for v2 users only; v1 keeps the avatar-initial fallback
+  // on cards and doesn't surface generation in the edit sheet.
+  const isV2Form = useIsV2();
+  const [imgBusy, setImgBusy] = useState(false);
+  async function generateImage() {
+    if (imgBusy) return;
+    const description = [
+      ch.name && `Name: ${ch.name}`,
+      ch.role && `Role: ${roleLabel || ch.role}`,
+      ch.gender && `Gender: ${ch.gender}`,
+      ch.archetype && `Archetype: ${ch.archetype}`,
+      ch.backstory && `Backstory: ${ch.backstory}`,
+      ch.motivations && `Motivations: ${ch.motivations}`,
+      ch.flaws && `Flaws: ${ch.flaws}`,
+    ].filter(Boolean).join("\n");
+    if (!description.trim()) {
+      if (typeof window !== "undefined") {
+        window.alert("Add a name + a few details (role, backstory, etc.) before generating a portrait.");
+      }
+      return;
+    }
+    const concept = getActiveConceptDraft(story);
+    const primaryGenre = concept.settings?.genres?.[0];
+    setImgBusy(true);
+    try {
+      const res = await fetch("/api/generate-character-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, genre: primaryGenre }),
+      });
+      const data = await res.json();
+      if (data.thumbnail) {
+        onUpdate({ thumbnail: data.thumbnail });
+      } else if (data.error && typeof window !== "undefined") {
+        window.alert(data.error);
+      }
+    } catch (err: any) {
+      if (typeof window !== "undefined") window.alert(err?.message || String(err));
+    } finally {
+      setImgBusy(false);
+    }
+  }
+
   return (
     <div>
+      {isV2Form && (
+        <div className="v2-character-form-portrait">
+          {ch.thumbnail ? (
+            <img src={ch.thumbnail} alt="" className="v2-character-form-portrait-img" />
+          ) : (
+            <div className="v2-character-form-portrait-img v2-character-form-portrait-placeholder">
+              {ch.name ? ch.name[0].toUpperCase() : "?"}
+            </div>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={generateImage}
+            disabled={imgBusy}
+            icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
+          >
+            {imgBusy ? "Generating…" : ch.thumbnail ? "Regenerate" : "Generate Portrait"}
+          </Button>
+        </div>
+      )}
       <TextAttrRow
         label="Name"
         value={ch.name}

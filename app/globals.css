@@ -7930,6 +7930,166 @@ html[data-design="v2"] .ai-wand img {
   display: block;
 }
 
+/* ── V2 character cards — populated state ──────────────────────
+   Layout: square portrait on the left, name + role pill + short
+   description stacked on the right, "⋯" menu glyph at the far right.
+   Card itself is a soft-radius white tile with a thin gray outline. */
+html[data-design="v2"] .v2-character-card {
+  padding: 0;
+  border-radius: 18px;
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  box-shadow: none;
+  margin-top: 14px;
+  overflow: hidden;
+}
+html[data-design="v2"] .v2-character-card .character-header {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+html[data-design="v2"] .v2-character-card .v2-character-portrait {
+  width: 110px;
+  height: 110px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  display: block;
+  background: var(--ds-color-gray-fill);
+  /* Match the card's outer radius on the portrait's left edge so the
+     image hugs the card; right edge is square so the body content can
+     sit flush against it. */
+  border-radius: 0;
+}
+html[data-design="v2"] .v2-character-card .v2-character-portrait-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 36px;
+  color: var(--ds-color-gray-chip-label);
+  background: var(--ds-color-gray-fill);
+}
+html[data-design="v2"] .v2-character-card .v2-character-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 12px 0;
+}
+html[data-design="v2"] .v2-character-name {
+  font-size: 22px;
+  line-height: 1.1;
+  margin: 0;
+  /* Truncate single-line names that overflow rather than wrapping
+     the rest of the layout. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html[data-design="v2"] .v2-character-role-pill {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ds-color-black);
+  background: var(--ds-color-gray-chip-fill);
+}
+/* Per-role accent fills (mapped to the v2 accent token pairs). */
+html[data-design="v2"] .v2-character-role-protagonist {
+  background: var(--ds-color-accent-green-on-light);
+}
+html[data-design="v2"] .v2-character-role-antagonist {
+  background: var(--ds-color-accent-red-on-light);
+}
+html[data-design="v2"] .v2-character-role-supporting {
+  background: var(--ds-color-accent-blue-on-light);
+}
+html[data-design="v2"] .v2-character-role-mentor {
+  background: var(--ds-color-accent-yellow-on-light);
+}
+html[data-design="v2"] .v2-character-role-love_interest {
+  background: var(--ds-color-accent-purple-on-light);
+}
+html[data-design="v2"] .v2-character-role-comic_relief {
+  background: var(--ds-color-accent-orange-on-light);
+}
+html[data-design="v2"] .v2-character-description {
+  color: var(--ds-color-black);
+  /* Clamp to ~3 lines on mobile so cards stay roughly the portrait's
+     height; longer descriptions fade off via ellipsis. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+html[data-design="v2"] .v2-character-menu {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  color: var(--ds-color-gray-chip-label);
+  padding: 12px 14px 0 0;
+}
+html[data-design="v2"] .v2-character-lock {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: var(--ds-color-gray-chip-fill);
+  color: var(--ds-color-gray-chip-label);
+}
+
+/* Edit-sheet portrait — sits at the top of the character edit form
+   above the Name row. Square preview + a Generate / Regenerate
+   button. Uses the new icon-ai-button.svg glyph in the button. */
+html[data-design="v2"] .v2-character-form-portrait {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+html[data-design="v2"] .v2-character-form-portrait-img {
+  width: 96px;
+  height: 96px;
+  border-radius: 14px;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ds-color-gray-fill);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  flex: 0 0 auto;
+}
+html[data-design="v2"] .v2-character-form-portrait-placeholder {
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 36px;
+  color: var(--ds-color-gray-chip-label);
+}
+
 /* AI history pager — sits next to the AI wand. v1 used a blue-50 →
    sky-50 gradient with a blue inset stroke; v2 mirrors the new
    `.ai-wand` chip exactly so the two read as siblings of one
