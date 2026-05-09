@@ -2028,6 +2028,7 @@ export function Studio({
                 setSection("story");
                 openNewSceneSheet(sorted.length);
               }}
+              onGoToStory={() => setSection("story")}
               bgScriptJob={bgScriptJob}
               onStartBackgroundScriptLoop={onStartBackgroundScriptLoop}
             />
@@ -4827,6 +4828,7 @@ function EmptyLayerState({
   story,
   setStory,
   autosaveEnabled,
+  addIcon,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -4864,6 +4866,11 @@ function EmptyLayerState({
   /** v2: whether autosave is on — controls the picker's "Save draft"
    *  button rendering inside the overlay. */
   autosaveEnabled?: boolean;
+  /** v2: optional override for the primary (Add) button's glyph.
+   *  Defaults to /icon-add-cta.svg. Script's empty state passes a
+   *  back-arrow icon so the "Go to Story" CTA reads as navigation
+   *  rather than creation. */
+  addIcon?: React.ReactNode;
 }) {
   const hasActions = !!onAdd || !!onGenerate;
   const isV2 = useIsV2();
@@ -4911,7 +4918,7 @@ function EmptyLayerState({
                 size="sm"
                 onClick={onAdd}
                 disabled={!!generating}
-                icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
+                icon={addIcon ?? <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
                 className="ds-type-cta"
               >
                 {addLabel}
@@ -7547,6 +7554,7 @@ function ScriptTab({
   importing,
   importStep,
   onAddScene,
+  onGoToStory,
   runGenerateAll,
   bgScriptJob,
   onStartBackgroundScriptLoop,
@@ -7581,6 +7589,10 @@ function ScriptTab({
   /** Switch to Story tab + open the scene-creation tray.
    *  Wired by Studio because scenes (beats) are created in Story. */
   onAddScene: () => void;
+  /** Switch to the Story tab without opening any tray. Wired into
+   *  the v2 empty-state CTA ("Go to Story") since Script can only
+   *  ever be empty when Story is empty too. */
+  onGoToStory: () => void;
   /** Wrap a Create-all action with the Studio-level scrim + sheet-close
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
@@ -7607,6 +7619,7 @@ function ScriptTab({
     opts?: { rewriteNewDraft?: boolean },
   ) => Promise<void>;
 }) {
+  const isV2 = useIsV2();
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
   const conceptDraft = getActiveConceptDraft(story);
@@ -7698,12 +7711,11 @@ function ScriptTab({
           scene" button), so the aggregate counter was noisy overhead. */}
 
       {!hasBeats && (
-        // Script's empty state is informational-only: no Add scene and
-        // no Write all. The user is expected to sketch scenes in the
-        // Story tab first (copy below explains this), so surfacing a
-        // sticky "Add scene" here would invite entering this tab out
-        // of flow. "Write all" is hidden too — with zero beats there's
-        // nothing to generate prose from.
+        // Script can only be empty when Story is empty too — there's
+        // nothing here to "create", just a navigation back to Story
+        // where scenes get authored. v2 surfaces a single "Go to
+        // Story" CTA (back-arrow glyph in the primary black chip).
+        // v1 keeps the prior info-only treatment (no buttons).
         <EmptyLayerState
           section="script"
           layer="script"
@@ -7712,8 +7724,15 @@ function ScriptTab({
           setStory={setStory}
           autosaveEnabled={autosaveEnabled}
           icon={<img src="/script-icon.svg" width={40} height={39} alt="" />}
-          title="No scenes yet"
-          caption="Sketch scenes in the Story tab, then return here to write them into prose."
+          title={isV2 ? "No Scenes to Script Yet" : "No scenes yet"}
+          caption={
+            isV2
+              ? "Build your scenes in Story first, then come back here to turn them into a script."
+              : "Sketch scenes in the Story tab, then return here to write them into prose."
+          }
+          addLabel={isV2 ? "Go to Story" : undefined}
+          onAdd={isV2 ? onGoToStory : undefined}
+          addIcon={isV2 ? <img src="/v2/icons/icon-back.svg" alt="" aria-hidden="true" /> : undefined}
         />
       )}
 

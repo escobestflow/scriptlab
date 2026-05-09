@@ -98,10 +98,12 @@ export default function PostLoginTransition({ onDone, ready = true }: PostLoginT
           opacity: 0;
         }
 
-        /* Full-viewport black box that collapses vertically to the
-           topbar's height during the "shrink" phase. Height drives
-           the "container shrinks to the size of the top nav bar"
-           behavior described in the spec. */
+        /* Full-viewport black box. Stays in place at full viewport
+           height through the entire transition — only fades out
+           (opacity 1 → 0) once the logo has settled into its top-bar
+           pose. (Was previously collapsing vertically, which made
+           the background "race up" with the logo; per spec the bg
+           should hold steady and dissolve cleanly afterward.) */
         .post-login-bg {
           position: absolute;
           left: 0;
@@ -109,19 +111,12 @@ export default function PostLoginTransition({ onDone, ready = true }: PostLoginT
           top: 0;
           height: 100vh;
           background: #0b0b0f;
-          transition: height 800ms cubic-bezier(0.22, 1, 0.36, 1);
+          opacity: 1;
+          transition: opacity 400ms cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .post-login-transition.phase-shrink .post-login-bg,
         .post-login-transition.phase-fade-out .post-login-bg,
         .post-login-transition.phase-done .post-login-bg {
-          /* Mirrors the real .topbar's outer box on the dark home
-             header: safe-area-top + 14px padding + 18.5px logo + 14px
-             padding + 25px (measured shortfall vs the live topbar on
-             device — the live bar includes internal button/chrome
-             padding that the simple safe-area+logo formula misses).
-             When this value matches the real topbar, the unmount is
-             visually seamless. */
-          height: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px + 14px + 25px);
+          opacity: 0;
         }
 
         /* Tagline — same pose, font, and typography as the splash's
@@ -173,16 +168,15 @@ export default function PostLoginTransition({ onDone, ready = true }: PostLoginT
         .post-login-transition.phase-fade-out .post-login-logo,
         .post-login-transition.phase-done .post-login-logo {
           /* Match .brand-logo-img inside .topbar-center: vertically
-             centered within the topbar padding, 82px wide. Shifted
-             7px lower than the pure-math center so it lands where
-             the live topbar actually renders the wordmark (the live
-             topbar has additional internal chrome pushing the logo
-             down a touch from the geometric midpoint).
+             centered within the topbar padding, 82px wide. Per
+             latest spec, lifted 8px higher than the prior +12 nudge
+             — the trailing offset goes 12 → 4 so the logo settles
+             into its topbar pose 8px sooner.
              Height is the aspect-preserving value for 82px width
-             (~17.64px) +1px -- per-design tweak to match the live
+             (~17.64px) +1px — per-design tweak to match the live
              wordmark rendered height on device (SVG gets stretched
              slightly taller than its intrinsic aspect). */
-          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 12px);
+          top: calc(env(safe-area-inset-top, 0px) + 14px + 18.5px / 2 + 4px);
           width: 82px;
           height: calc(82px * 18.5 / 86 + 1px);
         }
