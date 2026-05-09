@@ -6464,32 +6464,40 @@ function CharactersTab({
 
       {/* V2 inline action row — sits to the right of the LayerBar's
           "Character Draft N ▾" trigger when the cast is populated.
-          "+ Add character" + "⚡ Auto create" matching the screenshot.
-          Only renders for v2 + populated; v1 keeps its existing
-          flow (sticky bottom bar / empty-state CTAs).
+          Mirrors the empty-state CTA treatment exactly so the two
+          surfaces read as one system: glyph badge (black for primary
+          Add, white-with-stroke for secondary AI) + ds-type-cta
+          uppercase label. The buttons themselves carry no pill
+          outline — same `.empty-layer-actions` chrome reuse pattern.
           Hidden when partner-previewing — those buttons mutate state
           and we shouldn't offer that on a read-only view. */}
       {isV2 && hasCharacters && !previewActive && (
-        <div className="v2-cast-actions">
-          <button
-            type="button"
-            className="v2-cast-action v2-cast-action-primary"
+        // .empty-layer-actions reuses the v2 button-pair styling (no
+        // pill outline, glyph badge sizing) without `.empty-overlay-
+        // actions` (which would force column / left-aligned). The
+        // .v2-cast-actions class keeps this row horizontal next to
+        // the LayerBar's draft trigger.
+        <div className="empty-layer-actions v2-cast-actions">
+          <Button
+            variant="primary"
+            size="sm"
             onClick={openNewCharacter}
-            aria-label="Add character"
+            disabled={genBusy}
+            icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
+            className="ds-type-cta"
           >
-            <span className="v2-cast-action-glyph">+</span>
-            <span className="v2-cast-action-label ds-type-button-label">Add Character</span>
-          </button>
-          <button
-            type="button"
-            className="v2-cast-action v2-cast-action-secondary"
+            Add Character
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={generateAllCharacters}
             disabled={genBusy}
-            aria-label="Auto create characters"
+            icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
+            className="empty-state-ai-btn ds-type-cta"
           >
-            <span className="v2-cast-action-glyph v2-cast-action-glyph-bolt">⚡</span>
-            <span className="v2-cast-action-label ds-type-button-label">{genBusy ? "Creating…" : "Auto Create"}</span>
-          </button>
+            {genBusy ? "Creating…" : "Auto Create"}
+          </Button>
         </div>
       )}
 

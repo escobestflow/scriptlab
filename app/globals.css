@@ -8199,11 +8199,21 @@ html[data-design="v2"] .character-header [data-role="antagonist"]  { background:
 html[data-design="v2"] .character-header [data-role="supporting"]  { background: var(--ds-color-accent-blue-on-light); }
 html[data-design="v2"] .character-header [data-role="mentor"]      { background: var(--ds-color-accent-purple-on-light); }
 
-/* ── V2 Cast action row (populated state) ─────────────────────── */
+/* ── V2 Cast action row (populated state) ───────────────────────
+   Horizontal row of [Add Character] [Auto Create]. Sits to the
+   right of (or below, depending on parent layout) the LayerBar's
+   draft trigger. The element also carries `.empty-layer-actions`
+   so the button-pair styling (no pill outline, glyph chip) cascades
+   from the empty-state rules — but v1's
+   `.empty-layer-actions { flex-direction: column; max-width: 260; }`
+   would force these into a stacked column, so we explicitly reset
+   direction + max-width here. */
 html[data-design="v2"] .v2-cast-actions {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+  max-width: none;
   margin: 8px 0 14px;
 }
 html[data-design="v2"] .v2-cast-action {
