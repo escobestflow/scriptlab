@@ -8200,21 +8200,32 @@ html[data-design="v2"] .character-header [data-role="supporting"]  { background:
 html[data-design="v2"] .character-header [data-role="mentor"]      { background: var(--ds-color-accent-purple-on-light); }
 
 /* ── V2 Cast action row (populated state) ───────────────────────
-   Horizontal row of [Add Character] [Auto Create]. Sits to the
-   right of (or below, depending on parent layout) the LayerBar's
-   draft trigger. The element also carries `.empty-layer-actions`
-   so the button-pair styling (no pill outline, glyph chip) cascades
-   from the empty-state rules — but v1's
-   `.empty-layer-actions { flex-direction: column; max-width: 260; }`
-   would force these into a stacked column, so we explicitly reset
-   direction + max-width here. */
+   Horizontal row of [Add Character] [Auto Create]. Rendered into
+   the LayerBar's `rightSlot` so it sits on the SAME row as the
+   "Characters Draft N ▾" trigger (no separate row taking up
+   vertical space). The wrapper also carries `.empty-layer-actions`
+   so the button-pair styling (no pill outline, glyph chip)
+   cascades from the empty-state rules; v1's
+   `.empty-layer-actions { flex-direction: column; max-width: 260 }`
+   is explicitly reset here. */
 html[data-design="v2"] .v2-cast-actions {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 14px;
   max-width: none;
-  margin: 8px 0 14px;
+  margin: 0;
+}
+/* Push the slot to the bar's right edge (margin-left: auto) and
+   align it with the draft trigger via flex-end on the bar. The
+   trailing baseline-ish nudge (margin-bottom: -2) keeps the badge
+   chips visually centered with the draft text rather than sitting
+   slightly below it. */
+html[data-design="v2"] .layer-bar-right-slot {
+  margin-left: auto;
+  margin-bottom: -2px;
+  display: inline-flex;
+  align-items: center;
 }
 html[data-design="v2"] .v2-cast-action {
   display: inline-flex;
@@ -8394,9 +8405,9 @@ html[data-design="v2"] .studio-empty-overlay .empty-overlay-actions {
 html[data-design="v2"] .empty-layer-actions .ds-btn {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   height: 36px;
-  padding: 0 14px 0 4px;
+  padding: 0 4px 0 0;
   border-radius: 0;
   background: transparent;
   border: none;
@@ -8405,16 +8416,20 @@ html[data-design="v2"] .empty-layer-actions .ds-btn {
 }
 /* Glyph badge — 25×25 circle preceding the CTA label. The default
    styling matches the SECONDARY treatment (white circle, .7
-   gray-outline stroke, soft drop shadow); the primary override
-   below switches to a flat black circle with no stroke or shadow.
-   The actual glyph SVG is rendered by the JSX <img> inside. */
+   gray-outline OUTER stroke via box-shadow, soft drop shadow); the
+   primary override below switches to a flat black circle with no
+   stroke or shadow. The stroke is an outer ring (`box-shadow: 0 0
+   0 0.7px ...`) rather than a CSS `border` so it sits OUTSIDE the
+   25 box without eating into the icon area. */
 html[data-design="v2"] .empty-layer-actions .ds-btn .ds-btn-icon {
   width: 25px;
   height: 25px;
   border-radius: 50%;
   background: var(--ds-color-white);
-  border: 0.7px solid var(--ds-color-gray-outline);
-  box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
+  border: none;
+  box-shadow:
+    0 0 0 0.7px var(--ds-color-gray-outline),
+    0 2px 16px 0 rgba(0, 0, 0, 0.06);
   display: inline-flex;
   align-items: center;
   justify-content: center;

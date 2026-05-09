@@ -3226,6 +3226,7 @@ function LayerBar({
   autosaveEnabled = true,
   onOpenUpdateTray,
   onOpenReadThrough,
+  rightSlot,
 }: {
   layer: LayerKey;
   label: string;
@@ -3237,6 +3238,12 @@ function LayerBar({
    *  alongside the Update Other Layers trigger when the layer has
    *  source content. */
   onOpenReadThrough?: () => void;
+  /** Optional content rendered at the right end of the layer-bar.
+   *  Used by CharactersTab to host the Add/Auto-Create button pair on
+   *  the same row as the draft trigger. The slot pushes itself right
+   *  via margin-left: auto in CSS so it sits flush with the bar's
+   *  right edge regardless of which siblings are present. */
+  rightSlot?: React.ReactNode;
 }) {
   const hasSource = !isLayerDraftEmpty(story, layer);
   const { previewLayer } = usePartnerIdentity();
@@ -3294,6 +3301,7 @@ function LayerBar({
           <img src="/icon-draft-dropdown-caret.svg" alt="" className="drafts-caret" />
         </button>
       )}
+      {rightSlot && <div className="layer-bar-right-slot">{rightSlot}</div>}
     </div>
   );
 }
@@ -6458,48 +6466,47 @@ function CharactersTab({
     return owner ? { number: owner.number } : null;
   };
 
+  // V2 inline action row for the populated state — Add Character +
+  // Auto Create. Renders into the LayerBar's rightSlot below so the
+  // buttons sit on the same row as "Characters Draft N ▾". Hidden
+  // when partner-previewing — those buttons mutate state and we
+  // shouldn't offer that on a read-only view.
+  const v2CastActions = isV2 && hasCharacters && !previewActive ? (
+    <div className="empty-layer-actions v2-cast-actions">
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={openNewCharacter}
+        disabled={genBusy}
+        icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
+        className="ds-type-cta"
+      >
+        Add Character
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={generateAllCharacters}
+        disabled={genBusy}
+        icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
+        className="empty-state-ai-btn ds-type-cta"
+      >
+        {genBusy ? "Creating…" : "Auto Create"}
+      </Button>
+    </div>
+  ) : null;
+
   return (
     <>
-      <LayerBar layer="characters" label="Characters" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
-
-      {/* V2 inline action row — sits to the right of the LayerBar's
-          "Character Draft N ▾" trigger when the cast is populated.
-          Mirrors the empty-state CTA treatment exactly so the two
-          surfaces read as one system: glyph badge (black for primary
-          Add, white-with-stroke for secondary AI) + ds-type-cta
-          uppercase label. The buttons themselves carry no pill
-          outline — same `.empty-layer-actions` chrome reuse pattern.
-          Hidden when partner-previewing — those buttons mutate state
-          and we shouldn't offer that on a read-only view. */}
-      {isV2 && hasCharacters && !previewActive && (
-        // .empty-layer-actions reuses the v2 button-pair styling (no
-        // pill outline, glyph badge sizing) without `.empty-overlay-
-        // actions` (which would force column / left-aligned). The
-        // .v2-cast-actions class keeps this row horizontal next to
-        // the LayerBar's draft trigger.
-        <div className="empty-layer-actions v2-cast-actions">
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={openNewCharacter}
-            disabled={genBusy}
-            icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
-            className="ds-type-cta"
-          >
-            Add Character
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={generateAllCharacters}
-            disabled={genBusy}
-            icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
-            className="empty-state-ai-btn ds-type-cta"
-          >
-            {genBusy ? "Creating…" : "Auto Create"}
-          </Button>
-        </div>
-      )}
+      <LayerBar
+        layer="characters"
+        label="Characters"
+        story={story}
+        setStory={setStory}
+        autosaveEnabled={autosaveEnabled}
+        onOpenUpdateTray={onOpenUpdateTray}
+        rightSlot={v2CastActions}
+      />
 
       {/* Top-of-content Tip — only surfaces after the user has added
           their first character. On an empty tab the EmptyLayerState
