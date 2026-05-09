@@ -7677,14 +7677,19 @@ html[data-design="v2"] .layer-bar {
   right: 0;
   max-width: 520px;
   margin: 0 auto;
-  /* padding-bottom dropped 15 → 12 to nudge the draft trigger text
-     down 3px within the bar (flex-end + smaller bottom padding). */
-  padding: 0 30px 12px;
+  /* Bar +6px taller (94 → 100) and the draft trigger nudged 3px
+     down on screen. Mechanism: with `align-items: flex-end` the
+     trigger anchors to the bar's bottom edge at `padding-bottom`
+     from it; bumping padding-bottom 12 → 15 RAISES the trigger 3
+     within the bar, but since min-height grows by 6 (downward —
+     position:fixed pins the top) the bar's bottom moves down 6,
+     so net trigger screen-y is +3. */
+  padding: 0 30px 15px;
   z-index: 9;
   background: var(--ds-color-app-background);
   /* Drop the v1 SVG draft-bar-bg. */
   background-image: none;
-  min-height: 94px;
+  min-height: 100px;
   align-items: flex-end;
 }
 /* Tabs are sized by the parent .studio-tab-bar (height 71). The
