@@ -7934,19 +7934,27 @@ html[data-design="v2"] .ai-wand img {
    Layout: square portrait on the left, name + role pill + short
    description stacked on the right, "⋯" menu glyph at the far right.
    Card itself is a soft-radius white tile with a thin gray outline. */
-html[data-design="v2"] .v2-character-card {
+/* Stacked specificity — `.card.v2-character-card` overrides the
+   older `html[data-design="v2"] .card.character-card` block above
+   (which sets a 14px radius / 14px padding / overflow:visible legacy
+   look). Without bumping to `.card.X`, mine loses on every shared
+   property because the legacy rule's `.card.character-card` selector
+   matches more specifically. */
+html[data-design="v2"] .card.v2-character-card {
   padding: 0;
   border-radius: 18px;
   background: var(--ds-color-white);
   border: 0.7px solid var(--ds-color-gray-outline);
   box-shadow: none;
   margin-top: 14px;
+  margin-bottom: 0;
   overflow: hidden;
   /* Card row sized to the portrait — keeps every card a uniform
      120px tall regardless of how short or long the description is.
      The body's 3-line clamp + portrait's fixed height pin both
      sides of the row to the same height. */
   height: 120px;
+  min-height: 0;
 }
 html[data-design="v2"] .v2-character-card .character-header {
   display: flex;
@@ -7967,10 +7975,12 @@ html[data-design="v2"] .v2-character-card .v2-character-portrait {
   object-fit: cover;
   display: block;
   background: var(--ds-color-gray-fill);
-  /* Floating thumbnail look: 13px-radius rectangle with a small
-     inset from the card edges, not flush. */
-  border-radius: 13px;
-  margin: 8px 0 8px 8px;
+  /* Flush to the card's top-left and bottom-left edges. Left-side
+     corners match the card's outer 18px so the portrait flows
+     seamlessly into the card; right-side corners use the inner
+     13px so the visible inner edge stays soft. */
+  border-radius: 18px 13px 13px 18px;
+  margin: 0;
 }
 html[data-design="v2"] .v2-character-card .v2-character-portrait-placeholder {
   display: flex;
@@ -8148,68 +8158,15 @@ html[data-design="v2"] .attr-row-body {
   padding: 4px 16px 16px;
 }
 
-/* ── V2 Characters tab — populated cards ───────────────────────
-   Per screenshot: avatar (~64px square) on the left, name +
-   role pill + description stacked on the right. White card. */
-html[data-design="v2"] .card.character-card {
-  background: var(--ds-color-white);
-  border: 1px solid var(--ds-color-gray-outline);
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 10px;
-  box-shadow: none;
-  min-height: 0;
-  overflow: visible;
-}
-html[data-design="v2"] .character-header {
-  gap: 14px;
-  align-items: flex-start;
-}
-html[data-design="v2"] .character-avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 10px;
-  background: var(--ds-color-gray-dark-fill);
-  color: var(--ds-color-white);
-  font-family: var(--ds-font-display);
-  font-weight: 400;
-  font-size: 28px;
-  align-self: flex-start;
-}
-/* Name — Poynter, ~18px, fits comfortably with the role pill on
-   the next line. Override v1's 15px / 900 inline style by targeting
-   the first text-bearing child of the header's flex column. */
-html[data-design="v2"] .character-header > div:nth-child(2) > div:first-child {
-  font-family: var(--ds-font-display) !important;
-  font-weight: 400 !important;
-  font-size: 18px !important;
-  line-height: 1.1;
-  letter-spacing: 0;
-  color: var(--ds-color-black);
-  margin-bottom: 6px;
-}
-/* Role pill — capitalized accent fill, dark text. v1 already has a
-   .character-role chip-ish element but its position varies. We
-   target the children of .character-header that look chip-like. */
-html[data-design="v2"] .character-header .character-role,
-html[data-design="v2"] .character-header [data-role] {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 10px;
-  border-radius: 6px;
-  font-family: var(--ds-font-body);
-  font-weight: 500;
-  font-size: 9px;
-  letter-spacing: 0.03em;
-  color: var(--ds-color-black);
-  text-transform: uppercase;
-  background: var(--ds-color-gray-chip-fill);
-}
-html[data-design="v2"] .character-header [data-role="protagonist"] { background: var(--ds-color-accent-green-on-light); }
-html[data-design="v2"] .character-header [data-role="antagonist"]  { background: var(--ds-color-accent-orange-on-light); }
-html[data-design="v2"] .character-header [data-role="supporting"]  { background: var(--ds-color-accent-blue-on-light); }
-html[data-design="v2"] .character-header [data-role="mentor"]      { background: var(--ds-color-accent-purple-on-light); }
+/* The earlier v2 Characters card design (64px square avatar,
+   `.character-role` / `[data-role]` pills, generic `.character-card`
+   styling) has been replaced by the `.v2-character-card` block higher
+   in this file (100x120 portrait flush left, `.v2-character-role-pill`,
+   `.v2-character-name`). The v2 JSX always pairs `.card.character-card`
+   with `.v2-character-card`, so the legacy selectors had no remaining
+   target — they were also actively breaking the new layout via a
+   higher-specificity `.card.character-card { border-radius: 14; padding: 14 }`
+   that outranked the new card rule. Block removed in May 2026. */
 
 /* ── V2 Cast action row (populated state) ───────────────────────
    Horizontal row of [Add Character] [Auto Create]. Rendered into

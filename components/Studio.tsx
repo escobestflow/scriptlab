@@ -804,7 +804,77 @@ export function Studio({
         console.warn("Gender auto-detect skipped:", err);
       });
     }
+
+    // Image auto-generate: only fires for the create flow
+    // (`charSheetIsNew`). Triggered when the character isn't about to
+    // be auto-discarded, doesn't already have a thumbnail, and has a
+    // name to anchor the prompt. This is what makes the create flow
+    // feel "save → portrait appears" without surfacing a Generate
+    // button on the create sheet itself. Edits go through the form's
+    // explicit Generate / Upload buttons instead.
+    const needsImage =
+      charSheetIsNew &&
+      pre &&
+      pre.name.trim().length > 0 &&
+      !pre.thumbnail;
+    if (needsImage) {
+      autoGenerateCharacterImage(pre.id).catch(err => {
+        console.warn("Character image auto-generate skipped:", err);
+      });
+    }
   };
+
+  // Studio-level character image generation for the auto-on-create
+  // flow. Mirrors CharacterEditForm.generateImage but reads from the
+  // current `story` ref so it can run after the sheet has already
+  // closed. Fire-and-forget: the JPEG data URL is patched back onto
+  // Character.thumbnail via setStory. If the user opened the edit
+  // sheet in the meantime and manually regenerated, the most recent
+  // setStory wins by virtue of React's normal update ordering.
+  async function autoGenerateCharacterImage(characterId: string): Promise<void> {
+    const chars = getActiveCharactersDraft(story).characters;
+    const ch = chars.find(c => c.id === characterId);
+    if (!ch || ch.thumbnail) return;
+    const roleLabelMap: Record<string, string> = {
+      protagonist: "Protagonist", antagonist: "Antagonist",
+      supporting: "Supporting", mentor: "Mentor",
+      love_interest: "Love Interest", comic_relief: "Comic Relief",
+    };
+    const description = [
+      ch.name && `Name: ${ch.name}`,
+      ch.role && `Role: ${roleLabelMap[ch.role] || ch.role}`,
+      ch.gender && `Gender: ${ch.gender}`,
+      ch.archetype && `Archetype: ${ch.archetype}`,
+      ch.backstory && `Backstory: ${ch.backstory}`,
+      ch.motivations && `Motivations: ${ch.motivations}`,
+      ch.flaws && `Flaws: ${ch.flaws}`,
+    ].filter(Boolean).join("\n");
+    if (!description.trim()) return;
+    const concept = getActiveConceptDraft(story);
+    const primaryGenre = concept.settings?.genres?.[0];
+    const projectTone = concept.concept?.tone;
+    const res = await fetch("/api/generate-character-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
+    if (!thumb) return;
+    setStory(s => {
+      const live = getActiveCharactersDraft(s).characters;
+      const liveCh = live.find(c => c.id === characterId);
+      // Don't overwrite a thumbnail the user has set in the meantime
+      // (e.g. opened the edit sheet and manually generated/uploaded).
+      if (!liveCh || liveCh.thumbnail) return s;
+      return updateCharactersDraft(s, {
+        characters: live.map(c =>
+          c.id === characterId ? { ...c, thumbnail: thumb } : c
+        ),
+      });
+    });
+  }
 
   // Call /api/generate with detect_character_gender and patch the
   // result into Character.gender. Guarded so a slow/failed detection
@@ -5291,6 +5361,7 @@ function ConceptTab({
   activeEpisodeId?: string | null;
 }) {
   const d = getActiveConceptDraft(story);
+  const isV2 = useIsV2();
   const [openAttr, setOpenAttr] = useState<string | null>(null);
   // Partner-preview mode: expose per-field Copy buttons so the user can
   // pull individual concept fields (title, logline, tone, etc.) from
@@ -5553,7 +5624,7 @@ function ConceptTab({
         </div>
       )}
 
-      {!isPartnerPreviewing && (
+      {!isPartnerPreviewing && !isV2 && (
         <Tip id="concept-drafts-are-free">
           Save as many Concept drafts as you want — experiment freely. Your active draft is what the rest of the app reads.
         </Tip>
@@ -6478,7 +6549,10 @@ function CharactersTab({
   // buttons sit on the same row as "Characters Draft N ▾". Hidden
   // when partner-previewing — those buttons mutate state and we
   // shouldn't offer that on a read-only view.
-  const v2CastActions = isV2 && hasCharacters && !previewActive ? (
+  // Currently disabled by spec — the populated state's draft
+  // dropdown bar should not surface Add/Auto buttons; users add
+  // characters via the bottom sticky LayerStickyBar instead.
+  const v2CastActions = false && isV2 && hasCharacters && !previewActive ? (
     <div className="empty-layer-actions v2-cast-actions">
       <Button
         variant="primary"
@@ -6519,7 +6593,7 @@ function CharactersTab({
           their first character. On an empty tab the EmptyLayerState
           below is already teaching the main move; a second teaching
           surface on top would clutter the first-paint view. */}
-      {hasCharacters && (
+      {hasCharacters && !isV2 && (
         <Tip id="characters-distinct-voices" persist={false}>
           Give each character a distinct voice and clear want — it&apos;s what makes dialogue feel alive on the page.
         </Tip>
@@ -6596,7 +6670,7 @@ function CharactersTab({
                     </div>
                   )}
                   {v2Description && (
-                    <div className="v2-character-description ds-type-body-sm">
+                    <div className="v2-character-description ds-type-body">
                       {v2Description}
                     </div>
                   )}
@@ -7326,7 +7400,7 @@ function StoryTab({
       {/* Top-of-content Tip — only surfaces once the user has added a
           first scene. The empty state carries its own teaching; a tip
           on top of that would double the noise at first paint. */}
-      {hasBeats && (
+      {hasBeats && !isV2 && (
         <Tip id="story-scenes-are-building-blocks" persist={false}>
           Scenes are the building blocks of your script — long-press any scene to drag and reorder.
         </Tip>
@@ -7739,7 +7813,7 @@ function ScriptTab({
       {/* Top-of-content Tip — only surfaces once at least one scene
           has been written. On an empty Script the empty state already
           carries the primary teaching; this tip would pile on. */}
-      {hasProducedScript && (
+      {hasProducedScript && !isV2 && (
         <Tip id="script-scenes-from-outline" persist={false}>
           Every scene in the Story tab becomes prose here — the tighter your outline, the smoother the draft.
         </Tip>
