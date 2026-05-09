@@ -7934,6 +7934,50 @@ html[data-design="v2"] .ai-wand img {
   display: block;
 }
 
+/* Add-All-Characters chip — sibling of `.ai-wand` (same fill,
+   inset stroke, drop shadow, glyph). Sits in the layer-bar's
+   right slot on the populated Characters tab. The bar's own
+   padding-right:30 supplies the 30-from-screen-edge inset. */
+html[data-design="v2"] .add-all-characters-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 27px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--ds-color-gray-lightest);
+  box-shadow:
+    inset 0 0 0 0.7px var(--ds-color-gray-outline),
+    0 0 4px 0 rgba(0, 0, 0, 0.09);
+  color: var(--ds-color-black);
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: box-shadow 160ms var(--ease, ease), transform 120ms var(--ease, ease);
+}
+html[data-design="v2"] .add-all-characters-chip:hover {
+  box-shadow:
+    inset 0 0 0 0.7px var(--ds-color-gray-outline),
+    0 0 6px 0 rgba(0, 0, 0, 0.14);
+}
+html[data-design="v2"] .add-all-characters-chip:active {
+  transform: scale(0.97);
+}
+html[data-design="v2"] .add-all-characters-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+html[data-design="v2"] .add-all-characters-chip img {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 /* ── V2 character cards — populated state ──────────────────────
    Layout: square portrait on the left, name + role pill + short
    description stacked on the right, "⋯" menu glyph at the far right.
@@ -7954,10 +7998,10 @@ html[data-design="v2"] .card.v2-character-card {
   margin-bottom: 0;
   overflow: hidden;
   /* Card row sized to the portrait — keeps every card a uniform
-     120px tall regardless of how short or long the description is.
-     The body's 3-line clamp + portrait's fixed height pin both
+     122px tall regardless of how short or long the description is.
+     The body's 2-line clamp + portrait's fixed height pin both
      sides of the row to the same height. */
-  height: 120px;
+  height: 122px;
   min-height: 0;
 }
 html[data-design="v2"] .v2-character-card .character-header {
@@ -7974,7 +8018,7 @@ html[data-design="v2"] .v2-character-card .character-header {
 }
 html[data-design="v2"] .v2-character-card .v2-character-portrait {
   width: 100px;
-  height: 120px;
+  height: 122px;
   flex: 0 0 auto;
   object-fit: cover;
   display: block;
@@ -8002,7 +8046,11 @@ html[data-design="v2"] .v2-character-card .v2-character-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 12px 12px 12px 4px;
+  /* 20px right inset gives the description text a comfortable
+     gutter from the card's right edge; left 4px because the
+     portrait already sits flush, so a small gap reads as
+     intentional rather than cramped. */
+  padding: 12px 20px 12px 4px;
 }
 html[data-design="v2"] .v2-character-name {
   /* Token .ds-type-project-card-title now drives font-family /
@@ -8049,22 +8097,32 @@ html[data-design="v2"] .v2-character-role-comic_relief {
 }
 html[data-design="v2"] .v2-character-description {
   color: var(--ds-color-black);
-  /* Clamp to ~3 lines on mobile so cards stay roughly the portrait's
-     height; longer descriptions fade off via ellipsis. */
+  /* Clamp to 2 lines so cards stay tight against the portrait's
+     122px height; longer descriptions fade off via ellipsis. */
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 0;
 }
 html[data-design="v2"] .v2-character-menu {
-  flex: 0 0 auto;
-  align-self: flex-start;
-  font-size: 22px;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  color: var(--ds-color-gray-chip-label);
-  padding: 12px 14px 0 0;
+  /* Pinned to the card's top-right so the body can extend to a
+     uniform 20px right padding without the menu chip claiming its
+     own column in the row's flex layout. */
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+html[data-design="v2"] .v2-character-menu img {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 html[data-design="v2"] .v2-character-lock {
   display: inline-flex;

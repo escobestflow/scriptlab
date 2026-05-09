@@ -6546,35 +6546,23 @@ function CharactersTab({
 
   // V2 inline action row for the populated state — Add Character +
   // Auto Create. Renders into the LayerBar's rightSlot below so the
-  // buttons sit on the same row as "Characters Draft N ▾". Hidden
-  // when partner-previewing — those buttons mutate state and we
-  // shouldn't offer that on a read-only view.
-  // Currently disabled by spec — the populated state's draft
-  // dropdown bar should not surface Add/Auto buttons; users add
-  // characters via the bottom sticky LayerStickyBar instead.
-  const v2CastActions = false && isV2 && hasCharacters && !previewActive ? (
-    <div className="empty-layer-actions v2-cast-actions">
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={openNewCharacter}
-        disabled={genBusy}
-        icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
-        className="ds-type-cta"
-      >
-        Add Character
-      </Button>
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={generateAllCharacters}
-        disabled={genBusy}
-        icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
-        className="empty-state-ai-btn ds-type-cta"
-      >
-        {genBusy ? "Creating…" : "Auto Create"}
-      </Button>
-    </div>
+  // Single AI-styled "Add All Characters" chip on the layer draft
+  // dropdown bar's right slot. Shares the .ai-wand chip's fill /
+  // inset stroke / drop shadow so it reads as a sibling of the
+  // per-row AI buttons in Concept; uses the same paired-bolt glyph
+  // (icon-ai-button.svg). 30px-from-screen-edge inset comes from
+  // the layer-bar's own padding-right: 30 — no extra margin
+  // needed on the chip itself. Hidden during partner-previewing.
+  const v2CastActions = isV2 && hasCharacters && !previewActive ? (
+    <button
+      type="button"
+      className="add-all-characters-chip"
+      onClick={generateAllCharacters}
+      disabled={genBusy}
+    >
+      <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+      <span>{genBusy ? "Creating…" : "Add All Characters"}</span>
+    </button>
   ) : null;
 
   return (
@@ -6725,7 +6713,9 @@ function CharactersTab({
               )}
             </div>
             {isV2 ? (
-              <span className="v2-character-menu" aria-hidden="true">⋯</span>
+              <span className="v2-character-menu" aria-hidden="true">
+                <img src="/icon-options.svg" alt="" />
+              </span>
             ) : (
               <span className="beat-expand">›</span>
             )}
