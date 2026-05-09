@@ -6046,56 +6046,29 @@ function ConceptTab({
         </div>
       </AttrRow>
 
-      {/* Writer Style — roster of famous screenwriters, multi-select via
-          a fly-up sheet with a search filter. Rendered as a non-collapsing
-          row: selected writers show inline as pills next to the label, and
-          the Select/Edit button is always exposed below (no caret, no
-          duplicate chip list). On non-pilot TV episodes the whole row is
-          a tap target that fires the lock toast — body button is hidden. */}
-      <div
-        className="attr-row"
-        {...(conceptLocked
-          ? { onClick: lockTap, role: "button", style: { cursor: "pointer" } }
-          : {})}
+      {/* Writer Style — roster of famous screenwriters. Same collapsing
+          AttrRow treatment as Similar To: selected writers show as pills
+          on the header, expanding the row reveals a Select/Edit button
+          that opens the same fly-up sheet of writers. */}
+      <AttrRow
+        label="Writer Style"
+        values={d.settings.writerStyles.length > 0 ? d.settings.writerStyles.map(w => w.toUpperCase()) : undefined}
+        placeholder="Pick writers you want to echo"
+        expanded={openAttr === "writerStyles"}
+        onToggle={() => toggle("writerStyles")}
+        copyAction={previewCopy("writerStyles")}
+        readOnly={ro()}
+        noToggle={lockTap}
       >
-        <div className="attr-row-header attr-row-header-static">
-          <span className="attr-label">
-            Writer Style
-            {previewCopy("writerStyles") && (
-              <button
-                type="button"
-                className="partner-copy-field-btn"
-                title="Copy this from partner's draft"
-                aria-label="Copy writer style from partner's draft"
-                onClick={(e) => { e.stopPropagation(); previewCopy("writerStyles")!(); }}
-              >
-                <CopyGlyph />
-              </button>
-            )}
-          </span>
-          <div className="attr-values">
-            {d.settings.writerStyles.length > 0
-              ? d.settings.writerStyles.map(w => (
-                  <span key={w} className="attr-pill">{w.toUpperCase()}</span>
-                ))
-              : <span className="attr-placeholder">{(isPartnerPreviewing || conceptLocked) ? "None added" : "Pick writers you want to echo"}</span>}
-          </div>
-        </div>
-        {/* Hide the Select/Edit button when previewing the partner's
-            concept draft or when locked to a non-pilot episode. */}
-        {!isPartnerPreviewing && !conceptLocked && (
-          <div className="attr-row-body" style={{ paddingTop: 16 }}>
-            <Button
-              variant="secondary"
-              size="lg"
-              block
-              onClick={() => { setWriterFilter(""); setWriterSheetOpen(true); }}
-            >
-              {d.settings.writerStyles.length > 0 ? "Edit writers" : "Select writers"}
-            </Button>
-          </div>
-        )}
-      </div>
+        <Button
+          variant="secondary"
+          size="lg"
+          block
+          onClick={() => { setWriterFilter(""); setWriterSheetOpen(true); }}
+        >
+          {d.settings.writerStyles.length > 0 ? "Edit writers" : "Select writers"}
+        </Button>
+      </AttrRow>
 
       {/* Logline */}
       <TextAttrRow

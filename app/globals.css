@@ -6645,6 +6645,20 @@ html[data-design="v2"] .tabbar .tab.active {
   font-weight: 900;
   color: var(--ds-color-black);
 }
+/* RECORD label sits between Projects and Ideas — match the
+   inactive `.tab` typography exactly so the three labels read as
+   one nav row (no weight/size discrepancy). The label is its own
+   <div> outside the .tab buttons, hence the override here. */
+html[data-design="v2"] .record-label {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 8px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ds-color-gray-chip-label);
+  margin-top: 4px;
+  text-align: center;
+}
 @media (min-width: 1440px) {
   html[data-design="v2"] .tabbar .tab {
     font-weight: 400;
@@ -6654,6 +6668,12 @@ html[data-design="v2"] .tabbar .tab.active {
   }
   html[data-design="v2"] .tabbar .tab.active {
     font-weight: 700;
+  }
+  html[data-design="v2"] .record-label {
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: 0;
+    text-transform: none;
   }
 }
 
@@ -7921,7 +7941,10 @@ html[data-design="v2"] .ai-wand {
   height: 27px;
   border-radius: 5px;
   background: var(--ds-color-gray-lightest);
-  margin-left: 0;
+  /* 8px gutter between the AttrRow label text and the AI button so
+     the two read as separate affordances rather than running into
+     each other. (Was 0 — the chip sat flush against the label.) */
+  margin-left: 8px;
   margin-right: 4px;
   /* inset .7px gray-outline + 0 0 4 0 black 9% drop shadow */
   box-shadow:
@@ -7956,7 +7979,7 @@ html[data-design="v2"] .add-all-scenes-chip {
   align-items: center;
   gap: 6px;
   height: 29px;
-  padding: 0 5px;
+  padding: 0 10px;
   border: 0;
   border-radius: 5px;
   background: var(--ds-color-gray-lightest);
