@@ -7971,8 +7971,8 @@ html[data-design="v2"] .add-all-characters-chip:disabled {
   cursor: default;
 }
 html[data-design="v2"] .add-all-characters-chip img {
-  width: 22px;
-  height: 22px;
+  width: 7px;
+  height: 9.5px;
   display: block;
 }
 
@@ -8122,8 +8122,8 @@ html[data-design="v2"] .v2-character-menu {
   pointer-events: none;
 }
 html[data-design="v2"] .v2-character-menu img {
-  width: 18px;
-  height: 18px;
+  width: 13px;
+  height: 3px;
   display: block;
 }
 html[data-design="v2"] .v2-character-lock {
