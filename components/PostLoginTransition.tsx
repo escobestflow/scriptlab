@@ -47,7 +47,7 @@ interface PostLoginTransitionProps {
   ready?: boolean;
 }
 
-type Phase = "initial" | "fade-tagline" | "shrink" | "fade-out" | "done";
+type Phase = "initial" | "fade-tagline" | "shrink" | "bg-fade" | "fade-out" | "done";
 
 export default function PostLoginTransition({ onDone, ready = true }: PostLoginTransitionProps) {
   const [phase, setPhase] = useState<Phase>("initial");
@@ -58,18 +58,32 @@ export default function PostLoginTransition({ onDone, ready = true }: PostLoginT
     // bar shrinks" effect work — we don't want to start shrinking
     // before there's anything behind us to reveal.
     if (!ready) return;
+    // 0    : initial — black/light viewport, centered tagline + wordmark
+    // 500  : fade-tagline — tagline opacity → 0 (400ms)
+    // 1000 : shrink — wordmark animates from center to top-bar pose
+    //                 (800ms, settles at 1800)
+    // 1500 : bg-fade — light/dark backdrop starts fading (500ms,
+    //                  ends at 2000). Per spec, bg begins fading
+    //                  300ms BEFORE the logo lands so the surface
+    //                  has already started dissolving by the time
+    //                  the logo settles.
+    // 2000 : fade-out — root opacity → 0 (250ms) so logo + tagline
+    //                   cross-dissolve into the real app underneath.
+    // 2250 : done — onDone fires, parent unmounts.
     const t1 = setTimeout(() => setPhase("fade-tagline"), 500);
     const t2 = setTimeout(() => setPhase("shrink"), 1000);
-    const t3 = setTimeout(() => setPhase("fade-out"), 1800);
-    const t4 = setTimeout(() => {
+    const t3 = setTimeout(() => setPhase("bg-fade"), 1500);
+    const t4 = setTimeout(() => setPhase("fade-out"), 2000);
+    const t5 = setTimeout(() => {
       setPhase("done");
       onDone();
-    }, 2050);
+    }, 2250);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
+      clearTimeout(t5);
     };
   }, [ready, onDone]);
 
@@ -112,8 +126,9 @@ export default function PostLoginTransition({ onDone, ready = true }: PostLoginT
           height: 100vh;
           background: #0b0b0f;
           opacity: 1;
-          transition: opacity 400ms cubic-bezier(0.22, 1, 0.36, 1);
+          transition: opacity 500ms cubic-bezier(0.22, 1, 0.36, 1);
         }
+        .post-login-transition.phase-bg-fade .post-login-bg,
         .post-login-transition.phase-fade-out .post-login-bg,
         .post-login-transition.phase-done .post-login-bg {
           opacity: 0;
