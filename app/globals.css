@@ -6186,6 +6186,16 @@ html[data-design="v2"] .ds-type-body {
   line-height: normal;
   letter-spacing: 0;
 }
+/* Bold variant of `.ds-type-body` — same metrics (Lato / 13px /
+   line-height auto / letter-spacing 0), font-weight bumped to 700.
+   Used as the title weight on v2 scene rows in the Story tab. */
+html[data-design="v2"] .ds-type-body-bold {
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: normal;
+  letter-spacing: 0;
+}
 html[data-design="v2"] .ds-type-selected-option-label {
   font-family: var(--ds-font-body);
   font-weight: 500;
@@ -7935,11 +7945,13 @@ html[data-design="v2"] .ai-wand img {
   display: block;
 }
 
-/* Add-All-Characters chip — sibling of `.ai-wand` (same fill,
-   inset stroke, drop shadow, glyph). Sits in the layer-bar's
-   right slot on the populated Characters tab. The bar's own
-   padding-right:30 supplies the 30-from-screen-edge inset. */
-html[data-design="v2"] .add-all-characters-chip {
+/* Add-All-* chip — sibling of `.ai-wand` (same fill, inset stroke,
+   drop shadow, glyph). Used by both the populated Characters tab
+   ("Add All Characters") and Story tab ("Add All Scenes"). The
+   layer-bar's own padding-right:30 supplies the 30-from-screen-edge
+   inset. */
+html[data-design="v2"] .add-all-characters-chip,
+html[data-design="v2"] .add-all-scenes-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -7961,19 +7973,23 @@ html[data-design="v2"] .add-all-characters-chip {
   white-space: nowrap;
   transition: box-shadow 160ms var(--ease, ease), transform 120ms var(--ease, ease);
 }
-html[data-design="v2"] .add-all-characters-chip:hover {
+html[data-design="v2"] .add-all-characters-chip:hover,
+html[data-design="v2"] .add-all-scenes-chip:hover {
   box-shadow:
     inset 0 0 0 0.7px var(--ds-color-gray-outline),
     0 0 6px 0 rgba(0, 0, 0, 0.14);
 }
-html[data-design="v2"] .add-all-characters-chip:active {
+html[data-design="v2"] .add-all-characters-chip:active,
+html[data-design="v2"] .add-all-scenes-chip:active {
   transform: scale(0.97);
 }
-html[data-design="v2"] .add-all-characters-chip:disabled {
+html[data-design="v2"] .add-all-characters-chip:disabled,
+html[data-design="v2"] .add-all-scenes-chip:disabled {
   opacity: 0.55;
   cursor: default;
 }
-html[data-design="v2"] .add-all-characters-chip img {
+html[data-design="v2"] .add-all-characters-chip img,
+html[data-design="v2"] .add-all-scenes-chip img {
   width: 7px;
   height: 9.5px;
   display: block;
@@ -8223,6 +8239,175 @@ html[data-design="v2"] .attr-row-note-preview {
 html[data-design="v2"] .attr-row-body {
   border-top: none;
   padding: 4px 16px 16px;
+}
+
+/* ── V2 Story tab — populated scene rows ───────────────────────
+   Per screenshot: numbered timeline column on the left (circled
+   number + dotted vertical line connecting to the next), drag
+   handle next to it, then a card with a 101x72 painted thumbnail
+   on the left and title + body text on the right.
+
+   DOM:
+     .v2-beat-row
+       .v2-beat-number-col   (number badge + dotted line)
+       .beat-card.v2-beat-card
+         .beat-grip          (⋮⋮ drag affordance)
+         <img>.v2-beat-thumb (101x72)
+         .beat-info          (.beat-name + .beat-summary-preview) */
+html[data-design="v2"] .v2-beat-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+html[data-design="v2"] .v2-beat-number-col {
+  position: relative;
+  flex: 0 0 auto;
+  width: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* +12 padding-top brings the number badge down to the card's
+     vertical-center area (where the thumbnail's center sits). */
+  padding-top: 22px;
+}
+html[data-design="v2"] .v2-beat-number-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 0.7px solid var(--ds-color-gray-outline);
+  background: var(--ds-color-white);
+  color: var(--ds-color-gray-chip-label);
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+html[data-design="v2"] .v2-beat-number-badge.written {
+  background: var(--ds-color-black);
+  border-color: var(--ds-color-black);
+  color: var(--ds-color-white);
+}
+/* Dotted vertical line connecting consecutive scene rows. Drawn
+   as a pseudo-element on the number-col so it flows behind the
+   badge. The line stops at the badge of the next row. */
+html[data-design="v2"] .v2-beat-number-col::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: -14px; /* extends through the row's margin-bottom */
+  border-left: 1px dashed var(--ds-color-gray-outline);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+/* Last row: don't draw the line below the final badge. */
+html[data-design="v2"] .v2-beat-row:last-child .v2-beat-number-col::before {
+  display: none;
+}
+/* The card itself in v2 — white tile, soft outline, 18px radius
+   matching the character cards. No shadow. */
+html[data-design="v2"] .card.v2-beat-card {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border-radius: 18px;
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  box-shadow: none;
+  overflow: hidden;
+  min-height: 0;
+}
+html[data-design="v2"] .v2-beat-card .beat-header {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  width: 100%;
+  text-align: left;
+}
+/* The drag grip rail — a thin vertical column of 6 dots
+   (drawn via the unicode ⋮⋮ glyph) centered on the card's left
+   edge, inside the card before the thumbnail. */
+html[data-design="v2"] .v2-beat-card .beat-grip {
+  flex: 0 0 14px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-gray-chip-label);
+  font-size: 14px;
+  line-height: 1;
+  /* spacing between the grip and the thumbnail */
+  padding: 0 4px;
+  user-select: none;
+  cursor: grab;
+}
+html[data-design="v2"] .v2-beat-card .beat-grip:active {
+  cursor: grabbing;
+}
+html[data-design="v2"] .v2-beat-thumb {
+  width: 101px;
+  height: 72px;
+  flex: 0 0 auto;
+  object-fit: cover;
+  display: block;
+  background: var(--ds-color-gray-fill);
+  border-radius: 8px;
+  /* Centered in the card vertically with a small inset from the
+     left so the grip column doesn't run flush into the image. */
+  align-self: center;
+  margin: 12px 0 12px 0;
+}
+html[data-design="v2"] .v2-beat-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ds-color-gray-chip-label);
+  font-family: var(--ds-font-display);
+  font-size: 24px;
+}
+html[data-design="v2"] .v2-beat-card .beat-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px 14px 12px;
+  align-self: center;
+}
+/* In v2 the .beat-name and .beat-summary-preview classes are
+   carried over from v1, but their typography comes from the
+   `.ds-type-body-bold` and `.ds-type-body` utilities on the JSX.
+   We only override layout (margin, color, clamp). NO font-size /
+   font-weight overrides here — they would beat the utility classes
+   on specificity (`.v2-beat-card .beat-name` is 0,0,3,1 vs the
+   utility's 0,0,2,1). */
+html[data-design="v2"] .v2-beat-card .beat-name {
+  margin: 0;
+  color: var(--ds-color-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html[data-design="v2"] .v2-beat-card .beat-summary-preview {
+  margin: 0;
+  color: var(--ds-color-black);
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Hide v1 chrome that doesn't belong in the v2 row (number badge
+   from inside the card, expand chevron, momentIds count). */
+html[data-design="v2"] .v2-beat-card .beat-number,
+html[data-design="v2"] .v2-beat-card .beat-expand {
+  display: none;
 }
 
 /* The earlier v2 Characters card design (64px square avatar,

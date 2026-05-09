@@ -23,6 +23,11 @@ function normalizeBeat(b: any, index: number): Beat {
     ? b.twist : undefined;
   const weirdness = typeof b?.weirdness === "number" && b.weirdness >= 1 && b.weirdness <= 10
     ? b.weirdness : undefined;
+  // Inline data-URL thumbnail (data:image/jpeg;base64,...). Anything
+  // that isn't a non-empty string is dropped so saves can't grow a
+  // junk thumbnail field.
+  const thumbnail = typeof b?.thumbnail === "string" && b.thumbnail.trim().length > 0
+    ? b.thumbnail : undefined;
   return {
     position: index,
     momentIds: [],
@@ -30,6 +35,7 @@ function normalizeBeat(b: any, index: number): Beat {
     ...b,
     twist,
     weirdness,
+    thumbnail,
   };
 }
 

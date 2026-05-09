@@ -188,6 +188,11 @@ export interface Beat {
   weirdness?: number;
   status: BeatStatus;
   sceneContent?: string;
+  /** AI-generated cinematic scene thumbnail (7:5 painted still),
+   *  stored as a base64 data URL the same way Character.thumbnail is.
+   *  Optional — produced by /api/generate-scene-image after a beat is
+   *  saved with at least a name, or by bulk sync via Add All Scenes. */
+  thumbnail?: string;
 }
 
 export interface Episode {

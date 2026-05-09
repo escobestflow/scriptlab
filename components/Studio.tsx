@@ -743,6 +743,16 @@ export function Studio({
   const closeSceneSheet = () => {
     const id = sceneSheetBeatId;
     if (!id) return;
+    // Capture pre-close beat for auto-gen-image so we can decide
+    // whether to fire it without racing the discard logic below.
+    const preBeats = (() => {
+      if (isTV && activeEpisodeId) {
+        const ep = getActiveStoryLayerDraft(story).episodes?.find(e => e.id === activeEpisodeId);
+        return ep?.beats ?? [];
+      }
+      return getActiveStoryLayerDraft(story).beats;
+    })();
+    const pre = preBeats.find(b => b.id === id);
     // Auto-discard a blank scene (no name + no summary + no linked
     // ideas + no characters + no twist/weirdness dial moved).
     setBeats(bs => {
@@ -759,7 +769,54 @@ export function Studio({
       return bs.filter(b => b.id !== id).map((b, i) => ({ ...b, position: i }));
     });
     setSceneSheetBeatId(null);
+
+    // Image auto-generate: fires when the scene wasn't auto-discarded
+    // (has at least a name) AND has no thumbnail yet. Mirrors the
+    // characters auto-gen on character-sheet close.
+    const needsImage =
+      pre &&
+      pre.name.trim().length > 0 &&
+      !pre.thumbnail;
+    if (needsImage) {
+      autoGenerateSceneImage(pre.id).catch(err => {
+        console.warn("Scene image auto-generate skipped:", err);
+      });
+    }
   };
+
+  // Studio-level scene-image generation. Fire-and-forget; result
+  // patches back via setStory and won't overwrite a thumbnail the
+  // user manually set in the meantime. Mirrors
+  // autoGenerateCharacterImage with the scene-specific endpoint.
+  async function autoGenerateSceneImage(beatId: string): Promise<void> {
+    const draft = getActiveStoryLayerDraft(story);
+    const allBeats = isTV && activeEpisodeId
+      ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
+      : draft.beats;
+    const beat = allBeats.find(b => b.id === beatId);
+    if (!beat || beat.thumbnail) return;
+    const description = [
+      beat.name && `Beat: ${beat.name}`,
+      beat.summary && `Summary: ${beat.summary}`,
+      beat.purpose && `Purpose: ${beat.purpose}`,
+    ].filter(Boolean).join("\n");
+    if (!description.trim()) return;
+    const concept = getActiveConceptDraft(story);
+    const primaryGenre = concept.settings?.genres?.[0];
+    const projectTone = concept.concept?.tone;
+    const res = await fetch("/api/generate-scene-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
+    if (!thumb) return;
+    setBeats(bs => bs.map(b =>
+      b.id === beatId && !b.thumbnail ? { ...b, thumbnail: thumb } : b
+    ));
+  }
 
   const closeCharacterSheet = () => {
     const id = charSheetCharId;
@@ -7383,9 +7440,35 @@ function StoryTab({
   const direction = activeStoryDraft.direction ?? "";
   const [directionSheetOpen, setDirectionSheetOpen] = useState(false);
 
+  // Add-All-Scenes chip on the populated layer-bar's right slot.
+  // Mirrors the Characters tab's chip — same fill / inset stroke /
+  // drop shadow / paired-bolt glyph as the per-row .ai-wand.
+  // Reuses generateAllBeats so the bulk-create behavior stays one
+  // code path. Hidden on the empty state (no need to teach the
+  // affordance twice — the empty state has its own CTA).
+  const v2ScenesActions = isV2 && hasBeats ? (
+    <button
+      type="button"
+      className="add-all-scenes-chip"
+      onClick={generateAllBeats}
+      disabled={genBusy}
+    >
+      <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+      <span>{genBusy ? "Creating…" : "Add All Scenes"}</span>
+    </button>
+  ) : null;
+
   return (
     <>
-      <LayerBar layer="story" label="Story" story={story} setStory={setStory} autosaveEnabled={autosaveEnabled} onOpenUpdateTray={onOpenUpdateTray} />
+      <LayerBar
+        layer="story"
+        label="Story"
+        story={story}
+        setStory={setStory}
+        autosaveEnabled={autosaveEnabled}
+        onOpenUpdateTray={onOpenUpdateTray}
+        rightSlot={v2ScenesActions}
+      />
 
       {/* Top-of-content Tip — only surfaces once the user has added a
           first scene. The empty state carries its own teaching; a tip
@@ -7477,11 +7560,18 @@ function StoryTab({
           const isDragging = draggingIdx === i;
 
           return (
-            <div key={beat.id} ref={el => { beatRefs.current[i] = el; }}>
+            <div key={beat.id} ref={el => { beatRefs.current[i] = el; }} className={isV2 ? "v2-beat-row" : undefined}>
               {/* Drop indicator before this beat */}
               <div className={`beat-drop-indicator ${draggingIdx != null && dropTargetIdx === i && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1 ? "active" : ""}`} />
+              {isV2 && (
+                <div className="v2-beat-number-col" aria-hidden="true">
+                  <span className={`v2-beat-number-badge ${beat.status === "written" ? "written" : ""}`}>
+                    {i + 1}
+                  </span>
+                </div>
+              )}
               <div
-                className={`beat-card ${isDragging ? "dragging" : ""}`}
+                className={`beat-card ${isV2 ? "v2-beat-card" : ""} ${isDragging ? "dragging" : ""}`}
                 onTouchStart={(e) => {
                   const y = e.touches[0].clientY;
                   touchStartY.current = y;
@@ -7550,20 +7640,25 @@ function StoryTab({
                   setDropTargetIdx(null);
                 }}
               >
-                <div className="beat-header" style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                <div className="beat-header" style={isV2 ? undefined : { display: "flex", alignItems: "center", gap: 0 }}>
                   <div className="beat-grip" aria-hidden="true">&#10303;</div>
                   <button
-                    style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
+                    style={isV2 ? { display: "flex", alignItems: "stretch", flex: 1, padding: 0, textAlign: "left", background: "none", border: "none" } : { display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
                     onClick={() => { if (!isDragActive.current) openExistingScene(beat.id); }}
                   >
+                  {isV2 && (
+                    beat.thumbnail
+                      ? <img src={beat.thumbnail} alt="" className="v2-beat-thumb" />
+                      : <div className="v2-beat-thumb v2-beat-thumb-placeholder">{(beat.name || "?").charAt(0).toUpperCase()}</div>
+                  )}
                   <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
                     {i + 1}
                   </div>
                   <div className="beat-info">
-                    <div className="beat-name">{beat.name || "Untitled scene"}</div>
-                    <div className="beat-summary-preview">{beat.summary || "No summary"}</div>
+                    <div className={`beat-name${isV2 ? " ds-type-body-bold" : ""}`}>{beat.name || "Untitled scene"}</div>
+                    <div className={`beat-summary-preview${isV2 ? " ds-type-body" : ""}`}>{beat.summary || "No summary"}</div>
                   </div>
-                  {beat.momentIds.length > 0 && (
+                  {!isV2 && beat.momentIds.length > 0 && (
                     <span className="caption" style={{ flexShrink: 0 }}>
                       {beat.momentIds.length}m
                     </span>
