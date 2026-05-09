@@ -7614,7 +7614,22 @@ function StoryTab({
                 }}
               >
                 <div className="beat-header" style={isV2 ? undefined : { display: "flex", alignItems: "center", gap: 0 }}>
-                  <div className="beat-grip" aria-hidden="true">&#10303;</div>
+                  <div className="beat-grip" aria-hidden="true">
+                    {isV2 ? (
+                      // 6-dot grip (2 columns × 3 rows). The `&#10303;`
+                      // U+283F Braille glyph used in v1 falls back to a
+                      // single vertical-ellipsis on most fonts; SVG
+                      // dots render reliably.
+                      <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" aria-hidden="true">
+                        <circle cx="2" cy="2" r="1" />
+                        <circle cx="8" cy="2" r="1" />
+                        <circle cx="2" cy="7" r="1" />
+                        <circle cx="8" cy="7" r="1" />
+                        <circle cx="2" cy="12" r="1" />
+                        <circle cx="8" cy="12" r="1" />
+                      </svg>
+                    ) : "⠿"}
+                  </div>
                   <button
                     style={isV2 ? { display: "flex", alignItems: "stretch", flex: 1, padding: 0, textAlign: "left", background: "none", border: "none" } : { display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
                     onClick={() => { if (!isDragActive.current) openExistingScene(beat.id); }}
@@ -7645,15 +7660,19 @@ function StoryTab({
                 <div className={`beat-drop-indicator ${draggingIdx != null && dropTargetIdx === beats.length && dropTargetIdx !== draggingIdx && dropTargetIdx !== draggingIdx + 1 ? "active" : ""}`} />
               )}
 
-              <div className="beat-insert-row">
-                <button
-                  className="beat-insert-btn"
-                  onClick={() => openNewScene(i + 1)}
-                  aria-label="Insert scene here"
-                >
-                  + Add scene
-                </button>
-              </div>
+              {/* Inter-row "+ Add scene" button kept for v1 only — v2
+                  uses just the persistent bottom sticky bar. */}
+              {!isV2 && (
+                <div className="beat-insert-row">
+                  <button
+                    className="beat-insert-btn"
+                    onClick={() => openNewScene(i + 1)}
+                    aria-label="Insert scene here"
+                  >
+                    + Add scene
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

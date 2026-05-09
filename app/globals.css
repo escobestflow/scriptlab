@@ -8383,9 +8383,12 @@ html[data-design="v2"] .v2-beat-thumb {
   background: var(--ds-color-gray-fill);
   border-radius: 8px;
   /* Centered in the card vertically with a small inset from the
-     left so the grip column doesn't run flush into the image. */
+     left so the grip column doesn't run flush into the image.
+     8px top/bottom margin lets the card height land at ~88px
+     (8 + 72 + 8) — matches the reference where the card is
+     roughly the height of the thumb plus a thin gutter. */
   align-self: center;
-  margin: 12px 0 12px 0;
+  margin: 8px 0;
 }
 html[data-design="v2"] .v2-beat-thumb-placeholder {
   display: flex;
@@ -8401,7 +8404,9 @@ html[data-design="v2"] .v2-beat-card .beat-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 14px 16px 14px 12px;
+  /* Tight vertical padding so the card height is governed by the
+     thumbnail + ~3 lines of body, not by extra info gutter. */
+  padding: 8px 16px 8px 12px;
   align-self: center;
 }
 /* In v2 the .beat-name and .beat-summary-preview classes are
@@ -8421,7 +8426,10 @@ html[data-design="v2"] .v2-beat-card .beat-name {
 html[data-design="v2"] .v2-beat-card .beat-summary-preview {
   margin: 0;
   color: var(--ds-color-black);
-  -webkit-line-clamp: 2;
+  /* 3-line clamp matches the reference — most beat summaries fit
+     cleanly without ellipsizing, and the card height grows just
+     enough to hold them next to the 72px thumb. */
+  -webkit-line-clamp: 3;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
