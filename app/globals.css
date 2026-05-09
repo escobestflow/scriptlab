@@ -7644,19 +7644,16 @@ html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar .studio-tab {
    without the property; same removal that was made earlier on
    the home-page `.screen-scroll`. */
 html[data-design="v2"] .studio-scroll {
-  /* Per spec — content begins 50px higher than the previous
-     env+310, so first content (concept attribute card / character
-     row) starts inside the layer-bar's vertical area. The
-     layer-bar still sits above (z-index 9 > scroll content) and
-     visually masks anything that scrolls behind it.
-     Bumped through env+260 → +263 → +268 → +300 → +285 → +277 →
-     +276 → +282 — the +300 fully cleared the layer-bar (which ends
-     at env+296) but read too low; pulled back 24 total so first-row
-     content sits inside the layer-bar's bottom band as a deliberate
-     visual tuck rather than a hard gap. Latest +6 paired with the
-     6px-taller layer-bar (94 → 100) so the bottom-of-bar tuck
-     position stays the same relative to the bar. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 282px);
+  /* Tuning chain:
+       260 → 263 → 268 → 300 → 285 → 277 → 276 → 282 → 302
+     The earlier 282 kept a deliberate 20px "tuck" — the layer-bar
+     overlapped the first content row's top — but on Concept tab
+     (where rows have a thin top edge) that read as the bar
+     CUTTING the row, not tucking it. Bumping to 302 drops the
+     tuck entirely: with the layer-bar now at env+202..env+302,
+     scroll content starts at the bar's bottom edge and the
+     tab-content-wrap's own 8px top padding gives a clean gap. */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 302px);
   -webkit-overflow-scrolling: auto;
 }
 
