@@ -6614,9 +6614,12 @@ html[data-design="v2"] .projects-empty {
      container below (locks vertical overflow), the empty-state
      surface reads as a non-scrolling poster. */
   background-attachment: fixed;
-  /* Shift the graphic up 80px from its natural vertical center
-     so the door + horizon land higher in the frame. */
-  background-position: center calc(50% - 80px);
+  /* Graphic vertical position. Was at -80 (up 80 from center);
+     now +40 (down 40 from center) — net of -80 → +40 is the
+     "down 120px" shift the user asked for, landing the door
+     lower in the frame so the title + sub-copy stack reads
+     directly above it. */
+  background-position: center calc(50% + 40px);
   background-repeat: no-repeat;
   /* Stretch to the visible viewport between top nav + tab bar so the
      bg image fills the screen. dvh handles iOS dynamic toolbars. */
@@ -8875,6 +8878,16 @@ html[data-design="v2"] .script-view-sheet {
   padding: 0 0 env(safe-area-inset-bottom);
   display: flex;
   flex-direction: column;
+}
+/* Close button — mirrors the position the scene-edit sheet's
+   Close button sits in (top-right of the sheet, just below the
+   handle), absolute-positioned so it doesn't interfere with the
+   centered title/slug stack. */
+html[data-design="v2"] .script-view-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 20px;
+  z-index: 2;
 }
 html[data-design="v2"] .script-view-header {
   padding: 6px 20px 16px;

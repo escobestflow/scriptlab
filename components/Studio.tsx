@@ -5320,6 +5320,17 @@ function ScriptViewSheet({
       <div className={`sheet-backdrop ${open ? "open" : ""}`} onClick={onClose} />
       <div className={`sheet sheet-tall script-view-sheet ${open ? "open" : ""}`}>
         <div className="sheet-handle" />
+        {/* Close button — same top-right position the scene edit
+            sheet uses, but absolute-positioned so it doesn't
+            interfere with the centered title/slug stack below. */}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onClose}
+          className="script-view-close-btn"
+        >
+          Close
+        </Button>
         <div className="script-view-header">
           <div className="script-view-count ds-type-main-tab-nav-inactive">
             SCENE {activeIdx + 1} OF {Math.max(1, writtenBeats.length)}

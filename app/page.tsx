@@ -278,6 +278,125 @@ export default function Page() {
   // surface end-to-end, so theme-color is constant #F8F7F7. No
   // black phase to handle.
   //
+  // ── Pull-to-close gesture for all bottom-anchored sheets ──
+  // Native-feeling drag-down to dismiss. Works on any element
+  // matching `.sheet.open` or `.create-modal.open` — the drag has
+  // to start within the top 80px of the sheet (handle + header
+  // area) so users can still scroll content inside the sheet
+  // normally. We translate the sheet during drag for live
+  // feedback, then either snap back (if released early) or
+  // click the paired backdrop to fire the existing close handler
+  // (so app state stays consistent — no separate "close" path).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    let activeSheet: HTMLElement | null = null;
+    let backdrop: HTMLElement | null = null;
+    let startY = 0;
+    let currentY = 0;
+    let dragging = false;
+    // Saves the inline styles we override so we can restore them
+    // if the drag snaps back. The sheet's CSS transition is what
+    // animates the snap.
+    let prevTransform = "";
+    let prevTransition = "";
+
+    function findBackdrop(sheet: HTMLElement): HTMLElement | null {
+      // Each sheet ships with a sibling backdrop (`.sheet-backdrop`,
+      // `.create-modal-backdrop`, or `.easy-direction-backdrop`).
+      // Walk previous siblings first — that's the most common
+      // structural pattern in this codebase.
+      let el: Element | null = sheet.previousElementSibling;
+      while (el) {
+        if (
+          el instanceof HTMLElement &&
+          (el.classList.contains("sheet-backdrop") || el.classList.contains("create-modal-backdrop"))
+        ) return el;
+        el = el.previousElementSibling;
+      }
+      // Fallback: any open backdrop in the document. Works when
+      // sheet + backdrop aren't siblings under the same parent.
+      return document.querySelector<HTMLElement>(".sheet-backdrop.open, .create-modal-backdrop.open");
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      const t = e.target as HTMLElement;
+      const sheet = t.closest<HTMLElement>(".sheet.open, .create-modal.open");
+      if (!sheet) return;
+      // Only allow drag from the top region so internal scrolling
+      // (scene body, settings list, etc.) keeps working.
+      const rect = sheet.getBoundingClientRect();
+      const touchY = e.touches[0].clientY;
+      if (touchY - rect.top > 80) return;
+      // Skip if the touch is on an actual button / link — preserve
+      // click semantics on the handle's neighbors (Close button etc).
+      if (
+        t.closest("button, a, input, textarea, [role=button]") &&
+        !t.classList.contains("sheet-handle")
+      ) {
+        return;
+      }
+      activeSheet = sheet;
+      backdrop = findBackdrop(sheet);
+      startY = touchY;
+      currentY = touchY;
+      dragging = true;
+      prevTransform = sheet.style.transform;
+      prevTransition = sheet.style.transition;
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (!dragging || !activeSheet) return;
+      currentY = e.touches[0].clientY;
+      const delta = currentY - startY;
+      if (delta <= 0) {
+        activeSheet.style.transform = prevTransform;
+        return;
+      }
+      activeSheet.style.transition = "none";
+      activeSheet.style.transform = `translateY(${delta}px)`;
+    }
+
+    function onTouchEnd() {
+      if (!dragging || !activeSheet) return;
+      const delta = currentY - startY;
+      const sheet = activeSheet;
+      const threshold = Math.min(140, sheet.getBoundingClientRect().height * 0.22);
+      if (delta > threshold && backdrop) {
+        // Past the threshold — fire the backdrop's onClick. The
+        // sheet's own CSS will animate it off-screen as
+        // `.sheet.open → .sheet` (transform: translateY(110%)).
+        sheet.style.transform = prevTransform;
+        sheet.style.transition = prevTransition;
+        backdrop.click();
+      } else {
+        // Snap back. Restoring the inline transition lets the
+        // browser animate; clearing transform pops us home.
+        sheet.style.transition = "transform 220ms var(--ease, ease)";
+        sheet.style.transform = prevTransform;
+        // After the snap finishes, restore the original transition
+        // so the sheet's own open/close transitions work again.
+        const orig = prevTransition;
+        setTimeout(() => {
+          if (sheet) sheet.style.transition = orig;
+        }, 240);
+      }
+      dragging = false;
+      activeSheet = null;
+      backdrop = null;
+    }
+
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: true });
+    document.addEventListener("touchend", onTouchEnd);
+    document.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", onTouchEnd);
+      document.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, []);
+
   // V1: splash + PostLoginTransition are black; app is light
   // (#FDFEFE). theme-color flips from #000 → #FDFEFE once both
   // (a) splash dismissed AND (b) hydrated.
