@@ -6183,7 +6183,10 @@ html[data-design="v2"] .ds-type-body {
   font-family: var(--ds-font-body);
   font-weight: 400;
   font-size: 13px;
-  line-height: normal;
+  /* Was `normal` (= ~15.6 at Lato 13px). Bumped +2 to 18px per
+     spec — gives body copy a bit more breathing room without
+     loosening the structural rhythm. */
+  line-height: 18px;
   letter-spacing: 0;
 }
 /* Bold variant of `.ds-type-body` — same metrics (Lato / 13px /
@@ -8707,39 +8710,13 @@ html[data-design="v2"] .scene-popup-body {
   display: flex;
   flex-direction: column;
 }
-html[data-design="v2"] .scene-popup-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
+/* SCENE n OF N label — sits directly above the title with a
+   tight 2px gap, so the meta + name read as one stacked unit
+   rather than two separated rows. */
 html[data-design="v2"] .scene-popup-index {
+  display: block;
   color: var(--ds-color-gray-chip-label);
-}
-html[data-design="v2"] .scene-popup-nav {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-/* Prev/next buttons — 32x32 hit area for comfortable tap targets;
-   the visible chevron sits inside via flex centering. */
-html[data-design="v2"] .scene-popup-nav-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: transparent;
-  border: 0;
-  color: var(--ds-color-black);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-}
-html[data-design="v2"] .scene-popup-nav-btn:disabled {
-  opacity: 0.3;
-  cursor: default;
+  margin-bottom: -2px;
 }
 html[data-design="v2"] .scene-popup-name {
   margin: 0 0 8px;
@@ -8786,12 +8763,24 @@ html[data-design="v2"]:has(.scene-popup-scrim) .layer-sticky-bar-spacer {
   display: none;
 }
 
+/* Edit Scene + scene-nav row — sits at the bottom of the popup
+   body. Edit Scene flexes to fill remaining width; the prev / next
+   chevron buttons are 53px each, with a 20px gap between Edit and
+   Prev and a 10px gap between Prev and Next. The whole row is
+   inset 20px from each edge of the popup (via .scene-popup-body's
+   padding), so the button group sits 20-from-edge per spec. */
+html[data-design="v2"] .scene-popup-edit-row {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
 html[data-design="v2"] .scene-popup-edit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   height: 48px;
   border-radius: 14px;
   background: var(--ds-color-white);
@@ -8803,6 +8792,33 @@ html[data-design="v2"] .scene-popup-edit {
   letter-spacing: 0.07em;
   text-transform: uppercase;
   cursor: pointer;
+}
+/* Edge nav buttons (prev/next) — 53x48 with the same outline +
+   radius as Edit Scene; the centered SVG caret matches the topbar
+   back-button style (22x22, strokeWidth 1.8). */
+html[data-design="v2"] .scene-popup-nav-edge {
+  flex: 0 0 53px;
+  width: 53px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  color: var(--ds-color-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+html[data-design="v2"] .scene-popup-nav-edge.prev {
+  margin-left: 20px;
+}
+html[data-design="v2"] .scene-popup-nav-edge.next {
+  margin-left: 10px;
+}
+html[data-design="v2"] .scene-popup-nav-edge:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 /* The earlier v2 Characters card design (64px square avatar,

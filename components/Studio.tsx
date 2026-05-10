@@ -2364,37 +2364,9 @@ export function Studio({
                 </div>
               </div>
               <div className="scene-popup-body">
-                <div className="scene-popup-meta">
-                  <span className="scene-popup-index ds-type-main-tab-nav-inactive">
-                    SCENE {idx + 1} OF {total}
-                  </span>
-                  <div className="scene-popup-nav">
-                    <button
-                      type="button"
-                      className="scene-popup-nav-btn"
-                      onClick={goPrev}
-                      disabled={idx === 0}
-                      aria-label="Previous scene"
-                    >
-                      {/* Match the topbar back-button caret exactly:
-                          22px viewbox-fitted polyline, strokeWidth 1.8. */}
-                      <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
-                        <polyline points="15 18 9 12 15 6" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      className="scene-popup-nav-btn"
-                      onClick={goNext}
-                      disabled={idx === total - 1}
-                      aria-label="Next scene"
-                    >
-                      <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+                <span className="scene-popup-index ds-type-main-tab-nav-inactive">
+                  SCENE {idx + 1} OF {total}
+                </span>
                 <div className="scene-popup-name ds-type-project-card-title">
                   {beat.name || "Untitled scene"}
                 </div>
@@ -2412,17 +2384,41 @@ export function Studio({
                     ))}
                   </div>
                 )}
-                <button
-                  type="button"
-                  className="scene-popup-edit"
-                  onClick={goEdit}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                  <span>EDIT SCENE</span>
-                </button>
+                <div className="scene-popup-edit-row">
+                  <button
+                    type="button"
+                    className="scene-popup-edit"
+                    onClick={goEdit}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                    <span>EDIT SCENE</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="scene-popup-nav-edge prev"
+                    onClick={goPrev}
+                    disabled={idx === 0}
+                    aria-label="Previous scene"
+                  >
+                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="scene-popup-nav-edge next"
+                    onClick={goNext}
+                    disabled={idx === total - 1}
+                    aria-label="Next scene"
+                  >
+                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
