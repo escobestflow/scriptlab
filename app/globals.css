@@ -8287,6 +8287,30 @@ html[data-design="v2"] .v2-beat-row {
   margin-left: -2px;
   margin-right: -2px;
   height: 103px;
+  /* Positioning context for the drop indicators (taken out of the
+     flex flow below so they don't eat 50px of horizontal space
+     between row-left and the number column). */
+  position: relative;
+}
+/* Drop indicators (drag-and-drop affordances) sit BEFORE the
+   number-col and AFTER the card in the JSX. In v1 they're plain
+   block elements inside a non-flex wrapper. In v2 the row is a
+   flex container, so each indicator's `margin: 2 16` plus the
+   row's `gap: 18` was pushing the number-col 50px to the right.
+   Pulling them out of flow here keeps the row's flex layout
+   clean while the absolute-positioned line still appears at the
+   row top/bottom when its `.active` class fires. */
+html[data-design="v2"] .v2-beat-row > .beat-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin: 0;
+}
+html[data-design="v2"] .v2-beat-row > .beat-drop-indicator:first-child {
+  top: -8px;
+}
+html[data-design="v2"] .v2-beat-row > .beat-drop-indicator:last-child {
+  bottom: -8px;
 }
 html[data-design="v2"] .v2-beat-number-col {
   position: relative;
@@ -8340,8 +8364,13 @@ html[data-design="v2"] .v2-beat-row:last-child .v2-beat-number-col::before {
 }
 /* The card itself in v2 — white tile, soft outline, 18px radius
    matching the character cards. No shadow. Locked to the row's
-   103px height per spec so every row is a uniform tile. */
-html[data-design="v2"] .card.v2-beat-card {
+   103px height per spec so every row is a uniform tile.
+   Selector uses `.beat-card.v2-beat-card` because the JSX renders
+   the card as `beat-card v2-beat-card` (no plain `.card` class
+   like the character cards have). Earlier `.card.v2-beat-card`
+   selector silently never matched, leaving v1's 89px min-height
+   and `border: none` in effect. */
+html[data-design="v2"] .beat-card.v2-beat-card {
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
@@ -8353,6 +8382,12 @@ html[data-design="v2"] .card.v2-beat-card {
   overflow: hidden;
   height: 103px;
   min-height: 0;
+  /* Card itself is a flex container so its single child
+     (.beat-header) stretches to the full 103px height. Without
+     this the card was display:block with the header sitting at
+     its natural content height (~99), throwing off the thumb's
+     vertical centering (got 14/17 split instead of equal). */
+  display: flex;
 }
 html[data-design="v2"] .v2-beat-card .beat-header {
   display: flex;
