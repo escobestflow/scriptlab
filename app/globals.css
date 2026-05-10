@@ -8196,20 +8196,25 @@ html[data-design="v2"] .v2-character-lock {
    a stacked Generate / Upload button pair. The Generate button
    uses the icon-ai-button.svg glyph; Upload is plain-label. */
 html[data-design="v2"] .v2-character-form-portrait {
+  /* Image is centered horizontally as if it were the only child;
+     the action stack is absolute-positioned to the image's right
+     so its width never shifts the image. The image alone is the
+     row's visual anchor. */
+  position: relative;
   display: flex;
   align-items: center;
-  /* Center the portrait + buttons cluster horizontally in the
-     sheet body so the cluster reads as a deliberate hero element
-     above the field rows. The buttons stay flush next to the
-     portrait via the action-stack flex below. */
   justify-content: center;
-  gap: 14px;
   margin: 0 0 18px;
+  /* Lock the row to the image's height so absolute-positioned
+     actions have a definite bounding box to vertically center in. */
+  min-height: 144px;
 }
 html[data-design="v2"] .v2-character-form-portrait-img {
-  width: 100px;
-  height: 120px;
-  border-radius: 13px;
+  /* +20% over the previous 100x144 — proportional bump to the 5:6
+     character aspect ratio (100/120 → 120/144). */
+  width: 120px;
+  height: 144px;
+  border-radius: 14px;
   object-fit: cover;
   display: flex;
   align-items: center;
@@ -8221,10 +8226,18 @@ html[data-design="v2"] .v2-character-form-portrait-img {
 html[data-design="v2"] .v2-character-form-portrait-placeholder {
   font-family: var(--ds-font-display);
   font-weight: 400;
-  font-size: 36px;
+  font-size: 42px;
   color: var(--ds-color-gray-chip-label);
 }
 html[data-design="v2"] .v2-character-form-portrait-actions {
+  /* Pinned just past the image's right edge: row centerline +
+     half the image width (60px) + 14px gap. Vertically centered.
+     Image's geometry is unaffected because the actions stack is
+     out of normal flow. */
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 60px + 14px);
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
   gap: 8px;
