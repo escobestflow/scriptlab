@@ -491,6 +491,12 @@ export function Studio({
   // Read-through player sheet (Script tab): shows the full script formatted
   // for reading with per-character voice playback.
   const [readThroughOpen, setReadThroughOpen] = useState(false);
+  // When the Script View sheet's pencil routes us into the
+  // read-through, these stash the scroll target + the pre-on
+  // highlight-mode flag so the user lands in the right scene
+  // with the highlighter already armed. Cleared on sheet close.
+  const [readThroughInitialBeatId, setReadThroughInitialBeatId] = useState<string | null>(null);
+  const [readThroughInitialHighlight, setReadThroughInitialHighlight] = useState(false);
   // Script-import pipeline state. `importing` drives the CTA's spinner;
   // `importStep` is whichever derived-layer is currently in flight so we
   // can show "Generating Concept…" etc. in the card.
@@ -2451,8 +2457,15 @@ export function Studio({
         const goPrev = () => { if (idx > 0) setScriptViewBeatId(writtenBeats[idx - 1].id); };
         const goNext = () => { if (idx < total - 1) setScriptViewBeatId(writtenBeats[idx + 1].id); };
         const goEdit = () => {
+          // Pencil = enter highlight-and-edit-with-AI mode. We
+          // close this Script View sheet and hand off to the
+          // existing Read-through sheet (which owns the highlight
+          // logic) — pre-armed with highlight mode on and scrolled
+          // to the same beat the user was just reading.
           setScriptViewBeatId(null);
-          openExistingSceneSheet(beat.id);
+          setReadThroughInitialBeatId(beat.id);
+          setReadThroughInitialHighlight(true);
+          setReadThroughOpen(true);
         };
         return (
           <>
@@ -2677,7 +2690,16 @@ export function Studio({
         open={readThroughOpen}
         story={story}
         setStory={setStory}
-        onClose={() => setReadThroughOpen(false)}
+        onClose={() => {
+          setReadThroughOpen(false);
+          // Clear the deep-link initializers so a subsequent
+          // open (from the layer-bar Read-through chip, etc.)
+          // gets a fresh non-scrolled, highlight-off state.
+          setReadThroughInitialBeatId(null);
+          setReadThroughInitialHighlight(false);
+        }}
+        initialBeatId={readThroughInitialBeatId}
+        initialHighlightOn={readThroughInitialHighlight}
       />
 
       {confirmDeleteDialog}
@@ -4321,11 +4343,21 @@ function ReadThroughSheet({
   story,
   setStory,
   onClose,
+  initialBeatId,
+  initialHighlightOn,
 }: {
   open: boolean;
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   onClose: () => void;
+  /** Optional beat to scroll to when the sheet opens. Used by the
+   *  Script View sheet's pencil button so the user lands on the
+   *  scene they were just reading. */
+  initialBeatId?: string | null;
+  /** When true, highlight mode is pre-enabled on open — the user
+   *  goes straight to "select text + edit with AI" without having
+   *  to tap the Highlight toggle. */
+  initialHighlightOn?: boolean;
 }) {
   const charactersDraft = getActiveCharactersDraft(story);
   const conceptDraft = getActiveConceptDraft(story);
@@ -4385,6 +4417,29 @@ function ReadThroughSheet({
       setDragRects(null);
     }
   }, [open, highlightMode]);
+
+  // Wire up `initialBeatId` + `initialHighlightOn` props. Both fire
+  // ONCE per `open` transition (false → true) so we don't keep
+  // re-toggling state if the parent passes stable props. Scrolling
+  // is deferred a tick so the sheet's slide-up animation lays out
+  // the scene anchors first.
+  useEffect(() => {
+    if (!open) return;
+    if (initialHighlightOn) setHighlightMode(true);
+    if (initialBeatId) {
+      const t = setTimeout(() => {
+        const anchor = bodyRef.current?.querySelector<HTMLElement>(`[data-scene-id="${initialBeatId}"]`);
+        if (anchor && bodyRef.current) {
+          // Scroll to anchor inside the sheet body (not the
+          // window) so the rest of the page geometry stays put.
+          const top = anchor.offsetTop - bodyRef.current.offsetTop;
+          bodyRef.current.scrollTop = Math.max(0, top - 12);
+        }
+      }, 380);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // ── Composer (Phase 2) ─────────────────────────────────────────
   // Opens when the user taps "Change with AI" on a committed
