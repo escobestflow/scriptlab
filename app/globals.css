@@ -8523,27 +8523,44 @@ html[data-design="v2"] .v2-beat-card .beat-expand {
 }
 
 /* Inline-input attribute row — like a regular AttrRow but the
-   text input lives in the header to the right of the label, never
-   collapsing into a body. Used by the Scene name field so the user
-   can type a short title without the row ever looking "empty". */
+   text input lives in the header's .attr-values flex slot and
+   never collapses below the label. The input is styled to be
+   visually indistinguishable from `.attr-placeholder` text in
+   adjacent rows: same font, weight, size, color, and crucially
+   the same x-position (because it sits inside the same .attr-values
+   slot every other row uses). Used by Concept Title, Character
+   Name, Character Age, and Scene Name. */
 html[data-design="v2"] .attr-row-inline-input .attr-row-header {
   align-items: center;
-  gap: 12px;
+}
+html[data-design="v2"] .attr-row-inline-input .attr-values {
+  /* Drop the wrap behavior — single-line input never wraps. */
+  flex-wrap: nowrap;
 }
 html[data-design="v2"] .attr-inline-text-input {
   flex: 1;
+  width: 100%;
   min-width: 0;
-  border: none;
-  outline: none;
+  border: 0;
+  outline: 0;
   background: transparent;
   padding: 0;
+  margin: 0;
   font-family: var(--ds-font-body);
   font-weight: 400;
   font-size: 13px;
+  letter-spacing: 0;
+  line-height: normal;
   color: var(--ds-color-black);
-  text-align: right;
+  /* Left-aligned so a typed value or a placeholder share the same
+     x-coordinate as the placeholder/pill text in every other AttrRow
+     (which sits at the start of the .attr-values flex slot). */
+  text-align: left;
 }
 html[data-design="v2"] .attr-inline-text-input::placeholder {
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .attr-inline-text-input:disabled {
   color: var(--ds-color-gray-chip-label);
 }
 

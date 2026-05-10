@@ -5405,6 +5405,7 @@ function TextAttrRow({
   copyAction,
   readOnly,
   noToggle,
+  inline,
 }: {
   label: string;
   value: string;
@@ -5429,6 +5430,13 @@ function TextAttrRow({
    *  callback (used to surface a toast). Caret hidden, no input
    *  rendered. */
   noToggle?: () => void;
+  /** Permanent inline layout — input sits in the values slot to the
+   *  right of the label and never collapses below it. AI wand /
+   *  pager / copy / dot still render alongside the label. Used for
+   *  short single-line fields (Concept Title, Character Name,
+   *  Character Age, Scene Name) where the expand/collapse pattern
+   *  reads as fussy. */
+  inline?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -5455,6 +5463,38 @@ function TextAttrRow({
       <CopyGlyph />
     </button>
   ) : null;
+
+  // Inline branch — single permanent row, no expand/collapse. The
+  // input sits in the .attr-values flex slot so its left edge lines
+  // up with the placeholder text x-coordinate of every other AttrRow
+  // in the same form. Carets are dropped because there's no body to
+  // open into.
+  if (inline) {
+    return (
+      <div className="attr-row attr-row-inline-input">
+        <div className="attr-row-header">
+          <span className="attr-label">
+            {label}
+            {ai && !readOnly && !isLockedDisplay && <AIWandButton onClick={ai} loading={!!aiLoading} />}
+            {copyBtn}
+            {speak}
+            {dot && <span className="sync-dot attr-dot" />}
+          </span>
+          <div className="attr-values">
+            <input
+              className="attr-inline-text-input"
+              value={value}
+              onChange={e => onChange(e.target.value)}
+              placeholder={(readOnly || isLockedDisplay) ? "None added" : placeholder}
+              disabled={readOnly || isLockedDisplay}
+              onClick={isLockedDisplay ? () => noToggle!() : undefined}
+            />
+          </div>
+          {!readOnly && !isLockedDisplay && pager}
+        </div>
+      </div>
+    );
+  }
 
   if (!isOpen) {
     // Collapsed branch covers three cases:
@@ -5995,6 +6035,7 @@ function ConceptTab({
         copyAction={previewCopy("title")}
         readOnly={ro()}
         noToggle={lockTap}
+        inline
         pager={
           <HistoryPager
             history={titleHistory.history}
@@ -7215,6 +7256,7 @@ function CharacterEditForm({
         ai={() => generateCharacterField("name")}
         aiLoading={aiBusy === "name"}
         pager={pagerFor("name")}
+        inline
       />
 
       {/* Gender — chip selector. Four canonical buckets plus custom
@@ -7266,6 +7308,7 @@ function CharacterEditForm({
         value={ch.age ?? ""}
         placeholder="Add an age"
         onChange={v => onUpdate({ age: v })}
+        inline
       />
 
       {/* Role — chip selector matching Concept tab (Genre, etc). */}
@@ -8770,22 +8813,15 @@ function SceneEditForm({
         </div>
       )}
 
-      {/* Scene name — inline layout: input sits to the right of the
-          "Scene name" label rather than dropping below it. The
-          surrounding .attr-row chrome is preserved so this row reads
-          as a sibling of the chip-pickers below. */}
-      <div className="attr-row attr-row-inline-input">
-        <div className="attr-row-header">
-          <span className="attr-label">Scene name</span>
-          <input
-            type="text"
-            className="attr-inline-text-input"
-            value={beat.name}
-            onChange={e => onUpdate({ name: e.target.value })}
-            placeholder="Add a scene name"
-          />
-        </div>
-      </div>
+      {/* Scene name — `inline` keeps the input on the same row as
+          the label rather than dropping below it. */}
+      <TextAttrRow
+        label="Scene name"
+        value={beat.name}
+        placeholder="Add a scene name"
+        onChange={v => onUpdate({ name: v })}
+        inline
+      />
 
       {/* Linked idea — two-stage picker. Header pills summarize what's
           already linked by type. Body lists currently-linked ideas
