@@ -1766,10 +1766,13 @@ export default function Page() {
               onClick={() => {
                 if (createStep < 3) { setCreateStep(s => s + 1); return; }
                 if (easyModeChoice === "easy") {
-                  // Open the direction sheet first — the modal stays
-                  // mounted but visually behind the sheet. Submitting
-                  // the sheet calls finishCreateEasy with the user's
-                  // direction text.
+                  // Hide the create modal visually but keep
+                  // createDraft alive — finishCreateEasy reads it
+                  // when the direction sheet's submit fires. The
+                  // modal stack (z:70) was hiding the sheet (z:50)
+                  // when we left it open, so we collapse it here
+                  // before showing the sheet.
+                  setCreateOpen(false);
                   setEasyDirectionOpen(true);
                 } else if (easyModeChoice === "just") finishCreate();
               }}
@@ -1821,11 +1824,18 @@ export default function Page() {
           }
           return parts.join("\n\n");
         };
+        const cancelDirection = () => {
+          // Dismissing the direction sheet abandons the in-flight
+          // creation — clear the draft so reopening "+" starts
+          // from a fresh seed instead of resuming step 3.
+          setEasyDirectionOpen(false);
+          closeCreateModal();
+        };
         return (
           <>
             <div
-              className="sheet-backdrop open"
-              onClick={() => setEasyDirectionOpen(false)}
+              className="sheet-backdrop open easy-direction-backdrop"
+              onClick={cancelDirection}
             />
             <div className="sheet sheet-tall open easy-direction-sheet">
               <div className="sheet-handle" />
@@ -1834,7 +1844,7 @@ export default function Page() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setEasyDirectionOpen(false)}
+                  onClick={cancelDirection}
                 >
                   Close
                 </Button>
