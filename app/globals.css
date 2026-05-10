@@ -8610,6 +8610,147 @@ html[data-design="v2"] .attr-inline-text-input:disabled {
    `.moment-picker-item` (per-idea card) classes from the Scene
    sheet so the two flows look identical. No bespoke styles needed. */
 
+/* ── V2 Script tab — populated scene rows ─────────────────────
+   Per design reference: numbered timeline column on the left
+   (same badge + dotted line as Story), white card on the right
+   with a slug line, big serif title, body summary, and a footer
+   with page-range + a per-scene "Script Scene" AI chip. Reuses
+   the .v2-beat-number-col + .v2-beat-number-badge from Story so
+   the timeline aesthetic stays consistent across both layers. */
+html[data-design="v2"] .v2-script-row {
+  display: flex;
+  align-items: stretch;
+  gap: 18px;
+  margin-bottom: 14px;
+  margin-left: -2px;
+  margin-right: -2px;
+  position: relative;
+  /* No fixed height — the card grows to fit body text + footer. */
+}
+html[data-design="v2"] .v2-script-row .v2-beat-number-col {
+  /* Pin the badge to the card top instead of vertical-center, so
+     it lines up with the slug line ("INT. APARTMENT - NIGHT"). */
+  justify-content: flex-start;
+  padding-top: 18px;
+}
+html[data-design="v2"] .v2-script-row:last-child .v2-beat-number-col::before {
+  display: none;
+}
+/* Card surface — white tile, soft outline, 18px radius. Matches
+   the Story card style; differs in NOT having a fixed height. */
+html[data-design="v2"] .beat-card.v2-script-card {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: 16px 16px 14px;
+  border-radius: 18px;
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  box-shadow: none;
+  overflow: visible;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+html[data-design="v2"] .v2-script-options {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+html[data-design="v2"] .v2-script-options img {
+  width: 13px;
+  height: 3px;
+  display: block;
+}
+/* Tappable area covering slug + title + body. Plain block button
+   with no chrome — strips default button styling. */
+html[data-design="v2"] .v2-script-card-tap {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  /* Reserve room on the right so the absolute options icon never
+     overlaps the title text on narrow viewports. */
+  padding-right: 24px;
+}
+html[data-design="v2"] .v2-script-slug {
+  color: var(--ds-color-gray-chip-label);
+  margin-bottom: 4px;
+}
+html[data-design="v2"] .v2-script-name {
+  margin: 0 0 6px;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-script-summary {
+  margin: 0 0 14px;
+  color: var(--ds-color-black);
+  /* Clamp to 3 lines so multi-paragraph beats don't make the card
+     enormous; trailing ellipsis on overflow. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html[data-design="v2"] .v2-script-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+html[data-design="v2"] .v2-script-pages {
+  color: var(--ds-color-gray-chip-label);
+  /* Override the uppercase from ds-type-main-tab-nav-inactive —
+     "p. 1 - 8" reads better mixed-case than "P. 1 - 8". */
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+/* Per-scene chip — same fill / outline / shadow as the bulk
+   "Script All Scenes" chip in the layer-bar's right slot. */
+html[data-design="v2"] .v2-script-scene-chip {
+  /* All shared styling comes from .add-all-scenes-chip — this
+     class only marks the chip for any future per-scene overrides. */
+}
+
+/* Right-slot wrapper for the Script tab — Script-All-Scenes chip
+   plus the small read-through icon button, sitting on the same
+   row as "Script Draft N ▾". */
+html[data-design="v2"] .v2-script-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+html[data-design="v2"] .v2-script-readthrough-btn {
+  width: 36px;
+  height: 29px;
+  border-radius: 5px;
+  background: var(--ds-color-gray-lightest);
+  border: 0;
+  box-shadow:
+    inset 0 0 0 0.7px var(--ds-color-gray-outline),
+    0 0 4px 0 rgba(0, 0, 0, 0.09);
+  color: var(--ds-color-black);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+html[data-design="v2"] .v2-script-readthrough-btn:active {
+  transform: scale(0.97);
+}
+
 /* ── V2 Scene preview popup ──────────────────────────────────
    Lightweight modal that surfaces when a saved beat row is
    tapped in the Story tab. Uses a centered card with the scene
@@ -8621,9 +8762,12 @@ html[data-design="v2"] .scene-popup-scrim {
   z-index: 100;
   background: rgba(0, 0, 0, 0.4);
   display: flex;
-  align-items: center;
+  /* Anchor the popup card 180px from the viewport's bottom edge
+     instead of centering it. The 20px horizontal padding stays
+     so the card respects the 20-from-each-edge spec. */
+  align-items: flex-end;
   justify-content: center;
-  padding: 0 20px;       /* 20-from-viewport-edge per spec */
+  padding: 0 20px 180px;
   pointer-events: auto;
 }
 html[data-design="v2"] .scene-popup-card {
@@ -8710,13 +8854,14 @@ html[data-design="v2"] .scene-popup-body {
   display: flex;
   flex-direction: column;
 }
-/* SCENE n OF N label — sits directly above the title with a
-   tight 2px gap, so the meta + name read as one stacked unit
-   rather than two separated rows. */
+/* SCENE n OF N label — sits directly above the title. Latest
+   spec: +6px from prior tight setting, so the kicker reads as a
+   distinct row with a deliberate gap to the title rather than
+   crowding it. */
 html[data-design="v2"] .scene-popup-index {
   display: block;
   color: var(--ds-color-gray-chip-label);
-  margin-bottom: -2px;
+  margin-bottom: 4px;
 }
 html[data-design="v2"] .scene-popup-name {
   margin: 0 0 8px;

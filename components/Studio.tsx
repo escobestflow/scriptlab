@@ -2195,6 +2195,7 @@ export function Studio({
                 openNewSceneSheet(sorted.length);
               }}
               onGoToStory={() => setSection("story")}
+              openScenePopup={(id: string) => setScenePopupBeatId(id)}
               bgScriptJob={bgScriptJob}
               onStartBackgroundScriptLoop={onStartBackgroundScriptLoop}
             />
@@ -7977,6 +7978,7 @@ function ScriptTab({
   importStep,
   onAddScene,
   onGoToStory,
+  openScenePopup,
   runGenerateAll,
   bgScriptJob,
   onStartBackgroundScriptLoop,
@@ -8015,6 +8017,9 @@ function ScriptTab({
    *  the v2 empty-state CTA ("Go to Story") since Script can only
    *  ever be empty when Story is empty too. */
   onGoToStory: () => void;
+  /** v2 only — open the lightweight scene preview popup. Same prop
+   *  shape as StoryTab; ScriptTab forwards a row click to it. */
+  openScenePopup?: (beatId: string) => void;
   /** Wrap a Create-all action with the Studio-level scrim + sheet-close
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
@@ -8101,6 +8106,50 @@ function ScriptTab({
     }
   }
 
+  // v2 right-slot actions for the Script layer-bar — "Script All
+  // Scenes" chip (kicks off the same bulk-script loop the bottom
+  // sticky button uses) + a small Read-through chip so the user can
+  // open the formatted screen anywhere from the Script tab. Mirrors
+  // the Add All Scenes / Add All Characters chip styling.
+  const v2ScriptActions = isV2 && hasBeats ? (
+    <div className="v2-script-actions">
+      <button
+        type="button"
+        className="add-all-scenes-chip"
+        onClick={() => {
+          if (genBusy || !!bgScriptJob || !onStartBackgroundScriptLoop) return;
+          setGenBusy(true);
+          runGenerateAll(async () => {
+            try {
+              await onStartBackgroundScriptLoop(story, profile, { rewriteNewDraft: hasProducedScript });
+            } finally {
+              setGenBusy(false);
+            }
+          });
+        }}
+        disabled={genBusy || !!bgScriptJob}
+      >
+        <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+        <span>{genBusy || bgScriptJob ? "Scripting…" : "Script All Scenes"}</span>
+      </button>
+      {hasProducedScript && (
+        <button
+          type="button"
+          className="v2-script-readthrough-btn"
+          onClick={onOpenReadThrough}
+          aria-label="Read-through"
+          title="Open read-through"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+        </button>
+      )}
+    </div>
+  ) : null;
+
   return (
     <>
       {/* onOpenReadThrough gated on hasProducedScript: the read-through
@@ -8114,7 +8163,8 @@ function ScriptTab({
         setStory={setStory}
         autosaveEnabled={autosaveEnabled}
         onOpenUpdateTray={onOpenUpdateTray}
-        onOpenReadThrough={hasProducedScript ? onOpenReadThrough : undefined}
+        onOpenReadThrough={hasProducedScript && !isV2 ? onOpenReadThrough : undefined}
+        rightSlot={v2ScriptActions}
       />
 
       {/* Top-of-content Tip — only surfaces once at least one scene
@@ -8158,7 +8208,78 @@ function ScriptTab({
         />
       )}
 
-      {beats.map((beat, i) => {
+      {/* v2 layout — number column with dotted timeline + card with
+          slug line, big serif title, body, page-range and per-scene
+          AI chip. Mirrors the Story tab's row pattern. */}
+      {isV2 && beats.map((beat, i) => {
+        // Estimate page range from accumulated word counts. Standard
+        // screenplay convention: 1 page ≈ 250 words. We accumulate
+        // pages from prior beats, so beat i's range starts where
+        // beat i-1's ended + 1.
+        let cumStart = 1;
+        for (let j = 0; j < i; j++) {
+          const w = (beats[j].sceneContent || beats[j].summary || "").trim().split(/\s+/).filter(Boolean).length;
+          cumStart += Math.max(1, Math.round(w / 250));
+        }
+        const w = (beat.sceneContent || beat.summary || "").trim().split(/\s+/).filter(Boolean).length;
+        const pages = Math.max(1, Math.round(w / 250));
+        const pageEnd = cumStart + pages - 1;
+        const pageLabel = pages > 1 ? `p. ${cumStart} - ${pageEnd}` : `p. ${cumStart}`;
+        // Slug line — extract the first INT./EXT. line from
+        // sceneContent. Falls back to a generic "SCENE" pre-script.
+        const slugMatch = (beat.sceneContent || "").match(/^\s*(?:INT\.?|EXT\.?|INT\.?\/EXT\.?)\s+[^\n]+/im);
+        const slug = (slugMatch?.[0] ?? "SCENE").trim().toUpperCase();
+        const isWritten = beat.status === "written";
+        const isInflight = bgScriptJob?.inflightBeatId === beat.id;
+        const isQueued = !isInflight && bgScriptJob?.pendingBeatIds.has(beat.id) === true;
+        return (
+          <div key={beat.id} className="v2-script-row">
+            <div className="v2-beat-number-col" aria-hidden="true">
+              <span className={`v2-beat-number-badge ${isWritten ? "written" : ""}`}>{i + 1}</span>
+            </div>
+            <div className="card v2-script-card beat-card">
+              <button
+                type="button"
+                className="v2-script-options"
+                aria-label="Scene options"
+              >
+                <img src="/icon-options.svg" alt="" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="v2-script-card-tap"
+                onClick={() => openScenePopup?.(beat.id)}
+              >
+                <div className="v2-script-slug ds-type-main-tab-nav-inactive">{slug}</div>
+                <div className="v2-script-name ds-type-project-card-title">{beat.name || "Untitled scene"}</div>
+                <p className="v2-script-summary ds-type-body">{beat.summary || "No summary yet."}</p>
+              </button>
+              <div className="v2-script-footer">
+                <span className="v2-script-pages ds-type-main-tab-nav-inactive">{pageLabel}</span>
+                <button
+                  type="button"
+                  className="add-all-scenes-chip v2-script-scene-chip"
+                  onClick={() => {
+                    if (busy || isInflight || isQueued) return;
+                    run(
+                      { type: "generate_scene", payload: { beatIndex: i } },
+                      `${isWritten ? "Rewrite" : "Write"} · ${beat.name}`,
+                    );
+                  }}
+                  disabled={busy || isInflight || isQueued}
+                >
+                  <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                  <span>
+                    {isInflight ? "Scripting…" : isQueued ? "Queued" : "Script Scene"}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {!isV2 && beats.map((beat, i) => {
         // Resolve the linked moments so the scene card can echo what the
         // user attached back in Story — useful when scanning written prose
         // to see which personal moments seeded each beat.
@@ -8301,30 +8422,24 @@ function ScriptTab({
       )}
 
       {/* ── Import an existing script ──────────────────────────────
-          Lives at the bottom of the Script tab because that's where
-          a user who arrived here and realized "I already have a
-          screenplay, let me just upload it" ends up looking. The card
-          parses the file, splits scenes on INT./EXT. headings, and
-          deterministically populates three layers: Script (scenes),
-          Story (one beat per scene, status=written, sceneContent
-          copy-pasted), and Characters (verbatim dialogue cues). No
-          AI interpretation — 100% fidelity to the uploaded file. */}
-      <ImportScriptCard
-        onImportFile={onImportScript}
-        onImportPastedScript={onImportPastedScript}
-        onImportStoryDescription={onImportStoryDescription}
-        importing={importing}
-        importStep={importStep}
-      />
+          v1 only — v2 surfaces this through the project-creation
+          flow. Avoids duplicating the affordance at the bottom of
+          every Script tab in v2. */}
+      {!isV2 && (
+        <ImportScriptCard
+          onImportFile={onImportScript}
+          onImportPastedScript={onImportPastedScript}
+          onImportStoryDescription={onImportStoryDescription}
+          importing={importing}
+          importStep={importStep}
+        />
+      )}
 
-      {/* Sticky bottom action bar — only renders when the outline has
-          at least TWO scenes (beats). With a single scene, the per-card
-          "Write this scene with AI" button is sufficient and a bulk
-          "Write all scenes with AI" CTA is redundant. Two-or-more is
-          the threshold at which batching becomes meaningful and the
-          sticky bar earns its real-estate. Hidden entirely on empty
-          Script because the empty-state card already owns those CTAs. */}
-      {beats.length >= 2 && (
+      {/* Sticky bottom action bar — v1 only. v2 uses the
+          "Script All Scenes" chip in the layer-bar's right slot
+          plus per-row "Script Scene" chips, so a duplicate sticky
+          CTA at the bottom would double up. */}
+      {!isV2 && beats.length >= 2 && (
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
