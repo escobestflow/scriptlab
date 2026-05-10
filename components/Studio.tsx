@@ -7608,6 +7608,11 @@ function StoryTab({
   const touchStartY = useRef(0);
   const touchOffsetY = useRef(0);
   const isDragActive = useRef(false);
+  // Stays true for the tick after a drag-completed touchend so the
+  // synthetic click that fires on touch release is suppressed —
+  // otherwise the click would fall through to openScenePopup /
+  // openExistingScene immediately after the user finishes a drag.
+  const dragJustEnded = useRef(false);
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cloneRef = useRef<HTMLDivElement | null>(null);
 
@@ -7833,6 +7838,13 @@ function StoryTab({
                       while (diff < 0) { moveBeat(cur, "up"); cur--; diff++; }
                     }
                   }
+                  if (isDragActive.current) {
+                    // Suppress the synthetic click that fires next so
+                    // we don't navigate into the popup immediately
+                    // after dragging the same row.
+                    dragJustEnded.current = true;
+                    setTimeout(() => { dragJustEnded.current = false; }, 200);
+                  }
                   isDragActive.current = false;
                   setDraggingIdx(null);
                   setDropTargetIdx(null);
@@ -7847,7 +7859,7 @@ function StoryTab({
                   <button
                     style={isV2 ? { display: "flex", alignItems: "stretch", flex: 1, padding: 0, textAlign: "left", background: "none", border: "none" } : { display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
                     onClick={() => {
-                      if (isDragActive.current) return;
+                      if (isDragActive.current || dragJustEnded.current) return;
                       // v2: tap opens the preview popup first, which has
                       // an "Edit Scene" CTA that hands off to the full
                       // sheet. v1: legacy behavior — open the sheet
