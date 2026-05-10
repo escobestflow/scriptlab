@@ -85,8 +85,12 @@ export class EasyModeError extends Error {
 async function expandFullConcept(
   seed: Story,
   profile?: WriterProfile | null,
+  userDirection?: string,
 ): Promise<Story> {
-  const action: ActionRequest = { type: "generate_full_concept", payload: {} };
+  const action: ActionRequest = {
+    type: "generate_full_concept",
+    payload: userDirection?.trim() ? { userDirection: userDirection.trim() } : {},
+  };
   const rawText = await callGenerate(seed, action, profile);
   const parsed = extractJson(rawText);
   // normalizeConceptPatch strips title/projectType/genres defensively
@@ -112,14 +116,20 @@ async function expandFullConcept(
 export async function runEasyMode(
   seedStory: Story,
   callbacks: RunEasyModeCallbacks,
+  options?: { userDirection?: string },
 ): Promise<Story> {
   const { onStep, persist, profile } = callbacks;
   let current = seedStory;
 
-  // Step 1: Concept (empty → populated).
+  // Step 1: Concept (empty → populated). The optional userDirection
+  // — free-text guidance + selected-idea snippets the user supplied
+  // on the direction sheet before the AI fired — is forwarded to
+  // generate_full_concept so the invented Concept layer leans on the
+  // user's intent. Downstream steps (Characters/Story/Script) inherit
+  // that intent indirectly via the populated Concept they sync from.
   onStep("concept");
   try {
-    current = await expandFullConcept(current, profile);
+    current = await expandFullConcept(current, profile, options?.userDirection);
     await persist(current);
   } catch (e) {
     throw new EasyModeError("concept", current, e);

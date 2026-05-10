@@ -567,8 +567,12 @@ Rules:
     // model to invent a coherent logline/summary/tone/themes/endingTypes
     // that fit. Title/projectType/genres are sovereign — model is told
     // not to emit them, and the client strips them defensively anyway.
-    case "generate_full_concept":
-      return generateFullConceptPrompt(story);
+    case "generate_full_concept": {
+      const userDirection = typeof (action.payload as any)?.userDirection === "string"
+        ? (action.payload as any).userDirection
+        : undefined;
+      return generateFullConceptPrompt(story, userDirection);
+    }
 
     // ── Script-import pipeline ──
 
@@ -1007,7 +1011,7 @@ No prose outside the JSON.`;
 // three fields. We ask the model to fill the *remaining* concept fields
 // (logline, summary, tone, themes, endingTypes) and to leave title /
 // format / genres alone — those are sovereign once the user picked them.
-function generateFullConceptPrompt(story: Story): string {
+function generateFullConceptPrompt(story: Story, userDirection?: string): string {
   const projectTypeLabel =
     story.projectType === "tv-show" ? "TV show"
       : story.projectType === "short" ? "short film"
@@ -1018,9 +1022,16 @@ function generateFullConceptPrompt(story: Story): string {
   const shortRuntimeHint = story.projectType === "short"
     ? `\n\nThis is a short film. Target runtime ~${getActiveConceptDraft(story).settings.duration ?? 12} minutes — the concept must fit a short-film scope (one focused idea, turning point, or contradiction) rather than a feature arc.`
     : "";
+  // User-supplied direction collected on the Easy-mode direction
+  // sheet (free-text guidance + bullet list of selected ideas).
+  // Spliced in BEFORE the field-by-field rules so it influences
+  // every generated value, not just one.
+  const directionBlock = userDirection?.trim()
+    ? `\n\n## User direction\n${userDirection.trim()}\n\nLean on this guidance heavily — the user's intent should shape the logline, summary, tone, themes, and ending choice. Translate vague phrasing into specific, sensory choices; don't just rephrase the user's words back at them.`
+    : "";
   return `You are kicking off a new ${projectTypeLabel} project. The user has provided ONLY the title, format, and genres above — every other concept field is empty. Invent a coherent Concept layer that an experienced screenwriter would happily build the rest of the project on.
 
-The project's **title, format, and genres are fixed** — the user chose these at creation. Do NOT reconsider them and do NOT include them in your output.${shortRuntimeHint}
+The project's **title, format, and genres are fixed** — the user chose these at creation. Do NOT reconsider them and do NOT include them in your output.${shortRuntimeHint}${directionBlock}
 
 Each field:
 - logline: 1–2 sentences, ≤40 words. Protagonist + inciting event + goal + conflict + stakes. Must read like a real logline a working writer would pitch.

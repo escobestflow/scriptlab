@@ -357,6 +357,13 @@ export default function Page() {
   const [easyModeStep, setEasyModeStep] = useState<EasyModeStep | null>(null);
   const [easyModeError, setEasyModeError] = useState<{ step: EasyModeStep; message: string } | null>(null);
   const [easyModeProjectId, setEasyModeProjectId] = useState<string | null>(null);
+  // Easy-mode direction sheet — opens after the user picks Easy on
+  // step 3 + hits Finish. Gathers free-text guidance and selected
+  // saved ideas before kicking off runEasyMode so the AI has the
+  // user's intent baked in. `null` = sheet closed.
+  const [easyDirectionOpen, setEasyDirectionOpen] = useState(false);
+  const [easyDirectionText, setEasyDirectionText] = useState("");
+  const [easyDirectionIdeaIds, setEasyDirectionIdeaIds] = useState<string[]>([]);
   // Background script-generation job. Easy mode hands off to this after
   // scene 1 lands so the user can read scene 1 in the Script tab while
   // scenes 2..N stream in. `inflightBeatId` is the beat currently being
@@ -942,7 +949,7 @@ export default function Page() {
   // because the seed is committed before the chain starts — see
   // finishCreateEasy below). Persist callback awaits both local state and
   // Supabase upsert so a crash mid-chain leaves recoverable state.
-  async function runEasyModeWithSeed(seed: Story) {
+  async function runEasyModeWithSeed(seed: Story, userDirection?: string) {
     setEasyModeRunning(true);
     setEasyModeError(null);
     setEasyModeStep(null);
@@ -953,7 +960,7 @@ export default function Page() {
           setProjects(ps => ps.map(p => p.id === next.id ? next : p));
           if (user) await saveProjectToDB(user.id, next);
         },
-      });
+      }, { userDirection });
       // Success: navigate into the project on the Script tab so the
       // user lands on the final output. Thumbnail generation reads the
       // freshly populated logline + genres.
@@ -1095,7 +1102,7 @@ export default function Page() {
     });
   }
 
-  async function finishCreateEasy() {
+  async function finishCreateEasy(userDirection?: string) {
     if (!createDraft) return;
     const seed = createDraft;
     // Commit the empty seed FIRST so the project shows up in the user's
@@ -1106,7 +1113,10 @@ export default function Page() {
       try { await saveProjectToDB(user.id, seed); } catch { /* persist below */ }
     }
     closeCreateModal();
-    await runEasyModeWithSeed(seed);
+    setEasyDirectionOpen(false);
+    setEasyDirectionText("");
+    setEasyDirectionIdeaIds([]);
+    await runEasyModeWithSeed(seed, userDirection);
   }
 
   function updateDraft(u: (s: Story) => Story) {
@@ -1755,8 +1765,13 @@ export default function Page() {
               // the AI pipeline, Just create makes an empty project.
               onClick={() => {
                 if (createStep < 3) { setCreateStep(s => s + 1); return; }
-                if (easyModeChoice === "easy") finishCreateEasy();
-                else if (easyModeChoice === "just") finishCreate();
+                if (easyModeChoice === "easy") {
+                  // Open the direction sheet first — the modal stays
+                  // mounted but visually behind the sheet. Submitting
+                  // the sheet calls finishCreateEasy with the user's
+                  // direction text.
+                  setEasyDirectionOpen(true);
+                } else if (easyModeChoice === "just") finishCreate();
               }}
               // Each step gates the primary action:
               //   step 0 Format: must be actively chosen
@@ -1776,6 +1791,107 @@ export default function Page() {
           </div>
         </div>
       </div>
+
+      {/* Easy-mode direction sheet — shown after the user picks
+          "Easy mode" + Finish but before the AI runs. Lets them
+          shape the auto-created story with free-form direction +
+          a multi-select of saved ideas. Submitting calls
+          finishCreateEasy with the assembled direction string,
+          which flows through runEasyMode → expandFullConcept →
+          generate_full_concept's prompt. */}
+      {easyDirectionOpen && (() => {
+        const toggleIdea = (id: string) => {
+          setEasyDirectionIdeaIds(prev =>
+            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
+          );
+        };
+        const buildDirection = () => {
+          const text = easyDirectionText.trim();
+          const picked = easyDirectionIdeaIds
+            .map(id => moments.find(m => m.id === id))
+            .filter((m): m is Moment => !!m);
+          if (!text && picked.length === 0) return undefined;
+          const parts: string[] = [];
+          if (text) parts.push(text);
+          if (picked.length > 0) {
+            parts.push(
+              "Saved ideas the user wants woven in:",
+              ...picked.map(m => `- (${m.type}) ${m.text}`),
+            );
+          }
+          return parts.join("\n\n");
+        };
+        return (
+          <>
+            <div
+              className="sheet-backdrop open"
+              onClick={() => setEasyDirectionOpen(false)}
+            />
+            <div className="sheet sheet-tall open easy-direction-sheet">
+              <div className="sheet-handle" />
+              <div className="sheet-header">
+                <div className="sheet-title">Shape your story</div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setEasyDirectionOpen(false)}
+                >
+                  Close
+                </Button>
+              </div>
+              <div className="sheet-body" style={{ whiteSpace: "normal" }}>
+                <p className="caption" style={{ marginBottom: 14 }}>
+                  Give the AI any direction — vibe, plot seed, character
+                  hook, anything. Pick from your saved ideas to fold them
+                  into what gets generated. Skip both for a fully AI-
+                  invented project.
+                </p>
+                <textarea
+                  className="attr-text-input"
+                  value={easyDirectionText}
+                  onChange={e => setEasyDirectionText(e.target.value)}
+                  placeholder="e.g. A heist thriller with a quiet, melancholic ending. The protagonist is haunted by their estranged sister."
+                  rows={4}
+                  style={{ width: "100%", marginBottom: 18 }}
+                />
+                {moments.length > 0 && (
+                  <>
+                    <div className="eyebrow" style={{ marginBottom: 8 }}>
+                      Pick from your ideas {easyDirectionIdeaIds.length > 0 && `· ${easyDirectionIdeaIds.length} selected`}
+                    </div>
+                    <div className="easy-direction-ideas">
+                      {moments.slice(0, 30).map(m => {
+                        const selected = easyDirectionIdeaIds.includes(m.id);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className={`easy-direction-idea ${selected ? "selected" : ""}`}
+                            onClick={() => toggleIdea(m.id)}
+                          >
+                            <span className="easy-direction-idea-type">{m.type}</span>
+                            <span className="easy-direction-idea-text">{m.text}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="sheet-sticky-footer">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  block
+                  onClick={() => finishCreateEasy(buildDirection())}
+                >
+                  Create With AI
+                </Button>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* Easy-mode overlay — fullscreen scrim shown while the
           Concept→Characters→Story→Script chain is running, and on

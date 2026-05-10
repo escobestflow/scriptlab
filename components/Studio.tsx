@@ -8805,10 +8805,10 @@ function SceneEditForm({
     <div>
       {/* Scene image — preview + (Re)generate. v2 only; v1 doesn't
           surface scene thumbnails so there's nothing to manage there.
-          The button is hidden on a fresh blank scene (no name yet),
-          since the auto-fill effect will produce the first image
-          automatically once a name lands. */}
-      {isV2Form && (
+          Only shown on the EDIT sheet (`!isNew`). The CREATE sheet
+          stays clean — the auto-fill effect produces the first image
+          on its own once a name lands and the sheet closes. */}
+      {isV2Form && !isNew && (
         <div className="v2-scene-form-image">
           {beat.thumbnail
             ? <img src={beat.thumbnail} alt="" className="v2-scene-form-image-img" />
