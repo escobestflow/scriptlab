@@ -790,6 +790,38 @@ export function Studio({
     }
   };
 
+  // Track which beats are currently having a thumbnail generated
+  // so the auto-fill effect below doesn't double-fire on the same
+  // beat across re-renders (story state mutates several times
+  // during the request lifecycle).
+  const sceneImagesInFlight = useRef<Set<string>>(new Set());
+
+  // Auto-fill missing scene thumbnails. Fires whenever the story
+  // state changes — picks up beats produced by the bulk Add All
+  // Scenes path, individual sheet saves, or any future path that
+  // creates beats without a thumbnail.
+  useEffect(() => {
+    const draft = getActiveStoryLayerDraft(story);
+    const allBeats = isTV && activeEpisodeId
+      ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
+      : draft.beats;
+    for (const b of allBeats) {
+      if (
+        b.name?.trim() &&
+        !b.thumbnail &&
+        !sceneImagesInFlight.current.has(b.id)
+      ) {
+        sceneImagesInFlight.current.add(b.id);
+        autoGenerateSceneImage(b.id)
+          .catch(() => { /* swallow — the slot stays unset */ })
+          .finally(() => sceneImagesInFlight.current.delete(b.id));
+      }
+    }
+    // story is the dependency: any state mutation that adds beats
+    // or fills in their names triggers a re-scan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story, isTV, activeEpisodeId]);
+
   // Studio-level scene-image generation. Fire-and-forget; result
   // patches back via setStory and won't overwrite a thumbnail the
   // user manually set in the meantime. Mirrors
@@ -2344,7 +2376,9 @@ export function Studio({
                       disabled={idx === 0}
                       aria-label="Previous scene"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      {/* Match the topbar back-button caret exactly:
+                          22px viewbox-fitted polyline, strokeWidth 1.8. */}
+                      <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
                         <polyline points="15 18 9 12 15 6" />
                       </svg>
                     </button>
@@ -2355,7 +2389,7 @@ export function Studio({
                       disabled={idx === total - 1}
                       aria-label="Next scene"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
                     </button>
@@ -8519,8 +8553,50 @@ function SceneEditForm({
   onUpdate: (patch: Partial<Beat>) => void;
   onRemove: () => void;
 }) {
+  const isV2Form = useIsV2();
   const [openAttr, setOpenAttr] = useState<string | null>(null);
   const toggleAttr = (k: string) => setOpenAttr(o => o === k ? null : k);
+
+  // Scene image (re)generation, mirroring CharacterEditForm's
+  // portrait flow. Calls the same /api/generate-scene-image
+  // endpoint that the auto-fill effect uses; the returned data
+  // URL replaces beat.thumbnail.
+  const [imgBusy, setImgBusy] = useState(false);
+  async function generateSceneImage() {
+    if (imgBusy) return;
+    const description = [
+      beat.name && `Beat: ${beat.name}`,
+      beat.summary && `Summary: ${beat.summary}`,
+      beat.purpose && `Purpose: ${beat.purpose}`,
+    ].filter(Boolean).join("\n");
+    if (!description.trim()) {
+      if (typeof window !== "undefined") {
+        window.alert("Add a scene name + summary before generating an image.");
+      }
+      return;
+    }
+    const concept = getActiveConceptDraft(story);
+    const primaryGenre = concept.settings?.genres?.[0];
+    const projectTone = concept.concept?.tone;
+    setImgBusy(true);
+    try {
+      const res = await fetch("/api/generate-scene-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+      });
+      const data = await res.json();
+      if (data.thumbnail) {
+        onUpdate({ thumbnail: data.thumbnail });
+      } else if (data.error && typeof window !== "undefined") {
+        window.alert(data.error);
+      }
+    } catch (err: any) {
+      if (typeof window !== "undefined") window.alert(err?.message || String(err));
+    } finally {
+      setImgBusy(false);
+    }
+  }
 
   // Linked-idea picker: which idea-type the user is currently browsing.
   // Defaults to the first type that has any ideas the moment the user
@@ -8656,6 +8732,28 @@ function SceneEditForm({
 
   return (
     <div>
+      {/* Scene image — preview + (Re)generate. v2 only; v1 doesn't
+          surface scene thumbnails so there's nothing to manage there.
+          The button is hidden on a fresh blank scene (no name yet),
+          since the auto-fill effect will produce the first image
+          automatically once a name lands. */}
+      {isV2Form && (
+        <div className="v2-scene-form-image">
+          {beat.thumbnail
+            ? <img src={beat.thumbnail} alt="" className="v2-scene-form-image-img" />
+            : <div className="v2-scene-form-image-img v2-scene-form-image-placeholder" aria-hidden="true" />}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={generateSceneImage}
+            disabled={imgBusy || !beat.name?.trim()}
+            icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
+          >
+            {imgBusy ? "Generating…" : beat.thumbnail ? "Regenerate" : "Generate"}
+          </Button>
+        </div>
+      )}
+
       {/* Scene name */}
       <TextAttrRow
         label="Scene name"

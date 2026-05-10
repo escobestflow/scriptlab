@@ -8218,6 +8218,31 @@ html[data-design="v2"] .v2-character-form-portrait-actions {
   align-items: stretch;
 }
 
+/* Scene edit-sheet image preview — sits at the top of the scene
+   sheet above the Name row. 7:5 aspect to match the row thumbnail
+   crop, with a Generate / Regenerate button alongside. */
+html[data-design="v2"] .v2-scene-form-image {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+html[data-design="v2"] .v2-scene-form-image-img {
+  width: 140px;
+  height: 100px;
+  border-radius: 12px;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ds-color-gray-fill);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  flex: 0 0 auto;
+}
+html[data-design="v2"] .v2-scene-form-image-placeholder {
+  background: var(--ds-color-gray-fill);
+}
+
 /* AI history pager — sits next to the AI wand. v1 used a blue-50 →
    sky-50 gradient with a blue inset stroke; v2 mirrors the new
    `.ai-wand` chip exactly so the two read as siblings of one
@@ -8663,6 +8688,14 @@ html[data-design="v2"] .scene-popup-avatar-placeholder {
 }
 /* Edit Scene CTA — full-width pill with a thin gray outline,
    matching the visual weight of other secondary CTAs in v2. */
+/* When the scene preview popup is open, suppress the persistent
+   "+ Add scene" sticky bar at the bottom — it would otherwise sit
+   visually on top of the modal and double up the CTAs. */
+html[data-design="v2"]:has(.scene-popup-scrim) .layer-sticky-bar,
+html[data-design="v2"]:has(.scene-popup-scrim) .layer-sticky-bar-spacer {
+  display: none;
+}
+
 html[data-design="v2"] .scene-popup-edit {
   display: inline-flex;
   align-items: center;
