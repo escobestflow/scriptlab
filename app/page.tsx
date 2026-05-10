@@ -368,6 +368,24 @@ export default function Page() {
   // = "first type with ideas, computed at render time" so the UI
   // doesn't need a useEffect to bootstrap on open.
   const [easyDirectionTypeFilter, setEasyDirectionTypeFilter] = useState<Moment["type"] | null>(null);
+
+  // V2-only dev toggle — flips the Projects/Ideas tabs into their
+  // empty-state UI even when the account actually has data, so we
+  // can iterate on the empty-state design without deleting real
+  // projects. Persisted to localStorage; only the toggle button
+  // (rendered under the + in the topbar for v2 users) writes to it.
+  const [forceEmptyState, setForceEmptyState] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return localStorage.getItem("scriptlab.forceEmptyState") === "1"; }
+    catch { return false; }
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      if (forceEmptyState) localStorage.setItem("scriptlab.forceEmptyState", "1");
+      else localStorage.removeItem("scriptlab.forceEmptyState");
+    } catch { /* storage disabled — toggle still works for the session */ }
+  }, [forceEmptyState]);
   // Background script-generation job. Easy mode hands off to this after
   // scene 1 lands so the user can read scene 1 in the Script tab while
   // scenes 2..N stream in. `inflightBeatId` is the beat currently being
@@ -1259,26 +1277,43 @@ export default function Page() {
             <img src="/logo.svg" alt="Unfold" className="brand-logo-img" />
           </div>
           {isV2 ? (
-            <button
-              type="button"
-              className="v2-topbar-add"
-              onClick={() => {
-                if (mainTab === "projects") {
-                  openCreateModal();
-                } else {
-                  // Ideas tab: open the new-idea modal. Same setters
-                  // the in-tab onNew uses, kept inline here so a top-
-                  // level handler isn't needed (these state setters are
-                  // already in scope at the Page level).
-                  setNewIdeaText("");
-                  setNewIdeaType("scene");
-                  setNewIdeaOpen(true);
-                }
-              }}
-              aria-label={mainTab === "projects" ? "New project" : "New idea"}
-            >
-              <img src="/v2/icons/icon-add.svg" alt="" width={13} height={13} />
-            </button>
+            <div className="v2-topbar-right-stack">
+              <button
+                type="button"
+                className="v2-topbar-add"
+                onClick={() => {
+                  if (mainTab === "projects") {
+                    openCreateModal();
+                  } else {
+                    // Ideas tab: open the new-idea modal. Same setters
+                    // the in-tab onNew uses, kept inline here so a top-
+                    // level handler isn't needed (these state setters are
+                    // already in scope at the Page level).
+                    setNewIdeaText("");
+                    setNewIdeaType("scene");
+                    setNewIdeaOpen(true);
+                  }
+                }}
+                aria-label={mainTab === "projects" ? "New project" : "New idea"}
+              >
+                <img src="/v2/icons/icon-add.svg" alt="" width={13} height={13} />
+              </button>
+              {/* Dev-only empty-state preview toggle. Lets the
+                  account whose v2 session has real projects /
+                  ideas saved still preview the empty-state UIs
+                  without deleting the data. Persisted to
+                  localStorage so a reload keeps the chosen view. */}
+              <button
+                type="button"
+                className={`v2-empty-state-toggle ${forceEmptyState ? "is-on" : ""}`}
+                onClick={() => setForceEmptyState(v => !v)}
+                aria-pressed={forceEmptyState}
+                aria-label={forceEmptyState ? "Show populated state" : "Show empty state"}
+                title={forceEmptyState ? "Showing empty state — tap to flip back" : "Preview empty state"}
+              >
+                {forceEmptyState ? "FULL" : "EMPTY"}
+              </button>
+            </div>
           ) : (
             <div style={{ width: 44 }} />
           )}
@@ -1287,10 +1322,15 @@ export default function Page() {
           <div className="page-enter">
             {mainTab === "projects" && (
               <ProjectsTab
-                projects={projects}
+                /* forceEmptyState (dev toggle) substitutes empty
+                   data so the tab renders its empty-state UI even
+                   when real projects exist. Only the projects +
+                   pendingInvites lists are blanked — everything
+                   else (user identity, callbacks) is unchanged. */
+                projects={forceEmptyState ? [] : projects}
                 onOpen={(id) => setView({ kind: "studio", projectId: id })}
                 onNew={openCreateModal}
-                pendingInvites={pendingInvites}
+                pendingInvites={forceEmptyState ? [] : pendingInvites}
                 onAcceptInvite={handleAcceptInvite}
                 onDeclineInvite={handleDeclineInvite}
                 myUserId={user?.id ?? null}
@@ -1301,7 +1341,7 @@ export default function Page() {
             )}
             {mainTab === "moments" && (
               <MomentsTab
-                moments={moments}
+                moments={forceEmptyState ? [] : moments}
                 onEdit={(m) => setEditingMoment(m)}
                 onDelete={(id) => deleteMoment(id)}
                 onNew={() => {
