@@ -9023,13 +9023,23 @@ html[data-design="v2"] .scene-popup-scrim {
   z-index: 100;
   background: rgba(0, 0, 0, 0.4);
   display: flex;
-  /* Anchor the popup card 180px from the viewport's bottom edge
-     instead of centering it. The 20px horizontal padding stays
-     so the card respects the 20-from-each-edge spec. */
+  /* Default (story variant): anchor the popup card 180px from
+     the viewport's bottom edge. Script-unwritten variant has
+     less content (just the CTA, no character avatars / nav) so
+     bottom-anchoring lands it too high on the screen — that
+     variant overrides to center instead (see rule below). */
   align-items: flex-end;
   justify-content: center;
   padding: 0 20px 180px;
   pointer-events: auto;
+}
+/* Script-unwritten variant — short popup (image + name + summary
+   + single Script Scene CTA). Center vertically so the smaller
+   card lands in the natural middle of the viewport instead of
+   sitting high above the empty 180px bottom band. */
+html[data-design="v2"] .scene-popup-scrim.scene-popup-variant-script-unwritten {
+  align-items: center;
+  padding: 0 20px;
 }
 html[data-design="v2"] .scene-popup-card {
   width: 100%;

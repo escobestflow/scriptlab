@@ -2364,7 +2364,7 @@ export function Studio({
         };
         return (
           <div
-            className="scene-popup-scrim open"
+            className={`scene-popup-scrim open scene-popup-variant-${scenePopupVariant}`}
             role="dialog"
             aria-modal="true"
             onClick={closePopup}
