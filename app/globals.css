@@ -8345,20 +8345,26 @@ html[data-design="v2"] .v2-beat-number-badge.written {
   border-color: var(--ds-color-black);
   color: var(--ds-color-white);
 }
-/* Dotted vertical line connecting consecutive scene rows. Drawn
-   as a pseudo-element on the number-col so it flows behind the
-   badge. The line stops at the badge of the next row. */
+/* Dotted vertical line connecting consecutive scene badges.
+   Spans from the current badge's BOTTOM edge to the next row's
+   badge TOP edge — does NOT pass through either badge. Math:
+     - Row height 103, badge 21 centered → badge top at 41,
+       badge bottom at 62 (both from numCol/row top).
+     - Next row's badge top sits at 14 (row margin-bottom) + 41
+       (badge offset) = 55 below the current row's bottom.
+   So `top: 62; bottom: -55` exactly fills the gap between the
+   two badges. */
 html[data-design="v2"] .v2-beat-number-col::before {
   content: "";
   position: absolute;
   left: 50%;
-  top: 0;
-  bottom: -14px; /* extends through the row's margin-bottom */
+  top: 62px;
+  bottom: -55px;
   border-left: 1px dashed var(--ds-color-gray-outline);
   transform: translateX(-50%);
   z-index: 0;
 }
-/* Last row: don't draw the line below the final badge. */
+/* Last row: no next badge, so no line. */
 html[data-design="v2"] .v2-beat-row:last-child .v2-beat-number-col::before {
   display: none;
 }
