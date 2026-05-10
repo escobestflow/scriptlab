@@ -456,6 +456,12 @@ export function Studio({
   // hide the Delete CTA on a not-yet-committed scene.
   const [sceneSheetBeatId, setSceneSheetBeatId] = useState<string | null>(null);
   const [sceneSheetIsNew, setSceneSheetIsNew] = useState<boolean>(false);
+  // v2 only — a lightweight preview popup that surfaces when the
+  // user taps an already-saved beat in the Story tab. Shows the
+  // scene image, name, summary, character avatars, estimated
+  // duration, and an "Edit Scene" CTA that hands off to the full
+  // edit sheet via `sceneSheetBeatId`. null = closed.
+  const [scenePopupBeatId, setScenePopupBeatId] = useState<string | null>(null);
   // Character sheet — a single sheet used for BOTH creation and editing.
   // null = closed. "new-char-draft" marker or an existing character id = open.
   const [charSheetCharId, setCharSheetCharId] = useState<string | null>(null);
@@ -2122,6 +2128,7 @@ export function Studio({
               moments={moments}
               moveBeat={moveBeat}
               openExistingScene={openExistingSceneSheet}
+              openScenePopup={(id: string) => setScenePopupBeatId(id)}
               openNewScene={openNewSceneSheet}
               run={run}
               busy={busy}
@@ -2265,6 +2272,128 @@ export function Studio({
           />
         </div>
       </div>
+
+      {/* v2 scene preview popup — surfaces when the user taps an
+          already-saved beat row in the Story tab. The Edit Scene
+          button hands off to the full sheet below. */}
+      {(() => {
+        const popupOpen = scenePopupBeatId !== null;
+        if (!popupOpen) return null;
+        const idx = beats.findIndex(b => b.id === scenePopupBeatId);
+        const beat = idx >= 0 ? beats[idx] : null;
+        if (!beat) return null;
+        const total = beats.length;
+        const cast = getActiveCharactersDraft(story).characters;
+        const beatChars = (beat.characterIds ?? [])
+          .map(id => cast.find(c => c.id === id))
+          .filter((c): c is Character => !!c);
+        // Rough estimated duration from sceneContent length —
+        // 250 words/min is the screenplay-page convention. Falls
+        // back to "—:—" when no scene prose has been written yet.
+        const wordCount = (beat.sceneContent || "").trim().split(/\s+/).filter(Boolean).length;
+        const durationLabel = wordCount > 0
+          ? (() => {
+              const seconds = Math.max(1, Math.round((wordCount / 250) * 60));
+              const m = Math.floor(seconds / 60);
+              const s = seconds % 60;
+              return `${m}:${s.toString().padStart(2, "0")}`;
+            })()
+          : "—:—";
+        const closePopup = () => setScenePopupBeatId(null);
+        const goPrev = () => { if (idx > 0) setScenePopupBeatId(beats[idx - 1].id); };
+        const goNext = () => { if (idx < total - 1) setScenePopupBeatId(beats[idx + 1].id); };
+        const goEdit = () => {
+          setScenePopupBeatId(null);
+          openExistingSceneSheet(beat.id);
+        };
+        return (
+          <div
+            className="scene-popup-scrim open"
+            role="dialog"
+            aria-modal="true"
+            onClick={closePopup}
+          >
+            <div className="scene-popup-card" onClick={e => e.stopPropagation()}>
+              <div className="scene-popup-image">
+                {beat.thumbnail
+                  ? <img src={beat.thumbnail} alt="" />
+                  : <div className="scene-popup-image-placeholder" aria-hidden="true" />}
+                <button
+                  type="button"
+                  className="scene-popup-close"
+                  onClick={closePopup}
+                  aria-label="Close preview"
+                >
+                  <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
+                </button>
+                <div className="scene-popup-duration ds-type-body">
+                  <img src="/icon-duration.svg" alt="" aria-hidden="true" />
+                  <span>{durationLabel}</span>
+                </div>
+              </div>
+              <div className="scene-popup-body">
+                <div className="scene-popup-meta">
+                  <span className="scene-popup-index ds-type-main-tab-nav-inactive">
+                    SCENE {idx + 1} OF {total}
+                  </span>
+                  <div className="scene-popup-nav">
+                    <button
+                      type="button"
+                      className="scene-popup-nav-btn"
+                      onClick={goPrev}
+                      disabled={idx === 0}
+                      aria-label="Previous scene"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="15 18 9 12 15 6" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="scene-popup-nav-btn"
+                      onClick={goNext}
+                      disabled={idx === total - 1}
+                      aria-label="Next scene"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div className="scene-popup-name ds-type-project-card-title">
+                  {beat.name || "Untitled scene"}
+                </div>
+                <p className="scene-popup-summary ds-type-body">
+                  {beat.summary || "No summary yet."}
+                </p>
+                {beatChars.length > 0 && (
+                  <div className="scene-popup-characters" aria-label="Characters in this scene">
+                    {beatChars.map(c => (
+                      c.thumbnail
+                        ? <img key={c.id} src={c.thumbnail} alt="" className="scene-popup-avatar" />
+                        : <div key={c.id} className="scene-popup-avatar scene-popup-avatar-placeholder">
+                            {c.name ? c.name[0].toUpperCase() : "?"}
+                          </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="scene-popup-edit"
+                  onClick={goEdit}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                  <span>EDIT SCENE</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Scene sheet — single sheet for both creation and editing,
           mirroring the character-sheet pattern below. Sheet title
@@ -7351,7 +7480,7 @@ function CharacterEditForm({
 function StoryTab({
   story, setStory,
   beats, moments, moveBeat,
-  openExistingScene, openNewScene,
+  openExistingScene, openScenePopup, openNewScene,
   run, busy, syncState,
   autosaveEnabled = true,
   onOpenUpdateTray,
@@ -7364,6 +7493,9 @@ function StoryTab({
   moveBeat: (index: number, direction: "up" | "down") => void;
   /** Open the unified scene sheet for editing an existing beat. */
   openExistingScene: (beatId: string) => void;
+  /** v2 only — open the lightweight preview popup. v1 callers can
+   *  ignore (the row click falls through to openExistingScene). */
+  openScenePopup?: (beatId: string) => void;
   /** Insert a fresh blank beat at the given position and open its
    *  sheet — auto-discarded on close if the user filled nothing in. */
   openNewScene: (insertAt?: number) => void;
@@ -7621,7 +7753,15 @@ function StoryTab({
                   </div>
                   <button
                     style={isV2 ? { display: "flex", alignItems: "stretch", flex: 1, padding: 0, textAlign: "left", background: "none", border: "none" } : { display: "flex", alignItems: "center", gap: 12, flex: 1, padding: "16px 16px 16px 4px", textAlign: "left", background: "none", border: "none" }}
-                    onClick={() => { if (!isDragActive.current) openExistingScene(beat.id); }}
+                    onClick={() => {
+                      if (isDragActive.current) return;
+                      // v2: tap opens the preview popup first, which has
+                      // an "Edit Scene" CTA that hands off to the full
+                      // sheet. v1: legacy behavior — open the sheet
+                      // directly.
+                      if (isV2 && openScenePopup) openScenePopup(beat.id);
+                      else openExistingScene(beat.id);
+                    }}
                   >
                   {isV2 && (
                     beat.thumbnail
