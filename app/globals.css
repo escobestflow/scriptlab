@@ -8776,12 +8776,27 @@ html[data-design="v2"] .v2-script-name {
   color: var(--ds-color-black);
 }
 html[data-design="v2"] .v2-script-summary {
-  margin: 0 0 14px;
+  /* No margin-bottom so the page-count footer sits flush against
+     the description — earlier 14px gap read as a divider between
+     two visual blocks. Per spec there's no divider below the
+     description in script-tab cards. */
+  margin: 0;
   color: var(--ds-color-black);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+/* Footer sits 14px below the summary via its own margin-top —
+   keeps the visual rhythm tight (one block of content) instead
+   of a "summary block + separator + footer block" feel. */
+html[data-design="v2"] .v2-script-footer {
+  margin-top: 14px;
+}
+/* Defensive — make sure no inherited beat-card v1 border-tops
+   paint a divider on any descendant of v2-script-card. */
+html[data-design="v2"] .beat-card.v2-script-card > * {
+  border-top: none;
 }
 html[data-design="v2"] .v2-script-footer {
   display: flex;

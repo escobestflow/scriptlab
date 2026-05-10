@@ -8418,39 +8418,29 @@ function ScriptTab({
               </button>
               <div className="v2-script-footer">
                 <span className="v2-script-pages ds-type-main-tab-nav-inactive">{pageLabel}</span>
-                <button
-                  type="button"
-                  className="add-all-scenes-chip v2-script-scene-chip"
-                  onClick={() => {
-                    if (isWritten) {
-                      // Written → tap chip = open the Script View
-                      // sheet (same target as tapping the card).
-                      openScriptViewSheet?.(beat.id);
-                      return;
-                    }
-                    if (busy || isInflight || isQueued) return;
-                    run(
-                      { type: "generate_scene", payload: { beatIndex: i } },
-                      `Write · ${beat.name}`,
-                    );
-                  }}
-                  disabled={!isWritten && (busy || isInflight || isQueued)}
-                >
-                  <img
-                    src={isWritten ? "/icon-script-sml.svg" : "/icon-ai-button.svg"}
-                    alt=""
-                    aria-hidden="true"
-                    width={isWritten ? 10.86 : undefined}
-                    height={isWritten ? 11.27 : undefined}
-                  />
-                  <span>
-                    {isWritten
-                      ? "View Script"
-                      : isInflight ? "Scripting…"
-                      : isQueued ? "Queued"
-                      : "Script Scene"}
-                  </span>
-                </button>
+                {/* Per spec — once a scene is written, no chip sits
+                    next to the page number. The card itself is
+                    tappable and routes to the Script View sheet,
+                    so the chip is redundant for written beats. */}
+                {!isWritten && (
+                  <button
+                    type="button"
+                    className="add-all-scenes-chip v2-script-scene-chip"
+                    onClick={() => {
+                      if (busy || isInflight || isQueued) return;
+                      run(
+                        { type: "generate_scene", payload: { beatIndex: i } },
+                        `Write · ${beat.name}`,
+                      );
+                    }}
+                    disabled={busy || isInflight || isQueued}
+                  >
+                    <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                    <span>
+                      {isInflight ? "Scripting…" : isQueued ? "Queued" : "Script Scene"}
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
