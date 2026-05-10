@@ -2438,101 +2438,17 @@ export function Studio({
         );
       })()}
 
-      {/* v2 Script View sheet — full-screenplay-prose read mode
-          opened when a written scene row is tapped. Prev/next
-          navigate between WRITTEN beats only (so the user can
-          page through the actual script); body content is
-          monospace screenplay text that scrolls vertically. */}
-      {(() => {
-        if (scriptViewBeatId === null) return null;
-        const writtenBeats = beats.filter(b => b.status === "written" && (b.sceneContent || "").trim().length > 0);
-        const idx = writtenBeats.findIndex(b => b.id === scriptViewBeatId);
-        const beat = idx >= 0 ? writtenBeats[idx] : null;
-        if (!beat) return null;
-        const total = writtenBeats.length;
-        // Slug — same parse as the row.
-        const slugMatch = (beat.sceneContent || "").match(/^\s*(?:INT\.?|EXT\.?|INT\.?\/EXT\.?)\s+[^\n]+/im);
-        const slug = (slugMatch?.[0] ?? "SCENE").trim().toUpperCase();
-        const closeSheet = () => setScriptViewBeatId(null);
-        const goPrev = () => { if (idx > 0) setScriptViewBeatId(writtenBeats[idx - 1].id); };
-        const goNext = () => { if (idx < total - 1) setScriptViewBeatId(writtenBeats[idx + 1].id); };
-        const goEdit = () => {
-          // Pencil = enter highlight-and-edit-with-AI mode. We
-          // close this Script View sheet and hand off to the
-          // existing Read-through sheet (which owns the highlight
-          // logic) — pre-armed with highlight mode on and scrolled
-          // to the same beat the user was just reading.
-          setScriptViewBeatId(null);
-          setReadThroughInitialBeatId(beat.id);
-          setReadThroughInitialHighlight(true);
-          setReadThroughOpen(true);
-        };
-        return (
-          <>
-            <div className="sheet-backdrop open script-view-backdrop" onClick={closeSheet} />
-            <div className="sheet sheet-tall open script-view-sheet">
-              <div className="sheet-handle" />
-              <div className="script-view-header">
-                <div className="script-view-count ds-type-main-tab-nav-inactive">SCENE {idx + 1} OF {total}</div>
-                <div className="script-view-title-row">
-                  <button
-                    type="button"
-                    className="script-view-nav-btn"
-                    onClick={goPrev}
-                    disabled={idx === 0}
-                    aria-label="Previous written scene"
-                  >
-                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
-                      <polyline points="15 18 9 12 15 6" />
-                    </svg>
-                  </button>
-                  <div className="script-view-title-stack">
-                    <div className="script-view-name ds-type-project-card-title">{beat.name || "Untitled scene"}</div>
-                    <div className="script-view-slug ds-type-main-tab-nav-inactive">{slug}</div>
-                  </div>
-                  <button
-                    type="button"
-                    className="script-view-nav-btn"
-                    onClick={goNext}
-                    disabled={idx === total - 1}
-                    aria-label="Next written scene"
-                  >
-                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <div className="script-view-actions">
-                <button
-                  type="button"
-                  className="script-view-action-btn"
-                  onClick={goEdit}
-                  aria-label="Edit scene"
-                  title="Edit scene"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                </button>
-                <SpeakButton
-                  mode="script"
-                  size="md"
-                  text={beat.sceneContent || ""}
-                  characters={getActiveCharactersDraft(story).characters}
-                  projectType={story.projectType}
-                  genres={getActiveConceptDraft(story).settings.genres}
-                  title="Read scene aloud"
-                />
-              </div>
-              <div className="script-view-body" tabIndex={0}>
-                <pre className="script-view-prose">{beat.sceneContent || ""}</pre>
-              </div>
-            </div>
-          </>
-        );
-      })()}
+      {/* v2 Script View sheet — see ScriptViewSheet for full notes.
+          Renders all written scenes stacked with active-scene
+          tracking + inline highlight + composer. Closing nulls
+          the seed beat so the next open starts fresh. */}
+      <ScriptViewSheet
+        open={scriptViewBeatId !== null}
+        story={story}
+        setStory={setStory}
+        onClose={() => setScriptViewBeatId(null)}
+        initialBeatId={scriptViewBeatId}
+      />
 
       {/* Scene sheet — single sheet for both creation and editing,
           mirroring the character-sheet pattern below. Sheet title
@@ -5004,6 +4920,535 @@ function ReadThroughScene({
         )}
       </div>
     </div>
+  );
+}
+
+/* ============================================ */
+/* ============ SCRIPT VIEW SHEET ============== */
+/* ============================================ */
+
+/**
+ * Per-scene script reader/editor opened from the v2 Script tab when
+ * a written scene row is tapped. Renders ALL written scenes stacked
+ * in one scrollable body — the user reads from one scene right into
+ * the next without remounting the sheet. The header at the top
+ * stays pinned and updates its title/slug/count based on which
+ * scene is currently most visible (tracked via IntersectionObserver).
+ * Prev/next chevrons are jump-anchors that smooth-scroll to the
+ * adjacent written scene.
+ *
+ * The pencil button toggles a local highlight mode — same drag-to-
+ * highlight + "Change with AI" composer flow used by the legacy
+ * ReadThroughSheet, ported inline so the user never leaves this
+ * sheet to make a single-line rewrite. Submit hits the same
+ * `/api/generate` action (`rewrite_highlighted_range`) and splices
+ * the AI replacement directly into the beat's sceneContent.
+ */
+function ScriptViewSheet({
+  open,
+  story,
+  setStory,
+  onClose,
+  initialBeatId,
+}: {
+  open: boolean;
+  story: Story;
+  setStory: (u: (s: Story) => Story) => void;
+  onClose: () => void;
+  /** Optional beat to land on when the sheet opens. */
+  initialBeatId?: string | null;
+}) {
+  const charactersDraft = getActiveCharactersDraft(story);
+  const conceptDraft = getActiveConceptDraft(story);
+
+  const sl = getActiveStoryLayerDraft(story);
+  const flatBeats: Beat[] = sl
+    ? story.projectType === "tv-show"
+      ? (sl.episodes ?? []).flatMap(ep => ep.beats)
+      : sl.beats
+    : [];
+  const writtenBeats = flatBeats.filter(
+    b => b.status === "written" && b.sceneContent?.trim(),
+  );
+
+  // Active scene index = the one most-visible in the scrollable
+  // body. Updated by IntersectionObserver below.
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  // Highlight state — identical shape to ReadThroughSheet's. Yellow
+  // overlay rects are stored in body-local coordinates so scroll
+  // doesn't drift them.
+  const [highlightMode, setHighlightMode] = useState(false);
+  const [activeHighlight, setActiveHighlight] =
+    useState<ReadThroughHighlight | null>(null);
+  const [dragRects, setDragRects] = useState<
+    ReadThroughHighlight["rects"] | null
+  >(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+
+  // Composer state.
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [composerInstruction, setComposerInstruction] = useState("");
+  const [composerBusy, setComposerBusy] = useState(false);
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [keyboardBottomInset, setKeyboardBottomInset] = useState(0);
+  const composerInputRef = useRef<HTMLInputElement | null>(null);
+  const composerOpenRef = useRef(false);
+  useEffect(() => { composerOpenRef.current = composerOpen; }, [composerOpen]);
+
+  // Track on-screen keyboard so the composer pins flush above it.
+  useEffect(() => {
+    if (!composerOpen) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+      setKeyboardBottomInset(inset);
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, [composerOpen]);
+
+  // Reset composer state whenever it opens/closes.
+  useEffect(() => {
+    if (composerOpen) {
+      setComposerInstruction("");
+      setComposerError(null);
+      setTimeout(() => { composerInputRef.current?.focus(); }, 60);
+    } else {
+      setComposerError(null);
+    }
+  }, [composerOpen]);
+
+  // Reset state when the sheet closes / highlight mode goes off.
+  useEffect(() => {
+    if (!open || !highlightMode) {
+      setActiveHighlight(null);
+      setDragRects(null);
+    }
+  }, [open, highlightMode]);
+
+  // On open, scroll to the initial beat if requested.
+  useEffect(() => {
+    if (!open) return;
+    if (!initialBeatId) return;
+    const t = setTimeout(() => {
+      const host = bodyRef.current;
+      if (!host) return;
+      const anchor = host.querySelector<HTMLElement>(`[data-scene-id="${initialBeatId}"]`);
+      if (anchor) {
+        host.scrollTop = Math.max(0, anchor.offsetTop - 12);
+      }
+      const idx = writtenBeats.findIndex(b => b.id === initialBeatId);
+      if (idx >= 0) setActiveIdx(idx);
+    }, 380);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialBeatId]);
+
+  // Active-scene tracking — set the most-visible scene as active.
+  useEffect(() => {
+    if (!open) return;
+    const host = bodyRef.current;
+    if (!host) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        let best: { idx: number; ratio: number } | null = null;
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const id = (e.target as HTMLElement).dataset.sceneId;
+          if (!id) continue;
+          const idx = writtenBeats.findIndex(b => b.id === id);
+          if (idx < 0) continue;
+          if (!best || e.intersectionRatio > best.ratio) {
+            best = { idx, ratio: e.intersectionRatio };
+          }
+        }
+        if (best) setActiveIdx(best.idx);
+      },
+      { root: host, threshold: [0.15, 0.35, 0.55, 0.75] },
+    );
+    host.querySelectorAll<HTMLElement>("[data-scene-id]").forEach(el => obs.observe(el));
+    return () => obs.disconnect();
+  }, [open, writtenBeats.length]);
+
+  // Submit the composer's instruction against the activeHighlight.
+  // Mirrors ReadThroughSheet.submitComposer — same API action,
+  // same write-back path.
+  async function submitComposer() {
+    if (!activeHighlight || composerBusy) return;
+    const instruction = composerInstruction.trim();
+    if (!instruction) return;
+    setComposerBusy(true);
+    setComposerError(null);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story,
+          action: {
+            type: "rewrite_highlighted_range",
+            payload: {
+              sceneId: activeHighlight.sceneId,
+              selectedText: activeHighlight.text,
+              instruction,
+            },
+          },
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`/api/generate ${res.status}: ${body || "(no body)"}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let fullText = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.type === "text") fullText += msg.value;
+          } catch { /* ignore */ }
+        }
+      }
+      const replacement = parseReplacement(fullText);
+      if (!replacement) throw new Error("AI returned no replacement text.");
+      const sid = activeHighlight.sceneId;
+      const needle = activeHighlight.text;
+      setStory((s) => {
+        const sl2 = getActiveStoryLayerDraft(s);
+        if (!sl2) return s;
+        const writeInto = (arr: Beat[]): Beat[] => arr.map(b =>
+          b.id === sid && b.sceneContent
+            ? { ...b, sceneContent: replaceFirst(b.sceneContent, needle, replacement) }
+            : b,
+        );
+        if (s.projectType === "tv-show") {
+          return updateStoryLayerDraft(s, {
+            episodes: (sl2.episodes ?? []).map(ep => ({ ...ep, beats: writeInto(ep.beats) })),
+          });
+        }
+        return updateStoryLayerDraft(s, { beats: writeInto(sl2.beats) });
+      });
+      setComposerOpen(false);
+      setActiveHighlight(null);
+      setHighlightMode(false);
+    } catch (e) {
+      setComposerError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setComposerBusy(false);
+    }
+  }
+
+  // Walk up from `node` to find the enclosing [data-scene-id].
+  function sceneIdForNode(node: Node): string | null {
+    let el: Node | null = node;
+    while (el) {
+      if (el instanceof HTMLElement && el.dataset.sceneId) return el.dataset.sceneId;
+      el = el.parentNode;
+    }
+    return null;
+  }
+  function toLocalRects(rects: DOMRect[]): ReadThroughHighlight["rects"] {
+    const host = bodyRef.current;
+    if (!host) return [];
+    const base = host.getBoundingClientRect();
+    return rects.map((r) => ({
+      top: r.top - base.top + host.scrollTop,
+      left: r.left - base.left + host.scrollLeft,
+      width: r.width,
+      height: r.height,
+    }));
+  }
+
+  // selectionchange-driven highlighter — same approach as
+  // ReadThroughSheet. Native long-press-and-drag selects, then we
+  // capture the rects, render our own yellow overlay, and clear
+  // the native selection after a debounce.
+  const commitTimerRef = useRef<number | null>(null);
+  const weClearedSelectionRef = useRef(false);
+  useEffect(() => {
+    if (!highlightMode) {
+      setActiveHighlight(null);
+      setDragRects(null);
+      window.getSelection?.()?.removeAllRanges?.();
+      if (commitTimerRef.current != null) {
+        window.clearTimeout(commitTimerRef.current);
+        commitTimerRef.current = null;
+      }
+      return;
+    }
+    const el = bodyRef.current;
+    if (!el) return;
+
+    const onSelChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+        if (weClearedSelectionRef.current) {
+          weClearedSelectionRef.current = false;
+          return;
+        }
+        setDragRects(null);
+        if (!composerOpenRef.current) setActiveHighlight(null);
+        return;
+      }
+      const anchor = sel.anchorNode;
+      const focus = sel.focusNode;
+      if (!anchor || !focus) return;
+      if (!el.contains(anchor) || !el.contains(focus)) return;
+      const anchorSceneId = sceneIdForNode(anchor);
+      if (!anchorSceneId) return;
+      const focusSceneId = sceneIdForNode(focus);
+      let useRange: Range;
+      if (focusSceneId === anchorSceneId) {
+        useRange = sel.getRangeAt(0).cloneRange();
+      } else {
+        const sceneEl = el.querySelector<HTMLElement>(`[data-scene-id="${anchorSceneId}"]`);
+        if (!sceneEl) return;
+        const walker = document.createTreeWalker(sceneEl, NodeFilter.SHOW_TEXT);
+        let last: Text | null = null;
+        while (walker.nextNode()) last = walker.currentNode as Text;
+        if (!last) return;
+        useRange = document.createRange();
+        try {
+          useRange.setStart(anchor, sel.anchorOffset);
+          useRange.setEnd(last, last.length);
+        } catch { return; }
+      }
+      const text = useRange.toString();
+      if (text.trim().length < 2) {
+        setDragRects(null);
+        return;
+      }
+      const localRects = toLocalRects(Array.from(useRange.getClientRects()));
+      setDragRects(localRects);
+      setActiveHighlight({ sceneId: anchorSceneId, text, rects: localRects });
+      if (commitTimerRef.current != null) window.clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = window.setTimeout(() => {
+        commitTimerRef.current = null;
+        const s = window.getSelection();
+        if (!s || s.isCollapsed) return;
+        weClearedSelectionRef.current = true;
+        s.removeAllRanges();
+      }, 350);
+    };
+
+    document.addEventListener("selectionchange", onSelChange);
+    return () => {
+      document.removeEventListener("selectionchange", onSelChange);
+      if (commitTimerRef.current != null) {
+        window.clearTimeout(commitTimerRef.current);
+        commitTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightMode]);
+
+  function scrollToScene(beatId: string) {
+    const host = bodyRef.current;
+    if (!host) return;
+    const el = host.querySelector<HTMLElement>(`[data-scene-id="${beatId}"]`);
+    if (!el) return;
+    host.scrollTo({ top: Math.max(0, el.offsetTop - 12), behavior: "smooth" });
+  }
+  const goPrev = () => { if (activeIdx > 0) scrollToScene(writtenBeats[activeIdx - 1].id); };
+  const goNext = () => { if (activeIdx < writtenBeats.length - 1) scrollToScene(writtenBeats[activeIdx + 1].id); };
+
+  const activeBeat = writtenBeats[activeIdx] ?? null;
+  const slug = (() => {
+    if (!activeBeat) return "SCENE";
+    const m = (activeBeat.sceneContent || "").match(/^\s*(?:INT\.?|EXT\.?|INT\.?\/EXT\.?)\s+[^\n]+/im);
+    return (m?.[0] ?? "SCENE").trim().toUpperCase();
+  })();
+
+  const rectsToShow = dragRects ?? activeHighlight?.rects ?? null;
+  const fullSceneText = activeBeat
+    ? [activeBeat.name, activeBeat.sceneContent].filter(Boolean).join("\n\n")
+    : "";
+
+  return (
+    <>
+      <div className={`sheet-backdrop ${open ? "open" : ""}`} onClick={onClose} />
+      <div className={`sheet sheet-tall script-view-sheet ${open ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="script-view-header">
+          <div className="script-view-count ds-type-main-tab-nav-inactive">
+            SCENE {activeIdx + 1} OF {Math.max(1, writtenBeats.length)}
+          </div>
+          <div className="script-view-title-row">
+            <button
+              type="button"
+              className="script-view-nav-btn"
+              onClick={goPrev}
+              disabled={activeIdx === 0}
+              aria-label="Previous scene"
+            >
+              <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <div className="script-view-title-stack">
+              <div className="script-view-name ds-type-project-card-title">
+                {activeBeat?.name || "Untitled scene"}
+              </div>
+              <div className="script-view-slug ds-type-main-tab-nav-inactive">{slug}</div>
+            </div>
+            <button
+              type="button"
+              className="script-view-nav-btn"
+              onClick={goNext}
+              disabled={activeIdx >= writtenBeats.length - 1}
+              aria-label="Next scene"
+            >
+              <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div className="script-view-actions">
+          <button
+            type="button"
+            className={`script-view-action-btn ${highlightMode ? "active" : ""}`}
+            onClick={() => setHighlightMode(v => !v)}
+            aria-pressed={highlightMode}
+            aria-label={highlightMode ? "Exit highlight mode" : "Highlight & edit with AI"}
+            title={highlightMode ? "Exit highlight mode" : "Highlight & edit with AI"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
+          <SpeakButton
+            mode="script"
+            size="md"
+            text={fullSceneText}
+            characters={charactersDraft.characters}
+            projectType={story.projectType}
+            genres={conceptDraft.settings.genres}
+            title="Read scene aloud"
+          />
+        </div>
+        <div
+          ref={bodyRef}
+          className={`script-view-body ${highlightMode ? "highlighting" : ""}`}
+          tabIndex={0}
+        >
+          {rectsToShow && rectsToShow.length > 0 && (
+            <div className="read-through-hl-layer" aria-hidden>
+              {rectsToShow.map((r, i) => (
+                <div
+                  key={i}
+                  className="read-through-hl-rect"
+                  style={{ top: r.top, left: r.left, width: r.width, height: r.height }}
+                />
+              ))}
+            </div>
+          )}
+          {writtenBeats.length === 0 ? (
+            <div className="caption" style={{ textAlign: "center", padding: "40px 20px" }}>
+              No written scenes yet.
+            </div>
+          ) : (
+            writtenBeats.map(beat => (
+              <div key={beat.id} className="script-view-scene-block" data-scene-id={beat.id}>
+                <pre className="script-view-prose">{beat.sceneContent}</pre>
+              </div>
+            ))
+          )}
+        </div>
+        {activeHighlight && !composerOpen && (
+          <button
+            type="button"
+            className="read-through-hl-cta"
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
+            onClick={() => setComposerOpen(true)}
+          >
+            Change with AI
+          </button>
+        )}
+      </div>
+      {composerOpen && activeHighlight && (
+        <>
+          <div
+            className="read-through-composer-backdrop"
+            onClick={() => { if (!composerBusy) setComposerOpen(false); }}
+          />
+          <div
+            className="read-through-composer"
+            style={{ bottom: keyboardBottomInset }}
+          >
+            <div className="read-through-composer-preview">
+              <span className="read-through-composer-preview-label">Selected</span>
+              <span className="read-through-composer-preview-text">
+                {activeHighlight.text.length > 140
+                  ? activeHighlight.text.slice(0, 140).trimEnd() + "…"
+                  : activeHighlight.text}
+              </span>
+            </div>
+            <div className="read-through-composer-row">
+              <input
+                ref={composerInputRef}
+                type="text"
+                className="read-through-composer-input"
+                placeholder="What should change?"
+                value={composerInstruction}
+                onChange={(e) => setComposerInstruction(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitComposer();
+                  }
+                  if (e.key === "Escape") {
+                    if (!composerBusy) setComposerOpen(false);
+                  }
+                }}
+                disabled={composerBusy}
+                autoCapitalize="sentences"
+                autoCorrect="on"
+              />
+              <button
+                type="button"
+                className="read-through-composer-cancel"
+                onClick={() => setComposerOpen(false)}
+                disabled={composerBusy}
+                aria-label="Cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="read-through-composer-submit"
+                onClick={submitComposer}
+                disabled={composerBusy || !composerInstruction.trim()}
+              >
+                {composerBusy ? "…" : "Rewrite"}
+              </button>
+            </div>
+            {composerError && (
+              <div className="read-through-composer-error" role="alert">
+                {composerError}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

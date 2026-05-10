@@ -8934,13 +8934,43 @@ html[data-design="v2"] .script-view-action-btn {
   cursor: pointer;
   padding: 0;
 }
-/* Body — vertical scroll for long scripts. */
+/* Pencil button in its highlight-mode-on state — inverted so
+   the user has a visible "I am armed" signal. Tap again to
+   exit. */
+html[data-design="v2"] .script-view-action-btn.active {
+  background: var(--ds-color-black);
+  border-color: var(--ds-color-black);
+  color: var(--ds-color-white);
+}
+/* Body — enable native selection only while highlight mode is
+   on. Otherwise the prose reads as static text. */
+html[data-design="v2"] .script-view-body.highlighting {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+}
+/* Hide the iOS blue ::selection paint — our own yellow rect
+   layer is the source of truth. */
+html[data-design="v2"] .script-view-body.highlighting ::selection {
+  background: transparent;
+}
+html[data-design="v2"] .script-view-scene-block {
+  margin-bottom: 28px;
+  position: relative;
+}
+html[data-design="v2"] .script-view-scene-block:last-child {
+  margin-bottom: 0;
+}
+/* Body — vertical scroll for long scripts. `position: relative`
+   so the highlight overlay (.read-through-hl-layer) anchors to
+   the body's coordinate space — same setup as ReadThroughSheet. */
 html[data-design="v2"] .script-view-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 14px 20px 28px;
   -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 html[data-design="v2"] .script-view-prose {
   font-family: "Courier New", Courier, monospace;
