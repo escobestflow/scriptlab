@@ -462,6 +462,11 @@ export function Studio({
   // duration, and an "Edit Scene" CTA that hands off to the full
   // edit sheet via `sceneSheetBeatId`. null = closed.
   const [scenePopupBeatId, setScenePopupBeatId] = useState<string | null>(null);
+  // Where the popup was opened from. "story" = default preview
+  // with prev/next nav + Edit Scene; "script-unwritten" = opened
+  // from the Script tab on an unwritten beat, so the footer
+  // surfaces a single primary "Script Scene" CTA instead.
+  const [scenePopupVariant, setScenePopupVariant] = useState<"story" | "script-unwritten">("story");
   // v2 — Script View sheet (full screenplay prose, prev/next nav).
   // Distinct from scenePopupBeatId because the two surfaces show
   // different views of the same beat: the popup is a lightweight
@@ -2171,7 +2176,10 @@ export function Studio({
               moments={moments}
               moveBeat={moveBeat}
               openExistingScene={openExistingSceneSheet}
-              openScenePopup={(id: string) => setScenePopupBeatId(id)}
+              openScenePopup={(id: string) => {
+                setScenePopupVariant("story");
+                setScenePopupBeatId(id);
+              }}
               openNewScene={openNewSceneSheet}
               run={run}
               busy={busy}
@@ -2206,7 +2214,10 @@ export function Studio({
                 openNewSceneSheet(sorted.length);
               }}
               onGoToStory={() => setSection("story")}
-              openScenePopup={(id: string) => setScenePopupBeatId(id)}
+              openScenePopup={(id: string) => {
+                setScenePopupVariant("script-unwritten");
+                setScenePopupBeatId(id);
+              }}
               openScriptViewSheet={(id: string) => setScriptViewBeatId(id)}
               bgScriptJob={bgScriptJob}
               onStartBackgroundScriptLoop={onStartBackgroundScriptLoop}
@@ -2397,41 +2408,66 @@ export function Studio({
                     ))}
                   </div>
                 )}
-                <div className="scene-popup-edit-row">
+                {scenePopupVariant === "script-unwritten" ? (
+                  /* Opened from the Script tab on an unwritten beat
+                     — replace the read-mode footer with a single
+                     primary Script Scene CTA. Same generate action
+                     the per-row chip fires; closes the popup so the
+                     in-flight scene shows up in the row's spinner
+                     state immediately. */
                   <button
                     type="button"
-                    className="scene-popup-edit"
-                    onClick={goEdit}
+                    className="scene-popup-script-cta"
+                    onClick={() => {
+                      const beatIndex = beats.findIndex(b => b.id === beat.id);
+                      if (beatIndex < 0) return;
+                      setScenePopupBeatId(null);
+                      run(
+                        { type: "generate_scene", payload: { beatIndex } },
+                        `Write · ${beat.name}`,
+                      );
+                    }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                    <span>EDIT SCENE</span>
+                    <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                    <span>Script Scene</span>
                   </button>
-                  <button
-                    type="button"
-                    className="scene-popup-nav-edge prev"
-                    onClick={goPrev}
-                    disabled={idx === 0}
-                    aria-label="Previous scene"
-                  >
-                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
-                      <polyline points="15 18 9 12 15 6" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="scene-popup-nav-edge next"
-                    onClick={goNext}
-                    disabled={idx === total - 1}
-                    aria-label="Next scene"
-                  >
-                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  </button>
-                </div>
+                ) : (
+                  <div className="scene-popup-edit-row">
+                    <button
+                      type="button"
+                      className="scene-popup-edit"
+                      onClick={goEdit}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                      <span>EDIT SCENE</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="scene-popup-nav-edge prev"
+                      onClick={goPrev}
+                      disabled={idx === 0}
+                      aria-label="Previous scene"
+                    >
+                      <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                        <polyline points="15 18 9 12 15 6" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      className="scene-popup-nav-edge next"
+                      onClick={goNext}
+                      disabled={idx === total - 1}
+                      aria-label="Next scene"
+                    >
+                      <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -8863,11 +8899,17 @@ function ScriptTab({
               </button>
               <div className="v2-script-footer">
                 <span className="v2-script-pages ds-type-main-tab-nav-inactive">{pageLabel}</span>
-                {/* Per spec — once a scene is written, no chip sits
-                    next to the page number. The card itself is
-                    tappable and routes to the Script View sheet,
-                    so the chip is redundant for written beats. */}
-                {!isWritten && (
+                {isWritten ? (
+                  /* Written badge — small "Scripted ✓" indicator
+                      that replaces the chip. Card click still
+                      routes to the Script View sheet. */
+                  <span className="v2-script-scripted-flag ds-type-main-tab-nav-inactive">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span>Scripted</span>
+                  </span>
+                ) : (
                   <button
                     type="button"
                     className="add-all-scenes-chip v2-script-scene-chip"

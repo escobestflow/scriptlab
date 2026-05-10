@@ -8815,6 +8815,23 @@ html[data-design="v2"] .v2-script-scene-chip {
   /* All shared styling comes from .add-all-scenes-chip — this
      class only marks the chip for any future per-scene overrides. */
 }
+/* Scripted flag — small "✓ Scripted" badge that replaces the
+   Script Scene chip once a beat is written. Inline-flex with
+   the checkmark glyph + label; chip-label gray color so it
+   reads as a confirmed-state indicator rather than a clickable
+   affordance. */
+html[data-design="v2"] .v2-script-scripted-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ds-color-gray-chip-label);
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+html[data-design="v2"] .v2-script-scripted-flag svg {
+  display: block;
+  flex: 0 0 auto;
+}
 
 /* Right-slot wrapper for the Script tab — Script-All-Scenes chip
    plus the small read-through icon button, sitting on the same
@@ -9149,6 +9166,34 @@ html[data-design="v2"] .scene-popup-edit-row {
   display: flex;
   align-items: stretch;
   width: 100%;
+}
+/* Single primary Script Scene CTA shown when the popup is
+   opened from the Script tab on an unwritten beat. Full-width
+   with the same outline / radius / typography as Edit Scene
+   for visual continuity, just no companion nav buttons. */
+html[data-design="v2"] .scene-popup-script-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  color: var(--ds-color-black);
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  /* Override the .add-all-scenes-chip default chip height (29px). */
+}
+html[data-design="v2"] .scene-popup-script-cta img {
+  width: 11px;
+  height: 14px;
+  display: block;
 }
 html[data-design="v2"] .scene-popup-edit {
   display: inline-flex;
