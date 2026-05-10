@@ -462,6 +462,11 @@ export function Studio({
   // duration, and an "Edit Scene" CTA that hands off to the full
   // edit sheet via `sceneSheetBeatId`. null = closed.
   const [scenePopupBeatId, setScenePopupBeatId] = useState<string | null>(null);
+  // v2 — Script View sheet (full screenplay prose, prev/next nav).
+  // Distinct from scenePopupBeatId because the two surfaces show
+  // different views of the same beat: the popup is a lightweight
+  // preview, the sheet is the prose-reading mode. null = closed.
+  const [scriptViewBeatId, setScriptViewBeatId] = useState<string | null>(null);
   // Character sheet — a single sheet used for BOTH creation and editing.
   // null = closed. "new-char-draft" marker or an existing character id = open.
   const [charSheetCharId, setCharSheetCharId] = useState<string | null>(null);
@@ -2196,6 +2201,7 @@ export function Studio({
               }}
               onGoToStory={() => setSection("story")}
               openScenePopup={(id: string) => setScenePopupBeatId(id)}
+              openScriptViewSheet={(id: string) => setScriptViewBeatId(id)}
               bgScriptJob={bgScriptJob}
               onStartBackgroundScriptLoop={onStartBackgroundScriptLoop}
             />
@@ -2423,6 +2429,95 @@ export function Studio({
               </div>
             </div>
           </div>
+        );
+      })()}
+
+      {/* v2 Script View sheet — full-screenplay-prose read mode
+          opened when a written scene row is tapped. Prev/next
+          navigate between WRITTEN beats only (so the user can
+          page through the actual script); body content is
+          monospace screenplay text that scrolls vertically. */}
+      {(() => {
+        if (scriptViewBeatId === null) return null;
+        const writtenBeats = beats.filter(b => b.status === "written" && (b.sceneContent || "").trim().length > 0);
+        const idx = writtenBeats.findIndex(b => b.id === scriptViewBeatId);
+        const beat = idx >= 0 ? writtenBeats[idx] : null;
+        if (!beat) return null;
+        const total = writtenBeats.length;
+        // Slug — same parse as the row.
+        const slugMatch = (beat.sceneContent || "").match(/^\s*(?:INT\.?|EXT\.?|INT\.?\/EXT\.?)\s+[^\n]+/im);
+        const slug = (slugMatch?.[0] ?? "SCENE").trim().toUpperCase();
+        const closeSheet = () => setScriptViewBeatId(null);
+        const goPrev = () => { if (idx > 0) setScriptViewBeatId(writtenBeats[idx - 1].id); };
+        const goNext = () => { if (idx < total - 1) setScriptViewBeatId(writtenBeats[idx + 1].id); };
+        const goEdit = () => {
+          setScriptViewBeatId(null);
+          openExistingSceneSheet(beat.id);
+        };
+        return (
+          <>
+            <div className="sheet-backdrop open script-view-backdrop" onClick={closeSheet} />
+            <div className="sheet sheet-tall open script-view-sheet">
+              <div className="sheet-handle" />
+              <div className="script-view-header">
+                <div className="script-view-count ds-type-main-tab-nav-inactive">SCENE {idx + 1} OF {total}</div>
+                <div className="script-view-title-row">
+                  <button
+                    type="button"
+                    className="script-view-nav-btn"
+                    onClick={goPrev}
+                    disabled={idx === 0}
+                    aria-label="Previous written scene"
+                  >
+                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                  </button>
+                  <div className="script-view-title-stack">
+                    <div className="script-view-name ds-type-project-card-title">{beat.name || "Untitled scene"}</div>
+                    <div className="script-view-slug ds-type-main-tab-nav-inactive">{slug}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="script-view-nav-btn"
+                    onClick={goNext}
+                    disabled={idx === total - 1}
+                    aria-label="Next written scene"
+                  >
+                    <svg viewBox="0 0 24 24" style={{ width: 22, height: 22, stroke: "currentColor", strokeWidth: 1.8, fill: "none" }} aria-hidden="true">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div className="script-view-actions">
+                <button
+                  type="button"
+                  className="script-view-action-btn"
+                  onClick={goEdit}
+                  aria-label="Edit scene"
+                  title="Edit scene"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+                <SpeakButton
+                  mode="script"
+                  size="md"
+                  text={beat.sceneContent || ""}
+                  characters={getActiveCharactersDraft(story).characters}
+                  projectType={story.projectType}
+                  genres={getActiveConceptDraft(story).settings.genres}
+                  title="Read scene aloud"
+                />
+              </div>
+              <div className="script-view-body" tabIndex={0}>
+                <pre className="script-view-prose">{beat.sceneContent || ""}</pre>
+              </div>
+            </div>
+          </>
         );
       })()}
 
@@ -7979,6 +8074,7 @@ function ScriptTab({
   onAddScene,
   onGoToStory,
   openScenePopup,
+  openScriptViewSheet,
   runGenerateAll,
   bgScriptJob,
   onStartBackgroundScriptLoop,
@@ -8020,6 +8116,10 @@ function ScriptTab({
   /** v2 only — open the lightweight scene preview popup. Same prop
    *  shape as StoryTab; ScriptTab forwards a row click to it. */
   openScenePopup?: (beatId: string) => void;
+  /** v2 only — open the full-prose Script View sheet (read mode
+   *  with prev/next nav, scrollable screenplay text). Fired by
+   *  written scene rows / chips. */
+  openScriptViewSheet?: (beatId: string) => void;
   /** Wrap a Create-all action with the Studio-level scrim + sheet-close
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
@@ -8248,7 +8348,14 @@ function ScriptTab({
               <button
                 type="button"
                 className="v2-script-card-tap"
-                onClick={() => openScenePopup?.(beat.id)}
+                onClick={() => {
+                  // Written scenes open the new full-prose Script
+                  // View sheet (read mode); unwritten scenes still
+                  // route to the lightweight preview popup so the
+                  // user has the same Edit-Scene affordance there.
+                  if (isWritten) openScriptViewSheet?.(beat.id);
+                  else openScenePopup?.(beat.id);
+                }}
               >
                 <div className="v2-script-slug ds-type-main-tab-nav-inactive">{slug}</div>
                 <div className="v2-script-name ds-type-project-card-title">{beat.name || "Untitled scene"}</div>
@@ -8260,17 +8367,33 @@ function ScriptTab({
                   type="button"
                   className="add-all-scenes-chip v2-script-scene-chip"
                   onClick={() => {
+                    if (isWritten) {
+                      // Written → tap chip = open the Script View
+                      // sheet (same target as tapping the card).
+                      openScriptViewSheet?.(beat.id);
+                      return;
+                    }
                     if (busy || isInflight || isQueued) return;
                     run(
                       { type: "generate_scene", payload: { beatIndex: i } },
-                      `${isWritten ? "Rewrite" : "Write"} · ${beat.name}`,
+                      `Write · ${beat.name}`,
                     );
                   }}
-                  disabled={busy || isInflight || isQueued}
+                  disabled={!isWritten && (busy || isInflight || isQueued)}
                 >
-                  <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                  <img
+                    src={isWritten ? "/icon-script-sml.svg" : "/icon-ai-button.svg"}
+                    alt=""
+                    aria-hidden="true"
+                    width={isWritten ? 10.86 : undefined}
+                    height={isWritten ? 11.27 : undefined}
+                  />
                   <span>
-                    {isInflight ? "Scripting…" : isQueued ? "Queued" : "Script Scene"}
+                    {isWritten
+                      ? "View Script"
+                      : isInflight ? "Scripting…"
+                      : isQueued ? "Queued"
+                      : "Script Scene"}
                   </span>
                 </button>
               </div>
