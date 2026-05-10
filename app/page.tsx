@@ -364,6 +364,10 @@ export default function Page() {
   const [easyDirectionOpen, setEasyDirectionOpen] = useState(false);
   const [easyDirectionText, setEasyDirectionText] = useState("");
   const [easyDirectionIdeaIds, setEasyDirectionIdeaIds] = useState<string[]>([]);
+  // Active type filter on the Shape-your-story idea picker. null
+  // = "first type with ideas, computed at render time" so the UI
+  // doesn't need a useEffect to bootstrap on open.
+  const [easyDirectionTypeFilter, setEasyDirectionTypeFilter] = useState<Moment["type"] | null>(null);
   // Background script-generation job. Easy mode hands off to this after
   // scene 1 lands so the user can read scene 1 in the Script tab while
   // scenes 2..N stream in. `inflightBeatId` is the beat currently being
@@ -1116,6 +1120,7 @@ export default function Page() {
     setEasyDirectionOpen(false);
     setEasyDirectionText("");
     setEasyDirectionIdeaIds([]);
+    setEasyDirectionTypeFilter(null);
     await runEasyModeWithSeed(seed, userDirection);
   }
 
@@ -1803,6 +1808,26 @@ export default function Page() {
           which flows through runEasyMode → expandFullConcept →
           generate_full_concept's prompt. */}
       {easyDirectionOpen && (() => {
+        // Pretty type labels for the idea-picker chip row. Mirrors
+        // MOMENT_TYPE_LABELS in components/Studio.tsx — kept in sync
+        // by hand since both consumers iterate the Moment["type"]
+        // union exhaustively.
+        const TYPE_LABELS: Record<Moment["type"], string> = {
+          scene: "Scene", dialogue: "Dialogue", joke: "Joke",
+          memory: "Memory", character: "Character", image: "Image",
+          note: "Note", dream: "Dream",
+        };
+        const typeOrder: Moment["type"][] = ["scene", "dialogue", "joke", "memory", "character", "image", "note", "dream"];
+        const typesWithIdeas = typeOrder.filter(t => moments.some(m => m.type === t));
+        const activeTypeFilter = easyDirectionTypeFilter
+          ?? (typesWithIdeas[0] ?? null);
+        const ideasOfActiveType = activeTypeFilter
+          ? moments.filter(m => m.type === activeTypeFilter)
+          : [];
+        const linkedMoments = easyDirectionIdeaIds
+          .map(id => moments.find(m => m.id === id))
+          .filter((m): m is Moment => !!m);
+
         const toggleIdea = (id: string) => {
           setEasyDirectionIdeaIds(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id],
@@ -1810,16 +1835,13 @@ export default function Page() {
         };
         const buildDirection = () => {
           const text = easyDirectionText.trim();
-          const picked = easyDirectionIdeaIds
-            .map(id => moments.find(m => m.id === id))
-            .filter((m): m is Moment => !!m);
-          if (!text && picked.length === 0) return undefined;
+          if (!text && linkedMoments.length === 0) return undefined;
           const parts: string[] = [];
           if (text) parts.push(text);
-          if (picked.length > 0) {
+          if (linkedMoments.length > 0) {
             parts.push(
               "Saved ideas the user wants woven in:",
-              ...picked.map(m => `- (${m.type}) ${m.text}`),
+              ...linkedMoments.map(m => `- (${m.type}) ${m.text}`),
             );
           }
           return parts.join("\n\n");
@@ -1829,8 +1851,10 @@ export default function Page() {
           // creation — clear the draft so reopening "+" starts
           // from a fresh seed instead of resuming step 3.
           setEasyDirectionOpen(false);
+          setEasyDirectionTypeFilter(null);
           closeCreateModal();
         };
+
         return (
           <>
             <div
@@ -1864,27 +1888,72 @@ export default function Page() {
                   rows={4}
                   style={{ width: "100%", marginBottom: 18 }}
                 />
-                {moments.length > 0 && (
+                {moments.length === 0 ? (
+                  <div className="caption">
+                    No saved ideas yet — add some on the Ideas tab to
+                    fold them into auto-generated projects.
+                  </div>
+                ) : (
                   <>
-                    <div className="eyebrow" style={{ marginBottom: 8 }}>
-                      Pick from your ideas {easyDirectionIdeaIds.length > 0 && `· ${easyDirectionIdeaIds.length} selected`}
+                    {linkedMoments.length > 0 && (
+                      <div className="beat-moments" style={{ marginBottom: 12 }}>
+                        {linkedMoments.map(m => (
+                          <div key={m.id} className="linked-moment">
+                            <div className="moment-type-dot" />
+                            <div className="moment-preview">{m.text}</div>
+                            <button
+                              className="btn-icon"
+                              style={{ width: 28, height: 28, fontSize: 14 }}
+                              onClick={() => toggleIdea(m.id)}
+                              aria-label="Unlink"
+                            >&#10005;</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="eyebrow" style={{ marginBottom: 8 }}>Type</div>
+                    <div className="chip-row" style={{ marginBottom: 12 }}>
+                      {typesWithIdeas.map(t => (
+                        <Selector
+                          key={t}
+                          selected={activeTypeFilter === t}
+                          onClick={() => setEasyDirectionTypeFilter(t)}
+                        >
+                          {TYPE_LABELS[t]}
+                        </Selector>
+                      ))}
                     </div>
-                    <div className="easy-direction-ideas">
-                      {moments.slice(0, 30).map(m => {
-                        const selected = easyDirectionIdeaIds.includes(m.id);
-                        return (
-                          <button
-                            key={m.id}
-                            type="button"
-                            className={`easy-direction-idea ${selected ? "selected" : ""}`}
-                            onClick={() => toggleIdea(m.id)}
-                          >
-                            <span className="easy-direction-idea-type">{m.type}</span>
-                            <span className="easy-direction-idea-text">{m.text}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+
+                    {activeTypeFilter && (
+                      <>
+                        <div className="eyebrow" style={{ marginBottom: 8 }}>
+                          {TYPE_LABELS[activeTypeFilter]}s · {ideasOfActiveType.length}
+                        </div>
+                        <div>
+                          {ideasOfActiveType.map(m => {
+                            const isLinked = easyDirectionIdeaIds.includes(m.id);
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                className={`moment-picker-item ${isLinked ? "linked" : ""}`}
+                                onClick={() => toggleIdea(m.id)}
+                                style={{ width: "100%", textAlign: "left" }}
+                              >
+                                <div style={{ flex: 1 }}>
+                                  <div className="mp-text">{m.text}</div>
+                                  {m.tags.length > 0 && (
+                                    <div className="mp-tags">{m.tags.map(t => <span key={t}>{t}</span>)}</div>
+                                  )}
+                                </div>
+                                {isLinked && <div className="mp-linked-badge">Linked</div>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -1895,7 +1964,7 @@ export default function Page() {
                   block
                   onClick={() => finishCreateEasy(buildDirection())}
                 >
-                  Create With AI
+                  Finish &amp; Create with AI
                 </Button>
               </div>
             </div>
