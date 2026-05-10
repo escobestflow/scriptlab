@@ -8234,10 +8234,10 @@ function ScriptTab({
         const isQueued = !isInflight && bgScriptJob?.pendingBeatIds.has(beat.id) === true;
         return (
           <div key={beat.id} className="v2-script-row">
-            <div className="v2-beat-number-col" aria-hidden="true">
-              <span className={`v2-beat-number-badge ${isWritten ? "written" : ""}`}>{i + 1}</span>
-            </div>
             <div className="card v2-script-card beat-card">
+              <span className={`v2-script-number-badge ${isWritten ? "written" : ""}`} aria-hidden="true">
+                {i + 1}
+              </span>
               <button
                 type="button"
                 className="v2-script-options"

@@ -8611,38 +8611,24 @@ html[data-design="v2"] .attr-inline-text-input:disabled {
    sheet so the two flows look identical. No bespoke styles needed. */
 
 /* ── V2 Script tab — populated scene rows ─────────────────────
-   Per design reference: numbered timeline column on the left
-   (same badge + dotted line as Story), white card on the right
-   with a slug line, big serif title, body summary, and a footer
-   with page-range + a per-scene "Script Scene" AI chip. Reuses
-   the .v2-beat-number-col + .v2-beat-number-badge from Story so
-   the timeline aesthetic stays consistent across both layers. */
+   Per design reference: number badge sits INSIDE the card's
+   top-left (32x32, not in a separate left column), then slug
+   line, big serif title, body summary, footer with page-range +
+   "Script Scene" AI chip. Card padding-left makes room for the
+   absolutely-positioned badge so the slug/title/body all start
+   to its right. */
 html[data-design="v2"] .v2-script-row {
-  display: flex;
-  align-items: stretch;
-  gap: 18px;
   margin-bottom: 14px;
   margin-left: -2px;
   margin-right: -2px;
   position: relative;
-  /* No fixed height — the card grows to fit body text + footer. */
 }
-html[data-design="v2"] .v2-script-row .v2-beat-number-col {
-  /* Pin the badge to the card top instead of vertical-center, so
-     it lines up with the slug line ("INT. APARTMENT - NIGHT"). */
-  justify-content: flex-start;
-  padding-top: 18px;
-}
-html[data-design="v2"] .v2-script-row:last-child .v2-beat-number-col::before {
-  display: none;
-}
-/* Card surface — white tile, soft outline, 18px radius. Matches
-   the Story card style; differs in NOT having a fixed height. */
+/* Card surface — white tile, soft outline, 18px radius. Tall
+   left padding (74 = 20 outer + 32 badge + 22 gap) reserves
+   room for the absolute-positioned number badge. */
 html[data-design="v2"] .beat-card.v2-script-card {
-  flex: 1 1 auto;
-  min-width: 0;
   margin: 0;
-  padding: 16px 16px 14px;
+  padding: 20px 20px 18px 74px;
   border-radius: 18px;
   background: var(--ds-color-white);
   border: 0.7px solid var(--ds-color-gray-outline);
@@ -8653,10 +8639,34 @@ html[data-design="v2"] .beat-card.v2-script-card {
   display: flex;
   flex-direction: column;
 }
+/* Number badge — 32x32 circle pinned to the card's top-left. */
+html[data-design="v2"] .v2-script-number-badge {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 0.7px solid var(--ds-color-gray-outline);
+  background: var(--ds-color-white);
+  color: var(--ds-color-gray-chip-label);
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+html[data-design="v2"] .v2-script-number-badge.written {
+  background: var(--ds-color-black);
+  border-color: var(--ds-color-black);
+  color: var(--ds-color-white);
+}
 html[data-design="v2"] .v2-script-options {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 22px;
+  right: 18px;
   width: 24px;
   height: 24px;
   border: 0;
@@ -8683,21 +8693,25 @@ html[data-design="v2"] .v2-script-card-tap {
   width: 100%;
   /* Reserve room on the right so the absolute options icon never
      overlaps the title text on narrow viewports. */
-  padding-right: 24px;
+  padding-right: 28px;
 }
 html[data-design="v2"] .v2-script-slug {
   color: var(--ds-color-gray-chip-label);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  /* The slug aligns vertically with the badge's center-ish so the
+     row reads as a unit. Padding on the card top (20) plus this
+     0 margin-top keeps the slug at exactly card-top + 20, which
+     lines up with the badge center (badge top 20 + half height
+     16 = center 36; slug baseline lands ~24 below card-top, so
+     close enough that they read as one row). */
 }
 html[data-design="v2"] .v2-script-name {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
   color: var(--ds-color-black);
 }
 html[data-design="v2"] .v2-script-summary {
   margin: 0 0 14px;
   color: var(--ds-color-black);
-  /* Clamp to 3 lines so multi-paragraph beats don't make the card
-     enormous; trailing ellipsis on overflow. */
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -8711,8 +8725,6 @@ html[data-design="v2"] .v2-script-footer {
 }
 html[data-design="v2"] .v2-script-pages {
   color: var(--ds-color-gray-chip-label);
-  /* Override the uppercase from ds-type-main-tab-nav-inactive —
-     "p. 1 - 8" reads better mixed-case than "P. 1 - 8". */
   text-transform: none;
   letter-spacing: 0.04em;
 }
