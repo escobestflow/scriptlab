@@ -6608,11 +6608,25 @@ html[data-design="v2"] .projects-tab-heading + .ds-btn {
 html[data-design="v2"] .projects-empty {
   background-image: url("/v2/unfold-mobile-bg-final-final.png");
   background-size: cover;
-  background-position: center;
+  /* `fixed` anchors the image to the viewport, not the element —
+     so even if the page does scroll, the door / floor stay put.
+     Combined with the :has(.projects-empty) override on the scroll
+     container below (locks vertical overflow), the empty-state
+     surface reads as a non-scrolling poster. */
+  background-attachment: fixed;
+  /* Shift the graphic up 80px from its natural vertical center
+     so the door + horizon land higher in the frame. */
+  background-position: center calc(50% - 80px);
   background-repeat: no-repeat;
   /* Stretch to the visible viewport between top nav + tab bar so the
      bg image fills the screen. dvh handles iOS dynamic toolbars. */
   min-height: 100dvh;
+  /* Pull the element out of the parent .screen-scroll's 20px
+     horizontal padding so the bg image extends edge-to-edge of
+     the viewport. Without these the bg only painted within a
+     `viewport-40` box and the door looked inset on each side. */
+  margin-left: -20px;
+  margin-right: -20px;
   /* Bottom padding clears the fixed tab bar so the CTA isn't hidden;
      flex-end anchors the content stack to the lower portion of the
      screen, sitting on top of the floor area of the asset. */
@@ -6622,6 +6636,13 @@ html[data-design="v2"] .projects-empty {
   align-items: center;
   justify-content: flex-end;
   text-align: center;
+}
+/* Lock vertical scroll on the screen-scroll port when it's
+   rendering the empty Projects state — the BG image is fixed
+   to the viewport, so allowing scroll would let the content
+   stack slide while the door stays still. */
+html[data-design="v2"] .screen-scroll:has(.projects-empty) {
+  overflow: hidden;
 }
 /* Title: Poynter Oldstyle Display, single-line at mobile widths.
    Spec'd `ds-type-empty` is 34px which wraps "Your story starts here"
