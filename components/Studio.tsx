@@ -7258,6 +7258,16 @@ function CharacterEditForm({
         </div>
       </AttrRow>
 
+      {/* Age — free-text. Sits between Gender and Role per the
+          creation flow's natural ordering. Accepts numerics ("26")
+          and language ("around 30", "ancient"). */}
+      <TextAttrRow
+        label="Age"
+        value={ch.age ?? ""}
+        placeholder="Add an age"
+        onChange={v => onUpdate({ age: v })}
+      />
+
       {/* Role — chip selector matching Concept tab (Genre, etc). */}
       <AttrRow
         label="Role"
@@ -7279,13 +7289,19 @@ function CharacterEditForm({
         </div>
       </AttrRow>
 
-      {/* Archetype — 20 presets + custom input + AI */}
-      <div className="char-archetype-block">
-        <div className="char-archetype-header">
-          <span className="char-archetype-label">Archetype</span>
-          {ch.archetype && <span className="char-archetype-current">{ch.archetype}</span>}
-          <AIWandButton onClick={() => generateCharacterField("archetype")} loading={aiBusy === "archetype"} />
-        </div>
+      {/* Archetype — same AttrRow treatment as Role/Gender so the
+          collapsed state shows the current pick as a pill and the
+          AI wand sits beside the label. Custom-archetype input
+          stays in the expanded body alongside the preset chips. */}
+      <AttrRow
+        label="Archetype"
+        values={ch.archetype ? [ch.archetype.toUpperCase()] : undefined}
+        placeholder="Pick an archetype"
+        expanded={openAttr === "archetype"}
+        onToggle={() => toggleAttr("archetype")}
+        ai={() => generateCharacterField("archetype")}
+        aiLoading={aiBusy === "archetype"}
+      >
         <div className="chip-row">
           {ARCHETYPE_PRESETS.map(a => (
             <Selector key={a} type="button"
@@ -7329,7 +7345,7 @@ function CharacterEditForm({
             </Button>
           </div>
         )}
-      </div>
+      </AttrRow>
 
       <TextAttrRow
         label="Backstory"
@@ -8754,13 +8770,22 @@ function SceneEditForm({
         </div>
       )}
 
-      {/* Scene name */}
-      <TextAttrRow
-        label="Scene name"
-        value={beat.name}
-        placeholder="Add a scene name"
-        onChange={v => onUpdate({ name: v })}
-      />
+      {/* Scene name — inline layout: input sits to the right of the
+          "Scene name" label rather than dropping below it. The
+          surrounding .attr-row chrome is preserved so this row reads
+          as a sibling of the chip-pickers below. */}
+      <div className="attr-row attr-row-inline-input">
+        <div className="attr-row-header">
+          <span className="attr-label">Scene name</span>
+          <input
+            type="text"
+            className="attr-inline-text-input"
+            value={beat.name}
+            onChange={e => onUpdate({ name: e.target.value })}
+            placeholder="Add a scene name"
+          />
+        </div>
+      </div>
 
       {/* Linked idea — two-stage picker. Header pills summarize what's
           already linked by type. Body lists currently-linked ideas

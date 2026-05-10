@@ -53,6 +53,7 @@ function normalizeCharacter(c: any): Character {
     role: c.role || "",
     archetype: c.archetype || "",
     gender: typeof c.gender === "string" && c.gender ? c.gender : undefined,
+    age: typeof c.age === "string" && c.age.trim() ? c.age : undefined,
     backstory: c.backstory || "",
     motivations: c.motivations || "",
     flaws: c.flaws || "",

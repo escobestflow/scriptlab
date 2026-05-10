@@ -118,6 +118,10 @@ export interface Character {
    *  Populated either by direct user selection, or by AI auto-detect
    *  on sheet-close when the user didn't set it explicitly. */
   gender?: CharacterGender;
+  /** Optional — free-text age. Accepts numerics ("26") and language
+   *  ("around 30", "ancient"). Lives between gender and role in the
+   *  edit form's flow. Empty/missing = unset. */
+  age?: string;
   backstory: string;
   motivations: string;
   flaws: string;
