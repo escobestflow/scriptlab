@@ -8855,23 +8855,39 @@ html[data-design="v2"] .v2-script-actions {
   align-items: center;
   gap: 8px;
 }
+/* Download / send chip in the Script tab's layer-bar. Two
+   states driven by the .is-active modifier:
+     • inactive (default) — light fill (gray-chip-fill), muted
+       glyph (gray-chip-label). Communicates "not yet ready":
+       the user hasn't scripted every scene.
+     • active (.is-active) — dark fill (gray-dark-fill), white
+       glyph. Communicates "ready to download / send". */
 html[data-design="v2"] .v2-script-readthrough-btn {
   width: 36px;
   height: 29px;
   border-radius: 5px;
-  background: var(--ds-color-gray-lightest);
+  background: var(--ds-color-gray-chip-fill);
   border: 0;
   box-shadow:
     inset 0 0 0 0.7px var(--ds-color-gray-outline),
     0 0 4px 0 rgba(0, 0, 0, 0.09);
-  color: var(--ds-color-black);
+  color: var(--ds-color-gray-chip-label);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  transition: background 160ms var(--ease, ease), color 160ms var(--ease, ease);
 }
-html[data-design="v2"] .v2-script-readthrough-btn:active {
+html[data-design="v2"] .v2-script-readthrough-btn.is-active {
+  background: var(--ds-color-gray-dark-fill);
+  color: var(--ds-color-white);
+  cursor: pointer;
+}
+html[data-design="v2"] .v2-script-readthrough-btn:disabled {
+  cursor: default;
+}
+html[data-design="v2"] .v2-script-readthrough-btn.is-active:active {
   transform: scale(0.97);
 }
 

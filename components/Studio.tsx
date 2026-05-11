@@ -8803,21 +8803,31 @@ function ScriptTab({
         <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
         <span>{genBusy || bgScriptJob ? "Scripting…" : "Script All Scenes"}</span>
       </button>
-      {hasProducedScript && (
-        <button
-          type="button"
-          className="v2-script-readthrough-btn"
-          onClick={onOpenReadThrough}
-          aria-label="Read-through"
-          title="Open read-through"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-        </button>
-      )}
+      {(() => {
+        // Download / send chip. Active only when every beat in
+        // the active draft has prose written. The visual style
+        // switches via the `.is-active` class — dark fill +
+        // white glyph when ready to download, light fill +
+        // muted glyph otherwise. Disabled state is a no-op
+        // click (the action itself isn't wired yet).
+        const allScripted = hasBeats && writtenCount === beats.length;
+        return (
+          <button
+            type="button"
+            className={`v2-script-readthrough-btn ${allScripted ? "is-active" : ""}`}
+            onClick={allScripted ? onOpenReadThrough : undefined}
+            disabled={!allScripted}
+            aria-label={allScripted ? "Download or send the script" : "Script every scene to enable download"}
+            title={allScripted ? "Download / send" : "Script every scene to enable"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </button>
+        );
+      })()}
     </div>
   ) : null;
 
