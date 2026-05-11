@@ -6398,25 +6398,25 @@ html[data-design="v2"] .ds-image-shimmer.is-dark::after {
 }
 
 /* ── Populated Ideas tab top-of-viewport mask ──────────────────────
-   Fixed slab in app-background color, pinned to the viewport top.
-   Sits above the scroll content (list visibly slides under it) and
-   below the topbar buttons (z:30) so menu / add stay tappable. The
-   topbar's own background is transparent in v2, so this slab
-   effectively backs the topbar area + the heading row + the search
-   bar with a solid surface — the search bar reads as a fixed-feel
-   element on the gray band, and list rows scroll under everything.
-   Height = safe-area + 230px is enough to cover through the search
-   bar's bottom edge on every supported viewport:
-     safe-area + 55 (topbar) + 25 (heading marginTop)
-     + 47 (heading) + 20 (heading marginBottom)
-     + 56 (search bar) + 18 (search marginBottom)
-     = safe-area + 221px (+ ~9px buffer). */
+   Fixed 100px slab in app-background color, pinned to the viewport
+   top. Sits above the scroll content (the list visibly slides under
+   it) and below the topbar buttons (z:30) so menu / add stay
+   tappable. The topbar's own background is transparent in v2, so
+   this slab backs the topbar area + first ~45px of content with a
+   solid surface; the heading / search bar / filter pills sit BELOW
+   the mask in the page flow and remain visible.
+
+   Rendered OUTSIDE .page-enter at the .app-content level — the
+   `.page-enter` wrapper's residual `transform: translateY(0)` (from
+   its `animation: pageIn ... both` rule) would otherwise trap
+   position:fixed to that ancestor and the mask would scroll with
+   the content. */
 html[data-design="v2"] .v2-ideas-top-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: calc(env(safe-area-inset-top, 0px) + 230px);
+  height: 100px;
   background: var(--ds-color-app-background);
   z-index: 25;
   pointer-events: none;

@@ -1602,6 +1602,18 @@ export default function Page() {
             <div style={{ width: 44 }} />
           )}
         </div>
+        {/* Ideas-tab top mask — rendered OUTSIDE the .page-enter
+            wrapper because .page-enter has a residual `transform:
+            translateY(0)` (animation fill-mode: both) that creates a
+            containing block, which would trap position:fixed
+            descendants inside the scrolling region. Mounted as a
+            sibling of .screen-scroll so the mask truly pins to the
+            viewport. Only renders on the populated Ideas tab in v2;
+            forceEmptyState (dev toggle) is honored so the empty
+            state's door-graphic isn't clashed with a gray slab. */}
+        {isV2 && mainTab === "moments" && !forceEmptyState && moments.length > 0 && (
+          <div className="v2-ideas-top-mask" aria-hidden="true" />
+        )}
         <div className="screen-scroll" key={mainTab}>
           <div className="page-enter">
             {mainTab === "projects" && (
@@ -3515,14 +3527,10 @@ function MomentsTab({
 
   return (
     <>
-      {/* Top-of-screen mask, v2 only. Paints a 100px-tall band in the
-          page background color, fixed at the viewport top. Sits ABOVE
-          the scroll content so the list visibly slides under it, and
-          BELOW the topbar's menu / add buttons so those stay tappable.
-          Only rendered on the populated Ideas tab — the empty state's
-          door-graphic already extends to the top edge and would clash
-          with a same-color slab on top of it. */}
-      {isV2 && <div className="v2-ideas-top-mask" aria-hidden="true" />}
+      {/* Top-of-screen mask is rendered at the .app-content level
+          (outside .screen-scroll's .page-enter wrapper) to escape the
+          containing-block trap that .page-enter's residual transform
+          creates for position:fixed descendants. See app/page.tsx. */}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 - (isV2 ? 15 : 0) }}>
         <div className="display ideas-tab-heading ds-type-tab-header">Ideas</div>
         <Button
