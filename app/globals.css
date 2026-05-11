@@ -6614,12 +6614,11 @@ html[data-design="v2"] .projects-empty {
      container below (locks vertical overflow), the empty-state
      surface reads as a non-scrolling poster. */
   background-attachment: fixed;
-  /* Graphic vertical position. Was at -80 (up 80 from center);
-     now +40 (down 40 from center) — net of -80 → +40 is the
-     "down 120px" shift the user asked for, landing the door
-     lower in the frame so the title + sub-copy stack reads
-     directly above it. */
-  background-position: center calc(50% + 40px);
+  /* Graphic vertical position. Tuning chain: -80 → +40 → +10.
+     Latest -30 lifts the door a hair so the new (taller)
+     ds-type-empty-header title + the lifted copy block don't
+     crowd against it. */
+  background-position: center calc(50% + 10px);
   background-repeat: no-repeat;
   /* Stretch to the visible viewport between top nav + tab bar so the
      bg image fills the screen. dvh handles iOS dynamic toolbars. */
@@ -6632,8 +6631,10 @@ html[data-design="v2"] .projects-empty {
   margin-right: -20px;
   /* Bottom padding clears the fixed tab bar so the CTA isn't hidden;
      flex-end anchors the content stack to the lower portion of the
-     screen, sitting on top of the floor area of the asset. */
-  padding: 0 20px 130px;
+     screen, sitting on top of the floor area of the asset.
+     +48px (130 → 178) lifts the title + body + Get Started stack
+     up the screen, giving the door more breathing room above. */
+  padding: 0 20px 178px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6647,16 +6648,11 @@ html[data-design="v2"] .projects-empty {
 html[data-design="v2"] .screen-scroll:has(.projects-empty) {
   overflow: hidden;
 }
-/* Title: Poynter Oldstyle Display, single-line at mobile widths.
-   Spec'd `ds-type-empty` is 34px which wraps "Your story starts here"
-   onto two lines on a 360-px viewport — the comp shows it on one
-   line, so we step down to 28 mobile / 36 desktop. */
+/* Title typography now comes from the `.ds-type-empty-header`
+   token (Poynter / 400 / 34 / line-height 1) applied on the JSX.
+   This rule only owns layout (margin); the desktop bump below
+   has been dropped since the token handles its own scaling. */
 html[data-design="v2"] .projects-empty-title {
-  font-family: var(--ds-font-display);
-  font-weight: 400;
-  font-size: 28px;
-  line-height: 1.1;
-  letter-spacing: 0;
   margin: 0 0 8px;
 }
 /* Subtitle copy on v2 — Lato body weight + the gray-chip-label token
@@ -6669,11 +6665,8 @@ html[data-design="v2"] .projects-empty-sub {
   line-height: 1.55;
   margin: 6px 0 26px;
 }
-@media (min-width: 1440px) {
-  html[data-design="v2"] .projects-empty-title {
-    font-size: 36px;
-  }
-}
+/* Desktop title scaling is now owned by the `.ds-type-empty-header`
+   token itself — no per-class media-query override needed here. */
 
 /* Tabbar — white background, swap to v2 icons, apply main-tab-nav
    type tokens to labels. Uses content: url() to replace the <img>

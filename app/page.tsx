@@ -2722,7 +2722,7 @@ function ProjectsTab({
         {/* v1: rotating poster-stack illustration. v2: the door graphic is
              painted as the screen background via CSS, no inline element. */}
         {!isV2 && <EmptyPosterStack />}
-        <h1 className="projects-empty-title">
+        <h1 className="projects-empty-title ds-type-empty-header">
           Your story starts here
         </h1>
         <p className="projects-empty-sub">
