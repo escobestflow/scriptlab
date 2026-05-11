@@ -8818,10 +8818,11 @@ html[data-design="v2"] .v2-script-footer {
   justify-content: space-between;
   gap: 12px;
 }
+/* Page-range label sits next to the per-scene chip in the
+   footer. Typography from `.ds-type-body`; we just dim the
+   color to gray-chip-label so it reads as secondary info. */
 html[data-design="v2"] .v2-script-pages {
   color: var(--ds-color-gray-chip-label);
-  text-transform: none;
-  letter-spacing: 0.04em;
 }
 /* Per-scene chip — same fill / outline / shadow as the bulk
    "Script All Scenes" chip in the layer-bar's right slot. */
@@ -8829,23 +8830,11 @@ html[data-design="v2"] .v2-script-scene-chip {
   /* All shared styling comes from .add-all-scenes-chip — this
      class only marks the chip for any future per-scene overrides. */
 }
-/* Scripted flag — small "✓ Scripted" badge that replaces the
-   Script Scene chip once a beat is written. Inline-flex with
-   the checkmark glyph + label; chip-label gray color so it
-   reads as a confirmed-state indicator rather than a clickable
-   affordance. */
-html[data-design="v2"] .v2-script-scripted-flag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--ds-color-gray-chip-label);
-  text-transform: none;
-  letter-spacing: 0.04em;
-}
-html[data-design="v2"] .v2-script-scripted-flag svg {
-  display: block;
-  flex: 0 0 auto;
-}
+/* Removed: .v2-script-scripted-flag — written scenes now reuse
+   the same chip styling as the Script Scene CTA but with a
+   "View Script" label and /icon-script-sml.svg glyph. The chip
+   itself is class .v2-script-scene-chip (extending .add-all-
+   scenes-chip), so no separate rule is needed. */
 
 /* Right-slot wrapper for the Script tab — Script-All-Scenes chip
    plus the small read-through icon button, sitting on the same

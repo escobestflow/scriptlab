@@ -431,31 +431,17 @@ function ComponentsSection() {
               </p>
             </span>
             <div className="v2-script-footer">
-              <span className="v2-script-pages ds-type-main-tab-nav-inactive">p. 1 - 3</span>
-              <span className="v2-script-scripted-flag ds-type-main-tab-nav-inactive">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Scripted</span>
-              </span>
+              <span className="v2-script-pages ds-type-body">p. 1 - 3</span>
+              <button type="button" className="add-all-scenes-chip v2-script-scene-chip">
+                <img src="/icon-script-sml.svg" alt="" aria-hidden="true" width={10.86} height={11.27} />
+                <span>View Script</span>
+              </button>
             </div>
           </div>
         </div>
       </ComponentRow>
 
-      <ComponentRow
-        title="Scripted flag"
-        usedIn="Confirmed-state indicator that replaces the per-scene chip once a beat is written. Inline ✓ + label in gray-chip-label color so it reads as state, not a clickable affordance."
-      >
-        <span className="v2-script-scripted-flag ds-type-main-tab-nav-inactive">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          <span>Scripted</span>
-        </span>
-      </ComponentRow>
-
-      <ComponentRow
+<ComponentRow
         title="Inline attribute input"
         usedIn="Single-line text fields that sit inline with the row label rather than expanding below it. Used by Concept Title, Character Name, Character Age, and Scene Name."
       >

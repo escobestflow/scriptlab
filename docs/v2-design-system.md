@@ -191,7 +191,7 @@ truth; reuse them rather than inventing parallel rules in JSX.
 | `v2-beat-number-col` + `v2-beat-number-badge` | 21x21 outlined number badge with dotted timeline connector. Used by Story tab. |
 | `v2-script-card` | Script-tab scene row. 32x32 badge INSIDE card top-left, ds-type-int-header slug, ds-type-project-card-title title, ds-type-body summary, footer with page-range + per-scene chip. |
 | `v2-script-number-badge` | 32x32 number badge for Script tab. Lives inside the card. Written state inverts to black fill. |
-| `v2-script-scripted-flag` | "✓ Scripted" indicator that replaces the per-row chip once a beat is written. |
+| `v2-script-scene-chip` | Per-row chip in the Script tab. Same chip styling as `.add-all-scenes-chip`. Unwritten beat: AI bolt glyph + "Script Scene" label (fires generate). Written beat: `/icon-script-sml.svg` glyph + "View Script" label (opens the Script View sheet). |
 
 ### Attribute rows
 

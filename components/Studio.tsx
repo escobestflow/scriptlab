@@ -8943,17 +8943,27 @@ function ScriptTab({
                 <p className="v2-script-summary ds-type-body">{beat.summary || "No summary yet."}</p>
               </button>
               <div className="v2-script-footer">
-                <span className="v2-script-pages ds-type-main-tab-nav-inactive">{pageLabel}</span>
+                <span className="v2-script-pages ds-type-body">{pageLabel}</span>
                 {isWritten ? (
-                  /* Written badge — small "Scripted ✓" indicator
-                      that replaces the chip. Card click still
-                      routes to the Script View sheet. */
-                  <span className="v2-script-scripted-flag ds-type-main-tab-nav-inactive">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    <span>Scripted</span>
-                  </span>
+                  /* Written → "View Script" chip. Same chip
+                     styling/position as the Script Scene CTA;
+                     only the glyph + label change. Click opens
+                     the Script View sheet (same as a card-body
+                     tap). */
+                  <button
+                    type="button"
+                    className="add-all-scenes-chip v2-script-scene-chip"
+                    onClick={() => openScriptViewSheet?.(beat.id)}
+                  >
+                    <img
+                      src="/icon-script-sml.svg"
+                      alt=""
+                      aria-hidden="true"
+                      width={10.86}
+                      height={11.27}
+                    />
+                    <span>View Script</span>
+                  </button>
                 ) : (
                   <button
                     type="button"
