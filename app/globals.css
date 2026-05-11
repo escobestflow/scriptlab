@@ -8306,7 +8306,10 @@ html[data-design="v2"] .v2-character-card .v2-character-portrait {
   flex: 0 0 auto;
   object-fit: cover;
   display: block;
-  background: var(--ds-color-gray-fill);
+  /* Dark base — makes the shimmer sweep read clearly while the
+     AI portrait is generating. Initial-letter fallback (below)
+     uses light ink against this dark surface. */
+  background: var(--ds-color-gray-dark-fill);
   /* Flush to the card's top-left and bottom-left edges. Left-side
      corners match the card's outer 18px so the portrait flows
      seamlessly into the card; right-side corners use the inner
@@ -8321,8 +8324,9 @@ html[data-design="v2"] .v2-character-card .v2-character-portrait-placeholder {
   font-family: var(--ds-font-display);
   font-weight: 400;
   font-size: 36px;
-  color: var(--ds-color-gray-chip-label);
-  background: var(--ds-color-gray-fill);
+  /* Light ink for legibility on the dark placeholder fill. */
+  color: var(--ds-color-gray-chip-fill);
+  background: var(--ds-color-gray-dark-fill);
 }
 html[data-design="v2"] .v2-character-card .v2-character-body {
   flex: 1 1 auto;
@@ -8451,7 +8455,8 @@ html[data-design="v2"] .v2-character-form-portrait-img {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ds-color-gray-fill);
+  /* Dark base for both empty placeholder and shimmer states. */
+  background: var(--ds-color-gray-dark-fill);
   border: 0.7px solid var(--ds-color-gray-outline);
   flex: 0 0 auto;
 }
@@ -8459,7 +8464,8 @@ html[data-design="v2"] .v2-character-form-portrait-placeholder {
   font-family: var(--ds-font-display);
   font-weight: 400;
   font-size: 42px;
-  color: var(--ds-color-gray-chip-label);
+  /* Light ink — initial letter on dark fill. */
+  color: var(--ds-color-gray-chip-fill);
 }
 html[data-design="v2"] .v2-character-form-portrait-actions {
   /* Pinned just past the image's right edge: row centerline +
@@ -8493,12 +8499,13 @@ html[data-design="v2"] .v2-scene-form-image-img {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--ds-color-gray-fill);
+  /* Dark base — makes the shimmer sweep read clearly. */
+  background: var(--ds-color-gray-dark-fill);
   border: 0.7px solid var(--ds-color-gray-outline);
   flex: 0 0 auto;
 }
 html[data-design="v2"] .v2-scene-form-image-placeholder {
-  background: var(--ds-color-gray-fill);
+  background: var(--ds-color-gray-dark-fill);
 }
 
 /* AI history pager — sits next to the AI wand. v1 used a blue-50 →
@@ -8733,7 +8740,10 @@ html[data-design="v2"] .v2-beat-thumb {
   flex: 0 0 auto;
   object-fit: cover;
   display: block;
-  background: var(--ds-color-gray-fill);
+  /* Dark base — same dark gray as character + project placeholders,
+     chosen so the shimmer sweep reads consistently across all three
+     image types. */
+  background: var(--ds-color-gray-dark-fill);
   border-radius: 8px;
   /* Vertically centered in the 103px card — `align-self: center`
      splits the leftover height (~31px) evenly above and below. */
@@ -8744,7 +8754,8 @@ html[data-design="v2"] .v2-beat-thumb-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ds-color-gray-chip-label);
+  /* Light ink — initial letter on dark fill. */
+  color: var(--ds-color-gray-chip-fill);
   font-family: var(--ds-font-display);
   font-size: 24px;
 }
@@ -9234,7 +9245,7 @@ html[data-design="v2"] .scene-popup-image > img {
 html[data-design="v2"] .scene-popup-image-placeholder {
   width: 100%;
   height: 100%;
-  background: var(--ds-color-gray-fill);
+  background: var(--ds-color-gray-dark-fill);
 }
 /* Close X — based on the v2-topbar-add chip inverted (white bg,
    black glyph). The same /icon-add-cta.svg plus glyph is rotated

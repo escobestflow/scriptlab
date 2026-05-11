@@ -820,32 +820,10 @@ export default function Page() {
     if (hydrated && user) saveProjectsDebounced(projects);
   }, [projects, hydrated, user, saveProjectsDebounced]);
 
-  // Auto-generate thumbnails for projects that don't have one
-  const thumbnailGenRef = useRef(false);
-  useEffect(() => {
-    if (!hydrated || thumbnailGenRef.current) return;
-    const missing = projects.filter(p => !p.thumbnail && p.title);
-    if (missing.length === 0) return;
-    thumbnailGenRef.current = true;
-    (async () => {
-      for (const p of missing) {
-        try {
-          const res = await fetch("/api/generate-thumbnail", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: p.title, logline: getActiveConceptDraft(p).logline, genres: getActiveConceptDraft(p).settings.genres }),
-          });
-          if (!res.ok) continue;
-          const data = await res.json();
-          if (data.thumbnail) {
-            setProjects(ps => ps.map(pr =>
-              pr.id === p.id ? { ...pr, thumbnail: data.thumbnail } : pr
-            ));
-          }
-        } catch {}
-      }
-    })();
-  }, [hydrated, projects]);
+  // (Older one-shot auto-gen was removed — the `generateThumbnail` +
+  // thumbsInFlight loop below supersedes it. Keeping just one path
+  // makes the in-flight set the single source of truth for "shimmer
+  // = generating now" everywhere the cover renders.)
 
   const updateProject = (id: string, u: (s: Story) => Story) =>
     setProjects(ps => ps.map(p => p.id === id ? { ...u(p), updatedAt: new Date().toISOString() } : p));
@@ -913,12 +891,35 @@ export default function Page() {
     setTimeout(() => setToastVisible(false), 2000);
   }
 
-  async function generateThumbnail(projectId: string, title: string, logline: string, genres: string[]) {
+  // Generate (or regenerate) a project's cover thumbnail. Owns its own
+  // in-flight bookkeeping — the ref-Set blocks same-tick double-fires,
+  // and the state-Set drives the shimmer skin on EVERY surface where
+  // the project image is rendered (home cards + Settings-tab cover).
+  // Single source of truth: id ∈ thumbsInFlight ⇔ a generate-thumbnail
+  // request is currently live for this project.
+  //
+  // `extra` is the user's free-text prompt addition typed into the
+  // Settings-tab regenerate input (`story.thumbnailPromptExtra`). When
+  // called from auto-fill effects, callers pass "" (or omit it).
+  async function generateThumbnail(
+    projectId: string,
+    title: string,
+    logline: string,
+    genres: string[],
+    extra: string = "",
+  ) {
+    if (projectThumbnailsInFlight.current.has(projectId)) return;
+    projectThumbnailsInFlight.current.add(projectId);
+    setThumbsInFlight(prev => {
+      const next = new Set(prev);
+      next.add(projectId);
+      return next;
+    });
     try {
       const res = await fetch("/api/generate-thumbnail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, logline, genres }),
+        body: JSON.stringify({ title, logline, genres, extra }),
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -937,7 +938,14 @@ export default function Page() {
       if (user && updated) {
         try { await saveProjectToDB(user.id, updated); } catch { /* persist failure is non-fatal */ }
       }
-    } catch {}
+    } catch {} finally {
+      projectThumbnailsInFlight.current.delete(projectId);
+      setThumbsInFlight(prev => {
+        const next = new Set(prev);
+        next.delete(projectId);
+        return next;
+      });
+    }
   }
 
   // Backfill missing project thumbnails. Runs once whenever the
@@ -959,29 +967,17 @@ export default function Page() {
     if (!user) return;
     for (const p of projects) {
       if (p.thumbnail) continue;
-      if (projectThumbnailsInFlight.current.has(p.id)) continue;
       const draft = getActiveConceptDraft(p);
       const summary = draft.concept?.summary ?? "";
       if (!draft.logline?.trim() && !summary.trim()) continue;
-      projectThumbnailsInFlight.current.add(p.id);
-      setThumbsInFlight(prev => {
-        const next = new Set(prev);
-        next.add(p.id);
-        return next;
-      });
+      // generateThumbnail dedups + manages thumbsInFlight internally,
+      // so we just call it — no need to early-return on in-flight.
       generateThumbnail(
         p.id,
         p.title,
         draft.logline || summary,
         draft.settings.genres,
-      ).finally(() => {
-        projectThumbnailsInFlight.current.delete(p.id);
-        setThumbsInFlight(prev => {
-          const next = new Set(prev);
-          next.delete(p.id);
-          return next;
-        });
-      });
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, user]);
@@ -1384,6 +1380,20 @@ export default function Page() {
           setStory={(u: any) => updateProject(studioProject.id, u)}
           moments={moments}
           onBack={() => setView({ kind: "main" })}
+          /* Project thumbnail (re)generation, lifted from Studio so
+             a single in-flight Set drives the shimmer on EVERY surface
+             the cover is rendered (home cards + Settings tab cover). */
+          onRegenerateThumbnail={(extra: string) => {
+            const draft = getActiveConceptDraft(studioProject);
+            return generateThumbnail(
+              studioProject.id,
+              studioProject.title,
+              draft.logline,
+              draft.settings.genres,
+              extra,
+            );
+          }}
+          isThumbnailInFlight={thumbsInFlight.has(studioProject.id)}
           isNew={(view as any).isNew ?? false}
           isFirstProject={(view as any).isFirstProject ?? false}
           initialSection={(view as any).initialSection}
@@ -2961,18 +2971,17 @@ function ProjectsTab({
             onClick={() => onOpen(p.id)}
           >
             <div className="project-cover">
-              {p.thumbnail ? (
-                <img src={p.thumbnail} alt="" className="project-cover-img" />
-              ) : thumbsInFlight.has(p.id) ? (
-                /* Shimmer placeholder — fills the cover box while the
-                   AI thumbnail request is in-flight. `is-dark` reads
-                   against the v2 cover's gray-dark base; on v1 the
-                   dark gradient swallows it visually but the class
-                   harmlessly applies in both modes. */
+              {/* In-flight check FIRST: regenerate should visibly replace
+                  the existing image with shimmer, not sit invisibly
+                  behind it. If the API fails, the next render flips
+                  back to the existing thumbnail (it was never cleared). */}
+              {thumbsInFlight.has(p.id) ? (
                 <div
                   className="project-cover-fill ds-image-shimmer is-dark"
                   aria-label="Generating project image"
                 />
+              ) : p.thumbnail ? (
+                <img src={p.thumbnail} alt="" className="project-cover-img" />
               ) : (
                 <span className="project-cover-initial">
                   {p.title ? p.title.charAt(0).toUpperCase() : "?"}

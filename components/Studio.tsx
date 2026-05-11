@@ -167,6 +167,8 @@ export function Studio({
   initialSection,
   bgScriptJob = null,
   onStartBackgroundScriptLoop,
+  onRegenerateThumbnail,
+  isThumbnailInFlight = false,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -250,6 +252,14 @@ export function Studio({
     profile?: WriterProfile | null,
     opts?: { rewriteNewDraft?: boolean },
   ) => Promise<void>;
+  /** Project thumbnail (re)generation. Lifted to page.tsx so the
+   *  in-flight Set that backs the shimmer skin lives in a single
+   *  place — both the home project cards AND the Settings-tab cover
+   *  pulse together while a /api/generate-thumbnail call is live. */
+  onRegenerateThumbnail?: (extra: string) => Promise<void>;
+  /** Whether the active project's cover is currently being regenerated.
+   *  Drives the shimmer overlay on the SettingsTab cover image. */
+  isThumbnailInFlight?: boolean;
 }) {
   const [section, setSection] = useState<Section>(initialSection ?? "concept");
   // Current user's email for the initials chip on the user's own side
@@ -1519,6 +1529,8 @@ export function Studio({
               onRequestDeleteProject={() => setConfirmDeleteProject(true)}
               onEmailProject={onEmailProject}
               emailProjectBusy={emailProjectBusy}
+              onRegenerateThumbnail={onRegenerateThumbnail}
+              isThumbnailInFlight={isThumbnailInFlight}
             />
           </div>
         </div>
@@ -2431,10 +2443,12 @@ export function Studio({
           >
             <div className="scene-popup-card" onClick={e => e.stopPropagation()}>
               <div className="scene-popup-image">
-                {beat.thumbnail
-                  ? <img src={beat.thumbnail} alt="" />
-                  : scenesInFlight.has(beat.id)
-                    ? <div className="scene-popup-image-placeholder ds-image-shimmer" aria-label="Generating scene image" />
+                {/* In-flight FIRST — regenerate visibly replaces the
+                    existing image with shimmer. */}
+                {scenesInFlight.has(beat.id)
+                  ? <div className="scene-popup-image-placeholder ds-image-shimmer is-dark" aria-label="Generating scene image" />
+                  : beat.thumbnail
+                    ? <img src={beat.thumbnail} alt="" />
                     : <div className="scene-popup-image-placeholder" aria-hidden="true" />}
                 <button
                   type="button"
@@ -2462,10 +2476,10 @@ export function Studio({
                 {beatChars.length > 0 && (
                   <div className="scene-popup-characters" aria-label="Characters in this scene">
                     {beatChars.map(c => (
-                      c.thumbnail
-                        ? <img key={c.id} src={c.thumbnail} alt="" className="scene-popup-avatar" />
-                        : charsInFlight.has(c.id)
-                          ? <div key={c.id} className="scene-popup-avatar ds-image-shimmer" aria-label="Generating character portrait" />
+                      charsInFlight.has(c.id)
+                        ? <div key={c.id} className="scene-popup-avatar ds-image-shimmer is-dark" aria-label="Generating character portrait" />
+                        : c.thumbnail
+                          ? <img key={c.id} src={c.thumbnail} alt="" className="scene-popup-avatar" />
                           : <div key={c.id} className="scene-popup-avatar scene-popup-avatar-placeholder">
                               {c.name ? c.name[0].toUpperCase() : "?"}
                             </div>
@@ -7578,10 +7592,10 @@ function CharactersTab({
             onClick={() => openCharacter(ch.id)}
           >
             {isV2 ? (
-              ch.thumbnail ? (
+              charsInFlight.has(ch.id) ? (
+                <div className="v2-character-portrait ds-image-shimmer is-dark" aria-label="Generating character portrait" />
+              ) : ch.thumbnail ? (
                 <img src={ch.thumbnail} alt="" className="v2-character-portrait" />
-              ) : charsInFlight.has(ch.id) ? (
-                <div className="v2-character-portrait ds-image-shimmer" aria-label="Generating character portrait" />
               ) : (
                 <div className="v2-character-portrait v2-character-portrait-placeholder">
                   {ch.name ? ch.name[0].toUpperCase() : "?"}
@@ -7932,13 +7946,15 @@ function CharacterEditForm({
     <div>
       {isV2Form && !isNew && (
         <div className="v2-character-form-portrait">
-          {ch.thumbnail ? (
-            <img src={ch.thumbnail} alt="" className="v2-character-form-portrait-img" />
-          ) : (imgBusy || autoGenInFlight) ? (
+          {/* In-flight FIRST — covers both the local manual Regenerate
+              click (imgBusy) and bulk auto-gen (autoGenInFlight). */}
+          {(imgBusy || autoGenInFlight) ? (
             <div
-              className="v2-character-form-portrait-img ds-image-shimmer"
+              className="v2-character-form-portrait-img ds-image-shimmer is-dark"
               aria-label="Generating character portrait"
             />
+          ) : ch.thumbnail ? (
+            <img src={ch.thumbnail} alt="" className="v2-character-form-portrait-img" />
           ) : (
             <div className="v2-character-form-portrait-img v2-character-form-portrait-placeholder">
               {ch.name ? ch.name[0].toUpperCase() : "?"}
@@ -8597,10 +8613,13 @@ function StoryTab({
                     }}
                   >
                   {isV2 && (
-                    beat.thumbnail
-                      ? <img src={beat.thumbnail} alt="" className="v2-beat-thumb" />
-                      : scenesInFlight.has(beat.id)
-                        ? <div className="v2-beat-thumb ds-image-shimmer" aria-label="Generating scene image" />
+                    /* In-flight check FIRST — regenerate visibly replaces
+                       the old thumb with shimmer instead of sitting
+                       invisibly behind it. */
+                    scenesInFlight.has(beat.id)
+                      ? <div className="v2-beat-thumb ds-image-shimmer is-dark" aria-label="Generating scene image" />
+                      : beat.thumbnail
+                        ? <img src={beat.thumbnail} alt="" className="v2-beat-thumb" />
                         : <div className="v2-beat-thumb v2-beat-thumb-placeholder">{(beat.name || "?").charAt(0).toUpperCase()}</div>
                   )}
                   <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
@@ -9703,10 +9722,12 @@ function SceneEditForm({
           on its own once a name lands and the sheet closes. */}
       {isV2Form && !isNew && (
         <div className="v2-scene-form-image">
-          {beat.thumbnail
-            ? <img src={beat.thumbnail} alt="" className="v2-scene-form-image-img" />
-            : (imgBusy || autoGenInFlight)
-              ? <div className="v2-scene-form-image-img ds-image-shimmer" aria-label="Generating scene image" />
+          {/* In-flight FIRST — manual Regenerate (imgBusy) and bulk
+              auto-gen (autoGenInFlight) both show shimmer. */}
+          {(imgBusy || autoGenInFlight)
+            ? <div className="v2-scene-form-image-img ds-image-shimmer is-dark" aria-label="Generating scene image" />
+            : beat.thumbnail
+              ? <img src={beat.thumbnail} alt="" className="v2-scene-form-image-img" />
               : <div className="v2-scene-form-image-img v2-scene-form-image-placeholder" aria-hidden="true" />}
           <Button
             variant="secondary"
@@ -9970,6 +9991,8 @@ function SettingsTab({
   onRequestDeleteProject,
   onEmailProject,
   emailProjectBusy,
+  onRegenerateThumbnail,
+  isThumbnailInFlight = false,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -9982,33 +10005,22 @@ function SettingsTab({
    *  — renders the Email card only when provided. */
   onEmailProject?: () => void;
   emailProjectBusy?: boolean;
+  /** Lifted thumbnail regen — page.tsx flips thumbsInFlight, fetches
+   *  the API, persists. Same path the home project cards subscribe
+   *  to, so both surfaces shimmer in sync. */
+  onRegenerateThumbnail?: (extra: string) => Promise<void>;
+  /** Mirrors thumbsInFlight.has(story.id) from page.tsx. Drives the
+   *  cover-image shimmer overlay + the Regenerate button's busy state. */
+  isThumbnailInFlight?: boolean;
 }) {
-  const concept = getActiveConceptDraft(story);
-  const [generatingCover, setGeneratingCover] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement>(null);
 
   async function generateCover() {
-    setGeneratingCover(true);
-    try {
-      const res = await fetch("/api/generate-thumbnail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: story.title,
-          logline: concept.logline,
-          genres: concept.settings.genres,
-          extra: story.thumbnailPromptExtra || "",
-        }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.thumbnail) {
-        setStory(st => ({ ...st, thumbnail: data.thumbnail }));
-      }
-    } catch {} finally {
-      setGeneratingCover(false);
-    }
+    // Delegates to the lifted page-level handler so the in-flight
+    // Set is the single source of truth for shimmer everywhere.
+    if (!onRegenerateThumbnail) return;
+    await onRegenerateThumbnail(story.thumbnailPromptExtra || "");
   }
 
   // Upload + center-crop a user-supplied image into a 3:4 JPEG data URL
@@ -10056,7 +10068,25 @@ function SettingsTab({
 
       <div className="card">
         <span className="eyebrow">Cover</span>
-        {story.thumbnail && (
+        {/* When regenerating, replace the cover image with a shimmer
+            block of the same dimensions. If the API fails, the next
+            render flips back to the original thumbnail because we
+            never clear story.thumbnail. */}
+        {isThumbnailInFlight ? (
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <div
+              className="ds-image-shimmer is-dark"
+              aria-label="Generating project image"
+              style={{
+                width: "100%",
+                maxWidth: 320,
+                aspectRatio: "16 / 9",
+                borderRadius: 13,
+                display: "block",
+              }}
+            />
+          </div>
+        ) : story.thumbnail && (
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
             <img
               src={story.thumbnail}
@@ -10105,14 +10135,14 @@ function SettingsTab({
             variant="secondary"
             size="sm"
             onClick={generateCover}
-            disabled={generatingCover || uploadingCover}
+            disabled={isThumbnailInFlight || uploadingCover}
             icon={
               <svg viewBox="0 0 100 110" fill="currentColor" aria-hidden="true">
                 <path d="m41.785 60.52h-13.055c-0.52344-0.0078-1.0547-0.14844-1.5352-0.43359-1.4141-0.84766-1.8789-2.6836-1.0273-4.1016l31.906-53.211c0.60547-1.0117 1.7852-1.6094 3.0195-1.4141 1.6289 0.25391 2.7461 1.7773 2.4961 3.4102l-5.375 34.715h13.055c0.52344 0.0078 1.0547 0.14844 1.5352 0.43359 1.4141 0.84766 1.8789 2.6836 1.0273 4.1016l-31.906 53.211c-0.60547 1.0117-1.7852 1.6094-3.0195 1.4141-1.6289-0.25391-2.7461-1.7773-2.4961-3.4102z" />
               </svg>
             }
           >
-            {generatingCover ? "Generating..." : "Regenerate"}
+            {isThumbnailInFlight ? "Generating..." : "Regenerate"}
           </Button>
         </div>
 
@@ -10132,7 +10162,7 @@ function SettingsTab({
           variant="secondary"
           size="sm"
           onClick={() => uploadInputRef.current?.click()}
-          disabled={generatingCover || uploadingCover}
+          disabled={isThumbnailInFlight || uploadingCover}
           style={{ width: "100%", marginTop: 8 }}
         >
           {uploadingCover ? "Uploading..." : "Upload image"}
