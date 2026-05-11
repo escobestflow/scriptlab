@@ -810,53 +810,45 @@ export function Studio({
   // thumbnail generated so the auto-fill effects below don't
   // double-fire on the same id across re-renders (story state
   // mutates several times during a single request lifecycle).
+  // Dual tracking: ref for synchronous dedup across loop iterations
+  // in a single useEffect tick (setState is batched, so reading the
+  // state Set would lag), state Set for UI reactivity — the shimmer
+  // placeholder for each scene / character image subscribes here.
+  // Invariant: id ∈ inFlightState ⇔ a generate-* request is currently
+  // pending for that id ⇔ shimmer is rendering.
   const sceneImagesInFlight = useRef<Set<string>>(new Set());
   const characterImagesInFlight = useRef<Set<string>>(new Set());
+  const [scenesInFlight, setScenesInFlight] = useState<Set<string>>(new Set());
+  const [charsInFlight, setCharsInFlight] = useState<Set<string>>(new Set());
 
   // Auto-fill missing scene thumbnails. Fires whenever the story
   // state changes — picks up beats produced by the bulk Add All
   // Scenes path, individual sheet saves, easy-mode runs, or any
   // future path that creates beats without a thumbnail.
+  // Dedup + in-flight tracking happens INSIDE autoGenerateSceneImage
+  // so any caller (bulk loop, close-sheet path, form button) is safe.
   useEffect(() => {
     const draft = getActiveStoryLayerDraft(story);
     const allBeats = isTV && activeEpisodeId
       ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
       : draft.beats;
     for (const b of allBeats) {
-      if (
-        b.name?.trim() &&
-        !b.thumbnail &&
-        !sceneImagesInFlight.current.has(b.id)
-      ) {
-        sceneImagesInFlight.current.add(b.id);
-        autoGenerateSceneImage(b.id)
-          .catch(() => { /* swallow — the slot stays unset */ })
-          .finally(() => sceneImagesInFlight.current.delete(b.id));
+      if (b.name?.trim() && !b.thumbnail) {
+        autoGenerateSceneImage(b.id).catch(() => { /* swallow */ });
       }
     }
-    // story is the dependency: any state mutation that adds beats
-    // or fills in their names triggers a re-scan.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story, isTV, activeEpisodeId]);
 
   // Same auto-fill, characters edition. Fires on story-state
   // change for any character with a name + no thumbnail. Picks
   // up cast produced by the bulk Add All Characters path AND
-  // by easy-mode sync_concept_to_characters runs — without this,
-  // characters created in bulk never get auto-portraits (the
-  // existing close-sheet path only covers manual additions).
+  // by easy-mode sync_concept_to_characters runs.
   useEffect(() => {
     const draft = getActiveCharactersDraft(story);
     for (const c of draft.characters) {
-      if (
-        c.name?.trim() &&
-        !c.thumbnail &&
-        !characterImagesInFlight.current.has(c.id)
-      ) {
-        characterImagesInFlight.current.add(c.id);
-        autoGenerateCharacterImage(c.id)
-          .catch(() => { /* swallow — image stays unset */ })
-          .finally(() => characterImagesInFlight.current.delete(c.id));
+      if (c.name?.trim() && !c.thumbnail) {
+        autoGenerateCharacterImage(c.id).catch(() => { /* swallow */ });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -866,7 +858,14 @@ export function Studio({
   // patches back via setStory and won't overwrite a thumbnail the
   // user manually set in the meantime. Mirrors
   // autoGenerateCharacterImage with the scene-specific endpoint.
+  //
+  // Dedup + shimmer wiring: the ref-Set prevents same-tick double
+  // calls (state updates are batched), and the state-Set drives the
+  // shimmer placeholder on each scene's thumb slot. Both flip
+  // together at the start, and both clear together in `finally` —
+  // so "shimmering" is a precise signal that an API call is live.
   async function autoGenerateSceneImage(beatId: string): Promise<void> {
+    if (sceneImagesInFlight.current.has(beatId)) return;
     const draft = getActiveStoryLayerDraft(story);
     const allBeats = isTV && activeEpisodeId
       ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
@@ -879,21 +878,36 @@ export function Studio({
       beat.purpose && `Purpose: ${beat.purpose}`,
     ].filter(Boolean).join("\n");
     if (!description.trim()) return;
-    const concept = getActiveConceptDraft(story);
-    const primaryGenre = concept.settings?.genres?.[0];
-    const projectTone = concept.concept?.tone;
-    const res = await fetch("/api/generate-scene-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+    sceneImagesInFlight.current.add(beatId);
+    setScenesInFlight(prev => {
+      const next = new Set(prev);
+      next.add(beatId);
+      return next;
     });
-    if (!res.ok) return;
-    const data = await res.json();
-    const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
-    if (!thumb) return;
-    setBeats(bs => bs.map(b =>
-      b.id === beatId && !b.thumbnail ? { ...b, thumbnail: thumb } : b
-    ));
+    try {
+      const concept = getActiveConceptDraft(story);
+      const primaryGenre = concept.settings?.genres?.[0];
+      const projectTone = concept.concept?.tone;
+      const res = await fetch("/api/generate-scene-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
+      if (!thumb) return;
+      setBeats(bs => bs.map(b =>
+        b.id === beatId && !b.thumbnail ? { ...b, thumbnail: thumb } : b
+      ));
+    } finally {
+      sceneImagesInFlight.current.delete(beatId);
+      setScenesInFlight(prev => {
+        const next = new Set(prev);
+        next.delete(beatId);
+        return next;
+      });
+    }
   }
 
   const closeCharacterSheet = () => {
@@ -967,6 +981,7 @@ export function Studio({
   // sheet in the meantime and manually regenerated, the most recent
   // setStory wins by virtue of React's normal update ordering.
   async function autoGenerateCharacterImage(characterId: string): Promise<void> {
+    if (characterImagesInFlight.current.has(characterId)) return;
     const chars = getActiveCharactersDraft(story).characters;
     const ch = chars.find(c => c.id === characterId);
     if (!ch || ch.thumbnail) return;
@@ -985,30 +1000,49 @@ export function Studio({
       ch.flaws && `Flaws: ${ch.flaws}`,
     ].filter(Boolean).join("\n");
     if (!description.trim()) return;
-    const concept = getActiveConceptDraft(story);
-    const primaryGenre = concept.settings?.genres?.[0];
-    const projectTone = concept.concept?.tone;
-    const res = await fetch("/api/generate-character-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+    // Flip both ref + state simultaneously. The state flip triggers
+    // the shimmer overlay on every render-site that displays this
+    // character's portrait; the ref flip prevents same-tick re-entry
+    // (state ops are batched, refs are sync).
+    characterImagesInFlight.current.add(characterId);
+    setCharsInFlight(prev => {
+      const next = new Set(prev);
+      next.add(characterId);
+      return next;
     });
-    if (!res.ok) return;
-    const data = await res.json();
-    const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
-    if (!thumb) return;
-    setStory(s => {
-      const live = getActiveCharactersDraft(s).characters;
-      const liveCh = live.find(c => c.id === characterId);
-      // Don't overwrite a thumbnail the user has set in the meantime
-      // (e.g. opened the edit sheet and manually generated/uploaded).
-      if (!liveCh || liveCh.thumbnail) return s;
-      return updateCharactersDraft(s, {
-        characters: live.map(c =>
-          c.id === characterId ? { ...c, thumbnail: thumb } : c
-        ),
+    try {
+      const concept = getActiveConceptDraft(story);
+      const primaryGenre = concept.settings?.genres?.[0];
+      const projectTone = concept.concept?.tone;
+      const res = await fetch("/api/generate-character-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
       });
-    });
+      if (!res.ok) return;
+      const data = await res.json();
+      const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
+      if (!thumb) return;
+      setStory(s => {
+        const live = getActiveCharactersDraft(s).characters;
+        const liveCh = live.find(c => c.id === characterId);
+        // Don't overwrite a thumbnail the user has set in the meantime
+        // (e.g. opened the edit sheet and manually generated/uploaded).
+        if (!liveCh || liveCh.thumbnail) return s;
+        return updateCharactersDraft(s, {
+          characters: live.map(c =>
+            c.id === characterId ? { ...c, thumbnail: thumb } : c
+          ),
+        });
+      });
+    } finally {
+      characterImagesInFlight.current.delete(characterId);
+      setCharsInFlight(prev => {
+        const next = new Set(prev);
+        next.delete(characterId);
+        return next;
+      });
+    }
   }
 
   // Call /api/generate with detect_character_gender and patch the
@@ -2190,6 +2224,7 @@ export function Studio({
               onOpenUpdateTray={setUpdateTraySource}
               runGenerateAll={runGenerateAll}
               activeEpisodeId={activeEpisodeId}
+              charsInFlight={charsInFlight}
             />
           )}
           {section === "story" && (
@@ -2211,6 +2246,7 @@ export function Studio({
               autosaveEnabled={autosaveEnabled}
               onOpenUpdateTray={setUpdateTraySource}
               runGenerateAll={runGenerateAll}
+              scenesInFlight={scenesInFlight}
             />
           )}
           {section === "script" && (
@@ -2397,7 +2433,9 @@ export function Studio({
               <div className="scene-popup-image">
                 {beat.thumbnail
                   ? <img src={beat.thumbnail} alt="" />
-                  : <div className="scene-popup-image-placeholder" aria-hidden="true" />}
+                  : scenesInFlight.has(beat.id)
+                    ? <div className="scene-popup-image-placeholder ds-image-shimmer" aria-label="Generating scene image" />
+                    : <div className="scene-popup-image-placeholder" aria-hidden="true" />}
                 <button
                   type="button"
                   className="scene-popup-close"
@@ -2426,9 +2464,11 @@ export function Studio({
                     {beatChars.map(c => (
                       c.thumbnail
                         ? <img key={c.id} src={c.thumbnail} alt="" className="scene-popup-avatar" />
-                        : <div key={c.id} className="scene-popup-avatar scene-popup-avatar-placeholder">
-                            {c.name ? c.name[0].toUpperCase() : "?"}
-                          </div>
+                        : charsInFlight.has(c.id)
+                          ? <div key={c.id} className="scene-popup-avatar ds-image-shimmer" aria-label="Generating character portrait" />
+                          : <div key={c.id} className="scene-popup-avatar scene-popup-avatar-placeholder">
+                              {c.name ? c.name[0].toUpperCase() : "?"}
+                            </div>
                     ))}
                   </div>
                 )}
@@ -2537,6 +2577,7 @@ export function Studio({
                     story={story}
                     moments={moments}
                     isNew={sceneSheetIsNew}
+                    autoGenInFlight={scenesInFlight.has(activeBeat.id)}
                     onUpdate={(patch) => updateBeat(activeBeat.id, patch)}
                     onRemove={() => {
                       removeBeat(activeBeat.id);
@@ -2616,6 +2657,7 @@ export function Studio({
                       character={activeChar}
                       story={story}
                       isNew={charSheetIsNew || isCharLocked}
+                      autoGenInFlight={charsInFlight.has(activeChar.id)}
                       onUpdate={(patch) => {
                         if (isCharLocked) return;
                         setStory(s => updateCharactersDraft(s, {
@@ -7365,6 +7407,7 @@ function CharactersTab({
   onOpenUpdateTray,
   runGenerateAll,
   activeEpisodeId,
+  charsInFlight,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -7383,6 +7426,10 @@ function CharactersTab({
    *  episode that owns it. `null` means "no episode picked yet"; in
    *  that case we fall back to treating the pilot as active. */
   activeEpisodeId?: string | null;
+  /** Set of character ids whose AI portrait request is currently
+   *  in-flight (auto-fill effect or close-sheet path). Drives the
+   *  shimmer placeholder on each character card's portrait box. */
+  charsInFlight: Set<string>;
 }) {
   const d = getActiveCharactersDraft(story);
   const { profile } = useProfileCapture();
@@ -7533,6 +7580,8 @@ function CharactersTab({
             {isV2 ? (
               ch.thumbnail ? (
                 <img src={ch.thumbnail} alt="" className="v2-character-portrait" />
+              ) : charsInFlight.has(ch.id) ? (
+                <div className="v2-character-portrait ds-image-shimmer" aria-label="Generating character portrait" />
               ) : (
                 <div className="v2-character-portrait v2-character-portrait-placeholder">
                   {ch.name ? ch.name[0].toUpperCase() : "?"}
@@ -7658,6 +7707,7 @@ function CharacterEditForm({
   onUpdate,
   onRemove,
   isNew = false,
+  autoGenInFlight = false,
 }: {
   character: Character;
   story: Story;
@@ -7668,6 +7718,12 @@ function CharacterEditForm({
    *  yet. An unsaved blank character gets auto-discarded on sheet
    *  close, so there is literally nothing to delete. */
   isNew?: boolean;
+  /** True when Studio's bulk auto-gen effect is currently fetching
+   *  an AI portrait for this character. Drives the shimmer state on
+   *  the form's portrait box so the user sees the same "generating
+   *  now" signal here as on the character list. Composed with the
+   *  form's local `imgBusy` (which tracks manual Generate clicks). */
+  autoGenInFlight?: boolean;
 }) {
   const roles: { key: string; label: string }[] = [
     { key: "protagonist",   label: "Protagonist" },
@@ -7878,6 +7934,11 @@ function CharacterEditForm({
         <div className="v2-character-form-portrait">
           {ch.thumbnail ? (
             <img src={ch.thumbnail} alt="" className="v2-character-form-portrait-img" />
+          ) : (imgBusy || autoGenInFlight) ? (
+            <div
+              className="v2-character-form-portrait-img ds-image-shimmer"
+              aria-label="Generating character portrait"
+            />
           ) : (
             <div className="v2-character-form-portrait-img v2-character-form-portrait-placeholder">
               {ch.name ? ch.name[0].toUpperCase() : "?"}
@@ -8241,6 +8302,7 @@ function StoryTab({
   autosaveEnabled = true,
   onOpenUpdateTray,
   runGenerateAll,
+  scenesInFlight,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -8263,6 +8325,9 @@ function StoryTab({
   /** Wrap a Create-all action with the Studio-level scrim + sheet-close
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
+  /** Set of beat ids whose AI thumbnail request is currently in-flight.
+   *  Drives the shimmer placeholder on each scene row's thumb. */
+  scenesInFlight: Set<string>;
 }) {
   const isV2 = useIsV2();
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
@@ -8534,7 +8599,9 @@ function StoryTab({
                   {isV2 && (
                     beat.thumbnail
                       ? <img src={beat.thumbnail} alt="" className="v2-beat-thumb" />
-                      : <div className="v2-beat-thumb v2-beat-thumb-placeholder">{(beat.name || "?").charAt(0).toUpperCase()}</div>
+                      : scenesInFlight.has(beat.id)
+                        ? <div className="v2-beat-thumb ds-image-shimmer" aria-label="Generating scene image" />
+                        : <div className="v2-beat-thumb v2-beat-thumb-placeholder">{(beat.name || "?").charAt(0).toUpperCase()}</div>
                   )}
                   <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
                     {i + 1}
@@ -9436,7 +9503,7 @@ const MOMENT_TYPE_LABELS: Record<Moment["type"], string> = {
 };
 
 function SceneEditForm({
-  beat, story, moments, isNew, onUpdate, onRemove,
+  beat, story, moments, isNew, onUpdate, onRemove, autoGenInFlight = false,
 }: {
   beat: Beat;
   story: Story;
@@ -9444,6 +9511,11 @@ function SceneEditForm({
   isNew: boolean;
   onUpdate: (patch: Partial<Beat>) => void;
   onRemove: () => void;
+  /** True when Studio's bulk auto-gen effect is currently fetching
+   *  an AI thumbnail for this scene. Drives the shimmer state on
+   *  the form's image box. Composed with the form's local
+   *  `imgBusy` (which tracks manual Regenerate clicks). */
+  autoGenInFlight?: boolean;
 }) {
   const isV2Form = useIsV2();
   const [openAttr, setOpenAttr] = useState<string | null>(null);
@@ -9633,7 +9705,9 @@ function SceneEditForm({
         <div className="v2-scene-form-image">
           {beat.thumbnail
             ? <img src={beat.thumbnail} alt="" className="v2-scene-form-image-img" />
-            : <div className="v2-scene-form-image-img v2-scene-form-image-placeholder" aria-hidden="true" />}
+            : (imgBusy || autoGenInFlight)
+              ? <div className="v2-scene-form-image-img ds-image-shimmer" aria-label="Generating scene image" />
+              : <div className="v2-scene-form-image-img v2-scene-form-image-placeholder" aria-hidden="true" />}
           <Button
             variant="secondary"
             size="sm"

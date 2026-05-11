@@ -219,6 +219,13 @@ truth; reuse them rather than inventing parallel rules in JSX.
 | `/icon-duration.svg` | Clock glyph for scene-duration tag. |
 | `/icon-add-cta.svg` | Plus glyph for primary add buttons. |
 
+### Loading states
+
+| Class | Use |
+|---|---|
+| `.ds-image-shimmer` | Sweeping-highlight loading skin. Drop on a placeholder div sized like the eventual `<img>`. **Hard contract:** rendered ONLY while a real AI image-generation API call is in-flight for the asset — JSX gates it on per-asset in-flight Sets (`thumbsInFlight`, `scenesInFlight`, `charsInFlight`). If the box is shimmering, the request is 100% live. Honors `prefers-reduced-motion`. |
+| `.ds-image-shimmer.is-dark` | Variant for dark surfaces (e.g. v2 project covers over `gray-dark-fill`). Same animation, lower-alpha highlight + dark base. |
+
 ---
 
 ## Open questions / known issues

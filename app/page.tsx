@@ -947,7 +947,14 @@ export default function Page() {
   // initial generate call silently failed) gets a fresh
   // generate attempt. Same dedupe via a ref-Set as the scene /
   // character auto-fill effects in Studio.
+  // Dual tracking: ref for synchronous dedup (state updates are
+  // batched, so the next loop iteration would otherwise read stale
+  // state and double-fire), state Set for UI reactivity — the
+  // shimmer placeholder on each project card subscribes to this.
+  // "Shimmer is on" ⇔ "id is in thumbsInFlight" ⇔ "API call in
+  // flight," with no in-between/orphan states.
   const projectThumbnailsInFlight = useRef<Set<string>>(new Set());
+  const [thumbsInFlight, setThumbsInFlight] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (!user) return;
     for (const p of projects) {
@@ -957,12 +964,24 @@ export default function Page() {
       const summary = draft.concept?.summary ?? "";
       if (!draft.logline?.trim() && !summary.trim()) continue;
       projectThumbnailsInFlight.current.add(p.id);
+      setThumbsInFlight(prev => {
+        const next = new Set(prev);
+        next.add(p.id);
+        return next;
+      });
       generateThumbnail(
         p.id,
         p.title,
         draft.logline || summary,
         draft.settings.genres,
-      ).finally(() => projectThumbnailsInFlight.current.delete(p.id));
+      ).finally(() => {
+        projectThumbnailsInFlight.current.delete(p.id);
+        setThumbsInFlight(prev => {
+          const next = new Set(prev);
+          next.delete(p.id);
+          return next;
+        });
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects, user]);
@@ -1493,6 +1512,7 @@ export default function Page() {
                 myEmail={user?.email ?? null}
                 projectMembers={projectMembers}
                 partnerEmails={partnerEmails}
+                thumbsInFlight={thumbsInFlight}
               />
             )}
             {mainTab === "moments" && (
@@ -2724,6 +2744,7 @@ function ProjectsTab({
   projects, onOpen, onNew,
   pendingInvites, onAcceptInvite, onDeclineInvite,
   myUserId, myEmail, projectMembers, partnerEmails,
+  thumbsInFlight,
 }: {
   projects: Story[];
   onOpen: (id: string) => void;
@@ -2746,6 +2767,11 @@ function ProjectsTab({
    *  Loaded eagerly on dashboard hydration so the chip always has a
    *  letter, never a "?". */
   partnerEmails: Record<string, string>;
+  /** Set of project ids whose AI thumbnail is currently in-flight.
+   *  Drives the shimmer placeholder on each project card so the
+   *  user sees a clear "generating now" pulse instead of a static
+   *  initial-letter fallback. */
+  thumbsInFlight: Set<string>;
 }) {
   const hasInvites = pendingInvites.length > 0;
   const isV2 = useIsV2();
@@ -2937,6 +2963,16 @@ function ProjectsTab({
             <div className="project-cover">
               {p.thumbnail ? (
                 <img src={p.thumbnail} alt="" className="project-cover-img" />
+              ) : thumbsInFlight.has(p.id) ? (
+                /* Shimmer placeholder — fills the cover box while the
+                   AI thumbnail request is in-flight. `is-dark` reads
+                   against the v2 cover's gray-dark base; on v1 the
+                   dark gradient swallows it visually but the class
+                   harmlessly applies in both modes. */
+                <div
+                  className="project-cover-fill ds-image-shimmer is-dark"
+                  aria-label="Generating project image"
+                />
               ) : (
                 <span className="project-cover-initial">
                   {p.title ? p.title.charAt(0).toUpperCase() : "?"}

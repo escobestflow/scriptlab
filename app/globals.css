@@ -641,6 +641,14 @@ html[data-theme="dark"] .topbar {
   letter-spacing: -0.03em;
   line-height: 1;
 }
+/* Shimmer-mode fill — sized to the cover box so .ds-image-shimmer
+   paints its background + sweep across the whole card cover. No
+   text or initial inside (the shimmer alone reads as "generating"). */
+.project-cover-fill {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 .project-body {
   flex: 1;
@@ -6323,6 +6331,69 @@ html[data-design="v2"] .ds-type-project-page-title-empty {
   html[data-design="v2"] .ds-type-project-page-title-empty {
     font-size: 50px;
     line-height: normal;
+  }
+}
+
+/* ── V2 utility: AI image-generation shimmer ───────────────────────
+   Drop `.ds-image-shimmer` on a container (e.g. a placeholder div
+   sized like the eventual <img>) to show a sweeping highlight while
+   an AI image-generation request is in-flight. The pseudo-element
+   slides a translucent diagonal sheen across a neutral fill — no
+   reliance on background-size animation, so it stays crisp on any
+   aspect ratio. The class is design-system-wide and is applied on
+   ANY element kind (div, button, etc.). Pair with `is-dark` when
+   the surrounding card is dark (e.g. v2 project covers) so the
+   sheen reads against the darker base.
+
+   IMPORTANT contract: this class should ONLY render while a real
+   API call is in-flight (or queued) for the asset. The JSX gates
+   it on an in-flight Set so "shimmer = 100% generating right now."
+   Static placeholders (e.g. user has no logline yet) use the
+   non-shimmer placeholder variant instead. */
+@keyframes ds-shimmer-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+html[data-design="v2"] .ds-image-shimmer {
+  position: relative;
+  overflow: hidden;
+  /* Background-color (not shorthand) so container classes that use
+     `background: ...` shorthand can still override the base color
+     without us fighting the cascade. For unstyled containers (e.g.
+     the new `.project-cover-fill`) this neutral light-gray is the
+     visible base. */
+  background-color: #ECECEC;
+}
+html[data-design="v2"] .ds-image-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.7) 50%,
+    transparent 70%
+  );
+  animation: ds-shimmer-sweep 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+/* Dark variant — for containers whose surface is dark gray (e.g. v2
+   project covers via gray-dark-fill). Lowers the sweep alpha so the
+   highlight reads as a subtle sheen rather than a hard flash. */
+html[data-design="v2"] .ds-image-shimmer.is-dark {
+  background-color: #4A4A4A;
+}
+html[data-design="v2"] .ds-image-shimmer.is-dark::after {
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 70%
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-design="v2"] .ds-image-shimmer::after {
+    animation: none;
   }
 }
 

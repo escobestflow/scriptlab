@@ -467,6 +467,17 @@ function ComponentsSection() {
           <img src="/icon-options.svg" alt="" width={13} height={3} aria-hidden="true" />
         </span>
       </ComponentRow>
+
+      <ComponentRow
+        title="Image shimmer"
+        usedIn="`.ds-image-shimmer` — drop onto a placeholder div sized like the eventual image. Renders ONLY while an AI image-generation API call is in-flight for that asset (project thumbnail, scene thumb, character portrait). Pair with `.is-dark` over dark surfaces (e.g. project covers). Honors prefers-reduced-motion."
+      >
+        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <div className="ds-image-shimmer" style={{ width: 100, height: 122, borderRadius: 12 }} />
+          <div className="ds-image-shimmer" style={{ width: 101, height: 72, borderRadius: 8 }} />
+          <div className="ds-image-shimmer is-dark" style={{ width: 80, height: 107, borderRadius: 6 }} />
+        </div>
+      </ComponentRow>
     </div>
   );
 }
