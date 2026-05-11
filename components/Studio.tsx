@@ -903,13 +903,26 @@ export function Studio({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        let message = `HTTP ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.error) message = String(errData.error);
+        } catch { /* non-JSON body */ }
+        console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId}: ${message}`);
+        return;
+      }
       const data = await res.json();
       const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
-      if (!thumb) return;
+      if (!thumb) {
+        console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId}: API returned no thumbnail`);
+        return;
+      }
       setBeats(bs => bs.map(b =>
         b.id === beatId && !b.thumbnail ? { ...b, thumbnail: thumb } : b
       ));
+    } catch (err: any) {
+      console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId} threw:`, err?.message || err);
     } finally {
       sceneImagesInFlight.current.delete(beatId);
       setScenesInFlight(prev => {
@@ -1029,10 +1042,21 @@ export function Studio({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        let message = `HTTP ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.error) message = String(errData.error);
+        } catch { /* non-JSON body */ }
+        console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: ${message}`);
+        return;
+      }
       const data = await res.json();
       const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
-      if (!thumb) return;
+      if (!thumb) {
+        console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: API returned no thumbnail`);
+        return;
+      }
       setStory(s => {
         const live = getActiveCharactersDraft(s).characters;
         const liveCh = live.find(c => c.id === characterId);
@@ -1045,6 +1069,8 @@ export function Studio({
           ),
         });
       });
+    } catch (err: any) {
+      console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId} threw:`, err?.message || err);
     } finally {
       characterImagesInFlight.current.delete(characterId);
       setCharsInFlight(prev => {

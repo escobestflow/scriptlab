@@ -21,6 +21,7 @@ import sharp from "sharp";
 import { buildImagePrompt } from "@/lib/thumbnailPrompt";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import { isV2User } from "@/lib/v2Access";
+import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,56 +57,30 @@ export async function POST(req: Request) {
       anthropicKey,
     );
 
-    // Stage 2: route by design tier. V2 users get gpt-image-2 (better
-    // quality, ~5× the cost); v1 stays on dall-e-3 (legacy, cheaper).
-    // Wide landscape framing for both models — the same source image
-    // is reused at every placement on the dashboard.
+    // Stage 2: route by design tier with automatic fallback. V2 users
+    // try gpt-image-2 first (better quality, ~5x cost); if that fails
+    // for any reason (model unavailable, content moderation, quota,
+    // transient 5xx) the helper retries on dall-e-3. V1 users go
+    // straight to dall-e-3. See lib/imageGenWithFallback.ts.
     const isV2 = isV2User(req.headers.get("x-user-email"));
-    const imageBody = isV2
-      ? {
-          model: "gpt-image-2",
-          prompt,
-          n: 1,
-          size: "1536x768",    // 2:1 landscape — valid for gpt-image-2 (edges %16, ratio ≤ 3:1)
-          quality: "high",
-          // NOTE: no response_format. gpt-image-2 always returns
-          // base64 in data[0].b64_json — passing response_format
-          // causes a 400 "Unknown parameter".
-        }
-      : {
-          model: "dall-e-3",
-          prompt,
-          n: 1,
-          size: "1792x1024",   // dall-e-3's widest native landscape (~16:9)
-          response_format: "b64_json",
-          quality: "standard",
-        };
-    const res = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(imageBody),
+    const attempt = await generateImageWithFallback({
+      apiKey,
+      prompt,
+      sizes: { gptImage2: "1536x768", dallE3: "1792x1024" },
+      context: `generate-thumbnail project="${title || "Untitled"}"`,
+      preferV2: isV2,
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      return new Response(JSON.stringify({ error: `Image generation error (${imageBody.model}): ${err}` }), {
+    if (!attempt.ok) {
+      return new Response(JSON.stringify({
+        error: `Image generation failed: ${attempt.error}`,
+      }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    const data = await res.json();
-    const b64 = data.data?.[0]?.b64_json;
-
-    if (!b64) {
-      return new Response(JSON.stringify({ error: "No image returned" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const b64 = attempt.b64;
 
     // Compress: wide source PNG → 512x288 (16:9) JPEG. Source aspect
     // is ~2:1 (gpt-image-2) or ~16:9 (dall-e-3); fit:cover with
@@ -119,11 +94,15 @@ export async function POST(req: Request) {
 
     const dataUrl = `data:image/jpeg;base64,${jpegBuffer.toString("base64")}`;
 
-    return new Response(JSON.stringify({ thumbnail: dataUrl }), {
+    return new Response(JSON.stringify({ thumbnail: dataUrl, model: attempt.model }), {
+      // Same response shape as before plus a `model` field telling the
+      // client which path won (gpt-image-2 vs dall-e-3 fallback). Used
+      // for in-app debugging only — the frontend doesn't gate on this.
       headers: { "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    console.error("[generate-thumbnail] uncaught:", err?.message || err);
+    return new Response(JSON.stringify({ error: err?.message || String(err) }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

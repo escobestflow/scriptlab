@@ -228,6 +228,12 @@ export default function Page() {
   // message. Cleared after 3.5s so "Sent!" lingers long enough to
   // read but doesn't persist.
   const [emailToast, setEmailToast] = useState<string | null>(null);
+  // Thumbnail-generation feedback. `null` = hidden; non-empty string
+  // shows the message (success or error) for ~4s. Surfacing this is
+  // critical for "regenerate ran but image didn't change" scenarios —
+  // without the toast, the user sees shimmer → stop → nothing, with
+  // no signal whether the API call succeeded or failed.
+  const [thumbnailToast, setThumbnailToast] = useState<string | null>(null);
   // `true` while /api/send-email is in flight. Gates the Studio
   // top-nav envelope icon and the hamburger menu item so the user
   // can't double-fire a send.
@@ -915,15 +921,39 @@ export default function Page() {
       next.add(projectId);
       return next;
     });
+    // showError + clearToast are local helpers so every failure path
+    // gives the user the same surface (a toast at the bottom of the
+    // screen) AND a console.error for devtools — previously this
+    // function swallowed every failure, so a broken API endpoint
+    // looked exactly like a successful regenerate "with no change."
+    const showError = (msg: string) => {
+      console.error(`[generateThumbnail] project="${title}" id=${projectId}: ${msg}`);
+      setThumbnailToast(`Couldn't generate image: ${msg}`);
+      window.setTimeout(() => setThumbnailToast(null), 5000);
+    };
     try {
       const res = await fetch("/api/generate-thumbnail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, logline, genres, extra }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        // Try to extract the error message from the JSON body; fall
+        // back to the HTTP status if the body isn't JSON or is empty.
+        let message = `HTTP ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.error) message = String(errData.error);
+          else if (errData?.message) message = String(errData.message);
+        } catch { /* non-JSON body, stick with the status */ }
+        showError(message);
+        return;
+      }
       const data = await res.json();
-      if (!data.thumbnail) return;
+      if (!data.thumbnail) {
+        showError("API returned no thumbnail");
+        return;
+      }
       // Update local state AND persist to DB. Without the
       // saveProjectToDB call, the thumbnail only lived in
       // React state — a reload (or returning to Projects from
@@ -936,9 +966,15 @@ export default function Page() {
         return updated;
       }));
       if (user && updated) {
-        try { await saveProjectToDB(user.id, updated); } catch { /* persist failure is non-fatal */ }
+        try {
+          await saveProjectToDB(user.id, updated);
+        } catch (e: any) {
+          console.warn(`[generateThumbnail] persist failed (non-fatal):`, e?.message || e);
+        }
       }
-    } catch {} finally {
+    } catch (err: any) {
+      showError(err?.message || String(err));
+    } finally {
       projectThumbnailsInFlight.current.delete(projectId);
       setThumbsInFlight(prev => {
         const next = new Set(prev);
@@ -967,11 +1003,17 @@ export default function Page() {
     if (!user) return;
     for (const p of projects) {
       if (p.thumbnail) continue;
+      // Only require a title — the API (lib/thumbnailPrompt.ts)
+      // gracefully infers the [SUBJECT] from title alone when no
+      // logline / genres are present. Previously we required either
+      // a logline or a concept.summary, which silently skipped any
+      // project that hadn't yet picked up either (e.g. easy-mode
+      // projects whose initial logline write hadn't persisted on the
+      // first render after creation). generateThumbnail dedups +
+      // manages thumbsInFlight internally.
+      if (!p.title?.trim()) continue;
       const draft = getActiveConceptDraft(p);
       const summary = draft.concept?.summary ?? "";
-      if (!draft.logline?.trim() && !summary.trim()) continue;
-      // generateThumbnail dedups + manages thumbsInFlight internally,
-      // so we just call it — no need to early-return on in-flight.
       generateThumbnail(
         p.id,
         p.title,
@@ -2254,6 +2296,13 @@ export default function Page() {
           Content is dynamic ("Sending…" / "Sent to …" / "Failed to send: …"). */}
       <div className={`toast ${emailToast ? "show" : ""}`} style={{ bottom: 78 }}>
         {emailToast}
+      </div>
+
+      {/* Thumbnail-generation error toast. Bumped 24px above the email
+          toast so the two can coexist if both fire (unlikely but cheap
+          to handle). Cleared after 5s by the timer in showError. */}
+      <div className={`toast ${thumbnailToast ? "show" : ""}`} style={{ bottom: 102 }}>
+        {thumbnailToast}
       </div>
 
       {/* ── Email project picker sheet ──

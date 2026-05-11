@@ -11,6 +11,7 @@
 import sharp from "sharp";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import { isV2User } from "@/lib/v2Access";
+import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,51 +100,26 @@ export async function POST(req: Request) {
     );
     const isV2 = isV2User(req.headers.get("x-user-email"));
 
-    // Image gen — vertical 4:5 portrait. gpt-image-2 supports custom
-    // sizes; dall-e-3's nearest portrait is 1024x1792 (9:16, slightly
-    // taller than 4:5 but acceptable; sharp will center-crop).
-    const imageBody = isV2
-      ? {
-          model: "gpt-image-2",
-          prompt,
-          n: 1,
-          size: "1024x1280",  // 4:5 vertical, edges %16, valid for gpt-image-2
-          quality: "high",
-        }
-      : {
-          model: "dall-e-3",
-          prompt,
-          n: 1,
-          size: "1024x1792",
-          response_format: "b64_json",
-          quality: "standard",
-        };
-
-    const res = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(imageBody),
+    // Image gen — vertical 4:5 portrait with automatic fallback.
+    // gpt-image-2 first for v2 users; dall-e-3 fallback if it fails.
+    // dall-e-3's nearest portrait is 1024x1792 (9:16, slightly taller
+    // than 4:5 but acceptable; sharp will center-crop).
+    const attempt = await generateImageWithFallback({
+      apiKey,
+      prompt,
+      sizes: { gptImage2: "1024x1280", dallE3: "1024x1792" },
+      context: "generate-character-image",
+      preferV2: isV2,
     });
-
-    if (!res.ok) {
-      const err = await res.text();
-      return new Response(JSON.stringify({ error: `Image generation error (${imageBody.model}): ${err}` }), {
+    if (!attempt.ok) {
+      return new Response(JSON.stringify({
+        error: `Image generation failed: ${attempt.error}`,
+      }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }
-
-    const data = await res.json();
-    const b64 = data.data?.[0]?.b64_json;
-    if (!b64) {
-      return new Response(JSON.stringify({ error: "No image returned" }), {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
+    const b64 = attempt.b64;
 
     // Compress: source PNG → 500x600 (5:6) JPEG (~30–60KB). Card
     // displays at 100x120 logical / 200x240 retina, so 500x600 gives
