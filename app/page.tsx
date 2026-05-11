@@ -61,6 +61,30 @@ function markFirstProjectOnboardingSeen() {
   } catch { /* ignore */ }
 }
 
+/* Turn an OpenAI-style image-gen failure into a single readable
+   sentence suitable for a toast. Branches on the machine-readable
+   `code` field (passed through from /api/generate-thumbnail) so
+   account-level problems — billing limit hit, quota exhausted,
+   account deactivated — get an actionable message instead of the
+   raw error string. Returns generic "Couldn't generate image:
+   <msg>" for everything else. */
+function friendlyImageGenError(message: string, code: string | null): string {
+  switch (code) {
+    case "billing_hard_limit_reached":
+      return "Image generation is paused — the OpenAI account hit its billing hard limit. Raise the cap at platform.openai.com/account/billing/limits and try again.";
+    case "insufficient_quota":
+      return "The OpenAI account has no remaining quota. Top up your balance at platform.openai.com/account/billing and try again.";
+    case "account_deactivated":
+      return "The OpenAI account is deactivated. Check platform.openai.com/account before retrying.";
+    case "rate_limit_exceeded":
+      return "OpenAI is rate-limiting us right now — wait a minute and try regenerating.";
+    case "content_policy_violation":
+      return "Image was rejected by OpenAI's content policy. Try editing the project title / logline so the prompt steers clear of the flagged terms.";
+    default:
+      return `Couldn't generate image: ${message}`;
+  }
+}
+
 type MainTab = "projects" | "moments";
 
 /* ======= SVG Icons (from design assets) ======= */
@@ -913,23 +937,40 @@ export default function Page() {
     logline: string,
     genres: string[],
     extra: string = "",
+    opts: { auto?: boolean } = {},
   ) {
     if (projectThumbnailsInFlight.current.has(projectId)) return;
+    // Auto-fill no-ops when the account is out of credit. Manual
+    // regenerate (auto !== true) ALWAYS fires — the user's explicit
+    // tap should produce SOME response (a toast, at minimum).
+    if (opts.auto && accountLimitHit.current) return;
     projectThumbnailsInFlight.current.add(projectId);
     setThumbsInFlight(prev => {
       const next = new Set(prev);
       next.add(projectId);
       return next;
     });
-    // showError + clearToast are local helpers so every failure path
-    // gives the user the same surface (a toast at the bottom of the
-    // screen) AND a console.error for devtools — previously this
-    // function swallowed every failure, so a broken API endpoint
-    // looked exactly like a successful regenerate "with no change."
-    const showError = (msg: string) => {
-      console.error(`[generateThumbnail] project="${title}" id=${projectId}: ${msg}`);
-      setThumbnailToast(`Couldn't generate image: ${msg}`);
-      window.setTimeout(() => setThumbnailToast(null), 5000);
+    // showError gives every failure path the same surface — a toast
+    // at the bottom of the screen + a console.error for devtools.
+    // Toast copy is formatted by `friendlyImageGenError` so account-
+    // level failures (billing limit, no quota) get an actionable
+    // message instead of the raw JSON OpenAI returns.
+    const showError = (rawMessage: string, code: string | null) => {
+      console.error(`[generateThumbnail] project="${title}" id=${projectId} code=${code || "none"}: ${rawMessage}`);
+      // Trip the circuit breaker for account-level failures so the
+      // auto-fill loop stops burning failed requests. Manual regen
+      // still works (and a success clears the flag below).
+      if (
+        code === "billing_hard_limit_reached" ||
+        code === "insufficient_quota" ||
+        code === "account_deactivated"
+      ) {
+        accountLimitHit.current = true;
+      }
+      setThumbnailToast(friendlyImageGenError(rawMessage, code));
+      // Longer dwell (8s) than other toasts because the billing-limit
+      // copy is multi-sentence and needs more reading time.
+      window.setTimeout(() => setThumbnailToast(null), 8000);
     };
     try {
       const res = await fetch("/api/generate-thumbnail", {
@@ -938,22 +979,28 @@ export default function Page() {
         body: JSON.stringify({ title, logline, genres, extra }),
       });
       if (!res.ok) {
-        // Try to extract the error message from the JSON body; fall
-        // back to the HTTP status if the body isn't JSON or is empty.
+        // Extract error message + machine-readable code from the JSON
+        // body; fall back to the HTTP status if the body isn't JSON.
         let message = `HTTP ${res.status}`;
+        let code: string | null = null;
         try {
           const errData = await res.json();
           if (errData?.error) message = String(errData.error);
           else if (errData?.message) message = String(errData.message);
+          if (errData?.code) code = String(errData.code);
         } catch { /* non-JSON body, stick with the status */ }
-        showError(message);
+        showError(message, code);
         return;
       }
       const data = await res.json();
       if (!data.thumbnail) {
-        showError("API returned no thumbnail");
+        showError("API returned no thumbnail", null);
         return;
       }
+      // Success → clear the circuit breaker. If the user topped up
+      // their account and a manual retry just succeeded, re-enable
+      // auto-fill for the rest of the session.
+      accountLimitHit.current = false;
       // Update local state AND persist to DB. Without the
       // saveProjectToDB call, the thumbnail only lived in
       // React state — a reload (or returning to Projects from
@@ -973,7 +1020,7 @@ export default function Page() {
         }
       }
     } catch (err: any) {
-      showError(err?.message || String(err));
+      showError(err?.message || String(err), null);
     } finally {
       projectThumbnailsInFlight.current.delete(projectId);
       setThumbsInFlight(prev => {
@@ -999,6 +1046,14 @@ export default function Page() {
   // flight," with no in-between/orphan states.
   const projectThumbnailsInFlight = useRef<Set<string>>(new Set());
   const [thumbsInFlight, setThumbsInFlight] = useState<Set<string>>(new Set());
+  // Session-scoped circuit breaker. Set true the first time the API
+  // returns an account-level failure (billing hard limit, no quota,
+  // account deactivated). Subsequent AUTO-fill attempts no-op so the
+  // background loop doesn't burn through 200 failed requests + 200
+  // toasts when the OpenAI account is genuinely empty. Manual
+  // regenerate (user-initiated) still goes through; a successful
+  // manual regen clears the flag and re-enables auto-fill.
+  const accountLimitHit = useRef<boolean>(false);
   useEffect(() => {
     if (!user) return;
     for (const p of projects) {
@@ -1019,6 +1074,8 @@ export default function Page() {
         p.title,
         draft.logline || summary,
         draft.settings.genres,
+        "",
+        { auto: true },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

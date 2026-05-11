@@ -101,7 +101,8 @@ export async function POST(req: Request) {
     });
     if (!attempt.ok) {
       return new Response(JSON.stringify({
-        error: `Image generation failed: ${attempt.error}`,
+        error: attempt.error,
+        code: attempt.code,
       }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
