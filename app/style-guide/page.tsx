@@ -13,10 +13,71 @@
 // mount regardless of the global flag so the guide renders correctly
 // even if the viewer isn't on the v2 list (preview / debugging).
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { useIsV2 } from "@/lib/v2Access";
+
+/* ─────────────────────────────────────────────────────────────────
+   Copy-to-clipboard chip — appears at the right of every token /
+   component label so we can refer to a piece of the design system
+   by its exact id when iterating. Hit target is 44x44 via an
+   `::before` pseudo-element that extends past the visible 32x32
+   bounds, satisfying the WCAG 2.5.5 / Apple HIG minimum without
+   bloating the layout.
+   ───────────────────────────────────────────────────────────────── */
+
+function CopyIdButton({ id }: { id: string }) {
+  const [copied, setCopied] = useState(false);
+  async function handleCopy(e: React.MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    try {
+      // navigator.clipboard is the modern path; falls back to a
+      // textarea + execCommand on older Safari builds the style
+      // guide may be opened on.
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(id);
+      } else if (typeof document !== "undefined") {
+        const ta = document.createElement("textarea");
+        ta.value = id;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "absolute";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* swallow — silent failure is fine for a dev page */
+    }
+  }
+  return (
+    <button
+      type="button"
+      className={`sg-copy-btn${copied ? " is-copied" : ""}`}
+      onClick={handleCopy}
+      aria-label={copied ? `Copied ${id}` : `Copy ${id}`}
+      title={copied ? "Copied!" : `Copy "${id}"`}
+    >
+      {copied ? (
+        // Check glyph — 1.8 stroke matches the rest of the SVG iconry
+        // in this page (back arrow uses the same metrics).
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ) : (
+        // Standard "copy" icon — back square + front square stacked.
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2"/>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      )}
+    </button>
+  );
+}
 
 export default function StyleGuidePage() {
   const { user, loading } = useAuth();
@@ -125,7 +186,10 @@ function TypeSection() {
         <div key={t.cls} className="sg-row sg-row-type">
           <div className={`sg-type-sample ${t.cls}`}>{t.sample}</div>
           <div className="sg-meta">
-            <code className="sg-token">.{t.cls}</code>
+            <div className="sg-meta-head">
+              <code className="sg-token">.{t.cls}</code>
+              <CopyIdButton id={t.cls} />
+            </div>
             <span className="sg-spec">{t.mobile}{t.desktop ? <>  ·  desktop {t.desktop}</> : null}</span>
             <span className="sg-where">{t.usedIn}</span>
           </div>
@@ -192,7 +256,10 @@ function ColorSection() {
             }}
           />
           <div className="sg-meta">
-            <code className="sg-token">--ds-{c.name}</code>
+            <div className="sg-meta-head">
+              <code className="sg-token">--ds-{c.name}</code>
+              <CopyIdButton id={`--ds-${c.name}`} />
+            </div>
             <span className="sg-spec sg-hex">{c.hex.toUpperCase()}</span>
             {c.usedIn && <span className="sg-where">{c.usedIn}</span>}
           </div>
@@ -492,7 +559,10 @@ function ComponentRow({
   return (
     <div className="sg-row sg-row-component">
       <div className="sg-meta">
-        <span className="sg-comp-label">{title}</span>
+        <div className="sg-meta-head">
+          <span className="sg-comp-label">{title}</span>
+          <CopyIdButton id={title} />
+        </div>
         <span className="sg-where">{usedIn}</span>
       </div>
       <div className="sg-comp-demo">{children}</div>

@@ -6397,6 +6397,24 @@ html[data-design="v2"] .ds-image-shimmer.is-dark::after {
   }
 }
 
+/* ── Populated Ideas tab top-of-viewport mask ──────────────────────
+   Fixed 100px slab in app-background color, pinned to the viewport
+   top. Sits above the scroll content (so the list visibly slides
+   under it) and below the topbar buttons (z:30) so menu / add stay
+   tappable. The topbar's own background is transparent in v2, so
+   this slab effectively backs the topbar area + the first ~45px of
+   content with a solid surface. */
+html[data-design="v2"] .v2-ideas-top-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: var(--ds-color-app-background);
+  z-index: 25;
+  pointer-events: none;
+}
+
 /* App-shell mobile background. Bounded to viewports below the
    1440px desktop breakpoint so desktop keeps falling through to
    v1's body background until a desktop app-background value is
@@ -7267,6 +7285,63 @@ html[data-design="v2"] .sg-meta {
   gap: 4px;
   margin-top: 14px;
   color: var(--ds-color-gray-chip-label);
+}
+/* Head line within `.sg-meta` — pairs the token/component label
+   on the left with the copy-id button on the right. The button is
+   pinned to the right edge of the row via space-between so it sits
+   in a predictable spot regardless of label length. */
+html[data-design="v2"] .sg-meta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  /* Component rows have an oversized `.sg-comp-label` (22-28px) —
+     align the button to the label's vertical center via the flex
+     align-items setting above; no further offset needed. */
+}
+/* Copy-id button — appears in every `.sg-meta-head`. Visible box is
+   32x32 with a 16x16 icon; a pseudo-element extends the tap area
+   to a full 44x44 so the hit target meets WCAG 2.5.5 / Apple HIG
+   without adding visible padding to the layout. */
+html[data-design="v2"] .sg-copy-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ds-color-gray-chip-label);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+/* Invisible hit-target extension — 6px halo on every side brings the
+   effective tap area from 32x32 to 44x44 px. */
+html[data-design="v2"] .sg-copy-btn::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+html[data-design="v2"] .sg-copy-btn:hover {
+  background: var(--ds-color-gray-chip-fill);
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .sg-copy-btn:active {
+  opacity: 0.7;
+}
+html[data-design="v2"] .sg-copy-btn.is-copied {
+  color: var(--ds-color-black);
+  background: var(--ds-color-gray-chip-fill);
+}
+html[data-design="v2"] .sg-copy-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 html[data-design="v2"] .sg-token {
   font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", "Menlo", monospace;

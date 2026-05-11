@@ -3428,6 +3428,14 @@ function MomentsTab({
 
   return (
     <>
+      {/* Top-of-screen mask, v2 only. Paints a 100px-tall band in the
+          page background color, fixed at the viewport top. Sits ABOVE
+          the scroll content so the list visibly slides under it, and
+          BELOW the topbar's menu / add buttons so those stay tappable.
+          Only rendered on the populated Ideas tab — the empty state's
+          door-graphic already extends to the top edge and would clash
+          with a same-color slab on top of it. */}
+      {isV2 && <div className="v2-ideas-top-mask" aria-hidden="true" />}
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 40 - (isV2 ? 15 : 0) }}>
         <div className="display ideas-tab-heading ds-type-tab-header">Ideas</div>
         <Button
