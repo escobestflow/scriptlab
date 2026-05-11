@@ -806,16 +806,17 @@ export function Studio({
     }
   };
 
-  // Track which beats are currently having a thumbnail generated
-  // so the auto-fill effect below doesn't double-fire on the same
-  // beat across re-renders (story state mutates several times
-  // during the request lifecycle).
+  // Track which beats / characters are currently having a
+  // thumbnail generated so the auto-fill effects below don't
+  // double-fire on the same id across re-renders (story state
+  // mutates several times during a single request lifecycle).
   const sceneImagesInFlight = useRef<Set<string>>(new Set());
+  const characterImagesInFlight = useRef<Set<string>>(new Set());
 
   // Auto-fill missing scene thumbnails. Fires whenever the story
   // state changes — picks up beats produced by the bulk Add All
-  // Scenes path, individual sheet saves, or any future path that
-  // creates beats without a thumbnail.
+  // Scenes path, individual sheet saves, easy-mode runs, or any
+  // future path that creates beats without a thumbnail.
   useEffect(() => {
     const draft = getActiveStoryLayerDraft(story);
     const allBeats = isTV && activeEpisodeId
@@ -837,6 +838,29 @@ export function Studio({
     // or fills in their names triggers a re-scan.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story, isTV, activeEpisodeId]);
+
+  // Same auto-fill, characters edition. Fires on story-state
+  // change for any character with a name + no thumbnail. Picks
+  // up cast produced by the bulk Add All Characters path AND
+  // by easy-mode sync_concept_to_characters runs — without this,
+  // characters created in bulk never get auto-portraits (the
+  // existing close-sheet path only covers manual additions).
+  useEffect(() => {
+    const draft = getActiveCharactersDraft(story);
+    for (const c of draft.characters) {
+      if (
+        c.name?.trim() &&
+        !c.thumbnail &&
+        !characterImagesInFlight.current.has(c.id)
+      ) {
+        characterImagesInFlight.current.add(c.id);
+        autoGenerateCharacterImage(c.id)
+          .catch(() => { /* swallow — image stays unset */ })
+          .finally(() => characterImagesInFlight.current.delete(c.id));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story]);
 
   // Studio-level scene-image generation. Fire-and-forget; result
   // patches back via setStory and won't overwrite a thumbnail the

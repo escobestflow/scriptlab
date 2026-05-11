@@ -922,13 +922,50 @@ export default function Page() {
       });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.thumbnail) {
-        setProjects(ps => ps.map(p =>
-          p.id === projectId ? { ...p, thumbnail: data.thumbnail } : p
-        ));
+      if (!data.thumbnail) return;
+      // Update local state AND persist to DB. Without the
+      // saveProjectToDB call, the thumbnail only lived in
+      // React state — a reload (or returning to Projects from
+      // anywhere) would lose it, so easy-mode projects looked
+      // like they "never got" cover art.
+      let updated: Story | null = null;
+      setProjects(ps => ps.map(p => {
+        if (p.id !== projectId) return p;
+        updated = { ...p, thumbnail: data.thumbnail };
+        return updated;
+      }));
+      if (user && updated) {
+        try { await saveProjectToDB(user.id, updated); } catch { /* persist failure is non-fatal */ }
       }
     } catch {}
   }
+
+  // Backfill missing project thumbnails. Runs once whenever the
+  // projects list changes — any project that doesn't have a
+  // `thumbnail` set yet (e.g. easy-mode projects from before the
+  // generate-on-success path persisted to DB, or projects whose
+  // initial generate call silently failed) gets a fresh
+  // generate attempt. Same dedupe via a ref-Set as the scene /
+  // character auto-fill effects in Studio.
+  const projectThumbnailsInFlight = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!user) return;
+    for (const p of projects) {
+      if (p.thumbnail) continue;
+      if (projectThumbnailsInFlight.current.has(p.id)) continue;
+      const draft = getActiveConceptDraft(p);
+      const summary = draft.concept?.summary ?? "";
+      if (!draft.logline?.trim() && !summary.trim()) continue;
+      projectThumbnailsInFlight.current.add(p.id);
+      generateThumbnail(
+        p.id,
+        p.title,
+        draft.logline || summary,
+        draft.settings.genres,
+      ).finally(() => projectThumbnailsInFlight.current.delete(p.id));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projects, user]);
 
   function updateMoment(id: string, patch: Partial<Moment>) {
     const updated = moments.find(m => m.id === id);

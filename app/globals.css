@@ -6618,21 +6618,26 @@ html[data-design="v2"] .projects-tab-heading + .ds-btn {
    light "floor" below extends down through the page so the title /
    subtitle / CTA stack naturally overlays the floor area. No inline
    <img> element is rendered in v2 — JSX gates it on `isV2`. */
-html[data-design="v2"] .projects-empty {
+/* When the empty Projects state is rendered, paint the door
+   image on the html element itself — covers the entire viewport
+   including the safe-area inset + the absolute topbar area. The
+   `.projects-empty` element only covered the screen-scroll's
+   box (which starts AFTER the topbar), so a strip of v2's
+   gray-white page background was visible behind the menu / add
+   buttons. Painting on `html` collapses that gap to zero. */
+html[data-design="v2"]:has(.projects-empty) {
   background-image: url("/v2/unfold-mobile-bg-final-final.png");
   background-size: cover;
-  /* `fixed` anchors the image to the viewport, not the element —
-     so even if the page does scroll, the door / floor stay put.
-     Combined with the :has(.projects-empty) override on the scroll
-     container below (locks vertical overflow), the empty-state
-     surface reads as a non-scrolling poster. */
   background-attachment: fixed;
-  /* Graphic vertical position. Tuning chain: -80 → +40 → +10.
-     Latest -30 lifts the door a hair so the new (taller)
-     ds-type-empty-header title + the lifted copy block don't
-     crowd against it. */
   background-position: center calc(50% + 10px);
   background-repeat: no-repeat;
+}
+html[data-design="v2"] .projects-empty {
+  /* The element itself no longer needs its own bg-image — the
+     html-level paint above handles it. We keep the layout block
+     (flex column, anchored to flex-end) so the text + button
+     stack sits at the lower portion of the screen. */
+  background-image: none;
   /* Stretch to the visible viewport between top nav + tab bar so the
      bg image fills the screen. dvh handles iOS dynamic toolbars. */
   min-height: 100dvh;
@@ -7797,10 +7802,10 @@ html[data-design="v2"] .layer-bar {
      within the bar, but since min-height grows by 6 (downward —
      position:fixed pins the top) the bar's bottom moves down 6,
      so net trigger screen-y is +3.
-     Latest: padding-bottom 15 → 13 lowers the trigger another 2
-     within the bar, so net trigger screen-y is +5 from the
-     original 94/12 baseline. */
-  padding: 0 30px 13px;
+     Latest: padding-bottom 15 → 13 → 12 lowers the trigger
+     another 3 within the bar, so net trigger screen-y is +6
+     from the original 94/12 baseline. */
+  padding: 0 30px 12px;
   z-index: 9;
   background: var(--ds-color-app-background);
   /* Drop the v1 SVG draft-bar-bg. */
