@@ -6398,13 +6398,14 @@ html[data-design="v2"] .ds-image-shimmer.is-dark::after {
 }
 
 /* ── Populated Ideas tab top-of-viewport mask ──────────────────────
-   Fixed 100px slab in app-background color, pinned to the viewport
-   top. Sits above the scroll content (the list visibly slides under
-   it) and below the topbar buttons (z:30) so menu / add stay
-   tappable. The topbar's own background is transparent in v2, so
-   this slab backs the topbar area + first ~45px of content with a
-   solid surface; the heading / search bar / filter pills sit BELOW
-   the mask in the page flow and remain visible.
+   Fixed 80px slab in app-background color, pinned to the viewport
+   top. Sits below the topbar buttons (z:30) so menu / add stay
+   tappable. Height 80px is exactly the y-coordinate where the
+   scroll content's first row (the "Ideas" heading) starts, so the
+   mask is flush with the heading's top edge — no overlap, no
+   "covering" of in-flow content. The sticky search-bar wrapper
+   (below) pins at y_viewport=80 too, picking up exactly where the
+   mask ends.
 
    Rendered OUTSIDE .page-enter at the .app-content level — the
    `.page-enter` wrapper's residual `transform: translateY(0)` (from
@@ -6416,10 +6417,52 @@ html[data-design="v2"] .v2-ideas-top-mask {
   top: 0;
   left: 0;
   right: 0;
-  height: 100px;
+  height: 80px;
   background: var(--ds-color-app-background);
   z-index: 25;
   pointer-events: none;
+}
+
+/* ── Sticky search-bar + filter-pills wrapper ──────────────────────
+   Wraps the populated Ideas tab's `.search-bar` and `.filter-row`
+   so they pin TOGETHER at the top edge of the mask's lower boundary
+   (y_viewport=80) once the heading has scrolled past. Activation
+   point ≈ 67–114px of scroll (depends on the device's safe-area
+   inset), at which the search bar reaches y=80 and stops there;
+   the filter pills follow ~18px below it. Below them, the list
+   continues to scroll naturally.
+
+   `top: calc(80px - safe-area)` resolves to (mask bottom − scroll-
+   port top) on every device, so the sticky pin is always flush
+   with the mask's bottom edge regardless of notch / Dynamic Island.
+
+   Edge-to-edge background via -20/+20 margin/padding pair, matching
+   the existing `.filter-row` pattern so the sticky bg fills past
+   the scroll container's horizontal padding. */
+html[data-design="v2"] .v2-ideas-sticky-header {
+  position: sticky;
+  /* `top` is measured from `.screen-scroll`'s content edge (the inside
+     of its 55px padding-top), NOT the scrollport's outer edge. To pin
+     the wrapper exactly at y_viewport=80 (the mask's bottom edge),
+     we need: pin_y = content_edge_y + top = safe-area + 55 + top.
+     Solving for top = 25 - safe-area. The `env()` calc yields a
+     negative number on notch devices, which is what sticky needs to
+     pin earlier than the content edge. */
+  top: calc(25px - env(safe-area-inset-top, 0px));
+  background: var(--ds-color-app-background);
+  z-index: 24;
+  margin-left: -20px;
+  margin-right: -20px;
+  padding: 0 20px;
+}
+/* Demote the inner filter-row from its own sticky behavior — the
+   wrapper above is the sticky element now. Without this, the row
+   would try to sticky-pin at top:0 (its v1 default) and fight with
+   the parent. */
+html[data-design="v2"] .v2-ideas-sticky-header .filter-row {
+  position: relative;
+  top: auto;
+  z-index: auto;
 }
 
 /* App-shell mobile background. Bounded to viewports below the

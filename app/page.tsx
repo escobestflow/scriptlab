@@ -3544,29 +3544,36 @@ function MomentsTab({
         </Button>
       </div>
 
-      <div className="search-bar">
-        <IconSearch />
-        <input
-          className="ds-type-body"
-          placeholder="Search"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-      </div>
-      {/* Note: the `.search-bar` icon+input compound keeps its bespoke wrapper
-          because the layout is "icon inline with input". The styling intent
-          (minimalistic gray, fade-on-focus) matches <Input size="standard">. */}
+      {/* Sticky header — search-bar + filter-pills wrapped together
+          so they pin as a single unit at y_viewport=80 (flush with
+          the mask's bottom edge) once the heading scrolls past. v2
+          only — the wrapper class has no v1 styles, so v1 inherits
+          the previous "search-bar then filter-row" stacking. */}
+      <div className={isV2 ? "v2-ideas-sticky-header" : undefined}>
+        <div className="search-bar">
+          <IconSearch />
+          <input
+            className="ds-type-body"
+            placeholder="Search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        {/* Note: the `.search-bar` icon+input compound keeps its bespoke wrapper
+            because the layout is "icon inline with input". The styling intent
+            (minimalistic gray, fade-on-focus) matches <Input size="standard">. */}
 
-      <div className="filter-row">
-        {MOMENT_FILTERS.map(f => (
-          <button
-            key={f}
-            className={`filter-pill ds-type-selected-option-label ${filter === f ? "active" : ""}`}
-            onClick={() => setFilter(f)}
-          >
-            {f}
-          </button>
-        ))}
+        <div className="filter-row">
+          {MOMENT_FILTERS.map(f => (
+            <button
+              key={f}
+              className={`filter-pill ds-type-selected-option-label ${filter === f ? "active" : ""}`}
+              onClick={() => setFilter(f)}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Dev-only: Convert all notes to AI prompts. Shown only when the
