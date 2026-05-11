@@ -13,10 +13,15 @@
 // mount regardless of the global flag so the guide renders correctly
 // even if the viewer isn't on the v2 list (preview / debugging).
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { useIsV2 } from "@/lib/v2Access";
+
+/* Shared context so every CopyIdButton in the page automatically
+   suffixes its id with the current form factor. Avoids threading
+   `factor` through every ComponentRow callsite (there are ~20). */
+const FormFactorContext = createContext<"mobile" | "desktop">("mobile");
 
 /* ─────────────────────────────────────────────────────────────────
    Copy-to-clipboard chip — appears at the right of every token /
@@ -28,6 +33,12 @@ import { useIsV2 } from "@/lib/v2Access";
    ───────────────────────────────────────────────────────────────── */
 
 function CopyIdButton({ id }: { id: string }) {
+  const factor = useContext(FormFactorContext);
+  // Auto-suffix every copied id with the form factor — so a row's
+  // copy button writes `ds-type-body-mobile` on mobile and
+  // `ds-type-body-desktop` on desktop. Lets us refer to either
+  // side unambiguously when iterating.
+  const fullId = `${id}-${factor}`;
   const [copied, setCopied] = useState(false);
   async function handleCopy(e: React.MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
@@ -36,10 +47,10 @@ function CopyIdButton({ id }: { id: string }) {
       // textarea + execCommand on older Safari builds the style
       // guide may be opened on.
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(id);
+        await navigator.clipboard.writeText(fullId);
       } else if (typeof document !== "undefined") {
         const ta = document.createElement("textarea");
-        ta.value = id;
+        ta.value = fullId;
         ta.setAttribute("readonly", "");
         ta.style.position = "absolute";
         ta.style.left = "-9999px";
@@ -59,8 +70,8 @@ function CopyIdButton({ id }: { id: string }) {
       type="button"
       className={`sg-copy-btn${copied ? " is-copied" : ""}`}
       onClick={handleCopy}
-      aria-label={copied ? `Copied ${id}` : `Copy ${id}`}
-      title={copied ? "Copied!" : `Copy "${id}"`}
+      aria-label={copied ? `Copied ${fullId}` : `Copy ${fullId}`}
+      title={copied ? "Copied!" : `Copy "${fullId}"`}
     >
       {copied ? (
         // Check glyph — 1.8 stroke matches the rest of the SVG iconry
@@ -79,9 +90,30 @@ function CopyIdButton({ id }: { id: string }) {
   );
 }
 
+/* Form-factor detection — matches the 1440px breakpoint used by every
+   v2 type/layout media query in globals.css, so the style guide's
+   "what factor am I on" reading lines up exactly with what the live
+   CSS is rendering. Returns 'mobile' below 1440, 'desktop' at-and-
+   above. SSR-safe (defaults to 'mobile' until hydration). */
+type FormFactor = "mobile" | "desktop";
+function useFormFactor(): FormFactor {
+  const [factor, setFactor] = useState<FormFactor>("mobile");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1440px)");
+    setFactor(mq.matches ? "desktop" : "mobile");
+    const onChange = (e: MediaQueryListEvent) =>
+      setFactor(e.matches ? "desktop" : "mobile");
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return factor;
+}
+
 export default function StyleGuidePage() {
   const { user, loading } = useAuth();
   const isV2 = useIsV2();
+  const factor = useFormFactor();
 
   useEffect(() => {
     const prev = document.documentElement.dataset.design;
@@ -98,37 +130,43 @@ export default function StyleGuidePage() {
     }
   }, [loading, user, isV2]);
 
+  const factorLabel = factor === "desktop" ? "Desktop" : "Mobile";
+
   return (
-    <div className="sg-page">
-      <header className="sg-topbar">
-        <Link href="/" className="sg-back" aria-label="Back to app">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          <span>Back</span>
-        </Link>
-      </header>
+    <FormFactorContext.Provider value={factor}>
+      <div className="sg-page">
+        <header className="sg-topbar">
+          <Link href="/" className="sg-back" aria-label="Back to app">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span>Back</span>
+          </Link>
+        </header>
 
-      <main className="sg-stack">
-        <section className="sg-hero-block">
-          <div className="sg-eyebrow">Design</div>
-          <h1 className="sg-h1">Style Guide</h1>
-          <p className="sg-lede">
-            Tokens and components for the v2 redesign. Every value here
-            is the source of truth.
-          </p>
-        </section>
+        <main className="sg-stack">
+          <section className="sg-hero-block">
+            <div className="sg-eyebrow">Design</div>
+            <h1 className="sg-h1">Style Guide — {factorLabel}</h1>
+            <p className="sg-lede">
+              Tokens and components for the v2 redesign at the {factor}
+              {factor === "mobile" ? " (<1440px)" : " (≥1440px)"} form factor.
+              Resize the window to switch contexts. Copied IDs are suffixed
+              with `-{factor}` so we can refer to either side unambiguously.
+            </p>
+          </section>
 
-        <SectionTitle id="type" label="Type" />
-        <TypeSection />
+          <SectionTitle id="type" label="Type" />
+          <TypeSection factor={factor} />
 
-        <SectionTitle id="color" label="Color" />
-        <ColorSection />
+          <SectionTitle id="color" label="Color" />
+          <ColorSection />
 
-        <SectionTitle id="components" label="Components" />
-        <ComponentsSection />
-      </main>
-    </div>
+          <SectionTitle id="components" label="Components" />
+          <ComponentsSection />
+        </main>
+      </div>
+    </FormFactorContext.Provider>
   );
 }
 
@@ -178,23 +216,30 @@ const TYPE_TOKENS: TypeToken[] = [
   { cls: "ds-type-project-tab-nav-inactive",   sample: "STORY",                                      mobile: "7 / 500 / 0.07em / UPPER",   desktop: "12 / 500 / 0.09em / UPPER", mobilePx: 7, usedIn: "Inactive section tab in project detail." },
 ];
 
-function TypeSection() {
+function TypeSection({ factor }: { factor: FormFactor }) {
   const sorted = [...TYPE_TOKENS].sort((a, b) => b.mobilePx - a.mobilePx);
   return (
     <div className="sg-list">
-      {sorted.map(t => (
-        <div key={t.cls} className="sg-row sg-row-type">
-          <div className={`sg-type-sample ${t.cls}`}>{t.sample}</div>
-          <div className="sg-meta">
-            <div className="sg-meta-head">
-              <code className="sg-token">.{t.cls}</code>
-              <CopyIdButton id={t.cls} />
+      {sorted.map(t => {
+        // Show the spec for the current factor only. Desktop falls back
+        // to the mobile spec for tokens that don't have a desktop variant
+        // (e.g. attribute titles whose size doesn't change at the
+        // breakpoint) so the row never reads as empty.
+        const spec = factor === "desktop" && t.desktop ? t.desktop : t.mobile;
+        return (
+          <div key={t.cls} className="sg-row sg-row-type">
+            <div className={`sg-type-sample ${t.cls}`}>{t.sample}</div>
+            <div className="sg-meta">
+              <div className="sg-meta-head">
+                <code className="sg-token">.{t.cls}</code>
+                <CopyIdButton id={t.cls} />
+              </div>
+              <span className="sg-spec">{spec}</span>
+              <span className="sg-where">{t.usedIn}</span>
             </div>
-            <span className="sg-spec">{t.mobile}{t.desktop ? <>  ·  desktop {t.desktop}</> : null}</span>
-            <span className="sg-where">{t.usedIn}</span>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -258,6 +303,11 @@ function ColorSection() {
           <div className="sg-meta">
             <div className="sg-meta-head">
               <code className="sg-token">--ds-{c.name}</code>
+              {/* CopyIdButton auto-suffixes with the form factor via
+                  FormFactorContext, so the copied id reads e.g.
+                  --ds-color-black-mobile. Colors don't differ between
+                  factors, but the suffix is kept for consistency so
+                  every id copied from the page has the same shape. */}
               <CopyIdButton id={`--ds-${c.name}`} />
             </div>
             <span className="sg-spec sg-hex">{c.hex.toUpperCase()}</span>
