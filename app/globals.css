@@ -6398,18 +6398,25 @@ html[data-design="v2"] .ds-image-shimmer.is-dark::after {
 }
 
 /* ── Populated Ideas tab top-of-viewport mask ──────────────────────
-   Fixed 100px slab in app-background color, pinned to the viewport
-   top. Sits above the scroll content (so the list visibly slides
-   under it) and below the topbar buttons (z:30) so menu / add stay
-   tappable. The topbar's own background is transparent in v2, so
-   this slab effectively backs the topbar area + the first ~45px of
-   content with a solid surface. */
+   Fixed slab in app-background color, pinned to the viewport top.
+   Sits above the scroll content (list visibly slides under it) and
+   below the topbar buttons (z:30) so menu / add stay tappable. The
+   topbar's own background is transparent in v2, so this slab
+   effectively backs the topbar area + the heading row + the search
+   bar with a solid surface — the search bar reads as a fixed-feel
+   element on the gray band, and list rows scroll under everything.
+   Height = safe-area + 230px is enough to cover through the search
+   bar's bottom edge on every supported viewport:
+     safe-area + 55 (topbar) + 25 (heading marginTop)
+     + 47 (heading) + 20 (heading marginBottom)
+     + 56 (search bar) + 18 (search marginBottom)
+     = safe-area + 221px (+ ~9px buffer). */
 html[data-design="v2"] .v2-ideas-top-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: 100px;
+  height: calc(env(safe-area-inset-top, 0px) + 230px);
   background: var(--ds-color-app-background);
   z-index: 25;
   pointer-events: none;
@@ -6718,7 +6725,7 @@ html[data-design="v2"]:has(.projects-empty) {
   background-image: url("/v2/unfold-mobile-bg-final-final.png");
   background-size: cover;
   background-attachment: fixed;
-  background-position: center calc(50% + 10px);
+  background-position: center calc(50% - 38px);
   background-repeat: no-repeat;
 }
 html[data-design="v2"] .projects-empty {
@@ -6728,7 +6735,7 @@ html[data-design="v2"] .projects-empty {
      stays so the asset covers the safe-area inset + topbar. */
   background-image: url("/v2/unfold-mobile-bg-final-final.png");
   background-size: cover;
-  background-position: center calc(50% + 10px);
+  background-position: center calc(50% - 38px);
   background-repeat: no-repeat;
   /* Stretch to the visible viewport between top nav + tab bar so the
      bg image fills the screen. dvh handles iOS dynamic toolbars. */

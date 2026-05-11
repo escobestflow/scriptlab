@@ -3297,60 +3297,32 @@ function IdeasCarousel({
 }
 
 /**
- * Ideas tab first-run hero. Owns the active carousel index so the
- * heading above the frame can cross-fade to the string that matches
- * the current illustration. The body copy, CTA, and down-arrow stay
- * constant — only the title swaps with the image.
+ * Ideas tab first-run hero. Mirrors the Projects empty state exactly
+ * (same `.projects-empty` container, same title/sub typography, same
+ * primary Button CTA) so the two tabs feel like a matched pair. The
+ * door graphic painted on the html element via :has(.projects-empty)
+ * supplies the background; this component only owns the copy stack.
+ *
+ * Previously this surface carried a 5-slide carousel + cross-fading
+ * heading + bouncing-arrow CTA pointing at the record FAB. Retired
+ * in favor of the Projects-empty pattern for visual consistency.
  */
 function IdeasEmptyState({
   onStartRecording,
 }: {
   onStartRecording: () => void;
 }) {
-  const [carouselIndex, setCarouselIndex] = useState(0);
-  // Stable callback so IdeasCarousel's broadcast effect doesn't
-  // re-fire on every parent render.
-  const handleIndexChange = useCallback((i: number) => {
-    setCarouselIndex(i);
-  }, []);
-
   return (
-    <div className="projects-empty ideas-empty">
-      <IdeasCarousel onIndexChange={handleIndexChange} />
-      {/* `key` forces a fresh mount on every slide change so the CSS
-          fade-in animation re-runs; the outgoing element is dropped
-          instantly, which reads as a clean swap rather than a
-          cross-dissolve (simpler + cheaper). */}
-      <h1
-        key={carouselIndex}
-        className="projects-empty-title ideas-empty-title"
-      >
-        {IDEAS_CAROUSEL_HEADINGS[carouselIndex]}
+    <div className="projects-empty">
+      <h1 className="projects-empty-title ds-type-empty-header">
+        Ideas become stories
       </h1>
       <p className="projects-empty-sub">
-        {/* Explicit line breaks guarantee the intended three-line
-            layout regardless of viewport / font-metric drift:
-              1. Record ideas, memories, dreams, conversations,
-              2. or unforgettable moments and let AI turn them
-              3. into scenes and stories. */}
-        Record ideas, memories, dreams, conversations,<br />
-        or unforgettable moments and let AI turn them<br />
-        into scenes and stories.
+        Capture your moments, dreams and memories.<br />Build the story only you can tell.
       </p>
-      <button
-        type="button"
-        className="projects-empty-cta-text"
-        onClick={onStartRecording}
-      >
-        Start Recording
-      </button>
-      <img
-        src="/down-arrow.svg"
-        alt=""
-        width={44}
-        height={50}
-        className="projects-empty-down-arrow"
-      />
+      <Button variant="primary" size="lg" onClick={onStartRecording} style={{ minWidth: 180 }}>
+        SAVE AN IDEA
+      </Button>
     </div>
   );
 }
