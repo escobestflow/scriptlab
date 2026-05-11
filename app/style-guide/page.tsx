@@ -102,7 +102,9 @@ const TYPE_TOKENS: TypeToken[] = [
   { cls: "ds-type-project-page-title",         sample: "Where The Light Bends",                      mobile: "20 / 400 / 0",               desktop: "65 / 400 / 0", mobilePx: 20, usedIn: "Project detail page hero title." },
   { cls: "ds-type-project-card-title",         sample: "Cache",                                      mobile: "20 / 400 / 0",               desktop: "24 / 400 / 0", mobilePx: 20, usedIn: "Project card title in the home grid." },
   { cls: "ds-type-attribute-title",            sample: "Logline",                                    mobile: "13 / 600 / 0",                                            mobilePx: 13, usedIn: "Attribute row labels on project detail." },
-  { cls: "ds-type-body",                       sample: "Body copy — the default text for descriptions, idea cards, search inputs.", mobile: "13 / 400 / 0", mobilePx: 13, usedIn: "Idea-card text, search input, project-card meta." },
+  { cls: "ds-type-body",                       sample: "Body copy — the default text for descriptions, idea cards, search inputs.", mobile: "13 / 400 / 0 / lh 18px", mobilePx: 13, usedIn: "Idea-card text, search input, project-card meta, scene summaries." },
+  { cls: "ds-type-body-bold",                  sample: "Bold body — scene-row title in the Story tab.", mobile: "13 / 700 / 0", mobilePx: 13, usedIn: "Bold variant of body. Used as the scene title in Story-tab rows." },
+  { cls: "ds-type-int-header",                 sample: "INT. APARTMENT - NIGHT",                     mobile: "11 / 700 / 0.09em / UPPER",                              mobilePx: 11, usedIn: "Scene-location slug heading (INT./EXT. lines). Script-tab card slug + Script View sheet sub-title." },
   { cls: "ds-type-body-sm",                    sample: "Smaller body copy — used inside the layer empty-state caption beneath the title.", mobile: "10 / 400 / 0.03em / lh 14px", desktop: "11 / 400 / 0.03em / lh auto", mobilePx: 10, usedIn: "Empty-state caption (Define Your Characters body, Story / Script equivalents)." },
   { cls: "ds-type-cta",                        sample: "ADD A CHARACTER", mobile: "9 / 500 / 0.08em / UPPER", desktop: "11 / 500 / 0.08em / UPPER", mobilePx: 9, usedIn: "Empty-state CTAs (Add Character, Create With AI). Glyph-only — no pill outline, no fill." },
   { cls: "ds-type-button-label",               sample: "ALL",                                        mobile: "12 / 400 / 0.07em / UPPER",                              mobilePx: 12, usedIn: "Generic button labels." },
@@ -327,6 +329,157 @@ function ComponentsSection() {
             <span className="menu-toggle open"><span /><span /><span /></span>
           </span>
         </div>
+      </ComponentRow>
+
+      <ComponentRow
+        title="AI wand chip"
+        usedIn="Per-field AI generate trigger. 27x27 with the paired-bolt glyph (/icon-ai-button.svg), .7px inset stroke, soft drop shadow. Used inline next to attribute labels."
+      >
+        <button type="button" className="ai-wand" aria-label="Generate with AI">
+          <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+        </button>
+      </ComponentRow>
+
+      <ComponentRow
+        title="AI bulk chip — labeled"
+        usedIn="Bulk-generate affordances on layer-bar right slots (Add All Characters, Add All Scenes, Script All Scenes). Same chip styling as the wand, plus a label."
+      >
+        <div className="sg-comp-row sg-comp-row-wrap">
+          <button type="button" className="add-all-characters-chip">
+            <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+            <span>Add All Characters</span>
+          </button>
+          <button type="button" className="add-all-scenes-chip">
+            <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+            <span>Add All Scenes</span>
+          </button>
+        </div>
+      </ComponentRow>
+
+      <ComponentRow
+        title="Number badge"
+        usedIn="21x21 outlined circle that ties a row to its position in a list. Used on Story tab beat rows (with dotted timeline connecting consecutive badges). Written-state inverts (black fill, white digit)."
+      >
+        <div className="sg-comp-row" style={{ gap: 14 }}>
+          <span className="v2-beat-number-badge">1</span>
+          <span className="v2-beat-number-badge written">2</span>
+        </div>
+      </ComponentRow>
+
+      <ComponentRow
+        title="Story scene row"
+        usedIn="Story-tab beat row. Number badge + dotted timeline column, then a card with a 101x72 painted thumb on the left and ds-type-body-bold title + ds-type-body summary stacked on the right."
+      >
+        <div className="v2-beat-row" style={{ maxWidth: 480 }}>
+          <div className="v2-beat-number-col" aria-hidden="true">
+            <span className="v2-beat-number-badge">1</span>
+          </div>
+          <div className="card v2-beat-card beat-card">
+            <div className="beat-header">
+              <div className="beat-grip" aria-hidden="true">
+                <img src="/icon-row-move.svg" alt="" width={6} height={14} aria-hidden="true" />
+              </div>
+              <div
+                className="v2-beat-thumb v2-beat-thumb-placeholder"
+                style={{ background: "var(--ds-color-gray-dark-fill)" }}
+              />
+              <div className="beat-info">
+                <div className="beat-name ds-type-body-bold">Opening Image</div>
+                <div className="beat-summary-preview ds-type-body">A pale sun rises over a strange alien wetland.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ComponentRow>
+
+      <ComponentRow
+        title="Character card"
+        usedIn="Characters-tab populated row. 100x120 portrait flush to the card's left edge, role pill in an accent color, ds-type-body description clamped to 2 lines, options glyph pinned top-right."
+      >
+        <div className="card character-card v2-character-card" style={{ maxWidth: 480 }}>
+          <div className="character-header">
+            <div className="v2-character-portrait v2-character-portrait-placeholder">A</div>
+            <div className="v2-character-body">
+              <div className="v2-character-name ds-type-project-card-title">Alessandra Vance</div>
+              <div className="v2-character-role-pill v2-character-role-protagonist">PROTAGONIST</div>
+              <div className="v2-character-description ds-type-body">
+                A reserved forensic accountant whose carefully ordered life starts unraveling.
+              </div>
+            </div>
+            <span className="v2-character-menu" aria-hidden="true">
+              <img src="/icon-options.svg" alt="" />
+            </span>
+          </div>
+        </div>
+      </ComponentRow>
+
+      <ComponentRow
+        title="Script row"
+        usedIn="Script-tab populated row. 32x32 number badge inside the card top-left, then ds-type-int-header slug, ds-type-project-card-title scene name, ds-type-body summary, page-range + per-scene chip footer."
+      >
+        <div className="v2-script-row" style={{ maxWidth: 480 }}>
+          <div className="card v2-script-card beat-card">
+            <span className="v2-script-number-badge" aria-hidden="true">1</span>
+            <button type="button" className="v2-script-options" aria-label="Scene options">
+              <img src="/icon-options.svg" alt="" aria-hidden="true" />
+            </button>
+            <span className="v2-script-card-tap">
+              <div className="v2-script-slug ds-type-int-header">INT. APARTMENT - NIGHT</div>
+              <div className="v2-script-name ds-type-project-card-title">Opening: The Glitch</div>
+              <p className="v2-script-summary ds-type-body">
+                Waves crash against the rocks as a lone figure watches from the cliffs.
+              </p>
+            </span>
+            <div className="v2-script-footer">
+              <span className="v2-script-pages ds-type-main-tab-nav-inactive">p. 1 - 3</span>
+              <span className="v2-script-scripted-flag ds-type-main-tab-nav-inactive">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Scripted</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </ComponentRow>
+
+      <ComponentRow
+        title="Scripted flag"
+        usedIn="Confirmed-state indicator that replaces the per-scene chip once a beat is written. Inline ✓ + label in gray-chip-label color so it reads as state, not a clickable affordance."
+      >
+        <span className="v2-script-scripted-flag ds-type-main-tab-nav-inactive">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>Scripted</span>
+        </span>
+      </ComponentRow>
+
+      <ComponentRow
+        title="Inline attribute input"
+        usedIn="Single-line text fields that sit inline with the row label rather than expanding below it. Used by Concept Title, Character Name, Character Age, and Scene Name."
+      >
+        <div className="attr-row attr-row-inline-input" style={{ maxWidth: 480 }}>
+          <div className="attr-row-header">
+            <span className="attr-label">Title</span>
+            <div className="attr-values">
+              <input
+                className="attr-inline-text-input"
+                placeholder="Add a title"
+                defaultValue="Cache"
+              />
+            </div>
+          </div>
+        </div>
+      </ComponentRow>
+
+      <ComponentRow
+        title="Options glyph"
+        usedIn="Three-dot more-actions icon. 13x3 PNG/SVG. Pinned absolutely at top-right of card surfaces."
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
+          <img src="/icon-options.svg" alt="" width={13} height={3} aria-hidden="true" />
+        </span>
       </ComponentRow>
     </div>
   );

@@ -77,7 +77,9 @@ Letter-spacing percentages → em (3% = 0.03em).
 | `ds-type-project-tab-nav-active` | 7 / 700 / 0.07em / UPPER | 12 / 0.09em |
 | `ds-type-project-tab-nav-inactive` | 7 / 500 / 0.07em / UPPER | 12 / 0.09em |
 | `ds-type-attribute-title` | 13 / 600 / 0 | (same) |
-| `ds-type-body` | 13 / 400 / 0 | (same) |
+| `ds-type-body` | 13 / 400 / 0 / lh 18px | (same) |
+| `ds-type-body-bold` | 13 / 700 / 0 | (same) |
+| `ds-type-int-header` | 11 / 700 / 0.09em / UPPER | (same) |
 | `ds-type-body-sm` | 10 / 400 / 0.03em / lh 14px | 11 / 400 / 0.03em / lh auto |
 | `ds-type-cta` | 9 / 500 / 0.08em / UPPER | 11 / 500 / 0.08em / UPPER |
 | `ds-type-selected-option-label` | 9 / 500 / 0.03em / UPPER | (same) |
@@ -162,6 +164,60 @@ Files are `.ttf` (~50KB each). `.woff2` would be ~30% smaller — if
 the Font Bureau license includes web formats, it's worth swapping.
 Until then, `.ttf` is fine; browsers cache aggressively and only
 fetch faces actually used on the page.
+
+---
+
+## Components
+
+Live demos at `/style-guide`. The classes below are the source of
+truth; reuse them rather than inventing parallel rules in JSX.
+
+### Chips & buttons
+
+| Class | Notes |
+|---|---|
+| `ai-wand` | 27x27 paired-bolt chip. Per-field AI generate trigger. Glyph: `/icon-ai-button.svg`. |
+| `add-all-characters-chip` / `add-all-scenes-chip` | Labeled AI chips for layer-bar bulk actions. Same fill / stroke / shadow as `.ai-wand`. |
+| `v2-empty-state-toggle` | Dev-only toggle below the topbar `+` button. Flips Projects/Ideas into their empty-state UI without deleting data. |
+| `scene-popup-script-cta` | Full-width "Script Scene" primary CTA shown in the scene popup when opened from the Script tab on an unwritten beat. |
+
+### Cards & rows
+
+| Class | Notes |
+|---|---|
+| `card.v2-character-card` | Characters-tab row. 122-tall, 100x120 portrait flush left, role pill in accent color, options glyph absolute top-right. |
+| `v2-character-role-pill` + `v2-character-role-{protagonist\|antagonist\|...}` | Role pill with per-role accent fill. |
+| `v2-beat-row` + `v2-beat-card` | Story-tab scene row. 103-tall, 101x72 thumb left, ds-type-body-bold title + ds-type-body summary right. |
+| `v2-beat-number-col` + `v2-beat-number-badge` | 21x21 outlined number badge with dotted timeline connector. Used by Story tab. |
+| `v2-script-card` | Script-tab scene row. 32x32 badge INSIDE card top-left, ds-type-int-header slug, ds-type-project-card-title title, ds-type-body summary, footer with page-range + per-scene chip. |
+| `v2-script-number-badge` | 32x32 number badge for Script tab. Lives inside the card. Written state inverts to black fill. |
+| `v2-script-scripted-flag` | "✓ Scripted" indicator that replaces the per-row chip once a beat is written. |
+
+### Attribute rows
+
+| Class | Notes |
+|---|---|
+| `attr-row-inline-input` + `attr-inline-text-input` | Single-line text fields that sit inline with the row label rather than collapsing below. Used by Concept Title, Character Name, Character Age, Scene Name. |
+
+### Sheets
+
+| Class | Notes |
+|---|---|
+| `scene-popup-scrim` + `scene-popup-card` | Scene preview popup. Variant via `.scene-popup-variant-{story\|script-unwritten}` modifier — Story variant is bottom-anchored 180px from viewport bottom; Script-unwritten variant is vertically centered. |
+| `script-view-sheet` | Per-scene script reader/editor sheet. Renders ALL written scenes stacked in one scroll port; header updates live based on most-visible scene via IntersectionObserver. Pencil toggles inline highlight mode + AI rewrite composer (ported from `read-through-sheet`). |
+| `easy-direction-sheet` | "Shape your story" sheet shown after Easy mode + Finish. Direction textarea + Type-filter idea picker. |
+| Pull-to-close | Global gesture wired in `app/page.tsx` — drag any `.sheet.open` or `.create-modal.open` within the top 80px down past ~22% of sheet height to dismiss. Clicks the paired backdrop so existing close handlers fire. |
+
+### Icons
+
+| File | Use |
+|---|---|
+| `/icon-ai-button.svg` | Paired-bolt glyph for AI generate / regenerate actions. |
+| `/icon-script-sml.svg` | 10.86x11.27 script icon for the View Script chip on written rows. |
+| `/icon-options.svg` | 13x3 three-dot more-actions glyph. Card-corner menu. |
+| `/icon-row-move.svg` | 6x14 grip glyph for draggable rows. |
+| `/icon-duration.svg` | Clock glyph for scene-duration tag. |
+| `/icon-add-cta.svg` | Plus glyph for primary add buttons. |
 
 ---
 
