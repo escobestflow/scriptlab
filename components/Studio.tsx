@@ -5351,7 +5351,7 @@ function ScriptViewSheet({
               <div className="script-view-name ds-type-project-card-title">
                 {activeBeat?.name || "Untitled scene"}
               </div>
-              <div className="script-view-slug ds-type-main-tab-nav-inactive">{slug}</div>
+              <div className="script-view-slug ds-type-int-header">{slug}</div>
             </div>
             <button
               type="button"
@@ -8904,7 +8904,7 @@ function ScriptTab({
                   else openScenePopup?.(beat.id);
                 }}
               >
-                <div className="v2-script-slug ds-type-main-tab-nav-inactive">{slug}</div>
+                <div className="v2-script-slug ds-type-int-header">{slug}</div>
                 <div className="v2-script-name ds-type-project-card-title">{beat.name || "Untitled scene"}</div>
                 <p className="v2-script-summary ds-type-body">{beat.summary || "No summary yet."}</p>
               </button>

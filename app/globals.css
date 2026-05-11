@@ -6199,6 +6199,19 @@ html[data-design="v2"] .ds-type-body-bold {
   line-height: normal;
   letter-spacing: 0;
 }
+/* INT. / EXT. scene-location slug headings — Lato Bold 11 /
+   uppercase / 9% tracking. Same metrics on mobile and desktop
+   so the slug reads as a fixed structural element across
+   viewports. Used by the Script tab card slug + the script
+   read/edit sheet's slug under the scene title. */
+html[data-design="v2"] .ds-type-int-header {
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 11px;
+  line-height: normal;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
 html[data-design="v2"] .ds-type-selected-option-label {
   font-family: var(--ds-font-body);
   font-weight: 500;
