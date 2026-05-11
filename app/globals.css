@@ -6633,11 +6633,14 @@ html[data-design="v2"]:has(.projects-empty) {
   background-repeat: no-repeat;
 }
 html[data-design="v2"] .projects-empty {
-  /* The element itself no longer needs its own bg-image — the
-     html-level paint above handles it. We keep the layout block
-     (flex column, anchored to flex-end) so the text + button
-     stack sits at the lower portion of the screen. */
-  background-image: none;
+  /* Belt-and-suspenders: also paint the bg image on the element
+     itself so the graphic shows reliably even if a browser quirks
+     the html-level `:has()` selector above. The html-level paint
+     stays so the asset covers the safe-area inset + topbar. */
+  background-image: url("/v2/unfold-mobile-bg-final-final.png");
+  background-size: cover;
+  background-position: center calc(50% + 10px);
+  background-repeat: no-repeat;
   /* Stretch to the visible viewport between top nav + tab bar so the
      bg image fills the screen. dvh handles iOS dynamic toolbars. */
   min-height: 100dvh;
@@ -8745,7 +8748,7 @@ html[data-design="v2"] .v2-script-number-badge.written {
 }
 html[data-design="v2"] .v2-script-options {
   position: absolute;
-  top: 22px;
+  top: 18px;
   right: 18px;
   width: 24px;
   height: 24px;
