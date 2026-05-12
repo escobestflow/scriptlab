@@ -6876,6 +6876,46 @@ html[data-design="v2"] .record-label {
     letter-spacing: 0;
     text-transform: none;
   }
+
+  /* ── V2 desktop layout shell ───────────────────────────────────
+     Sidebar widens with the viewport, content stays a fixed 1050px
+     wide and 60px away from the sidebar. Any extra width above
+     1440px is split equally between the left sidebar and the
+     right-side empty gutter.
+
+     At W = 1440: sidebar = 268, gap = 60, content = 1050, right = 62
+     At W = 1500: sidebar = 298, gap = 60, content = 1050, right = 92
+     At W = 2000: sidebar = 548, gap = 60, content = 1050, right = 342
+
+     The math: sidebar grows by (W - 1440) / 2; the remainder of the
+     right pane (app-content) is `W - sidebar`, of which the left
+     60 is the gap and the next 1050 is content — whatever's after
+     1050 is the right gutter (no padding-right, just leftover space).
+
+     V1 desktop sidebar stays at 220px; this rule is v2-scoped so
+     the older layout isn't touched. */
+  html[data-design="v2"] .desktop-sidebar {
+    width: calc(268px + max(0px, (100vw - 1440px) / 2));
+  }
+
+  /* Right-pane scroll port — fixed 60px left padding for the gap
+     from the sidebar; 0 right padding so the rest of the pane
+     becomes the natural right gutter. v1's `padding: 28px 40px 60px`
+     supplies top/bottom values via the shorthand; we only override
+     left/right longhands here. */
+  html[data-design="v2"] .screen-scroll {
+    padding-left: 60px;
+    padding-right: 0;
+  }
+
+  /* Content wrapper — left-aligned at 1050px. Overrides v1 desktop's
+     `max-width: 1120px; margin: 0 auto;` (which centered everything
+     and was 70px wider than the v2 spec). */
+  html[data-design="v2"] .page-enter {
+    max-width: 1050px;
+    margin-left: 0;
+    margin-right: 0;
+  }
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────
