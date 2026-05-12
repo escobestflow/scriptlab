@@ -6937,6 +6937,12 @@ function ConceptTab({
       })()}
       </div>{/* /.v2-concept-col-left */}
 
+      {/* Right-column wrapper. Same display:contents-on-mobile,
+          card-on-desktop pattern as .v2-concept-col-left. Contains
+          Logline / Summary / Similar To / Writer Style / Tone /
+          Themes / Story Framework / Ending. The portal-rendered
+          picker sheets after Ending stay OUTSIDE this wrapper. */}
+      <div className="v2-concept-col-right">
       {/* Similar To — free-form references (films / shows) each tagged
           with which craft aspects the user wants to mirror. */}
       <AttrRow
@@ -7350,6 +7356,7 @@ function ConceptTab({
           readOnly={ro()}
         />
       </AttrRow>
+      </div>{/* /.v2-concept-col-right */}
 
       {/* Writer-style picker — fly-up sheet with a filterable roster of
           famous screenwriters. Multi-select; the ConceptTab's chip row
