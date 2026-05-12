@@ -7068,15 +7068,23 @@ html[data-design="v2"] .record-label {
      whole surface; tapping opens the project Settings panel (mirrors
      the v2 mobile thumb behavior).
 
-     Soft white fade at TOP and BOTTOM edges via mask-image — the
-     image blends into the page background instead of presenting a
-     hard rectangular edge. The middle 70% (15%→85%) is fully
-     opaque; the top + bottom 15% bands fade to transparent so the
-     app-background shows through. Border-radius dropped — the fade
-     supplies the soft-edge feel naturally, and mixing radius with a
-     fade-to-transparent overlap creates visual conflict at the
-     corners (clip + transparency competing). */
+     Soft white fade at ALL edges via a 3-layer gradient overlay,
+     ported directly from the user's Figma Make prototype
+     (src/app/App.tsx line 50 in their "Desktop Unfold" project).
+     The image renders unmodified; a `::after` pseudo-element paints
+     white-fading-to-transparent over the edges so the image blends
+     into the page rather than presenting a rectangular crop.
+
+     Layer stack (top to bottom in the cascade, painted last-first):
+       1. Radial vignette — ellipse 764×445 at center; transparent
+          from 0 to 28.365% radius, fading to white at 47.115%.
+          Image center stays fully visible; outer 50%+ goes white.
+       2. Right-edge fade: linear 270deg, white 0%→transparent 22%.
+       3. Left-edge fade:  linear 90deg,  white 1.66%→transparent 24.6%.
+
+     Combined: clean image in the center, fully white at the corners. */
   html[data-design="v2"] .v2-desktop-hero-image {
+    position: relative;
     flex: 0 0 537px;
     width: 537px;
     height: 313px;
@@ -7087,8 +7095,16 @@ html[data-design="v2"] .record-label {
     overflow: hidden;
     cursor: pointer;
     display: block;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 15%, #000 85%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, #000 15%, #000 85%, transparent 100%);
+  }
+  html[data-design="v2"] .v2-desktop-hero-image::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(ellipse 764px 445px at center, rgba(255,255,255,0) 28.365%, rgba(255,255,255,1) 47.115%),
+      linear-gradient(270deg, rgb(255,255,255) 0%, rgba(255,255,255,0) 22.008%),
+      linear-gradient(90deg, rgb(255,255,255) 1.6622%, rgba(255,255,255,0) 24.645%);
   }
   html[data-design="v2"] .v2-desktop-hero-image img {
     width: 100%;
