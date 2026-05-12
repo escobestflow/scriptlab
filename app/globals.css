@@ -7985,10 +7985,17 @@ html[data-design="v2"] .studio-nav-fixed > [aria-label="Settings"] img {
   filter: none;
 }
 
-/* Title + draft trigger — visually relocate from inside
-   .studio-header-sticky (which is in the scroll container) to the
-   top nav center. position: fixed pins them above the page so they
-   don't move with scroll. */
+/* V2 MOBILE-ONLY — title + draft trigger position: fixed relocation.
+   These rules visually pull the .studio-header-sticky's title and
+   drafts trigger up to the top-nav center on mobile (each rule sets
+   position: fixed + top: env(...) coordinates). On DESKTOP they
+   need to be hidden by the desktop block's
+   `.studio-header-sticky > *:not(.studio-tabs-row) { display: none }`
+   rule — but THAT rule has the same specificity as these (both 0,3,0),
+   so without a media-query wrapper here, the unscoped rules below
+   come later in source order and win → drafts trigger renders as
+   the "duplicate dropdown at top middle" the user reported. */
+@media (max-width: 1439.98px) {
 html[data-design="v2"] .studio-header-sticky > .project-header-title-btn {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 12px);
@@ -8030,6 +8037,7 @@ html[data-design="v2"] .studio-header-sticky > .drafts-dropdown-trigger .drafts-
   width: 8px;
   height: 8px;
 }
+} /* /@media (max-width: 1439.98px) — end V2-mobile fixed title+draft block */
 
 /* Save button + TV episode row + caption — hide for now. v2 doesn't
    yet have a designated home for these; surface them again once
@@ -8358,16 +8366,26 @@ html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar .studio-tab {
    hero + tab pill. Modern iOS does momentum scrolling by default
    without the property; same removal that was made earlier on
    the home-page `.screen-scroll`. */
-html[data-design="v2"] .studio-scroll {
-  /* Tuning chain:
-       260 → 263 → 268 → 300 → 285 → 277 → 276 → 282 → 302 → 299
-     302 dropped the layer-bar tuck entirely (content sat exactly at
-     the bar's bottom edge, with the wrap's 8px top padding as the
-     visible gap). Latest -3 lifts everything 3px higher per spec —
-     content top now sits 3px ABOVE the bar's bottom edge, so the
-     bar covers the first 3px of the rounded card top. */
-  padding-top: calc(env(safe-area-inset-top, 0px) + 299px);
-  -webkit-overflow-scrolling: auto;
+/* V2 MOBILE-ONLY .studio-scroll padding-top — clears the
+   position:fixed mobile hero (134) + tab pill (env+177 + 71 + slop).
+   Wrapped in @media (max-width: 1439.98px) so it does NOT bleed
+   into desktop, where there are no fixed elements inside the scroll
+   and the equivalent rule in the desktop @media block sets
+   padding-top: 0. Previous bug: this rule was unscoped + came AFTER
+   the desktop override in source order, so it won the cascade at
+   ≥1440 and pushed the hero ~300px below the topbar. */
+@media (max-width: 1439.98px) {
+  html[data-design="v2"] .studio-scroll {
+    /* Tuning chain:
+         260 → 263 → 268 → 300 → 285 → 277 → 276 → 282 → 302 → 299
+       302 dropped the layer-bar tuck entirely (content sat exactly at
+       the bar's bottom edge, with the wrap's 8px top padding as the
+       visible gap). Latest -3 lifts everything 3px higher per spec —
+       content top now sits 3px ABOVE the bar's bottom edge, so the
+       bar covers the first 3px of the rounded card top. */
+    padding-top: calc(env(safe-area-inset-top, 0px) + 299px);
+    -webkit-overflow-scrolling: auto;
+  }
 }
 
 /* Layer draft dropdown bar — fixed-position persistent strip.
