@@ -900,6 +900,71 @@ export function Studio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story]);
 
+  // Auto-generate a short "tagline" (≤120 chars) from the active
+  // concept's logline. Fires once per concept-draft when a logline
+  // exists and a tagline hasn't been generated yet. The desktop
+  // hero displays this as the small-caps description under the
+  // project title — loglines are usually 30–60 words and don't fit
+  // the 2-line treatment. Dedup via taglineInFlight ref so the
+  // effect's [story] dependency doesn't double-fire while a request
+  // is pending.
+  const taglineInFlight = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const concept = getActiveConceptDraft(story);
+    if (!concept) return;
+    if (!isV2 || !isDesktop) return;
+    if (!concept.logline?.trim()) return;
+    if (concept.tagline?.trim()) return;
+    if (taglineInFlight.current.has(concept.id)) return;
+    taglineInFlight.current.add(concept.id);
+    (async () => {
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            story,
+            action: { type: "generate_concept_tagline", payload: {} },
+            profile: null,
+          }),
+        });
+        if (!res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = "";
+        let buf = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const evt = JSON.parse(line);
+              if (evt.type === "text") fullText += evt.value;
+            } catch { /* ignore malformed line */ }
+          }
+        }
+        const m = fullText.match(/\{[\s\S]*\}/);
+        if (!m) return;
+        let parsed: { tagline?: string } | null = null;
+        try { parsed = JSON.parse(m[0]); } catch { return; }
+        const tagline = parsed?.tagline?.trim();
+        if (!tagline) return;
+        // Hard-cap at 120 in case the model overruns the budget.
+        const capped = tagline.length > 120 ? tagline.slice(0, 120).trimEnd() : tagline;
+        setStory(s => updateConceptDraft(s, { tagline: capped }));
+      } catch {
+        /* swallow — hero falls back to the truncated logline */
+      } finally {
+        taglineInFlight.current.delete(concept.id);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story, isV2, isDesktop]);
+
   // Studio-level scene-image generation. Fire-and-forget; result
   // patches back via setStory and won't overwrite a thumbnail the
   // user manually set in the meantime. Mirrors
@@ -1744,11 +1809,25 @@ export function Studio({
                 {story.title || "Untitled"}
               </h1>
               <div className="v2-desktop-hero-rule" aria-hidden="true" />
-              {activeConcept.logline?.trim() && (
-                <p className="v2-desktop-hero-description">
-                  {activeConcept.logline}
-                </p>
-              )}
+              {(() => {
+                // Prefer the AI-generated tagline (≤120 chars, set by
+                // the auto-tagline useEffect above) over the raw
+                // logline (often 30-60 words, doesn't fit the 2-line
+                // treatment). Fallback while the tagline is generating:
+                // truncate the logline at 120 chars on a word boundary.
+                const tag = activeConcept.tagline?.trim();
+                const fallback = (() => {
+                  const ll = activeConcept.logline?.trim() ?? "";
+                  if (!ll) return "";
+                  if (ll.length <= 120) return ll;
+                  const cut = ll.slice(0, 120);
+                  const sp = cut.lastIndexOf(" ");
+                  return (sp > 80 ? cut.slice(0, sp) : cut).trimEnd() + "…";
+                })();
+                const text = tag || fallback;
+                if (!text) return null;
+                return <p className="v2-desktop-hero-description">{text}</p>;
+              })()}
               <div className="v2-desktop-hero-updated">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <circle cx="12" cy="12" r="9"/>

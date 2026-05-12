@@ -248,6 +248,12 @@ export interface ConceptLayerDraft {
   updatedAt: string;
   savedAt: string;          // moves only when user explicitly saves
   logline: string;
+  /** AI-generated short version of the logline (≤120 chars). Used on
+   *  the desktop project hero as the small-caps description under the
+   *  title. Optional — falls back to a truncated logline if absent.
+   *  Auto-generated when the desktop hero mounts with a non-empty
+   *  logline and no tagline yet. */
+  tagline?: string;
   settings: StorySettings;
   concept: Concept;
   savedSnapshot?: ConceptSavedSnapshot; // for per-field change dots

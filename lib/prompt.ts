@@ -48,6 +48,7 @@ export type ActionType =
   | "generate_concept_title"
   | "generate_concept_logline"
   | "generate_concept_summary"
+  | "generate_concept_tagline"
   | "generate_concept_tone"
   | "generate_concept_themes"
   | "generate_concept_ending"
@@ -139,6 +140,7 @@ export function modelForAction(type: ActionType): string {
     case "generate_concept_title":
     case "generate_concept_logline":
     case "generate_concept_summary":
+    case "generate_concept_tagline":
     case "generate_concept_tone":
     case "generate_concept_themes":
     case "generate_concept_ending":

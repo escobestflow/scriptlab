@@ -6906,6 +6906,14 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .desktop-sidebar {
     background: var(--ds-color-gray-sidebar);
   }
+  /* Center the Unfold wordmark in the sidebar's brand slot — v1 has
+     it left-anchored via `padding: 6px 10px 22px`; we want it
+     horizontally centered in the column. */
+  html[data-design="v2"] .desktop-sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   /* ── V2 desktop layout shell ───────────────────────────────────
      Sidebar widens with the viewport, content stays a fixed 1050px
@@ -6993,11 +7001,15 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-concept-col-right {
     /* Override the mobile `display: contents` so the wrappers
        actually participate in the grid layout and render their own
-       boxes. */
+       boxes. 20px horizontal padding so the row contents AND the
+       between-row dividers (which are `border-top` on the rows
+       themselves) inset cleanly from the card edges rather than
+       running edge-to-edge. */
     display: block;
     background: var(--ds-color-gray-lightest); /* #FCFBFB */
     border: 0.7px solid var(--ds-color-gray-outline); /* #E4E3E4 */
     border-radius: 18px;
+    padding: 0 20px;
     overflow: hidden;
     align-self: start;
   }
@@ -7012,7 +7024,9 @@ html[data-design="v2"] .record-label {
   /* Strip the per-row card chrome inside both wrappers so the rows
      look like sections of one continuous card. Background, border,
      border-radius, and margin all go to zero — the wrapper supplies
-     the surface. */
+     the surface. 12px top + 12px bottom padding bumps each row's
+     height by 24px so the contents get extra breathing room above
+     and below per spec. */
   html[data-design="v2"] .v2-concept-col-left .attr-row,
   html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-inline-input,
   html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-text-open,
@@ -7023,6 +7037,8 @@ html[data-design="v2"] .record-label {
     border: none;
     border-radius: 0;
     margin: 0;
+    padding-top: 12px;
+    padding-bottom: 12px;
     box-shadow: none;
   }
   /* Hairline divider between consecutive rows. Adjacent sibling
@@ -7168,11 +7184,11 @@ html[data-design="v2"] .record-label {
     color: var(--ds-color-black);
     line-height: 1;
   }
-  /* Gold underline — short horizontal bar in the brand accent color.
-     Sits 16px below the title, ~150px wide. */
+  /* Gold underline — 104×2 brand-accent bar between title and
+     description per design. */
   html[data-design="v2"] .v2-desktop-hero-rule {
-    width: 150px;
-    height: 1px;
+    width: 104px;
+    height: 2px;
     background: var(--ds-color-unfold-gold);
     margin: 18px 0 26px;
   }

@@ -407,6 +407,12 @@ Use the existing concept (format, genre, title, logline, tone, themes, ending) a
 
 Return STRICT JSON: { "summary": string }`;
 
+    case "generate_concept_tagline":
+      return `Write ONE tagline for this project — a short, punchy compression of the logline above. STRICT CONSTRAINT: 120 characters or fewer including spaces and punctuation. Single sentence, no period if it would push past 120. Sentence-case is fine; the UI uppercases it on display.
+Use the existing concept (format, genre, title, logline, summary, tone, themes, ending) as the brief, but reach for the logline's central tension specifically — what's the one thing this story is ABOUT. Avoid generic prestige-cinema words ("haunting", "powerful", "unforgettable"). No quote marks around the result.
+
+Return STRICT JSON: { "tagline": string }`;
+
     case "generate_concept_tone":
       return `Pick ONE tone descriptor for this project.
 Use the existing concept (format, genre, title, logline, summary, themes, ending) as the brief. The tone should be a short evocative phrase (2–6 words) that would guide a writer's room — e.g. "bone-dry deadpan", "neon-lit dread", "sun-bleached melancholy".
