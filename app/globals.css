@@ -7145,6 +7145,45 @@ html[data-design="v2"] .record-label {
     flex: 0 0 14px;
   }
 
+  /* ── V2 desktop sticky-header reset ──────────────────────────────
+     The v2 mobile rule zeros out .studio-header-sticky (it's
+     collapsed to height:0 because mobile pulls the tab pill out via
+     position: fixed). On desktop the tab bar lives INSIDE the
+     studio-header-sticky in normal flow, so reverse the collapse
+     and drop the v1 base's `position: sticky; top: -44px` — the
+     hero, tab bar, and layer pill all scroll together. */
+  html[data-design="v2"] .studio-header-sticky {
+    position: static;
+    top: auto;
+    z-index: auto;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    height: auto;
+    box-shadow: none;
+  }
+  /* Layer-bar (CONCEPT DRAFT N pill) — in-flow below the tab bar,
+     no sticky or fixed positioning. Drops the v1 base's sticky
+     behavior, the v2 mobile's position:fixed pill anchoring, and
+     all the bar-bg / negative-margin chrome. The dark draft-trigger
+     button inside renders normally; the bar's only job here is to
+     space the pill from the tab bar above and the column cards
+     below. */
+  html[data-design="v2"] .layer-bar {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    z-index: auto;
+    max-width: none;
+    margin: 0 0 20px;
+    padding: 18px 0 0;
+    background: transparent;
+    background-image: none;
+    min-height: auto;
+    align-items: center;
+  }
+
   /* ── V2 desktop section tab bar ─────────────────────────────────
      V2 mobile renders the tab bar as a fixed-position floating pill
      (border-radius: 20, drop-shadow, 480px max-width, position:
@@ -7973,16 +8012,23 @@ html[data-design="v2"] .studio-header-sticky > .caption {
   display: none;
 }
 
-/* Sticky header collapses to almost nothing in v2 — the tab pill
-   is now position:fixed (not nested inside this), and the title +
-   draft trigger are also position:fixed in the topbar. Just zero
-   it out so it occupies no extra layout space. */
-html[data-design="v2"] .studio-header-sticky {
-  position: static;
-  background: transparent;
-  padding: 0;
-  margin: 0;
-  height: 0;
+/* Sticky header collapses to almost nothing in V2 MOBILE — the tab
+   pill is position:fixed (not nested inside this), and the title +
+   draft trigger are also position:fixed in the topbar. We zero this
+   container out so it occupies no extra layout space.
+
+   ON DESKTOP this collapse is wrong — the desktop tab bar lives
+   inside .studio-header-sticky and needs a real height. Scope the
+   rule to mobile only; the desktop @media block sets its own
+   in-flow sizing. */
+@media (max-width: 1439.98px) {
+  html[data-design="v2"] .studio-header-sticky {
+    position: static;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    height: 0;
+  }
 }
 
 /* Hero — persistent at top of page, never scrolls. Pinned via
@@ -8308,30 +8354,36 @@ html[data-design="v2"] .studio-scroll {
    z-index ordering keeps the tab pill above the layer-bar.
    Height bumped to 94px. align-items: flex-end + padding-bottom 15
    so the draft trigger text sits 15px from the bar's bottom edge. */
-html[data-design="v2"] .layer-bar {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 202px);
-  left: 0;
-  right: 0;
-  max-width: 520px;
-  margin: 0 auto;
-  /* Bar +6px taller (94 → 100) and the draft trigger nudged 3px
-     down on screen. Mechanism: with `align-items: flex-end` the
-     trigger anchors to the bar's bottom edge at `padding-bottom`
-     from it; bumping padding-bottom 12 → 15 RAISES the trigger 3
-     within the bar, but since min-height grows by 6 (downward —
-     position:fixed pins the top) the bar's bottom moves down 6,
-     so net trigger screen-y is +3.
-     Latest: padding-bottom 15 → 13 → 12 lowers the trigger
-     another 3 within the bar, so net trigger screen-y is +6
-     from the original 94/12 baseline. */
-  padding: 0 30px 12px;
-  z-index: 9;
-  background: var(--ds-color-app-background);
-  /* Drop the v1 SVG draft-bar-bg. */
-  background-image: none;
-  min-height: 100px;
-  align-items: flex-end;
+/* V2 MOBILE-ONLY layer-bar (position: fixed pill, anchored just
+   under the floating tab pill at env+202). On desktop this block
+   collides with the in-flow layout the design wants — the desktop
+   @media rule below pulls layer-bar back into normal flow. */
+@media (max-width: 1439.98px) {
+  html[data-design="v2"] .layer-bar {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 202px);
+    left: 0;
+    right: 0;
+    max-width: 520px;
+    margin: 0 auto;
+    /* Bar +6px taller (94 → 100) and the draft trigger nudged 3px
+       down on screen. Mechanism: with `align-items: flex-end` the
+       trigger anchors to the bar's bottom edge at `padding-bottom`
+       from it; bumping padding-bottom 12 → 15 RAISES the trigger 3
+       within the bar, but since min-height grows by 6 (downward —
+       position:fixed pins the top) the bar's bottom moves down 6,
+       so net trigger screen-y is +3.
+       Latest: padding-bottom 15 → 13 → 12 lowers the trigger
+       another 3 within the bar, so net trigger screen-y is +6
+       from the original 94/12 baseline. */
+    padding: 0 30px 12px;
+    z-index: 9;
+    background: var(--ds-color-app-background);
+    /* Drop the v1 SVG draft-bar-bg. */
+    background-image: none;
+    min-height: 100px;
+    align-items: flex-end;
+  }
 }
 /* Tabs are sized by the parent .studio-tab-bar (height 71). The
    tab itself is `position: relative` from v1, which we use here
