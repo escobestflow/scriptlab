@@ -2891,62 +2891,70 @@ function projectGridPattern(n: number): ("small" | "hero")[] {
   return build(true) ?? build(false) ?? [];
 }
 
-/* V2 desktop project-grid pattern. Cards alternate between two row
-   shapes that BOTH sum exactly to the 1050px content width:
+/* V2 desktop project-grid pattern. Cards flow into rows that BOTH
+   sum (when full) to the 1050px content width:
      - "small" cards in 3-up rows: 336.67 × 410.5 (portrait)
      - "hero"  cards in 2-up rows: 515    × 309   (landscape)
    With 20px gaps on both axes. The return array is card-level (same
    shape as the mobile pattern above), so the CSS flex-wrap layout
    packs them into rows automatically based on each card's width.
+   Partial rows (e.g. the last row of N=7 has only 2 small cards
+   instead of 3) wrap correctly — leftover cards land flush left,
+   with the empty slots opening up on the right.
 
-   Pattern rules (see chat plan for the rationale):
-     1. Anchors for small N (1..5): hand-tuned single rows / pairs.
-     2. N divisible by 3 (N ≥ 6): all small rows. Packs cleanest, denser.
-     3. N % 5 == 1 (N = 11, 16, 21…): trade the last 5-unit
-        (hero-row + small-row) for two small-rows (3+3=6) so the page
-        doesn't end on an orphaned single card.
-     4. Otherwise: repeat 5-card "rhythm units" of (hero-row + small-row),
-        then a tail of 0/2/3/4 cards as a final partial section.
-   N=1: a single hero card sits at the LEFT of the row, no centering. */
+   Pattern (hand-tuned anchors for N=1..6; alternating rule for N≥7):
+     N=1  → 1 hero, partial 2-up row
+     N=2  → 2 hero, full 2-up row
+     N=3  → 3 small, full 3-up row
+     N=4  → 2 hero rows         (same-type stack — only way to hit 4)
+     N=5  → 1 hero + 1 small row
+     N=6  → 2 small rows        (same-type stack — only way to hit 6
+                                  with full rows; preferred over 3 hero
+                                  rows for density)
+     N≥7  → alternating rows of type small, hero, small, hero, …
+            starting with SMALL, each row filled to capacity (small=3,
+            hero=2). Last row may be partial.
+
+   Tracing N=7 through N=14 to confirm:
+     N=7  → small(3) + hero(2) + small(2)             = 7   (last partial)
+     N=8  → small(3) + hero(2) + small(3)             = 8
+     N=9  → small(3) + hero(2) + small(3) + hero(1)   = 9   (last partial)
+     N=10 → small(3) + hero(2) + small(3) + hero(2)   = 10
+     N=11 → 3 + 2 + 3 + 2 + small(1)                  = 11  (last partial)
+     N=12 → 3 + 2 + 3 + 2 + small(2)                  = 12  (last partial)
+     N=13 → 3 + 2 + 3 + 2 + small(3)                  = 13
+     N=14 → 3 + 2 + 3 + 2 + 3 + hero(1)               = 14  (last partial)
+*/
 function projectGridPatternDesktop(n: number): ("small" | "hero")[] {
   if (n <= 0) return [];
 
-  // Small-N anchors. Each entry below sums exactly to a clean row
-  // composition (or, for N=1, a single hero left-aligned).
+  // Hand-tuned anchors for N=1..6 — none of these follow the
+  // N≥7 alternation rule. N=4 and N=6 specifically stack same-type
+  // rows because there's no way to hit those exact counts with only
+  // full rows otherwise (alternating would force a partial row in
+  // the middle of the layout, which is uglier than a same-type stack
+  // at small N).
   if (n === 1) return ["hero"];
   if (n === 2) return ["hero", "hero"];
   if (n === 3) return ["small", "small", "small"];
   if (n === 4) return ["hero", "hero", "hero", "hero"];
   if (n === 5) return ["hero", "hero", "small", "small", "small"];
+  if (n === 6) return ["small", "small", "small", "small", "small", "small"];
 
-  const unit = (): ("small" | "hero")[] =>
-    ["hero", "hero", "small", "small", "small"]; // 2 hero + 3 small = 5
-
-  // Rule 2: clean fit when divisible by 3 — all small rows.
-  if (n % 3 === 0) {
-    return Array<("small" | "hero")>(n).fill("small");
+  // N ≥ 7: alternate row types starting with SMALL. Each row gets
+  // its capacity worth of cards (small=3, hero=2) until cards run
+  // out; the final row may be partial.
+  const out: ("small" | "hero")[] = [];
+  let remaining = n;
+  let next: "small" | "hero" = "small";
+  while (remaining > 0) {
+    const capacity = next === "small" ? 3 : 2;
+    const count = Math.min(capacity, remaining);
+    for (let i = 0; i < count; i++) out.push(next);
+    remaining -= count;
+    next = next === "small" ? "hero" : "small";
   }
-
-  // Rule 3: N % 5 == 1 → swap the final unit for 6 cards (2 small rows)
-  // so we don't end with a stray hero alone (e.g. N=11, 16, 21…).
-  if (n % 5 === 1) {
-    const fullUnits = (n - 6) / 5;
-    const rows: ("small" | "hero")[] = [];
-    for (let i = 0; i < fullUnits; i++) rows.push(...unit());
-    rows.push("small", "small", "small", "small", "small", "small");
-    return rows;
-  }
-
-  // Rule 4: rhythm units + tail.
-  const fullUnits = Math.floor(n / 5);
-  const remainder = n % 5;
-  const rows: ("small" | "hero")[] = [];
-  for (let i = 0; i < fullUnits; i++) rows.push(...unit());
-  if (remainder === 2) rows.push("hero", "hero");
-  else if (remainder === 3) rows.push("small", "small", "small");
-  else if (remainder === 4) rows.push("hero", "hero", "hero", "hero");
-  // remainder === 0 → no tail; remainder === 1 was handled above.
-  return rows;
+  return out;
 }
 
 function ProjectsTab({
