@@ -2891,6 +2891,64 @@ function projectGridPattern(n: number): ("small" | "hero")[] {
   return build(true) ?? build(false) ?? [];
 }
 
+/* V2 desktop project-grid pattern. Cards alternate between two row
+   shapes that BOTH sum exactly to the 1050px content width:
+     - "small" cards in 3-up rows: 336.67 × 410.5 (portrait)
+     - "hero"  cards in 2-up rows: 515    × 309   (landscape)
+   With 20px gaps on both axes. The return array is card-level (same
+   shape as the mobile pattern above), so the CSS flex-wrap layout
+   packs them into rows automatically based on each card's width.
+
+   Pattern rules (see chat plan for the rationale):
+     1. Anchors for small N (1..5): hand-tuned single rows / pairs.
+     2. N divisible by 3 (N ≥ 6): all small rows. Packs cleanest, denser.
+     3. N % 5 == 1 (N = 11, 16, 21…): trade the last 5-unit
+        (hero-row + small-row) for two small-rows (3+3=6) so the page
+        doesn't end on an orphaned single card.
+     4. Otherwise: repeat 5-card "rhythm units" of (hero-row + small-row),
+        then a tail of 0/2/3/4 cards as a final partial section.
+   N=1: a single hero card sits at the LEFT of the row, no centering. */
+function projectGridPatternDesktop(n: number): ("small" | "hero")[] {
+  if (n <= 0) return [];
+
+  // Small-N anchors. Each entry below sums exactly to a clean row
+  // composition (or, for N=1, a single hero left-aligned).
+  if (n === 1) return ["hero"];
+  if (n === 2) return ["hero", "hero"];
+  if (n === 3) return ["small", "small", "small"];
+  if (n === 4) return ["hero", "hero", "hero", "hero"];
+  if (n === 5) return ["hero", "hero", "small", "small", "small"];
+
+  const unit = (): ("small" | "hero")[] =>
+    ["hero", "hero", "small", "small", "small"]; // 2 hero + 3 small = 5
+
+  // Rule 2: clean fit when divisible by 3 — all small rows.
+  if (n % 3 === 0) {
+    return Array<("small" | "hero")>(n).fill("small");
+  }
+
+  // Rule 3: N % 5 == 1 → swap the final unit for 6 cards (2 small rows)
+  // so we don't end with a stray hero alone (e.g. N=11, 16, 21…).
+  if (n % 5 === 1) {
+    const fullUnits = (n - 6) / 5;
+    const rows: ("small" | "hero")[] = [];
+    for (let i = 0; i < fullUnits; i++) rows.push(...unit());
+    rows.push("small", "small", "small", "small", "small", "small");
+    return rows;
+  }
+
+  // Rule 4: rhythm units + tail.
+  const fullUnits = Math.floor(n / 5);
+  const remainder = n % 5;
+  const rows: ("small" | "hero")[] = [];
+  for (let i = 0; i < fullUnits; i++) rows.push(...unit());
+  if (remainder === 2) rows.push("hero", "hero");
+  else if (remainder === 3) rows.push("small", "small", "small");
+  else if (remainder === 4) rows.push("hero", "hero", "hero", "hero");
+  // remainder === 0 → no tail; remainder === 1 was handled above.
+  return rows;
+}
+
 function ProjectsTab({
   projects, onOpen, onNew,
   pendingInvites, onAcceptInvite, onDeclineInvite,
@@ -2926,6 +2984,7 @@ function ProjectsTab({
 }) {
   const hasInvites = pendingInvites.length > 0;
   const isV2 = useIsV2();
+  const isDesktop = useIsDesktop();
 
   // First-run empty state — only when there are also no pending
   // invites. A brand-new user whose first interaction is an invite
@@ -3025,8 +3084,14 @@ function ProjectsTab({
       {(() => {
         // Compute hero/small placement once for the whole grid so each
         // card knows its role from the total count, not its position
-        // alone. See projectGridPattern() for the full rule table.
-        const cardLayout = projectGridPattern(projects.length);
+        // alone. Desktop (v2 only, ≥1440px) uses its own pattern with
+        // 3-up small rows + 2-up hero rows summing to a 1050px grid;
+        // mobile falls through to the original alternating-row logic.
+        // See projectGridPattern / projectGridPatternDesktop for the
+        // full rule tables.
+        const cardLayout = (isV2 && isDesktop)
+          ? projectGridPatternDesktop(projects.length)
+          : projectGridPattern(projects.length);
         return (
       <div className="project-grid">
       {projects.map((p, idx) => {

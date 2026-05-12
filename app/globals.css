@@ -7059,6 +7059,48 @@ html[data-design="v2"] .project-card .attr-pill {
   background: var(--ds-color-gray-chip-fill);
   color: var(--ds-color-black);
 }
+
+/* ── V2 desktop project grid (≥1440px) ─────────────────────────────
+   Overrides v2 mobile's 2-column grid with a flex-wrap layout sized
+   to a fixed 1050px row width. Cards carry their own widths via the
+   `.is-hero` modifier; the projectGridPatternDesktop() function in
+   page.tsx orders them so each row sums to exactly 1050:
+     - 3 small × 336.67 + 2 gaps × 20 = 1050
+     - 2 hero × 515 + 1 gap × 20     = 1050
+   Row gap and column gap are both 20px. Cards are LEFT-aligned within
+   their row — when a row is partial (only N=1: a single hero alone),
+   the card sits flush to the left edge of the grid, no centering. */
+@media (min-width: 1440px) {
+  html[data-design="v2"] .project-grid {
+    /* Replace the mobile grid layout with flex-wrap so the mixed
+       widths flow naturally. Width capped at 1050 so the grid never
+       grows past the spec'd content column. */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    width: 1050px;
+    max-width: 1050px;
+    justify-content: flex-start;
+    align-content: flex-start;
+  }
+  /* Small (3-up) card. Width = (1050 - 2 gaps × 20) / 3 = 336.667px.
+     Height auto via the 337 / 410.5 aspect ratio. Overrides v2
+     mobile's fixed 208px height. */
+  html[data-design="v2"] .project-grid .project-card {
+    width: calc((1050px - 40px) / 3);
+    height: auto;
+    aspect-ratio: 337 / 410.5;
+  }
+  /* Hero (2-up) card. 515 × 309 — landscape. Clears v2 mobile's
+     `grid-column: 1 / -1` since the parent isn't a grid anymore;
+     keeping the property as a no-op is fine but `auto` is explicit. */
+  html[data-design="v2"] .project-grid .project-card.is-hero {
+    width: 515px;
+    aspect-ratio: 515 / 309;
+    grid-column: auto;
+  }
+}
+
 /* ── V2 Ideas tab ──────────────────────────────────────────────
    Search bar restyle (light gray fill, no border, full-width pill),
    filter chips repainted (active: black/white, inactive: white with
