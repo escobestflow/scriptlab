@@ -7326,7 +7326,9 @@ html[data-design="v2"] .record-label {
     z-index: auto;
     max-width: none;
     margin: 0 0 20px;
-    padding: 18px 0 0;
+    /* Top padding decreased 18 → 12 per spec — 6px tighter gap
+       between the tab bar's bottom edge and the layer-draft pill. */
+    padding: 12px 0 0;
     background: transparent;
     background-image: none;
     min-height: auto;
@@ -7355,10 +7357,12 @@ html[data-design="v2"] .record-label {
     /* Flat band: 66px tall, top hairline + bottom 2px strokes
        in --ds-color-gray-divider (#DBDAD9), no radius, no shadow,
        transparent fill. Width matches the tab content column
-       (1050px) so the bar's strokes don't run past the content.
-       Tabs are content-sized, left-anchored 80px inside the bar's
-       left edge (gives the gold underline visual room under the
-       title block above), with a 90px gap between adjacent tabs. */
+       (1054px) so the bar's strokes don't run past the content.
+       Tab links sit FLUSH with the bar's left edge (padding: 0),
+       then the first child carries `margin-left: -35px` to push
+       the whole row 35px further left — net position: 35px LEFT
+       of the column cards' left edge. The 90px tab-to-tab gap
+       still drives subsequent spacing. */
     height: 66px;
     /* 1054 = 418 + 23 + 613 — same as the concept tab's column
        grid total, so the bar's strokes align with the column
@@ -7367,10 +7371,7 @@ html[data-design="v2"] .record-label {
     background: transparent;
     border-radius: 0;
     box-shadow: none;
-    /* 80px inner left padding shifts the tab links right inside
-       the full-width strokes — the gray hairlines still span 1054
-       end-to-end so the bar reads as the column gutter beneath. */
-    padding: 0 0 0 80px;
+    padding: 0;
     border-left: none;
     border-right: none;
     border-top: 1px solid var(--ds-color-gray-divider);
@@ -7379,6 +7380,15 @@ html[data-design="v2"] .record-label {
        tabs, left-anchored, 90px between adjacent tabs. */
     justify-content: flex-start;
     gap: 90px;
+    /* The first tab carries margin-left: -35 below — that overflows
+       the bar's left edge. overflow:visible keeps it visible. */
+    overflow: visible;
+  }
+  /* Pull the entire tab row 35px LEFT of the bar's content edge.
+     Subsequent tabs follow via the flex gap so the whole row
+     shifts as a unit. */
+  html[data-design="v2"] .studio-tab-bar .studio-tab:first-child {
+    margin-left: -35px;
   }
   /* Each tab is content-width (override v1's flex:1 even-share). */
   html[data-design="v2"] .studio-tab-bar .studio-tab {
@@ -7435,10 +7445,11 @@ html[data-design="v2"] .record-label {
     transform: none;
   }
 
-  /* Active-tab underline indicator — 4px gold bar pinned to the
-     bottom edge of the tab, offset -2px to OVERLAP the bar's 2px
-     gray-divider border so the gold visually replaces it across
-     the active tab's width. Specificity bumped to .studio-tab-bar
+  /* Active-tab underline indicator — 6px gold bar pinned to the
+     bottom edge of the tab, offset -2px so its bottom 2px overlap
+     the bar's 2px gray-divider bottom border (visually replacing
+     it across the active tab's width) and the top 4px sit inside
+     the tab area. Specificity bumped to .studio-tab-bar
      .studio-tab.active::after so the mobile dot rule (same selector
      without the .studio-tab-bar prefix) can't win on source order.
      `left: -30; right: -30` extends the underline 30px past EACH
@@ -7451,7 +7462,7 @@ html[data-design="v2"] .record-label {
     left: -30px;
     right: -30px;
     bottom: -2px;
-    height: 4px;
+    height: 6px;
     width: auto;
     background: var(--ds-color-unfold-gold);
     border-radius: 0;
@@ -7498,6 +7509,18 @@ html[data-design="v2"] .record-label {
      breathing room previously here was removed per spec. */
   html[data-design="v2"] .v2-desktop-hero {
     margin-top: 0;
+  }
+
+  /* Attribute row labels on desktop pick up the gray-dark-fill
+     (#626262) color. The font properties already match the
+     `.ds-type-attribute-title` token (font-weight: 600 / 13px /
+     letter-spacing: 0) via the bare `.attr-label` rule further
+     down the stylesheet — we just override color here. Mobile
+     keeps the original black via the bare rule below the desktop
+     @media block. The token class is also added to the JSX so
+     future token changes propagate without touching this rule. */
+  html[data-design="v2"] .attr-label {
+    color: var(--ds-color-gray-dark-fill);
   }
 
   /* ─────────────────────────────────────────────────────────────

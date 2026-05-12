@@ -6268,7 +6268,7 @@ function AttrRow({
           }
         } : undefined}
       >
-        <span className="attr-label">
+        <span className="attr-label ds-type-attribute-title">
           {label}
           {/* AI wand hidden in readOnly (partner-preview) rows —
               there's nothing to generate into someone else's draft. */}
@@ -6803,7 +6803,7 @@ function TextAttrRow({
     return (
       <div className="attr-row attr-row-inline-input" data-label={label}>
         <div className="attr-row-header">
-          <span className="attr-label">
+          <span className="attr-label ds-type-attribute-title">
             {label}
             {ai && !readOnly && !isLockedDisplay && <AIWandButton onClick={ai} loading={!!aiLoading} />}
             {copyBtn}
@@ -6859,7 +6859,7 @@ function TextAttrRow({
             }
           } : undefined}
         >
-          <span className="attr-label">
+          <span className="attr-label ds-type-attribute-title">
             {label}
             {/* AI wand + history pager hide in readOnly / locked
                 modes — neither action makes sense when the viewer
@@ -6891,7 +6891,7 @@ function TextAttrRow({
   return (
     <div className="attr-row attr-row-text-open" data-label={label}>
       <div className="attr-row-header attr-row-header-static">
-        <span className="attr-label">
+        <span className="attr-label ds-type-attribute-title">
           {label}
           {/* Same readOnly rule as the collapsed branch above. */}
           {ai && !readOnly && <AIWandButton onClick={ai} loading={!!aiLoading} />}
