@@ -7364,12 +7364,16 @@ html[data-design="v2"] .record-label {
   }
   /* Hide the v2 mobile selection-box (.studio-tab-bg) — desktop
      uses a 4px gold underline indicator instead. Same for the
-     per-tab dirty dot (.sync-dot) which the design omits. */
-  html[data-design="v2"] .studio-tab .studio-tab-bg,
-  html[data-design="v2"] .studio-tab.active .studio-tab-bg {
+     per-tab dirty dot (.sync-dot) which the design omits.
+     Specificity bumped via `.studio-tab-bar` prefix so the bare
+     `.studio-tab.active .studio-tab-bg { display: block }` rule
+     later in this stylesheet (which paints the mobile white pill)
+     can't win on source order at ≥1440. */
+  html[data-design="v2"] .studio-tab-bar .studio-tab .studio-tab-bg,
+  html[data-design="v2"] .studio-tab-bar .studio-tab.active .studio-tab-bg {
     display: none;
   }
-  html[data-design="v2"] .studio-tab .sync-dot {
+  html[data-design="v2"] .studio-tab-bar .studio-tab .sync-dot {
     display: none;
   }
   /* ── V2 desktop tab icons + label layout ─────────────────────────
@@ -7414,12 +7418,16 @@ html[data-design="v2"] .record-label {
      gray-divider border so the gold visually replaces it across
      the active tab's width. Specificity bumped to .studio-tab-bar
      .studio-tab.active::after so the mobile dot rule (same selector
-     without the .studio-tab-bar prefix) can't win on source order. */
+     without the .studio-tab-bar prefix) can't win on source order.
+     `left: -30; right: -30` extends the underline 30px past EACH
+     side of the tab — 60px total wider than the tab itself, per
+     spec. The 90px tab-to-tab gap absorbs the spillover without
+     adjacent underlines touching. */
   html[data-design="v2"] .studio-tab-bar .studio-tab.active::after {
     content: "";
     position: absolute;
-    left: 0;
-    right: 0;
+    left: -30px;
+    right: -30px;
     bottom: -2px;
     height: 4px;
     width: auto;
@@ -7430,13 +7438,15 @@ html[data-design="v2"] .record-label {
   }
 
   /* ── V2 desktop draft dropdown pills ─────────────────────────────
-     Every .drafts-dropdown-trigger on desktop (project hero DRAFT
-     pill, layer-bar CONCEPT/CHARACTERS/etc DRAFT N pill, TV episode
-     trigger) gets the same dark pill treatment: gray-dark-fill
-     background, white label, white caret. The ds-type-draft-dropdown
-     class still supplies the typography token, so labels keep their
-     letter-spacing + weight; only colors + container chrome change. */
-  html[data-design="v2"] .drafts-dropdown-trigger {
+     The project HERO pill uses `.drafts-dropdown-trigger`; the
+     layer-bar pill (CONCEPT/CHARACTERS/etc DRAFT N) uses
+     `.layer-draft-trigger`. Different classes, same desired chrome
+     on desktop — comma-extended so both get the dark-pill treatment
+     without code duplication. The competing `.layer-draft-trigger
+     { color: black }` desktop rule further down in this stylesheet
+     is mobile-gated below so source order doesn't unwind us. */
+  html[data-design="v2"] .drafts-dropdown-trigger,
+  html[data-design="v2"] .layer-draft-trigger {
     background: var(--ds-color-gray-dark-fill);
     color: var(--ds-color-white);
     border: 0;
@@ -7453,17 +7463,19 @@ html[data-design="v2"] .record-label {
   }
   /* Caret icons ship as a black SVG. `brightness(0) invert(1)`
      repaints the SVG pure white for the pill's white-on-dark
-     treatment. */
-  html[data-design="v2"] .drafts-dropdown-trigger .drafts-caret {
+     treatment. Covers both trigger classes. */
+  html[data-design="v2"] .drafts-dropdown-trigger .drafts-caret,
+  html[data-design="v2"] .layer-draft-trigger .drafts-caret {
     filter: brightness(0) invert(1);
+    /* Layer-draft caret has its own opacity:1 + width/height rules
+       elsewhere; brightness(0) invert(1) just repaints whatever
+       gets painted. */
   }
 
-  /* 8px breathing room above the project hero so the image + title
-     block don't sit flush with the topbar. Applied as margin-top
-     on the hero rather than padding-top on .studio-scroll so the
-     value is easy to find and adjust. */
+  /* Hero sits flush against the topbar — no top margin. The 8px
+     breathing room previously here was removed per spec. */
   html[data-design="v2"] .v2-desktop-hero {
-    margin-top: 8px;
+    margin-top: 0;
   }
 }
 
@@ -10297,11 +10309,19 @@ html[data-design="v2"] .studio-empty-overlay .layer-draft-picker {
    ships without its prior opacity="0.5" attribute now, so opacity:
    1 here gives full black (the v1 `.drafts-caret { opacity: 0.55 }`
    rule still fires in v1, keeping that surface unchanged). */
-html[data-design="v2"] .layer-draft-trigger {
-  color: var(--ds-color-black);
-}
-html[data-design="v2"] .layer-draft-trigger .drafts-caret {
-  opacity: 1;
+/* Mobile-only: black text + opaque caret on the layer-draft trigger.
+   Desktop replaces this surface with the dark-pill chrome shared with
+   `.drafts-dropdown-trigger` (rule earlier in this stylesheet inside
+   the desktop @media block) — the bare rules here would otherwise
+   win on source order at ≥1440 and bleach out the white-on-dark pill
+   color back to black. */
+@media (max-width: 1439.98px) {
+  html[data-design="v2"] .layer-draft-trigger {
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .layer-draft-trigger .drafts-caret {
+    opacity: 1;
+  }
 }
 
 /* Title — typography comes from `.ds-type-empty-header` utility on

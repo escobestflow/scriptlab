@@ -3030,7 +3030,7 @@ function SectionTabs({
                 except on .active so we don't have to track another
                 conditional in JSX. */}
             <span className="studio-tab-bg" aria-hidden="true" />
-            <span className="studio-tab-label">{t.label}</span>
+            <span className={`studio-tab-label ${section === t.key ? "ds-type-project-tab-nav-active" : "ds-type-project-tab-nav-inactive"}`}>{t.label}</span>
             {dot && <span className="sync-dot" />}
           </button>
         );
