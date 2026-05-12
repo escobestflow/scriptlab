@@ -6066,6 +6066,7 @@ html[data-design="v2"] {
   --ds-color-gray-chip-outline: #EDEDED;
   --ds-color-gray-chip-fill:    #F4F4F4;
   --ds-color-gray-sidebar:      #F3F2F2; /* Desktop left-nav column fill. */
+  --ds-color-gray-divider:      #DBDAD9; /* Desktop tab-nav top + bottom divider lines. */
   --ds-color-gray-chip-label:   #888888;
   --ds-color-gray-dark-fill:    #626262;
 
@@ -7097,7 +7098,13 @@ html[data-design="v2"] .record-label {
     flex-direction: row;
     align-items: center;
     gap: 23px;
-    margin-bottom: 24px;
+    /* Width matches the tab content (1054 = 418 + 23 + 613) so the
+       hero is flush with the tab bar + column cards below. */
+    width: 1054px;
+    /* No bottom margin — tab nav sits flush below the image. The
+       margin-top: 8px rule further down keeps the small breathing
+       room above the hero (between topbar and image). */
+    margin-bottom: 0;
   }
   /* Image button — 537 × 313 left-anchored. Cursor pointer on the
      whole surface; tapping opens the project Settings panel (mirrors
@@ -7231,6 +7238,12 @@ html[data-design="v2"] .record-label {
      container. */
   html[data-design="v2"] .studio-scroll {
     padding-top: 0;
+    /* Match the home Projects/Ideas content inset: 60px from the
+       sidebar's right edge, 0 on the right (the right gutter is
+       handled by the .app-content's natural width). Hero, tab bar,
+       layer pill, and column cards all start at this padding edge. */
+    padding-left: 60px;
+    padding-right: 0;
   }
 
   /* ── V2 desktop sticky-header reset ──────────────────────────────
@@ -7291,22 +7304,25 @@ html[data-design="v2"] .record-label {
     z-index: auto;
   }
   html[data-design="v2"] .studio-tab-bar {
-    /* Flat band: 66px tall, hairline top + bottom strokes only,
-       no radius, no shadow, transparent fill. Tabs are content-
-       sized + left-anchored with a 90px gap (matches the Figma
-       prototype source), so the bar reads as four labeled tabs
-       grouped at the left rather than equally distributed across
-       1050px. */
+    /* Flat band: 66px tall, top hairline + bottom 2px strokes
+       in --ds-color-gray-divider (#DBDAD9), no radius, no shadow,
+       transparent fill. Width matches the tab content column
+       (1050px) so the bar's strokes don't run past the content.
+       Tabs are content-sized + left-anchored with a 90px gap
+       (matches the Figma prototype source). */
     height: 66px;
-    width: 100%;
+    /* 1054 = 418 + 23 + 613 — same as the concept tab's column
+       grid total, so the bar's strokes align with the column
+       cards' left + right edges. */
+    width: 1054px;
     background: transparent;
     border-radius: 0;
     box-shadow: none;
     padding: 0;
     border-left: none;
     border-right: none;
-    border-top: 0.7px solid var(--ds-color-gray-outline);
-    border-bottom: 0.7px solid var(--ds-color-gray-outline);
+    border-top: 1px solid var(--ds-color-gray-divider);
+    border-bottom: 2px solid var(--ds-color-gray-divider);
     /* Override v1's space-between distribution: content-sized
        tabs, left-anchored, 90px between adjacent tabs. */
     justify-content: flex-start;
@@ -7327,15 +7343,15 @@ html[data-design="v2"] .record-label {
     display: none;
   }
   /* Active-tab underline indicator — 4px tall gold bar pinned to
-     the bottom edge of the tab, overlapping the bar's 0.7px gray
-     border so it reads as a deliberate marker rather than a
-     stacked shadow. */
+     the bottom edge of the tab, offset -2px to overlap the bar's
+     2px gray-divider border so the gold visually replaces it for
+     the width of the active tab. */
   html[data-design="v2"] .studio-tab.active::after {
     content: "";
     position: absolute;
     left: 0;
     right: 0;
-    bottom: -0.7px;
+    bottom: -2px;
     height: 4px;
     background: var(--ds-color-unfold-gold);
     pointer-events: none;
