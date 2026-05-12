@@ -7137,6 +7137,12 @@ html[data-design="v2"] .record-label {
     overflow: hidden;
     cursor: pointer;
     display: block;
+    /* Cancel the parent `.studio-scroll` padding-left:60px so the
+       hero image's left edge sits flush against the main sidebar
+       rather than 60px inside the content column. The right-hand
+       meta block stays at its natural flex position — only the
+       image bleeds left into the sidebar gutter. */
+    margin-left: -60px;
   }
   html[data-design="v2"] .v2-desktop-hero-image::after {
     content: "";
@@ -7190,6 +7196,15 @@ html[data-design="v2"] .record-label {
     margin: 0;
     color: var(--ds-color-black);
     line-height: 1;
+    /* Fixed 476px text box. white-space:nowrap keeps the title on
+       a SINGLE line; the auto-fit useLayoutEffect in Studio.tsx
+       measures scrollWidth and scales font-size down when the
+       title's natural rendered width exceeds 476 (rather than
+       breaking or ellipsizing). overflow:hidden guards against
+       a 1-2px subpixel residual after rescale. */
+    width: 476px;
+    white-space: nowrap;
+    overflow: hidden;
   }
   /* Gold underline — 104×2 brand-accent bar between title and
      description per design. */
@@ -7212,6 +7227,17 @@ html[data-design="v2"] .record-label {
     text-transform: uppercase;
     color: var(--ds-color-black);
     margin: 0 0 22px;
+    /* Description = full logline. Hard-cap at 2 lines with a
+       trailing ellipsis via the line-clamp pattern. Width matches
+       the title box (476) so both share a right edge under the
+       gold rule. */
+    width: 476px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   /* "Updated 2d ago" — clock icon + small muted label. */
   html[data-design="v2"] .v2-desktop-hero-updated {
@@ -7308,8 +7334,9 @@ html[data-design="v2"] .record-label {
        in --ds-color-gray-divider (#DBDAD9), no radius, no shadow,
        transparent fill. Width matches the tab content column
        (1050px) so the bar's strokes don't run past the content.
-       Tabs are content-sized + left-anchored with a 90px gap
-       (matches the Figma prototype source). */
+       Tabs are content-sized, left-anchored 80px inside the bar's
+       left edge (gives the gold underline visual room under the
+       title block above), with a 90px gap between adjacent tabs. */
     height: 66px;
     /* 1054 = 418 + 23 + 613 — same as the concept tab's column
        grid total, so the bar's strokes align with the column
@@ -7318,7 +7345,10 @@ html[data-design="v2"] .record-label {
     background: transparent;
     border-radius: 0;
     box-shadow: none;
-    padding: 0;
+    /* 80px inner left padding shifts the tab links right inside
+       the full-width strokes — the gray hairlines still span 1054
+       end-to-end so the bar reads as the column gutter beneath. */
+    padding: 0 0 0 80px;
     border-left: none;
     border-right: none;
     border-top: 1px solid var(--ds-color-gray-divider);
@@ -7342,18 +7372,60 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .studio-tab .sync-dot {
     display: none;
   }
-  /* Active-tab underline indicator — 4px tall gold bar pinned to
-     the bottom edge of the tab, offset -2px to overlap the bar's
-     2px gray-divider border so the gold visually replaces it for
-     the width of the active tab. */
-  html[data-design="v2"] .studio-tab.active::after {
+  /* ── V2 desktop tab icons + label layout ─────────────────────────
+     V2 mobile lays each tab out as a STACKED column — icon absolutely
+     positioned at top:14, label absolutely positioned at bottom:18 —
+     to fit the squat mobile tab pill. Desktop wants an inline-ROW
+     layout: icon LEFT of label with 8px gap. Reset the absolute
+     positioning on both ::before (the icon) and .studio-tab-label,
+     then let inline-flex on the tab itself lay them out horizontally.
+     Higher specificity (`.studio-tab-bar .studio-tab`) so this wins
+     against the unscoped mobile rules later in the cascade. The
+     [data-section=concept|characters|story|script] mask-image asset
+     selection is reused unchanged from mobile. */
+  html[data-design="v2"] .studio-tab-bar .studio-tab {
+    position: relative;
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    height: 100%;
+    padding: 0;
+  }
+  html[data-design="v2"] .studio-tab-bar .studio-tab::before {
+    position: static;
+    top: auto;
+    left: auto;
+    transform: none;
+    /* 18×18 square for desktop — reads cleaner inline-with-label
+       than the mobile portrait 16×19. */
+    width: 18px;
+    height: 18px;
+  }
+  html[data-design="v2"] .studio-tab-bar .studio-tab .studio-tab-label {
+    position: static;
+    bottom: auto;
+    left: auto;
+    transform: none;
+  }
+
+  /* Active-tab underline indicator — 4px gold bar pinned to the
+     bottom edge of the tab, offset -2px to OVERLAP the bar's 2px
+     gray-divider border so the gold visually replaces it across
+     the active tab's width. Specificity bumped to .studio-tab-bar
+     .studio-tab.active::after so the mobile dot rule (same selector
+     without the .studio-tab-bar prefix) can't win on source order. */
+  html[data-design="v2"] .studio-tab-bar .studio-tab.active::after {
     content: "";
     position: absolute;
     left: 0;
     right: 0;
     bottom: -2px;
     height: 4px;
+    width: auto;
     background: var(--ds-color-unfold-gold);
+    border-radius: 0;
+    transform: none;
     pointer-events: none;
   }
 
@@ -7369,7 +7441,11 @@ html[data-design="v2"] .record-label {
     color: var(--ds-color-white);
     border: 0;
     border-radius: 30px;
-    padding: 8px 18px;
+    /* Fixed 29px pill height per spec. Vertical centering owned by
+       inline-flex + align-items:center; padding goes horizontal-only
+       so the pill height never bloats with token font-size changes. */
+    height: 29px;
+    padding: 0 18px;
     display: inline-flex;
     align-items: center;
     gap: 8px;
