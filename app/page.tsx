@@ -1582,21 +1582,9 @@ export default function Page() {
               >
                 <img src="/v2/icons/icon-add.svg" alt="" width={13} height={13} />
               </button>
-              {/* Dev-only empty-state preview toggle. Lets the
-                  account whose v2 session has real projects /
-                  ideas saved still preview the empty-state UIs
-                  without deleting the data. Persisted to
-                  localStorage so a reload keeps the chosen view. */}
-              <button
-                type="button"
-                className={`v2-empty-state-toggle ${forceEmptyState ? "is-on" : ""}`}
-                onClick={() => setForceEmptyState(v => !v)}
-                aria-pressed={forceEmptyState}
-                aria-label={forceEmptyState ? "Show populated state" : "Show empty state"}
-                title={forceEmptyState ? "Showing empty state — tap to flip back" : "Preview empty state"}
-              >
-                {forceEmptyState ? "FULL" : "EMPTY"}
-              </button>
+              {/* Dev-only empty-state preview toggle has moved into
+                  the main menu (alongside Dark mode, Draft popups,
+                  Autosave) — single home for utility switches. */}
             </div>
           ) : (
             <div style={{ width: 44 }} />
@@ -1877,6 +1865,41 @@ export default function Page() {
               <span className="toggle-switch-knob" />
             </button>
           </div>
+
+          {/* Empty-state preview — V2 dev affordance. Lets an account
+              with real projects / ideas preview the empty-state UI
+              without deleting data. Same utility-row pattern as the
+              switches above; persisted via the same forceEmptyState
+              localStorage key, so a reload keeps the chosen view. */}
+          {isV2 && (
+            <div
+              className="menu-panel-utility"
+              style={{ ["--d" as any]: "255ms" }}
+              onClick={() => setForceEmptyState(v => !v)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setForceEmptyState(v => !v);
+                }
+              }}
+            >
+              <span className="label">Empty state preview</span>
+              <button
+                type="button"
+                className={`toggle-switch toggle-switch-dark ${forceEmptyState ? "on" : ""}`}
+                aria-label="Toggle empty-state preview"
+                aria-pressed={forceEmptyState}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setForceEmptyState(v => !v);
+                }}
+              >
+                <span className="toggle-switch-knob" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
