@@ -6065,6 +6065,7 @@ html[data-design="v2"] {
   --ds-color-gray-outline:      #E4E3E4;
   --ds-color-gray-chip-outline: #EDEDED;
   --ds-color-gray-chip-fill:    #F4F4F4;
+  --ds-color-gray-sidebar:      #F3F2F2; /* Desktop left-nav column fill. */
   --ds-color-gray-chip-label:   #888888;
   --ds-color-gray-dark-fill:    #626262;
 
@@ -6886,6 +6887,24 @@ html[data-design="v2"] .record-label {
     font-size: 14px;
     letter-spacing: 0;
     text-transform: none;
+  }
+
+  /* ── V2 desktop surfaces ──────────────────────────────────────
+     Body becomes white (was --ds-color-app-background / #F8F7F7 on
+     mobile — same gray as the sidebar would otherwise blend into).
+     The mobile background rule at the bottom of globals.css is
+     already wrapped in `@media (max-width: 1439.98px)`, so this
+     override is the only body bg at ≥1440. */
+  html[data-design="v2"] body {
+    background: var(--ds-color-white);
+  }
+  /* Sidebar fill — #F3F2F2 per spec, sits a hair darker than the
+     white main background so the left column reads as its own
+     column without a hard border. v1's `.desktop-sidebar` rule
+     sets background: var(--bg) which would inherit the body bg
+     on v2; this v2-scoped override paints the column explicitly. */
+  html[data-design="v2"] .desktop-sidebar {
+    background: var(--ds-color-gray-sidebar);
   }
 
   /* ── V2 desktop layout shell ───────────────────────────────────
