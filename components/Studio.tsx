@@ -1740,7 +1740,7 @@ export function Studio({
                 <span>Draft {activeProjectDraft.number}</span>
                 <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
               </button>
-              <h1 className="v2-desktop-hero-title">
+              <h1 className="v2-desktop-hero-title ds-type-project-page-title">
                 {story.title || "Untitled"}
               </h1>
               <div className="v2-desktop-hero-rule" aria-hidden="true" />

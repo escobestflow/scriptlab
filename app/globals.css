@@ -7159,16 +7159,14 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-desktop-hero-draft {
     margin-bottom: 18px;
   }
-  /* Title — Poynter display ~85px. No letter-spacing tweak; the
-     display font already carries the right metrics. */
+  /* Title — typography is owned by the `.ds-type-project-page-title`
+     token applied alongside this class on the JSX (Poynter / 400 /
+     65px on desktop). This rule only zeros out the default <h1>
+     margins; the token supplies font + size + tracking. */
   html[data-design="v2"] .v2-desktop-hero-title {
-    font-family: var(--ds-font-display);
-    font-weight: 400;
-    font-size: 85px;
-    line-height: 1;
-    letter-spacing: -0.01em;
     margin: 0;
     color: var(--ds-color-black);
+    line-height: 1;
   }
   /* Gold underline — short horizontal bar in the brand accent color.
      Sits 16px below the title, ~150px wide. */
@@ -7278,12 +7276,11 @@ html[data-design="v2"] .record-label {
   }
   html[data-design="v2"] .studio-tab-bar {
     /* Flat band: 66px tall, hairline top + bottom strokes only,
-       no radius, no shadow, transparent fill (lets the page bg
-       show through so the strokes read as a divider band). Width
-       inherits 100% from the studio-tabs-row above. Internal tab
-       spacing (justify-content: space-between on the tab bar +
-       flex:1 per tab) is unchanged — tabs grow to fill the new
-       full width while the gap rhythm stays the same. */
+       no radius, no shadow, transparent fill. Tabs are content-
+       sized + left-anchored with a 90px gap (matches the Figma
+       prototype source), so the bar reads as four labeled tabs
+       grouped at the left rather than equally distributed across
+       1050px. */
     height: 66px;
     width: 100%;
     background: transparent;
@@ -7294,6 +7291,71 @@ html[data-design="v2"] .record-label {
     border-right: none;
     border-top: 0.7px solid var(--ds-color-gray-outline);
     border-bottom: 0.7px solid var(--ds-color-gray-outline);
+    /* Override v1's space-between distribution: content-sized
+       tabs, left-anchored, 90px between adjacent tabs. */
+    justify-content: flex-start;
+    gap: 90px;
+  }
+  /* Each tab is content-width (override v1's flex:1 even-share). */
+  html[data-design="v2"] .studio-tab-bar .studio-tab {
+    flex: 0 0 auto;
+  }
+  /* Hide the v2 mobile selection-box (.studio-tab-bg) — desktop
+     uses a 4px gold underline indicator instead. Same for the
+     per-tab dirty dot (.sync-dot) which the design omits. */
+  html[data-design="v2"] .studio-tab .studio-tab-bg,
+  html[data-design="v2"] .studio-tab.active .studio-tab-bg {
+    display: none;
+  }
+  html[data-design="v2"] .studio-tab .sync-dot {
+    display: none;
+  }
+  /* Active-tab underline indicator — 4px tall gold bar pinned to
+     the bottom edge of the tab, overlapping the bar's 0.7px gray
+     border so it reads as a deliberate marker rather than a
+     stacked shadow. */
+  html[data-design="v2"] .studio-tab.active::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -0.7px;
+    height: 4px;
+    background: var(--ds-color-unfold-gold);
+    pointer-events: none;
+  }
+
+  /* ── V2 desktop draft dropdown pills ─────────────────────────────
+     Every .drafts-dropdown-trigger on desktop (project hero DRAFT
+     pill, layer-bar CONCEPT/CHARACTERS/etc DRAFT N pill, TV episode
+     trigger) gets the same dark pill treatment: gray-dark-fill
+     background, white label, white caret. The ds-type-draft-dropdown
+     class still supplies the typography token, so labels keep their
+     letter-spacing + weight; only colors + container chrome change. */
+  html[data-design="v2"] .drafts-dropdown-trigger {
+    background: var(--ds-color-gray-dark-fill);
+    color: var(--ds-color-white);
+    border: 0;
+    border-radius: 30px;
+    padding: 8px 18px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  /* Caret icons ship as a black SVG. `brightness(0) invert(1)`
+     repaints the SVG pure white for the pill's white-on-dark
+     treatment. */
+  html[data-design="v2"] .drafts-dropdown-trigger .drafts-caret {
+    filter: brightness(0) invert(1);
+  }
+
+  /* 8px breathing room above the project hero so the image + title
+     block don't sit flush with the topbar. Applied as margin-top
+     on the hero rather than padding-top on .studio-scroll so the
+     value is easy to find and adjust. */
+  html[data-design="v2"] .v2-desktop-hero {
+    margin-top: 8px;
   }
 }
 
