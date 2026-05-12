@@ -5669,7 +5669,7 @@ function AttrRow({
     onToggle();
   };
   return (
-    <div className="attr-row">
+    <div className="attr-row" data-label={label}>
       <div
         className="attr-row-header"
         role={interactive ? "button" : undefined}
@@ -6216,7 +6216,7 @@ function TextAttrRow({
   // open into.
   if (inline) {
     return (
-      <div className="attr-row attr-row-inline-input">
+      <div className="attr-row attr-row-inline-input" data-label={label}>
         <div className="attr-row-header">
           <span className="attr-label">
             {label}
@@ -6260,7 +6260,7 @@ function TextAttrRow({
       setFocused(true);
     };
     return (
-      <div className="attr-row">
+      <div className="attr-row" data-label={label}>
         <div
           className="attr-row-header"
           role={interactive ? "button" : undefined}
@@ -6304,7 +6304,7 @@ function TextAttrRow({
   const inputClass = `attr-text-input ${!focused && hasValue ? "unfocused-filled" : ""}`;
 
   return (
-    <div className="attr-row attr-row-text-open">
+    <div className="attr-row attr-row-text-open" data-label={label}>
       <div className="attr-row-header attr-row-header-static">
         <span className="attr-label">
           {label}

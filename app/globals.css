@@ -6916,6 +6916,67 @@ html[data-design="v2"] .record-label {
     margin-left: 0;
     margin-right: 0;
   }
+
+  /* ── V2 desktop Concept tab — 2-column attribute grid ───────────
+     Overrides v1 desktop's `column-count: 2` (CSS multi-column auto-
+     balances, no precise placement) with an explicit CSS Grid:
+       418px (left col) + 23px gap + 613px (right col) = 1054px
+     The 4px overhang past the 1050 content column is intentional
+     — both column widths come from the desktop design spec.
+     Each AttrRow / TextAttrRow root now carries `data-label="X"`,
+     so this block uses attribute selectors to bind each row to a
+     column AND a vertical order. `order` (not grid-row) controls
+     vertical stacking because mobile JSX order has rows in a
+     different sequence than the desktop column composition. */
+  html[data-design="v2"] .tab-content-wrap-concept {
+    /* Replace v1's column-count + column-fill with explicit grid. */
+    display: grid;
+    grid-template-columns: 418px 613px;
+    column-gap: 23px;
+    align-items: start;
+    /* `column-count` from v1 leaks through if not reset. */
+    column-count: unset;
+    column-gap: 23px;
+  }
+  /* LayerBar (Concept Draft pill) sits on its own full-width row
+     above the 2 columns. Same for tip cards / partner notices. */
+  html[data-design="v2"] .tab-content-wrap-concept > .layer-bar,
+  html[data-design="v2"] .tab-content-wrap-concept > .tip-card,
+  html[data-design="v2"] .tab-content-wrap-concept > .partner-preview-empty-notice,
+  html[data-design="v2"] .tab-content-wrap-concept > .toast {
+    grid-column: 1 / -1;
+    order: 0;
+    column-span: unset;
+  }
+  /* LEFT column — Format, Duration / Short Structure, Episode Title
+     (TV), Genre, Sub-Genre. `order` controls vertical stack.
+     Title isn't currently rendered as an AttrRow — adding it as a
+     dedicated row is deferred to a follow-up change. */
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Format"] { grid-column: 1; order: 2; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 3; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 4; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Title"] { grid-column: 1; order: 5; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Genre"] { grid-column: 1; order: 6; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Sub-Genre"] { grid-column: 1; order: 7; }
+  /* RIGHT column — Logline FIRST per design, then Summary, Similar To,
+     Writer Style, Tone, Themes, Story Framework, Ending. */
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Logline"] { grid-column: 2; order: 1; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Summary"] { grid-column: 2; order: 2; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Similar To"] { grid-column: 2; order: 3; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Writer Style"] { grid-column: 2; order: 4; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Tone"] { grid-column: 2; order: 5; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Themes"] { grid-column: 2; order: 6; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Story Framework"] { grid-column: 2; order: 7; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Ending"] { grid-column: 2; order: 8; }
+
+  /* ── V2 desktop section tab bar — 66px tall per design ──────────
+     v1 desktop has its own .studio-tab-bar layout; this v2-scoped
+     override only changes the height. Other styling (active state,
+     icon/label composition) untouched for now — visual restyle to
+     match the design's underline indicator + icons is a follow-up. */
+  html[data-design="v2"] .studio-tab-bar {
+    height: 66px;
+  }
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────
