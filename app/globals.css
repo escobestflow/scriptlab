@@ -7009,7 +7009,7 @@ html[data-design="v2"] .record-label {
     display: block;
     background: var(--ds-color-gray-lightest); /* #FCFBFB */
     border: 0.7px solid var(--ds-color-gray-outline); /* #E4E3E4 */
-    border-radius: 18px;
+    border-radius: 13px;
     padding: 0 20px;
     overflow: hidden;
     align-self: start;
