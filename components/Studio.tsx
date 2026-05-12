@@ -6635,6 +6635,13 @@ function ConceptTab({
         </Tip>
       )}
 
+      {/* Left-column wrapper. On mobile, `.v2-concept-col-left` is
+          display:contents (transparent) so the rows behave exactly as
+          before. On desktop, the wrapper becomes a single rounded
+          card (#FCFBFB fill, 0.7px gray-outline stroke) containing
+          Format / Duration / Short Structure / Episode Title / Genre
+          / Sub-Genre stacked with thin divider lines between them. */}
+      <div className="v2-concept-col-left">
       {/* Format */}
       <AttrRow
         label="Format"
@@ -6928,6 +6935,7 @@ function ConceptTab({
           </AttrRow>
         );
       })()}
+      </div>{/* /.v2-concept-col-left */}
 
       {/* Similar To — free-form references (films / shows) each tagged
           with which craft aspects the user wants to mirror. */}

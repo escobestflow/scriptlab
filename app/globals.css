@@ -6474,6 +6474,15 @@ html[data-design="v2"] .v2-ideas-sticky-header .filter-row {
   html[data-design="v2"] body {
     background: var(--ds-color-app-background);
   }
+  /* The v2 concept-tab left-column wrapper is visually invisible
+     below desktop (display: contents) so the rows inside flow as
+     direct siblings — keeps mobile JSX behavior unchanged. The
+     wrapper only renders its card at ≥1440 v2 desktop, where the
+     companion rule inside the desktop @media block sets display:
+     block + the gray-lightest fill + thin gray-outline stroke. */
+  html[data-design="v2"] .v2-concept-col-left {
+    display: contents;
+  }
 }
 
 /* ── V2 Projects-tab home screen — mobile redesign ─────────────
@@ -6948,10 +6957,48 @@ html[data-design="v2"] .record-label {
     order: 0;
     column-span: unset;
   }
-  /* LEFT column — Format, Duration / Short Structure, Episode Title
-     (TV), Genre, Sub-Genre. `order` controls vertical stack.
-     Title isn't currently rendered as an AttrRow — adding it as a
-     dedicated row is deferred to a follow-up change. */
+  /* LEFT column is wrapped in a `<div class="v2-concept-col-left">`
+     in the JSX. That wrapper is the single grid item for column 1
+     AND the visible "card" (light fill + thin gray stroke). The
+     attr-rows inside no longer carry their individual card chrome;
+     they flatten and get a hairline divider between siblings.
+
+     The earlier [data-label="…"] grid-column rules for left-column
+     rows (Format / Duration / Short Structure / Episode Title /
+     Genre / Sub-Genre) are now NO-OPS because those rows aren't
+     direct grid children — they live inside the wrapper. We keep
+     them for hypothetical future renders that bypass the wrapper. */
+  html[data-design="v2"] .v2-concept-col-left {
+    /* Override the mobile `display: contents` so the wrapper actually
+       participates in the grid layout and renders its own box. */
+    display: block;
+    grid-column: 1;
+    order: 1;
+    background: var(--ds-color-gray-lightest); /* #FCFBFB */
+    border: 0.7px solid var(--ds-color-gray-outline); /* #E4E3E4 */
+    border-radius: 18px;
+    overflow: hidden;
+    align-self: start;
+  }
+  /* Strip the per-row card chrome inside the wrapper so the rows
+     look like sections of one continuous card. Background, border,
+     border-radius, and margin all go to zero — the wrapper supplies
+     the surface. */
+  html[data-design="v2"] .v2-concept-col-left .attr-row,
+  html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-inline-input,
+  html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-text-open {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin: 0;
+    box-shadow: none;
+  }
+  /* Hairline divider between consecutive rows. Adjacent sibling
+     selector — the first row in the card has no top border. */
+  html[data-design="v2"] .v2-concept-col-left .attr-row + .attr-row {
+    border-top: 0.7px solid var(--ds-color-gray-outline);
+  }
+  /* Legacy [data-label] grid-column rules kept for fallback. */
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Format"] { grid-column: 1; order: 2; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 3; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 4; }
