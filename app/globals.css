@@ -7002,11 +7002,12 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-concept-col-right {
     /* Override the mobile `display: contents` so the wrappers
        actually participate in the grid layout and render their own
-       boxes. 20px horizontal padding so the row contents AND the
-       between-row dividers (which are `border-top` on the rows
-       themselves) inset cleanly from the card edges rather than
-       running edge-to-edge. */
-    display: block;
+       boxes. Flex column (NOT block) so the per-row `order` rules
+       below can reorder rows visually without rewriting JSX —
+       desktop wants Title first in the left card and Logline+Summary
+       first in the right card, but mobile renders in source order. */
+    display: flex;
+    flex-direction: column;
     background: var(--ds-color-gray-lightest); /* #FCFBFB */
     border: 0.7px solid var(--ds-color-gray-outline); /* #E4E3E4 */
     border-radius: 13px;
@@ -7042,20 +7043,35 @@ html[data-design="v2"] .record-label {
     padding-bottom: 12px;
     box-shadow: none;
   }
-  /* Hairline divider between consecutive rows. Adjacent sibling
-     selector — the first row in each card has no top border. */
-  html[data-design="v2"] .v2-concept-col-left .attr-row + .attr-row,
-  html[data-design="v2"] .v2-concept-col-right .attr-row + .attr-row {
+  /* Hairline divider between rows. Apply border-top to EVERY row in
+     the wrappers, then strip from the visually-first row in each
+     card via [data-label] selector. Can't use the adjacent-sibling
+     `+ .attr-row` shortcut any more because flex `order` decouples
+     visual order from DOM order — the DOM-first row may not be the
+     visually-first, so :first-child / `+` would draw the wrong
+     dividers after reorder. */
+  html[data-design="v2"] .v2-concept-col-left .attr-row,
+  html[data-design="v2"] .v2-concept-col-right .attr-row {
     border-top: 0.7px solid var(--ds-color-gray-outline);
   }
-  /* Legacy [data-label] grid-column rules kept for fallback. */
+  html[data-design="v2"] .v2-concept-col-left .attr-row[data-label="Title"],
+  html[data-design="v2"] .v2-concept-col-left .attr-row[data-label="Show Title"],
+  html[data-design="v2"] .v2-concept-col-right .attr-row[data-label="Logline"] {
+    border-top: 0;
+  }
+  /* LEFT column — Title FIRST per spec, then Format, Short Structure
+     (short-only), Duration (short-only), Episode Title (TV-only),
+     Genre, Sub-Genre. The `order` numbers don't need to be
+     contiguous; flex sorts ascending. */
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Title"],
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Show Title"] { grid-column: 1; order: 1; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Format"] { grid-column: 1; order: 2; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 3; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 4; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 3; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 4; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Title"] { grid-column: 1; order: 5; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Genre"] { grid-column: 1; order: 6; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Sub-Genre"] { grid-column: 1; order: 7; }
-  /* RIGHT column — Logline FIRST per design, then Summary, Similar To,
+  /* RIGHT column — Logline FIRST per spec, then Summary, Similar To,
      Writer Style, Tone, Themes, Story Framework, Ending. */
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Logline"] { grid-column: 2; order: 1; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Summary"] { grid-column: 2; order: 2; }
