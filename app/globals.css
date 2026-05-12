@@ -7033,13 +7033,28 @@ html[data-design="v2"] .record-label {
   /* ── V2 desktop project hero ─────────────────────────────────
      Image LEFT (537×313), title block RIGHT (drafts pill, big
      serif title, gold rule, logline-as-description, "Updated X ago"
-     timestamp). Hides the v2 mobile sticky image + header-sticky's
-     title parts so they don't duplicate or fight for position. */
+     timestamp). Hides every competing top-of-page chrome from v2
+     mobile so nothing renders above the hero. */
+
+  /* Mobile-only top nav bar (back button + help button) — was
+     absolute-positioned at top:0 of .app and bleeding through on
+     desktop, where the sidebar already owns the back-to-projects
+     affordance. */
+  html[data-design="v2"] .studio-nav-fixed { display: none; }
+
+  /* Mobile fixed full-bleed hero image — replaced by .v2-desktop-hero
+     above (in JSX). */
   html[data-design="v2"] .studio-thumb-scroll { display: none; }
   html[data-design="v2"] .studio-thumb-empty-title { display: none; }
-  html[data-design="v2"] .studio-header-sticky .project-header-title,
-  html[data-design="v2"] .studio-header-sticky > .drafts-dropdown-trigger,
-  html[data-design="v2"] .studio-header-sticky > .project-drafts-row {
+
+  /* Inside .studio-header-sticky, hide EVERYTHING except the
+     `.studio-tabs-row` (the section tab bar). The title button,
+     drafts-dropdown-trigger, and the TV episode row all live here
+     and were appearing as a "duplicate" stack at the top of the
+     page on desktop. The single `> *:not(.studio-tabs-row)`
+     selector covers all of them without enumerating individual
+     class names — safer if a new child shows up later. */
+  html[data-design="v2"] .studio-header-sticky > *:not(.studio-tabs-row) {
     display: none;
   }
   html[data-design="v2"] .v2-desktop-hero {
