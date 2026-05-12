@@ -7030,13 +7030,42 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Story Framework"] { grid-column: 2; order: 7; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Ending"] { grid-column: 2; order: 8; }
 
-  /* ── V2 desktop section tab bar — 66px tall per design ──────────
-     v1 desktop has its own .studio-tab-bar layout; this v2-scoped
-     override only changes the height. Other styling (active state,
-     icon/label composition) untouched for now — visual restyle to
-     match the design's underline indicator + icons is a follow-up. */
+  /* ── V2 desktop section tab bar ─────────────────────────────────
+     V2 mobile renders the tab bar as a fixed-position floating pill
+     (border-radius: 20, drop-shadow, 480px max-width, position:
+     fixed). On desktop the design calls for an in-flow, full-width
+     band with NO corner radius, NO drop-shadow, and NO left/right
+     borders — just a top + bottom hairline stroke. */
+  html[data-design="v2"] .studio-tabs-row {
+    /* Unwind the mobile fixed-pill positioning. The tabs-row now
+       flows inline with the page content at full content width. */
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    z-index: auto;
+  }
   html[data-design="v2"] .studio-tab-bar {
+    /* Flat band: 66px tall, hairline top + bottom strokes only,
+       no radius, no shadow, transparent fill (lets the page bg
+       show through so the strokes read as a divider band). Width
+       inherits 100% from the studio-tabs-row above. Internal tab
+       spacing (justify-content: space-between on the tab bar +
+       flex:1 per tab) is unchanged — tabs grow to fill the new
+       full width while the gap rhythm stays the same. */
     height: 66px;
+    width: 100%;
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    border-left: none;
+    border-right: none;
+    border-top: 0.7px solid var(--ds-color-gray-outline);
+    border-bottom: 0.7px solid var(--ds-color-gray-outline);
   }
 }
 
@@ -8027,16 +8056,20 @@ html[data-design="v2"]:has(.studio-empty-overlay) .studio-header-sticky > .proje
   pointer-events: none;
 }
 
-/* Section tabs — persistent overlay slightly above the hero's
-   bottom edge. Pinned via position: fixed; 71px tall pill, 20px
-   gutters from viewport edges, 20px corner radius. The hero is
-   y=87..217; the tab pill sits at y=182..253 → overlaps the hero
-   by ~35px (visually "slightly overlayed" per spec). Same
-   max-width:520px clamp as the hero for desktop.
-   `width: auto` is required to override v1's
-   `.studio-tabs-row { width: 100% }`, which would otherwise force
-   full viewport width and push the pill's right edge past the
-   right gutter. */
+/* ── Section tabs — V2 MOBILE-ONLY block ────────────────────────
+   The rules below describe the floating-pill tab bar that overlays
+   the hero on V2 mobile (≤1439.98px). Pinned via position: fixed;
+   71px tall pill, 20px gutters from viewport edges, 20px corner
+   radius. The hero is y=87..217; the tab pill sits at y=182..253
+   → overlaps the hero by ~35px (visually "slightly overlayed").
+
+   WHY THE WRAPPER: these rules are not media-scoped by default and
+   were applying on desktop too, where they fought a separate
+   desktop @media override. Wrapping the whole pill behavior in
+   `@media (max-width: 1439.98px)` cleanly hands the desktop tab
+   bar off to its own @media block (full-width flat band, no
+   shadow, no radius — see the V2 desktop section above). */
+@media (max-width: 1439.98px) {
 html[data-design="v2"] .studio-tabs-row {
   position: fixed;
   /* 15px lower than the prior env+162 per spec — tab bar bottom
@@ -8122,6 +8155,7 @@ html[data-design="v2"] .studio-tab-bar .studio-tab {
 html[data-design="v2"]:has(.studio-empty-overlay) .studio-tab-bar .studio-tab {
   transform: translateY(9px);
 }
+} /* /@media (max-width: 1439.98px) — end V2-mobile tab pill block */
 
 /* Scroll container — content needs to clear the fixed tab pill
    (bottom edge at y=253) before becoming visible. 272px = tab
