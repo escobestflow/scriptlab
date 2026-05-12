@@ -7030,6 +7030,121 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Story Framework"] { grid-column: 2; order: 7; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Ending"] { grid-column: 2; order: 8; }
 
+  /* ── V2 desktop project hero ─────────────────────────────────
+     Image LEFT (537×313), title block RIGHT (drafts pill, big
+     serif title, gold rule, logline-as-description, "Updated X ago"
+     timestamp). Hides the v2 mobile sticky image + header-sticky's
+     title parts so they don't duplicate or fight for position. */
+  html[data-design="v2"] .studio-thumb-scroll { display: none; }
+  html[data-design="v2"] .studio-thumb-empty-title { display: none; }
+  html[data-design="v2"] .studio-header-sticky .project-header-title,
+  html[data-design="v2"] .studio-header-sticky > .drafts-dropdown-trigger,
+  html[data-design="v2"] .studio-header-sticky > .project-drafts-row {
+    display: none;
+  }
+  html[data-design="v2"] .v2-desktop-hero {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 23px;
+    margin-bottom: 24px;
+  }
+  /* Image button — 537 × 313 left-anchored. Cursor pointer on the
+     whole surface; tapping opens the project Settings panel (mirrors
+     the v2 mobile thumb behavior). */
+  html[data-design="v2"] .v2-desktop-hero-image {
+    flex: 0 0 537px;
+    width: 537px;
+    height: 313px;
+    background: var(--ds-color-gray-dark-fill);
+    border: 0;
+    border-radius: 14px;
+    padding: 0;
+    overflow: hidden;
+    cursor: pointer;
+    display: block;
+  }
+  html[data-design="v2"] .v2-desktop-hero-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  html[data-design="v2"] .v2-desktop-hero-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ds-color-gray-chip-fill);
+    font-family: var(--ds-font-display);
+    font-size: 96px;
+  }
+  /* Right-side stack: drafts pill (existing), big serif title,
+     short gold rule, description (logline), updated timestamp. */
+  html[data-design="v2"] .v2-desktop-hero-meta {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    /* Anchor block centers vertically with the image via the parent's
+       align-items: center — we just stack content with deliberate
+       gaps below. */
+  }
+  /* Reusing the existing .drafts-dropdown-trigger / .ds-type-draft-dropdown
+     classes — adding only the bottom margin specific to this hero
+     placement. */
+  html[data-design="v2"] .v2-desktop-hero-draft {
+    margin-bottom: 18px;
+  }
+  /* Title — Poynter display ~85px. No letter-spacing tweak; the
+     display font already carries the right metrics. */
+  html[data-design="v2"] .v2-desktop-hero-title {
+    font-family: var(--ds-font-display);
+    font-weight: 400;
+    font-size: 85px;
+    line-height: 1;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: var(--ds-color-black);
+  }
+  /* Gold underline — short horizontal bar in the brand accent color.
+     Sits 16px below the title, ~150px wide. */
+  html[data-design="v2"] .v2-desktop-hero-rule {
+    width: 150px;
+    height: 1px;
+    background: var(--ds-color-unfold-gold);
+    margin: 18px 0 26px;
+  }
+  /* Description — UPPER + light tracking, body-sm token weight.
+     `text-transform: uppercase` because the source field (logline)
+     is typically free-form sentence-case; the desktop hero wants the
+     SMALL-CAPS treatment. */
+  html[data-design="v2"] .v2-desktop-hero-description {
+    font-family: var(--ds-font-body);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    line-height: 1.5;
+    text-transform: uppercase;
+    color: var(--ds-color-black);
+    margin: 0 0 22px;
+  }
+  /* "Updated 2d ago" — clock icon + small muted label. */
+  html[data-design="v2"] .v2-desktop-hero-updated {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--ds-font-body);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ds-color-unfold-gold);
+  }
+  html[data-design="v2"] .v2-desktop-hero-updated svg {
+    flex: 0 0 14px;
+  }
+
   /* ── V2 desktop section tab bar ─────────────────────────────────
      V2 mobile renders the tab bar as a fixed-position floating pill
      (border-radius: 20, drop-shadow, 480px max-width, position:

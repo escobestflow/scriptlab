@@ -148,6 +148,41 @@ function initialForMember(
   return initialFor(email);
 }
 
+/** Local copy of app/page.tsx's useIsDesktop — the hook isn't exported
+ *  from there, so we duplicate the 10-line implementation rather than
+ *  refactor across files. Keys on the same 1440px breakpoint the rest
+ *  of v2 uses. SSR-safe: starts false until the effect runs. */
+function useIsDesktopStudio(): boolean {
+  const [v, setV] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1440px)");
+    setV(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setV(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return v;
+}
+
+/** "Updated Nm/h/d ago" — relative-time formatter for the V2 desktop
+ *  project hero. Mirrors the SettingsTab's local formatDate but lifted
+ *  to module scope so the hero block can call it. */
+function formatUpdatedAgo(iso: string): string {
+  if (!iso) return "";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  const ms = Date.now() - t;
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "Just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export function Studio({
   story,
   setStory,
@@ -343,6 +378,7 @@ export function Studio({
   }, [showSuccess]);
   const [draftsDropdownOpen, setDraftsDropdownOpen] = useState(false);
   const isV2 = useIsV2();
+  const isDesktop = useIsDesktopStudio();
   // TV-only: dropdown to switch the active episode. Sheet mirrors the
   // project-drafts treatment — same trigger style, same bottom-sheet.
   // Tapping an episode sets `activeEpisodeId` globally (so the Story tab
@@ -1674,6 +1710,56 @@ export function Studio({
             the top nav. Using a <button> (not the bare <div>) gives
             proper keyboard + accessibility semantics and a tap surface
             that doesn't fight with swipe gestures on iOS. */}
+
+        {/* V2 desktop hero — image LEFT, title block RIGHT. Replaces
+            the v2 mobile sticky thumb + header-sticky title treatment
+            on viewports ≥1440. CSS hides the mobile equivalents on
+            desktop so they don't duplicate or fight for position. */}
+        {isV2 && isDesktop && (
+          <div className="v2-desktop-hero">
+            <button
+              type="button"
+              className="v2-desktop-hero-image"
+              onClick={() => setShowSetup(true)}
+              aria-label="Open project settings"
+            >
+              {story.thumbnail ? (
+                <img src={story.thumbnail} alt="" />
+              ) : (
+                <div className="v2-desktop-hero-image-placeholder">
+                  {story.title ? story.title.charAt(0).toUpperCase() : "?"}
+                </div>
+              )}
+            </button>
+            <div className="v2-desktop-hero-meta">
+              <button
+                type="button"
+                className="drafts-dropdown-trigger ds-type-draft-dropdown v2-desktop-hero-draft"
+                onClick={() => setDraftsDropdownOpen(v => !v)}
+              >
+                <span>Draft {activeProjectDraft.number}</span>
+                <img src="/icon-draft-dropdown-caret.svg" alt="" className={`drafts-caret ${draftsDropdownOpen ? "open" : ""}`} />
+              </button>
+              <h1 className="v2-desktop-hero-title">
+                {story.title || "Untitled"}
+              </h1>
+              <div className="v2-desktop-hero-rule" aria-hidden="true" />
+              {activeConcept.logline?.trim() && (
+                <p className="v2-desktop-hero-description">
+                  {activeConcept.logline}
+                </p>
+              )}
+              <div className="v2-desktop-hero-updated">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9"/>
+                  <polyline points="12 7 12 12 15 14"/>
+                </svg>
+                <span>Updated {formatUpdatedAgo(story.updatedAt)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <button
           type="button"
           className="studio-thumb-scroll studio-thumb-button"
