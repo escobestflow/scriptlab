@@ -7145,6 +7145,19 @@ html[data-design="v2"] .record-label {
     flex: 0 0 14px;
   }
 
+  /* ── V2 desktop studio-scroll padding ─────────────────────────────
+     The v2 mobile rule pads .studio-scroll's top by ~299px to clear
+     the position:fixed mobile hero + tab pill stack. On desktop
+     nothing is position:fixed inside the scroll, so the 299px push
+     drops the hero way down the page. Reset to just the safe-area
+     inset (so content clears the topbar) plus a small breathing
+     room. The hero / tab bar / layer pill / column cards then
+     scroll together as a normal stack from the top of the scroll
+     container. */
+  html[data-design="v2"] .studio-scroll {
+    padding-top: 0;
+  }
+
   /* ── V2 desktop sticky-header reset ──────────────────────────────
      The v2 mobile rule zeros out .studio-header-sticky (it's
      collapsed to height:0 because mobile pulls the tab pill out via
