@@ -7066,18 +7066,29 @@ html[data-design="v2"] .record-label {
   }
   /* Image button — 537 × 313 left-anchored. Cursor pointer on the
      whole surface; tapping opens the project Settings panel (mirrors
-     the v2 mobile thumb behavior). */
+     the v2 mobile thumb behavior).
+
+     Soft white fade at TOP and BOTTOM edges via mask-image — the
+     image blends into the page background instead of presenting a
+     hard rectangular edge. The middle 70% (15%→85%) is fully
+     opaque; the top + bottom 15% bands fade to transparent so the
+     app-background shows through. Border-radius dropped — the fade
+     supplies the soft-edge feel naturally, and mixing radius with a
+     fade-to-transparent overlap creates visual conflict at the
+     corners (clip + transparency competing). */
   html[data-design="v2"] .v2-desktop-hero-image {
     flex: 0 0 537px;
     width: 537px;
     height: 313px;
     background: var(--ds-color-gray-dark-fill);
     border: 0;
-    border-radius: 14px;
+    border-radius: 0;
     padding: 0;
     overflow: hidden;
     cursor: pointer;
     display: block;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 15%, #000 85%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 15%, #000 85%, transparent 100%);
   }
   html[data-design="v2"] .v2-desktop-hero-image img {
     width: 100%;
