@@ -7581,19 +7581,20 @@ html[data-design="v2"] .record-label {
 
   /* ── V2 desktop Characters tab — 2-column card grid ──────────
      Each card keeps the same image-LEFT / body-RIGHT DNA as the
-     mobile v2 character card, but with: a square 155px portrait
-     (was 100×122 on mobile), auto card height (was 122px lock),
-     attribute pills row at the bottom of the body (gated visible
-     by the desktop display:flex below), and a 2-column grid on
-     the tab wrapper. Mobile renders untouched — the wrap stays
-     a single column flow, the card stays 122px tall, and
-     .v2-character-attrs stays display:none (set on the base rule
-     near the other v2 character card styles further down). */
+     mobile v2 character card, but at locked dimensions per spec:
+     card 511×157, portrait 157×157 (square), name uses the
+     `.ds-type-project-card-title` token. Grid: two explicit 511px
+     columns with 30px column + row gap. Total grid extent =
+     511 + 30 + 511 = 1052, 2px shy of the 1054 tab content width
+     (the slack falls on the right). Mobile renders untouched —
+     wrap stays single-column, card stays 122px tall, and
+     `.v2-character-attrs` stays `display: none` per its base rule
+     further down. */
   html[data-design="v2"] .tab-content-wrap-characters {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 20px;
-    row-gap: 20px;
+    grid-template-columns: 511px 511px;
+    column-gap: 30px;
+    row-gap: 30px;
     align-items: start;
   }
   /* Full-width children (layer-bar + the draft pill, tip cards,
@@ -7605,18 +7606,15 @@ html[data-design="v2"] .record-label {
     grid-column: 1 / -1;
   }
   html[data-design="v2"] .card.v2-character-card {
-    height: auto;
-    min-height: 155px;
+    width: 511px;
+    height: 157px;
+    min-height: 0;
     /* row-gap on the grid handles inter-card spacing now. */
     margin-bottom: 0;
   }
   html[data-design="v2"] .v2-character-card .v2-character-portrait {
-    width: 155px;
-    /* Stretch to the card height so even when the body grows past
-       155 (long description + 3 pills) the portrait fills the
-       vertical extent. */
-    height: auto;
-    align-self: stretch;
+    width: 157px;
+    height: 157px;
   }
   html[data-design="v2"] .v2-character-card .v2-character-body {
     /* Slightly more padding than mobile so the description + the
