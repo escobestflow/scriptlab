@@ -7614,18 +7614,25 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .tab-content-wrap-characters > .toast {
     grid-column: 1 / -1;
   }
-  html[data-design="v2"] .card.v2-character-card {
+  /* CRITICAL: every desktop override below carries a
+     `.tab-content-wrap-characters` ancestor prefix so its selector
+     specificity beats the BARE v2 character-card rules ~1500 lines
+     later in this stylesheet (which set portrait 100×122 / card
+     height 122 etc. for the mobile single-column layout). Without
+     the bump, the bare rules win on source order and the desktop
+     dimensions never apply. */
+  html[data-design="v2"] .tab-content-wrap-characters .card.v2-character-card {
     width: 511px;
     height: 157px;
     min-height: 0;
     /* row-gap on the grid handles inter-card spacing now. */
     margin-bottom: 0;
   }
-  html[data-design="v2"] .v2-character-card .v2-character-portrait {
+  html[data-design="v2"] .tab-content-wrap-characters .v2-character-card .v2-character-portrait {
     width: 157px;
     height: 157px;
   }
-  html[data-design="v2"] .v2-character-card .v2-character-body {
+  html[data-design="v2"] .tab-content-wrap-characters .v2-character-card .v2-character-body {
     /* Slightly more padding than mobile so the description + the
        attribute pill row breathe. */
     padding: 14px 20px 14px 14px;
@@ -7633,7 +7640,7 @@ html[data-design="v2"] .record-label {
   /* Reveal the attribute pills row on desktop. margin-top: auto
      pushes it to the bottom of the flex-column body so the row
      sits at the card's bottom even when the description is short. */
-  html[data-design="v2"] .v2-character-card .v2-character-attrs {
+  html[data-design="v2"] .tab-content-wrap-characters .v2-character-card .v2-character-attrs {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
