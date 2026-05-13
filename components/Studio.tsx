@@ -864,6 +864,12 @@ export function Studio({
   // pending for that id ⇔ shimmer is rendering.
   const sceneImagesInFlight = useRef<Set<string>>(new Set());
   const characterImagesInFlight = useRef<Set<string>>(new Set());
+  // Sentinel for "auto-gen has already failed/aborted for this id";
+  // skips further auto-retry on subsequent story-state changes. The
+  // user can still trigger a manual regen from the character edit
+  // sheet's Generate button. Cleared whenever the user toggles back
+  // into the project from elsewhere (component remount).
+  const characterImagesFailed = useRef<Set<string>>(new Set());
   const [scenesInFlight, setScenesInFlight] = useState<Set<string>>(new Set());
   const [charsInFlight, setCharsInFlight] = useState<Set<string>>(new Set());
 
@@ -898,6 +904,27 @@ export function Studio({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story]);
+
+  // One-shot diagnostic on initial story load — surfaces in DevTools
+  // exactly which characters had a thumbnail vs. which didn't on the
+  // freshest load from Supabase. If a character the user expects to
+  // already have an image shows `thumbnail=NONE` here, the data round-
+  // tripped through the DB and came back without it.
+  const characterThumbAuditFired = useRef(false);
+  useEffect(() => {
+    if (characterThumbAuditFired.current) return;
+    const draft = getActiveCharactersDraft(story);
+    if (draft.characters.length === 0) return;
+    characterThumbAuditFired.current = true;
+    const audit = draft.characters.map(c => ({
+      id: c.id.slice(0, 8),
+      name: c.name,
+      thumbnail: c.thumbnail
+        ? `present (${c.thumbnail.startsWith("data:") ? "data-url, " + c.thumbnail.length + " chars" : c.thumbnail.slice(0, 60) + "…"})`
+        : "NONE",
+    }));
+    console.log("[character thumbnail audit]", audit);
   }, [story]);
 
   // Auto-fit the V2 desktop hero title to its 476px text box.
@@ -1076,6 +1103,12 @@ export function Studio({
   // setStory wins by virtue of React's normal update ordering.
   async function autoGenerateCharacterImage(characterId: string): Promise<void> {
     if (characterImagesInFlight.current.has(characterId)) return;
+    // Hard skip — once a character fails (or is skipped/aborted),
+    // don't keep retrying on every story-state change. The retry
+    // loop was what kept the shimmer pinned on screen forever when
+    // the underlying call hangs or errors. The user can manually
+    // retry from the character edit sheet's Generate button.
+    if (characterImagesFailed.current.has(characterId)) return;
     const chars = getActiveCharactersDraft(story).characters;
     const ch = chars.find(c => c.id === characterId);
     if (!ch || ch.thumbnail) return;
@@ -1094,6 +1127,11 @@ export function Studio({
       ch.flaws && `Flaws: ${ch.flaws}`,
     ].filter(Boolean).join("\n");
     if (!description.trim()) return;
+    // DIAGNOSTIC — surfaces in DevTools any time this fires. If the
+    // user sees this log for a character they expect to already have
+    // a thumbnail, the thumbnail isn't in the loaded data (Supabase
+    // returned a row without it, or normalize stripped it).
+    console.log(`[autoGenerateCharacterImage] firing for "${ch.name}" id=${characterId} — thumbnail missing on load`);
     // Flip both ref + state simultaneously. The state flip triggers
     // the shimmer overlay on every render-site that displays this
     // character's portrait; the ref flip prevents same-tick re-entry
@@ -1104,6 +1142,12 @@ export function Studio({
       next.add(characterId);
       return next;
     });
+    // 60s abort guard — prevents the in-flight state (and thus the
+    // shimmer) from sticking forever when the upstream call hangs.
+    // Independent of the route's own timeout because gpt-image-2 +
+    // dall-e-3 fallback can compound.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort("timeout-60s"), 60_000);
     try {
       const concept = getActiveConceptDraft(story);
       const primaryGenre = concept.settings?.genres?.[0];
@@ -1112,6 +1156,7 @@ export function Studio({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         let message = `HTTP ${res.status}`;
@@ -1120,12 +1165,14 @@ export function Studio({
           if (errData?.error) message = String(errData.error);
         } catch { /* non-JSON body */ }
         console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: ${message}`);
+        characterImagesFailed.current.add(characterId);
         return;
       }
       const data = await res.json();
       const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
       if (!thumb) {
         console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: API returned no thumbnail`);
+        characterImagesFailed.current.add(characterId);
         return;
       }
       setStory(s => {
@@ -1141,8 +1188,13 @@ export function Studio({
         });
       });
     } catch (err: any) {
-      console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId} threw:`, err?.message || err);
+      const msg = err?.name === "AbortError" || err?.message?.includes("aborted")
+        ? "aborted after 60s (upstream hang)"
+        : (err?.message || String(err));
+      console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId} threw:`, msg);
+      characterImagesFailed.current.add(characterId);
     } finally {
+      clearTimeout(timeoutId);
       characterImagesInFlight.current.delete(characterId);
       setCharsInFlight(prev => {
         const next = new Set(prev);
