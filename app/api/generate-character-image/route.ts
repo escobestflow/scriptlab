@@ -12,6 +12,7 @@ import sharp from "sharp";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
+import { uploadJpegToStorage } from "@/lib/imageStorage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -131,9 +132,14 @@ export async function POST(req: Request) {
       .jpeg({ quality: 80 })
       .toBuffer();
 
-    const dataUrl = `data:image/jpeg;base64,${jpegBuffer.toString("base64")}`;
+    // Upload to the `character-images` Supabase Storage bucket and
+    // return its public URL. Falls back to an inline data URL when
+    // SUPABASE_SERVICE_ROLE_KEY isn't configured (legacy behavior),
+    // so the API contract stays the same: caller treats `thumbnail`
+    // as an opaque string and `<img src>` renders either form.
+    const { thumbnail } = await uploadJpegToStorage("character-images", jpegBuffer);
 
-    return new Response(JSON.stringify({ thumbnail: dataUrl }), {
+    return new Response(JSON.stringify({ thumbnail }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err: any) {

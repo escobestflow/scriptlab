@@ -931,6 +931,167 @@ export function Studio({
     console.log("[character thumbnail audit]", audit);
   }, [story]);
 
+  // ── Background migration: inline base64 thumbnails → Storage URLs ──
+  // Walks every character/beat in the active drafts on story load.
+  // If a `thumbnail` is still in legacy `data:image/jpeg;base64,...`
+  // form, POSTs it to /api/migrate-image-thumbnail, swaps in the
+  // returned Storage URL, and lets the existing autosave persist the
+  // smaller row. Runs sequentially (one item at a time) to avoid
+  // hammering the migration endpoint when a project has 7 characters
+  // and 30 beats. Stops at the first 503 (Storage not configured) so
+  // we don't burn cycles when SUPABASE_SERVICE_ROLE_KEY is missing.
+  //
+  // Safe to re-fire on every story-state change: the dedupe ref
+  // prevents in-flight duplicates per id, and the `startsWith("data:")`
+  // gate means once an item is on Storage we skip it forever.
+  const thumbMigrationInFlight = useRef<Set<string>>(new Set());
+  const thumbMigrationDone = useRef<Set<string>>(new Set());
+  const thumbMigrationDisabled = useRef<boolean>(false);
+  useEffect(() => {
+    if (thumbMigrationDisabled.current) return;
+    let cancelled = false;
+
+    async function migrateOne(
+      bucket: "character-images" | "scene-images",
+      idKey: string,
+      dataUrl: string,
+      patch: (newUrl: string) => void,
+    ): Promise<boolean> {
+      if (cancelled) return false;
+      if (thumbMigrationDisabled.current) return false;
+      if (thumbMigrationDone.current.has(idKey)) return true;
+      if (thumbMigrationInFlight.current.has(idKey)) return false;
+      thumbMigrationInFlight.current.add(idKey);
+      try {
+        const res = await fetch("/api/migrate-image-thumbnail", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dataUrl, bucket }),
+        });
+        if (res.status === 503) {
+          // Storage not configured — abandon migration for this session.
+          console.warn("[thumbnail migration] Storage not configured (SUPABASE_SERVICE_ROLE_KEY missing). Skipping.");
+          thumbMigrationDisabled.current = true;
+          return false;
+        }
+        if (!res.ok) {
+          let msg = `HTTP ${res.status}`;
+          try {
+            const data = await res.json();
+            if (data?.error) msg = String(data.error);
+          } catch { /* ignore */ }
+          console.error(`[thumbnail migration] ${idKey}: ${msg}`);
+          return false;
+        }
+        const data = await res.json();
+        const url = typeof data?.url === "string" ? data.url : null;
+        if (!url) {
+          console.error(`[thumbnail migration] ${idKey}: API returned no url`);
+          return false;
+        }
+        thumbMigrationDone.current.add(idKey);
+        if (!cancelled) patch(url);
+        return true;
+      } catch (err: any) {
+        console.error(`[thumbnail migration] ${idKey} threw:`, err?.message || err);
+        return false;
+      } finally {
+        thumbMigrationInFlight.current.delete(idKey);
+      }
+    }
+
+    (async () => {
+      // Snapshot the work-list synchronously so a setStory partway
+      // through doesn't cause us to re-walk the same drafts.
+      const work: Array<{ key: string; bucket: "character-images" | "scene-images"; dataUrl: string; apply: (url: string) => void }> = [];
+      for (const cd of story.charactersDrafts) {
+        for (const c of cd.characters) {
+          if (typeof c.thumbnail === "string" && c.thumbnail.startsWith("data:image/")) {
+            const characterDraftId = cd.id;
+            const characterId = c.id;
+            const dataUrl = c.thumbnail;
+            work.push({
+              key: `char:${characterId}`,
+              bucket: "character-images",
+              dataUrl,
+              apply: (url) => {
+                setStory(s => ({
+                  ...s,
+                  charactersDrafts: s.charactersDrafts.map(d =>
+                    d.id !== characterDraftId
+                      ? d
+                      : {
+                          ...d,
+                          characters: d.characters.map(ch =>
+                            ch.id !== characterId
+                              ? ch
+                              : ch.thumbnail === dataUrl
+                                ? { ...ch, thumbnail: url }
+                                : ch,
+                          ),
+                        }
+                  ),
+                }));
+              },
+            });
+          }
+        }
+      }
+      for (const sd of story.storyDrafts) {
+        const beatLists: Array<{ beats: typeof sd.beats; episodeId?: string }> = [];
+        if (sd.beats && sd.beats.length > 0) beatLists.push({ beats: sd.beats });
+        for (const ep of sd.episodes ?? []) beatLists.push({ beats: ep.beats, episodeId: ep.id });
+        for (const list of beatLists) {
+          for (const b of list.beats) {
+            if (typeof b.thumbnail === "string" && b.thumbnail.startsWith("data:image/")) {
+              const storyDraftId = sd.id;
+              const episodeId = list.episodeId;
+              const beatId = b.id;
+              const dataUrl = b.thumbnail;
+              work.push({
+                key: `beat:${beatId}`,
+                bucket: "scene-images",
+                dataUrl,
+                apply: (url) => {
+                  setStory(s => ({
+                    ...s,
+                    storyDrafts: s.storyDrafts.map(d => {
+                      if (d.id !== storyDraftId) return d;
+                      const swapBeat = (bb: typeof b) =>
+                        bb.id === beatId && bb.thumbnail === dataUrl
+                          ? { ...bb, thumbnail: url }
+                          : bb;
+                      if (episodeId) {
+                        return {
+                          ...d,
+                          episodes: (d.episodes ?? []).map(ep =>
+                            ep.id === episodeId
+                              ? { ...ep, beats: ep.beats.map(swapBeat) }
+                              : ep,
+                          ),
+                        };
+                      }
+                      return { ...d, beats: d.beats.map(swapBeat) };
+                    }),
+                  }));
+                },
+              });
+            }
+          }
+        }
+      }
+      if (work.length === 0) return;
+      console.log(`[thumbnail migration] queued ${work.length} legacy data-URL thumbnails to upload to Storage`);
+      for (const item of work) {
+        if (cancelled || thumbMigrationDisabled.current) break;
+        await migrateOne(item.bucket, item.key, item.dataUrl, item.apply);
+      }
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story]);
+
   // Auto-fit the V2 desktop hero title to its 476px text box.
   // The `.v2-desktop-hero-title` element renders at the
   // `ds-type-project-page-title` token's natural size (Poynter /
