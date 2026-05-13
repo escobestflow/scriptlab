@@ -7596,6 +7596,15 @@ html[data-design="v2"] .record-label {
     column-gap: 30px;
     row-gap: 30px;
     align-items: start;
+    /* Override the v1 base rule inside this same @media block that
+       caps `.tab-content-wrap-characters` at max-width:880 with
+       margin-left/right:auto (a single-column reading-width cap
+       inherited from the text-heavy tab pattern). v2 desktop wants
+       the cards left-anchored at the studio-scroll content edge —
+       60px from the sidebar — matching the Concept tab columns. */
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
   }
   /* Full-width children (layer-bar + the draft pill, tip cards,
      toast notices, partner-preview banner) span both columns. */
