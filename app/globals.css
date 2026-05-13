@@ -7184,10 +7184,22 @@ html[data-design="v2"] .record-label {
       linear-gradient(270deg, rgb(255,255,255) 0%, rgba(255,255,255,0) 22.008%),
       linear-gradient(90deg, rgb(255,255,255) 1.6622%, rgba(255,255,255,0) 24.645%)
     );
+    /* Solid-white halo extending 200px beyond ::after's box.
+       CRITICAL for the blur control: CSS `filter: blur()` samples
+       a kernel of pixels around each output pixel, and pixels OUTSIDE
+       the element box are treated as transparent. Without the halo,
+       the edges of the gradient fade to semi-transparent when blurred
+       (because the kernel averages "white at edge" with "transparent
+       beyond"). The box-shadow paints real white pixels in a ring
+       around the gradient — the blur kernel samples those instead,
+       so the visible edges stay opaque white at any blur amount.
+       The parent button has `overflow: hidden` so the box-shadow
+       itself is clipped to invisible — only its contribution to the
+       blur calculation reaches the viewer. */
+    box-shadow: 0 0 0 200px var(--ds-color-white);
     /* Global blur — same custom-property wiring as the gradient
        above. Falls back to 0px (sharp) when no configurator is
-       active. The parent image button has overflow:hidden so the
-       blur halo is clipped at the image boundary. */
+       active. */
     filter: blur(var(--hero-gradient-blur, 0px));
   }
   html[data-design="v2"] .v2-desktop-hero-image img {
@@ -7366,6 +7378,13 @@ html[data-design="v2"] .record-label {
     max-width: none;
     margin: 0;
     z-index: auto;
+    /* CRITICAL: the v1 base rule sets `justify-content: center`,
+       which centers the 1054px tab bar inside the wider content
+       area — so the bar's bottom border ends up ~29px right of
+       the concept column wrappers' left edge at 1440. Reset to
+       flex-start so the bar's left edge aligns flush with the
+       column cards' left edge. */
+    justify-content: flex-start;
   }
   html[data-design="v2"] .studio-tab-bar {
     /* Flat band: 66px tall, top hairline + bottom 2px strokes
