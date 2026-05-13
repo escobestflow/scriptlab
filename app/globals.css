@@ -7386,7 +7386,7 @@ html[data-design="v2"] .record-label {
     border-radius: 0;
     box-shadow: none;
     padding: 0;
-    margin-left: 20px;
+    margin-left: 25px;
     border-left: none;
     border-right: none;
     border-top: 1px solid var(--ds-color-gray-divider);
@@ -7401,17 +7401,12 @@ html[data-design="v2"] .record-label {
     overflow: visible;
   }
   /* First-tab margin-left shifts the entire tab row relative to
-     the bar's left edge. Math summary (in viewport-X terms):
-       • bar moves +20 (margin-left:20 above)
-       • contents need to net +40 from their PREVIOUS viewport pos
-       • that's +20 RELATIVE to the bar's new edge
-       • previous first-tab margin was -35 → now -15
-     Net visible position: first tab sits 15px LEFT of the bar's
-     new content edge (which is 20px right of the column wrappers
-     edge), so first tab sits 5px RIGHT of the column wrappers'
-     left edge. */
+     the bar's left edge. Net visible position is bar.margin-left
+     + first-tab.margin-left from the column wrappers' edge. With
+     bar.margin-left:25 + first-tab.margin-left:30, the first tab
+     sits 55px right of the column wrappers' left edge. */
   html[data-design="v2"] .studio-tab-bar .studio-tab:first-child {
-    margin-left: -15px;
+    margin-left: 30px;
   }
   /* Each tab is content-width (override v1's flex:1 even-share). */
   html[data-design="v2"] .studio-tab-bar .studio-tab {
