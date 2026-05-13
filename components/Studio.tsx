@@ -7787,6 +7787,23 @@ function CharactersTab({
                       {v2Description}
                     </div>
                   )}
+                  {/* Attribute pills (age / gender / archetype) shown
+                      at the bottom of the desktop card per the spec.
+                      Mobile hides this row via CSS so the existing
+                      122px-tall card layout is unchanged. */}
+                  {(ch.age?.trim() || ch.gender?.trim() || ch.archetype?.trim()) && (
+                    <div className="v2-character-attrs">
+                      {ch.age?.trim() && (
+                        <span className="v2-character-attr-pill">{ch.age}</span>
+                      )}
+                      {ch.gender?.trim() && (
+                        <span className="v2-character-attr-pill">{ch.gender}</span>
+                      )}
+                      {ch.archetype?.trim() && (
+                        <span className="v2-character-attr-pill">{ch.archetype}</span>
+                      )}
+                    </div>
+                  )}
                   {lock && (
                     <span
                       className="v2-character-lock"

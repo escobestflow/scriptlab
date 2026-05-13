@@ -7579,6 +7579,61 @@ html[data-design="v2"] .record-label {
     color: var(--ds-color-gray-dark-fill);
   }
 
+  /* ── V2 desktop Characters tab — 2-column card grid ──────────
+     Each card keeps the same image-LEFT / body-RIGHT DNA as the
+     mobile v2 character card, but with: a square 155px portrait
+     (was 100×122 on mobile), auto card height (was 122px lock),
+     attribute pills row at the bottom of the body (gated visible
+     by the desktop display:flex below), and a 2-column grid on
+     the tab wrapper. Mobile renders untouched — the wrap stays
+     a single column flow, the card stays 122px tall, and
+     .v2-character-attrs stays display:none (set on the base rule
+     near the other v2 character card styles further down). */
+  html[data-design="v2"] .tab-content-wrap-characters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 20px;
+    row-gap: 20px;
+    align-items: start;
+  }
+  /* Full-width children (layer-bar + the draft pill, tip cards,
+     toast notices, partner-preview banner) span both columns. */
+  html[data-design="v2"] .tab-content-wrap-characters > .layer-bar,
+  html[data-design="v2"] .tab-content-wrap-characters > .tip-card,
+  html[data-design="v2"] .tab-content-wrap-characters > .partner-preview-empty-notice,
+  html[data-design="v2"] .tab-content-wrap-characters > .toast {
+    grid-column: 1 / -1;
+  }
+  html[data-design="v2"] .card.v2-character-card {
+    height: auto;
+    min-height: 155px;
+    /* row-gap on the grid handles inter-card spacing now. */
+    margin-bottom: 0;
+  }
+  html[data-design="v2"] .v2-character-card .v2-character-portrait {
+    width: 155px;
+    /* Stretch to the card height so even when the body grows past
+       155 (long description + 3 pills) the portrait fills the
+       vertical extent. */
+    height: auto;
+    align-self: stretch;
+  }
+  html[data-design="v2"] .v2-character-card .v2-character-body {
+    /* Slightly more padding than mobile so the description + the
+       attribute pill row breathe. */
+    padding: 14px 20px 14px 14px;
+  }
+  /* Reveal the attribute pills row on desktop. margin-top: auto
+     pushes it to the bottom of the flex-column body so the row
+     sits at the card's bottom even when the description is short. */
+  html[data-design="v2"] .v2-character-card .v2-character-attrs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: auto;
+    padding-top: 6px;
+  }
+
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────
@@ -9211,6 +9266,29 @@ html[data-design="v2"] .v2-character-menu img {
   height: 3px;
   display: block;
 }
+/* Attribute pills row + individual pill chrome.
+   `.v2-character-attrs` defaults to `display: none` so the row
+   only paints on desktop (where the desktop @media block above
+   sets display: flex). The pill chrome itself is shared — same
+   visual at any width — even though it only renders at ≥1440. */
+html[data-design="v2"] .v2-character-attrs {
+  display: none;
+}
+html[data-design="v2"] .v2-character-attr-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 0.7px solid var(--ds-color-gray-outline);
+  background: var(--ds-color-white);
+  font-family: var(--ds-font-body);
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ds-color-gray-chip-label);
+  white-space: nowrap;
+}
+
 html[data-design="v2"] .v2-character-lock {
   display: inline-flex;
   align-self: flex-start;
