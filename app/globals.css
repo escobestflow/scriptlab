@@ -7373,20 +7373,20 @@ html[data-design="v2"] .record-label {
        in --ds-color-gray-divider (#DBDAD9), no radius, no shadow,
        transparent fill. Width matches the tab content column
        (1054px) so the bar's strokes don't run past the content.
-       Tab links sit FLUSH with the bar's left edge (padding: 0),
-       then the first child carries `margin-left: -35px` to push
-       the whole row 35px further left — net position: 35px LEFT
-       of the column cards' left edge. The 90px tab-to-tab gap
-       still drives subsequent spacing. */
+       margin-left:20 nudges the whole bar 20px right of the
+       column wrappers' left edge. The first tab inside then
+       carries an additional negative margin so the tab labels
+       sit further LEFT of the bar's own left edge (overflow:
+       visible keeps them visible). */
     height: 66px;
     /* 1054 = 418 + 23 + 613 — same as the concept tab's column
-       grid total, so the bar's strokes align with the column
-       cards' left + right edges. */
+       grid total. */
     width: 1054px;
     background: transparent;
     border-radius: 0;
     box-shadow: none;
     padding: 0;
+    margin-left: 20px;
     border-left: none;
     border-right: none;
     border-top: 1px solid var(--ds-color-gray-divider);
@@ -7395,15 +7395,23 @@ html[data-design="v2"] .record-label {
        tabs, left-anchored, 90px between adjacent tabs. */
     justify-content: flex-start;
     gap: 90px;
-    /* The first tab carries margin-left: -35 below — that overflows
-       the bar's left edge. overflow:visible keeps it visible. */
+    /* The first tab carries a negative margin-left below — that
+       overflows the bar's left edge. overflow:visible keeps it
+       visible. */
     overflow: visible;
   }
-  /* Pull the entire tab row 35px LEFT of the bar's content edge.
-     Subsequent tabs follow via the flex gap so the whole row
-     shifts as a unit. */
+  /* First-tab margin-left shifts the entire tab row relative to
+     the bar's left edge. Math summary (in viewport-X terms):
+       • bar moves +20 (margin-left:20 above)
+       • contents need to net +40 from their PREVIOUS viewport pos
+       • that's +20 RELATIVE to the bar's new edge
+       • previous first-tab margin was -35 → now -15
+     Net visible position: first tab sits 15px LEFT of the bar's
+     new content edge (which is 20px right of the column wrappers
+     edge), so first tab sits 5px RIGHT of the column wrappers'
+     left edge. */
   html[data-design="v2"] .studio-tab-bar .studio-tab:first-child {
-    margin-left: -35px;
+    margin-left: -15px;
   }
   /* Each tab is content-width (override v1's flex:1 even-share). */
   html[data-design="v2"] .studio-tab-bar .studio-tab {
