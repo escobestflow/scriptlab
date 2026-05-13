@@ -41,6 +41,7 @@ import {
   type HeroGradientConfig,
   DEFAULT_HERO_GRADIENT,
   buildHeroGradientCSS,
+  buildHeroGradientFilter,
 } from "@/lib/heroGradient";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
@@ -969,6 +970,9 @@ export function Studio({
           start: { ...DEFAULT_HERO_GRADIENT.left.start, ...(parsed?.left?.start ?? {}) },
           end:   { ...DEFAULT_HERO_GRADIENT.left.end,   ...(parsed?.left?.end   ?? {}) },
         },
+        // New top-level field added after the v1 config shipped — fall
+        // back to default when missing in an older saved blob.
+        blur: typeof parsed?.blur === "number" ? parsed.blur : DEFAULT_HERO_GRADIENT.blur,
       };
     } catch {
       return DEFAULT_HERO_GRADIENT;
@@ -984,6 +988,13 @@ export function Studio({
   // cheap (~3 layer concatenations) — keeps the configurator output
   // textarea + the live image perfectly in sync without a useMemo.
   const heroGradientCss = buildHeroGradientCSS(heroGradient);
+  // Blur is wired as its OWN custom property (just the numeric `Npx`
+  // value, not the `blur(...)` wrapper) so the CSS rule's
+  // `filter: blur(var(--hero-gradient-blur, 0px))` stays parseable
+  // even when blur is 0. `buildHeroGradientFilter` produces the
+  // human-readable `blur(Npx)` for the output-textarea preview.
+  const heroGradientBlurPx = `${heroGradient.blur}px`;
+  const heroGradientFilter = buildHeroGradientFilter(heroGradient);
 
   // Studio-level scene-image generation. Fire-and-forget; result
   // patches back via setStory and won't overwrite a thumbnail the
@@ -1810,8 +1821,12 @@ export function Studio({
               // Live gradient overlay — the configurator flyout
               // mutates `heroGradient` state which builds this string;
               // the CSS rule on `.v2-desktop-hero-image::after` reads
-              // it back via `background-image: var(--hero-gradient-bg, …)`.
-              style={{ ["--hero-gradient-bg" as string]: heroGradientCss } as React.CSSProperties}
+              // it back via `background-image: var(--hero-gradient-bg, …)`
+              // and `filter: blur(var(--hero-gradient-blur, 0px))`.
+              style={{
+                ["--hero-gradient-bg" as string]: heroGradientCss,
+                ["--hero-gradient-blur" as string]: heroGradientBlurPx,
+              } as React.CSSProperties}
             >
               {story.thumbnail ? (
                 <img src={story.thumbnail} alt="" />
@@ -1890,6 +1905,7 @@ export function Studio({
             value={heroGradient}
             onChange={setHeroGradient}
             cssString={heroGradientCss}
+            filterString={heroGradientFilter}
           />
         )}
 
@@ -3113,12 +3129,17 @@ function HeroGradientConfigurator({
   value,
   onChange,
   cssString,
+  filterString,
 }: {
   open: boolean;
   onClose: () => void;
   value: HeroGradientConfig;
   onChange: (next: HeroGradientConfig) => void;
   cssString: string;
+  /** Pre-built `filter` value (e.g. `blur(4px)` or `none`). Surfaced
+   *  alongside the background-image line in the output textarea so
+   *  the user can copy both declarations together. */
+  filterString: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -3143,9 +3164,14 @@ function HeroGradientConfigurator({
   const setLeftEnd = (patch: Partial<HeroGradientConfig["left"]["end"]>) =>
     onChange({ ...value, left: { ...value.left, end: { ...value.left.end, ...patch } } });
 
+  // Output declaration emitted in the read-only textarea + copied
+  // to clipboard. Two lines (background-image + filter) so the user
+  // can paste both into globals.css together when they've found
+  // values they like.
+  const outputDeclaration = `background-image: ${cssString};\nfilter: ${filterString};`;
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(`background-image: ${cssString};`);
+      await navigator.clipboard.writeText(outputDeclaration);
       setCopied(true);
       setTimeout(() => setCopied(false), 1400);
     } catch { /* clipboard blocked — user can still select+copy from the textarea */ }
@@ -3180,6 +3206,19 @@ function HeroGradientConfigurator({
         </header>
 
         <div className="hero-grad-panel-body">
+
+          {/* ── Global: applies to the whole overlay ── */}
+          <section className="hero-grad-section">
+            <div className="hero-grad-section-header">
+              <h3 className="hero-grad-section-title">Global</h3>
+            </div>
+            <RangeRow
+              label="Blur (px)"
+              value={value.blur}
+              onChange={blur => onChange({ ...value, blur })}
+              min={0} max={50} step={0.5}
+            />
+          </section>
 
           {/* ── Layer 1: Radial Vignette ── */}
           <section className="hero-grad-section">
@@ -3334,7 +3373,7 @@ function HeroGradientConfigurator({
             <textarea
               className="hero-grad-textarea"
               readOnly
-              value={`background-image: ${cssString};`}
+              value={outputDeclaration}
               onClick={e => (e.target as HTMLTextAreaElement).select()}
             />
             <button

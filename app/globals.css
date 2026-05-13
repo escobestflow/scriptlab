@@ -6819,24 +6819,33 @@ html[data-design="v2"] .tabbar {
    needed) and lock dimensions per spec:
      - Projects (active + inactive): 20×17
      - Ideas    (active + inactive): 14.58×20
-   Override v1's `.tab .icon img { width:100%; height:100% }` since
-   we now have explicit per-icon sizing. */
-html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="project-icon-active"] {
+   Selectors target BOTH the mobile `.tabbar` (bottom-anchored on
+   <1440) and the desktop `.desktop-sidebar` (left rail on ≥1440)
+   so the same v2 folder/lightbulb assets paint in both surfaces.
+   Desktop sidebar uses `.desktop-sidebar-item.active` for the
+   active state and `.desktop-sidebar-icon` for the slot wrapper.
+   Dimensions match across both since the desktop sidebar slot is
+   22×22 — the icons sit centered with a 1–4px inset on each side. */
+html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="project-icon-active"],
+html[data-design="v2"] .desktop-sidebar-item.active .desktop-sidebar-icon img[src*="project-icon-active"] {
   content: url("/v2/icons/icon-projects-active.svg");
   width: 20px;
   height: 17px;
 }
-html[data-design="v2"] .tabbar .tab .icon img[src*="project-icon-inactive"] {
+html[data-design="v2"] .tabbar .tab .icon img[src*="project-icon-inactive"],
+html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="project-icon-inactive"] {
   content: url("/v2/icons/icon-projects-inactive.svg");
   width: 20px;
   height: 17px;
 }
-html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="ideas-icon-active"] {
+html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="ideas-icon-active"],
+html[data-design="v2"] .desktop-sidebar-item.active .desktop-sidebar-icon img[src*="ideas-icon-active"] {
   content: url("/v2/icons/icon-ideas-active.svg");
   width: 14.58px;
   height: 20px;
 }
-html[data-design="v2"] .tabbar .tab .icon img[src*="ideas-icon-inactive"] {
+html[data-design="v2"] .tabbar .tab .icon img[src*="ideas-icon-inactive"],
+html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="ideas-icon-inactive"] {
   content: url("/v2/icons/icon-ideas-inactive.svg");
   width: 14.58px;
   height: 20px;
@@ -7175,6 +7184,11 @@ html[data-design="v2"] .record-label {
       linear-gradient(270deg, rgb(255,255,255) 0%, rgba(255,255,255,0) 22.008%),
       linear-gradient(90deg, rgb(255,255,255) 1.6622%, rgba(255,255,255,0) 24.645%)
     );
+    /* Global blur — same custom-property wiring as the gradient
+       above. Falls back to 0px (sharp) when no configurator is
+       active. The parent image button has overflow:hidden so the
+       blur halo is clipped at the image boundary. */
+    filter: blur(var(--hero-gradient-blur, 0px));
   }
   html[data-design="v2"] .v2-desktop-hero-image img {
     width: 100%;

@@ -67,6 +67,11 @@ export interface HeroGradientConfig {
   radial: RadialLayer;
   right: LinearLayer;
   left: LinearLayer;
+  /** Gaussian blur applied to the entire gradient overlay as a CSS
+   *  `filter`, in pixels. Acts as a global softening pass on top of
+   *  the per-stop fade controls — every gradient layer gets blurrier
+   *  together. 0 = sharp gradients (the shipping default). */
+  blur: number;
 }
 
 /** Mirror of the values currently baked into globals.css. */
@@ -93,6 +98,7 @@ export const DEFAULT_HERO_GRADIENT: HeroGradientConfig = {
     start: { color: "#FFFFFF", alpha: 1, stop: 1.6622 },
     end:   { color: "#FFFFFF", alpha: 0, stop: 24.645 },
   },
+  blur: 0,
 };
 
 /** Parse "#RRGGBB" (or "RRGGBB") into [r, g, b] in 0..255. Falls back to white on parse failure. */
@@ -149,4 +155,13 @@ export function buildHeroGradientCSS(c: HeroGradientConfig): string {
     );
   }
   return layers.length > 0 ? layers.join(", ") : "none";
+}
+
+/** Build the `filter` value for the gradient overlay. Currently
+ *  only emits `blur(Npx)`, but kept as a separate helper so we
+ *  can add other filter primitives (drop-shadow, brightness, etc.)
+ *  later without touching the configurator wiring. Returns `none`
+ *  when blur is 0 so the CSS rule reads cleanly. */
+export function buildHeroGradientFilter(c: HeroGradientConfig): string {
+  return c.blur > 0 ? `blur(${c.blur}px)` : "none";
 }
