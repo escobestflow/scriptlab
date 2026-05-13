@@ -6816,39 +6816,56 @@ html[data-design="v2"] .tabbar {
   background: var(--ds-color-white);
 }
 /* Tab icons — paint the v2 SVG via content: url() (no JSX change
-   needed) and lock dimensions per spec:
-     - Projects (active + inactive): 20×17
-     - Ideas    (active + inactive): 14.58×20
-   Selectors target BOTH the mobile `.tabbar` (bottom-anchored on
-   <1440) and the desktop `.desktop-sidebar` (left rail on ≥1440)
-   so the same v2 folder/lightbulb assets paint in both surfaces.
-   Desktop sidebar uses `.desktop-sidebar-item.active` for the
-   active state and `.desktop-sidebar-icon` for the slot wrapper.
-   Dimensions match across both since the desktop sidebar slot is
-   22×22 — the icons sit centered with a 1–4px inset on each side. */
-html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="project-icon-active"],
-html[data-design="v2"] .desktop-sidebar-item.active .desktop-sidebar-icon img[src*="project-icon-active"] {
+   needed) and lock dimensions per spec.
+   MOBILE TABBAR uses /v2/icons/* at 20×17 (projects) / 14.58×20
+   (ideas). Desktop sidebar uses a DIFFERENT asset set
+   (/icon-desktop-*) at 17×15 / 12.56×17.23 — see the desktop-only
+   block below. */
+html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="project-icon-active"] {
   content: url("/v2/icons/icon-projects-active.svg");
   width: 20px;
   height: 17px;
 }
-html[data-design="v2"] .tabbar .tab .icon img[src*="project-icon-inactive"],
-html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="project-icon-inactive"] {
+html[data-design="v2"] .tabbar .tab .icon img[src*="project-icon-inactive"] {
   content: url("/v2/icons/icon-projects-inactive.svg");
   width: 20px;
   height: 17px;
 }
-html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="ideas-icon-active"],
-html[data-design="v2"] .desktop-sidebar-item.active .desktop-sidebar-icon img[src*="ideas-icon-active"] {
+html[data-design="v2"] .tabbar .tab[class*="active"] .icon img[src*="ideas-icon-active"] {
   content: url("/v2/icons/icon-ideas-active.svg");
   width: 14.58px;
   height: 20px;
 }
-html[data-design="v2"] .tabbar .tab .icon img[src*="ideas-icon-inactive"],
-html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="ideas-icon-inactive"] {
+html[data-design="v2"] .tabbar .tab .icon img[src*="ideas-icon-inactive"] {
   content: url("/v2/icons/icon-ideas-inactive.svg");
   width: 14.58px;
   height: 20px;
+}
+
+/* Desktop sidebar icons — a SEPARATE asset set from the mobile
+   tabbar (different glyph proportions for the larger, longer-form
+   left rail). Same `content: url()` swap pattern + explicit
+   dimensions. The desktop sidebar is `display: none` below 1440
+   so these rules effectively only paint at the desktop viewport. */
+html[data-design="v2"] .desktop-sidebar-item.active .desktop-sidebar-icon img[src*="project-icon-active"] {
+  content: url("/icon-desktop-projects-active.svg");
+  width: 17px;
+  height: 15px;
+}
+html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="project-icon-inactive"] {
+  content: url("/icon-desktop-projects-inactive.svg");
+  width: 17px;
+  height: 15px;
+}
+html[data-design="v2"] .desktop-sidebar-item.active .desktop-sidebar-icon img[src*="ideas-icon-active"] {
+  content: url("/icon-desktop-ideas-active.svg");
+  width: 12.56px;
+  height: 17.23px;
+}
+html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="ideas-icon-inactive"] {
+  content: url("/icon-desktop-ideas-inactive.svg");
+  width: 12.56px;
+  height: 17.23px;
 }
 
 /* Tabbar labels — apply ds-type-main-tab-nav-* type tokens. Mobile
@@ -6908,21 +6925,42 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] body {
     background: var(--ds-color-white);
   }
-  /* Sidebar fill — #F3F2F2 per spec, sits a hair darker than the
-     white main background so the left column reads as its own
-     column without a hard border. v1's `.desktop-sidebar` rule
-     sets background: var(--bg) which would inherit the body bg
-     on v2; this v2-scoped override paints the column explicitly. */
+  /* Sidebar fill — `--ds-color-gray-fill` (#FBF9F9), a hair off
+     pure white so the left column reads as its own surface against
+     the white main background. The right-edge hairline divider from
+     v1 (`border-right: 1px solid var(--border)`) is dropped — the
+     fill-difference alone separates the column. Top padding bumped
+     to 100px so the logo's top edge sits 100px below the column's
+     top edge (.desktop-sidebar-brand's own padding-top is zeroed
+     below so the value is exact, not summed). */
   html[data-design="v2"] .desktop-sidebar {
-    background: var(--ds-color-gray-sidebar);
+    background: var(--ds-color-gray-fill);
+    border-right: 0;
+    padding-top: 100px;
   }
   /* Center the Unfold wordmark in the sidebar's brand slot — v1 has
      it left-anchored via `padding: 6px 10px 22px`; we want it
-     horizontally centered in the column. */
+     horizontally centered in the column. padding-top:0 lets the
+     sidebar's own padding-top own the logo's distance from the top
+     edge (100px exact). */
   html[data-design="v2"] .desktop-sidebar-brand {
     display: flex;
     align-items: center;
     justify-content: center;
+    padding-top: 0;
+  }
+  /* Nav items — 24px horizontal padding inside each Projects/Ideas
+     row (radius:10 already in v1). Active state paints a
+     `--ds-color-gray-sidebar` (#F3F2F2) box behind the row, slightly
+     darker than the sidebar fill so the selected tab reads as a
+     contained chip rather than blending in. Inactive stays
+     transparent. */
+  html[data-design="v2"] .desktop-sidebar-item {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  html[data-design="v2"] .desktop-sidebar-item.active {
+    background: var(--ds-color-gray-sidebar);
   }
 
   /* ── V2 desktop layout shell ───────────────────────────────────
