@@ -868,8 +868,12 @@ export function Studio({
   // skips further auto-retry on subsequent story-state changes. The
   // user can still trigger a manual regen from the character edit
   // sheet's Generate button. Cleared whenever the user toggles back
-  // into the project from elsewhere (component remount).
+  // into the project from elsewhere (component remount). Defense-in-
+  // depth: the PERSISTENT `imageGenAttempted` flag on the row is the
+  // primary stop; these refs cover the case where the flag's setStory
+  // hasn't flushed yet within a single session.
   const characterImagesFailed = useRef<Set<string>>(new Set());
+  const sceneImagesFailed = useRef<Set<string>>(new Set());
   const [scenesInFlight, setScenesInFlight] = useState<Set<string>>(new Set());
   const [charsInFlight, setCharsInFlight] = useState<Set<string>>(new Set());
 
@@ -974,24 +978,44 @@ export function Studio({
   // so "shimmering" is a precise signal that an API call is live.
   async function autoGenerateSceneImage(beatId: string): Promise<void> {
     if (sceneImagesInFlight.current.has(beatId)) return;
+    // Mirror the character circuit-breaker — one failed/aborted
+    // attempt per beat per session, never re-fired.
+    if (sceneImagesFailed.current.has(beatId)) return;
     const draft = getActiveStoryLayerDraft(story);
     const allBeats = isTV && activeEpisodeId
       ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
       : draft.beats;
     const beat = allBeats.find(b => b.id === beatId);
     if (!beat || beat.thumbnail) return;
+    // PERSISTENT sentinel — once this beat has been tried (success or
+    // fail) the flag is saved on the row. Auto-gen never reattempts
+    // across reloads. Manual regen from the beat edit sheet still
+    // works. Same guarantee as Character.imageGenAttempted above.
+    if (beat.imageGenAttempted) {
+      console.log(`[autoGenerateSceneImage] skipped beat="${beat.name}" id=${beatId} — imageGenAttempted=true (manual regen via beat sheet only)`);
+      return;
+    }
     const description = [
       beat.name && `Beat: ${beat.name}`,
       beat.summary && `Summary: ${beat.summary}`,
       beat.purpose && `Purpose: ${beat.purpose}`,
     ].filter(Boolean).join("\n");
     if (!description.trim()) return;
+    console.log(`[autoGenerateSceneImage] firing for beat="${beat.name}" id=${beatId} — thumbnail missing on load`);
+    // Stamp the attempted-flag immediately, before the fetch. See
+    // the same reasoning in autoGenerateCharacterImage above.
+    setBeats(bs => bs.map(b =>
+      b.id === beatId && !b.imageGenAttempted ? { ...b, imageGenAttempted: true } : b
+    ));
     sceneImagesInFlight.current.add(beatId);
     setScenesInFlight(prev => {
       const next = new Set(prev);
       next.add(beatId);
       return next;
     });
+    // 60s abort guard — mirrors the character path.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort("timeout-60s"), 60_000);
     try {
       const concept = getActiveConceptDraft(story);
       const primaryGenre = concept.settings?.genres?.[0];
@@ -1000,6 +1024,7 @@ export function Studio({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         let message = `HTTP ${res.status}`;
@@ -1008,20 +1033,27 @@ export function Studio({
           if (errData?.error) message = String(errData.error);
         } catch { /* non-JSON body */ }
         console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId}: ${message}`);
+        sceneImagesFailed.current.add(beatId);
         return;
       }
       const data = await res.json();
       const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
       if (!thumb) {
         console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId}: API returned no thumbnail`);
+        sceneImagesFailed.current.add(beatId);
         return;
       }
       setBeats(bs => bs.map(b =>
         b.id === beatId && !b.thumbnail ? { ...b, thumbnail: thumb } : b
       ));
     } catch (err: any) {
-      console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId} threw:`, err?.message || err);
+      const msg = err?.name === "AbortError" || err?.message?.includes("aborted")
+        ? "aborted after 60s (upstream hang)"
+        : (err?.message || String(err));
+      console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId} threw:`, msg);
+      sceneImagesFailed.current.add(beatId);
     } finally {
+      clearTimeout(timeoutId);
       sceneImagesInFlight.current.delete(beatId);
       setScenesInFlight(prev => {
         const next = new Set(prev);
@@ -1112,6 +1144,16 @@ export function Studio({
     const chars = getActiveCharactersDraft(story).characters;
     const ch = chars.find(c => c.id === characterId);
     if (!ch || ch.thumbnail) return;
+    // PERSISTENT sentinel — set on every successful AND failed prior
+    // attempt and stored on the character row. If we've ever tried
+    // for this character, never auto-retry. Even if the thumbnail
+    // is somehow missing from the loaded row, we skip. This is the
+    // last line of defense against the "auto-gen burns my OpenAI
+    // credit on every reload" failure mode the user reported.
+    if (ch.imageGenAttempted) {
+      console.log(`[autoGenerateCharacterImage] skipped "${ch.name}" id=${characterId} — imageGenAttempted=true (manual regen via edit sheet only)`);
+      return;
+    }
     const roleLabelMap: Record<string, string> = {
       protagonist: "Protagonist", antagonist: "Antagonist",
       supporting: "Supporting", mentor: "Mentor",
@@ -1132,6 +1174,24 @@ export function Studio({
     // a thumbnail, the thumbnail isn't in the loaded data (Supabase
     // returned a row without it, or normalize stripped it).
     console.log(`[autoGenerateCharacterImage] firing for "${ch.name}" id=${characterId} — thumbnail missing on load`);
+    // STAMP the persistent attempted-flag IMMEDIATELY, before the
+    // fetch. Two reasons:
+    //   1. If the API hangs or aborts, the flag still gets saved by
+    //      the autosave debouncer — so no future session will retry.
+    //   2. If the [story] dep re-fires the effect mid-flight, the
+    //      early-return at the top of this function reads the now-
+    //      true flag and bails. Belt-and-suspenders with the
+    //      in-flight ref guard.
+    setStory(s => {
+      const live = getActiveCharactersDraft(s).characters;
+      const liveCh = live.find(c => c.id === characterId);
+      if (!liveCh || liveCh.imageGenAttempted) return s;
+      return updateCharactersDraft(s, {
+        characters: live.map(c =>
+          c.id === characterId ? { ...c, imageGenAttempted: true } : c
+        ),
+      });
+    });
     // Flip both ref + state simultaneously. The state flip triggers
     // the shimmer overlay on every render-site that displays this
     // character's portrait; the ref flip prevents same-tick re-entry
@@ -8145,7 +8205,12 @@ function CharacterEditForm({
       });
       const data = await res.json();
       if (data.thumbnail) {
-        onUpdate({ thumbnail: data.thumbnail });
+        // Stamp imageGenAttempted alongside the new thumbnail so
+        // auto-gen never re-fires for this character on a later
+        // session (even if the thumbnail ever rolls back / goes
+        // missing). Manual Generate clicks here are the explicit
+        // re-gen path going forward.
+        onUpdate({ thumbnail: data.thumbnail, imageGenAttempted: true });
       } else if (data.error && typeof window !== "undefined") {
         window.alert(data.error);
       }
@@ -8171,7 +8236,10 @@ function CharacterEditForm({
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result;
-      if (typeof result === "string") onUpdate({ thumbnail: result });
+      // imageGenAttempted set here too — even an upload counts as
+      // "we've intentionally produced a thumbnail for this
+      // character," so auto-gen shouldn't ever step on it later.
+      if (typeof result === "string") onUpdate({ thumbnail: result, imageGenAttempted: true });
     };
     reader.readAsDataURL(file);
   }
@@ -9804,7 +9872,11 @@ function SceneEditForm({
       });
       const data = await res.json();
       if (data.thumbnail) {
-        onUpdate({ thumbnail: data.thumbnail });
+        // Manual scene-image regen: stamp imageGenAttempted=true
+        // alongside the thumbnail so the auto-gen effect can never
+        // try to step on this beat later (same protection as the
+        // character manual path above).
+        onUpdate({ thumbnail: data.thumbnail, imageGenAttempted: true });
       } else if (data.error && typeof window !== "undefined") {
         window.alert(data.error);
       }

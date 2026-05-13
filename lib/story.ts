@@ -139,6 +139,18 @@ export interface Character {
   aiVoice?: CharacterAiVoice | null;
   arc: string;
   notes: string;
+  /** Sticky "we already tried" sentinel for the auto-image-generation
+   *  effect. Set to true the first time auto-gen fires for this
+   *  character — regardless of whether the API call succeeded, failed,
+   *  or aborted — and the manual Generate / Upload paths set it too.
+   *  Once true, the auto-gen effect skips this character forever, even
+   *  if the thumbnail later goes missing from the row (silent save
+   *  failure, etc.). Manual regen from the edit sheet still works.
+   *  Older saves without this field default to undefined (falsy) — for
+   *  characters that have a thumbnail this is fine (the thumbnail
+   *  check already short-circuits auto-gen); for thumbnail-less older
+   *  characters this is the ONLY path that fires a first attempt. */
+  imageGenAttempted?: boolean;
   /** TV-only: id of the Episode this character was created in. Set on
    *  add and never re-stamped, so the creator-episode is stable. The
    *  Characters tab uses it to lock cross-episode edits — a character
@@ -197,6 +209,11 @@ export interface Beat {
    *  Optional — produced by /api/generate-scene-image after a beat is
    *  saved with at least a name, or by bulk sync via Add All Scenes. */
   thumbnail?: string;
+  /** Same sticky sentinel as `Character.imageGenAttempted` — set true
+   *  the first time auto-gen fires for this beat (success or failure),
+   *  blocks further auto-attempts on subsequent reloads. Manual gen
+   *  from the beat sheet bypasses this. */
+  imageGenAttempted?: boolean;
 }
 
 export interface Episode {

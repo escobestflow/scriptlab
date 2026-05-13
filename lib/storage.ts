@@ -28,6 +28,9 @@ function normalizeBeat(b: any, index: number): Beat {
   // junk thumbnail field.
   const thumbnail = typeof b?.thumbnail === "string" && b.thumbnail.trim().length > 0
     ? b.thumbnail : undefined;
+  // Sticky auto-gen sentinel — once set, prevents future auto-image-
+  // generation re-attempts for this beat across reloads.
+  const imageGenAttempted = b?.imageGenAttempted === true ? true : undefined;
   return {
     position: index,
     momentIds: [],
@@ -36,6 +39,7 @@ function normalizeBeat(b: any, index: number): Beat {
     twist,
     weirdness,
     thumbnail,
+    imageGenAttempted,
   };
 }
 
@@ -76,6 +80,11 @@ function normalizeCharacter(c: any): Character {
     thumbnail: typeof c.thumbnail === "string" && c.thumbnail
       ? c.thumbnail
       : undefined,
+    // Sticky auto-gen sentinel — preserved verbatim so the
+    // "skip auto-gen on next reload" guarantee survives the DB
+    // round-trip. Coerced to undefined when absent / falsy so older
+    // saves don't carry an explicit `false` and force a re-attempt.
+    imageGenAttempted: c.imageGenAttempted === true ? true : undefined,
   };
 }
 
