@@ -7443,7 +7443,12 @@ html[data-design="v2"] .record-label {
     margin-left: 25px;
     border-left: none;
     border-right: none;
-    border-top: 1px solid var(--ds-color-gray-divider);
+    /* Top hairline at 30% opacity per spec — softer than the
+       bottom rule so the tab bar reads as a "ceiling lifting
+       toward the page" rather than a hard frame. Hardcoded rgba
+       since CSS hex tokens don't carry alpha. The token's value
+       is #DBDAD9 = rgb(219, 218, 217). */
+    border-top: 1px solid rgba(219, 218, 217, 0.3);
     border-bottom: 2px solid var(--ds-color-gray-divider);
     /* Override v1's space-between distribution: content-sized
        tabs, left-anchored, 90px between adjacent tabs. */
@@ -7752,13 +7757,15 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-thumb-placeholder {
     font-size: 40px;
   }
-  /* The body column now stacks three rows: scene-heading slugline
-     (when present), title, summary preview. Bumped gap from 5 to 8
-     and gave the body a generous 20px left padding (was 12 on mobile)
-     so the title doesn't sit cramped against the 172-wide thumb. */
+  /* The body column stacks three rows: scene-heading slugline
+     (when present), title, summary preview. padding-left bumped
+     from 20 → 29 (+9 between thumb and content per spec). gap:8
+     applies between location / title / summary; per-element
+     margins below add the extra spacing the spec calls for between
+     specific pairs without affecting the others. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-info {
     gap: 8px;
-    padding: 18px 20px;
+    padding: 18px 20px 18px 29px;
   }
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-location {
     /* Re-enable the slugline row on desktop (the base rule above
@@ -7770,28 +7777,46 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-name {
     /* `.ds-type-project-card-title` token now drives font-family /
        weight / size on the JSX. Local rule keeps single-line ellipsis
-       handling so long titles don't break the card's fixed height. */
+       handling so long titles don't break the card's fixed height.
+       margin-top: -3 lifts the title 3px (closes the location-title
+       gap from 8 to 5); margin-bottom: +3 grows the title-description
+       gap from 8 to 11. Per spec. */
     line-height: 1;
+    margin-top: -3px;
+    margin-bottom: 3px;
   }
-  /* Description / summary — capped at 300px so the meta column has
-     room to sit on the right. The card's flex layout otherwise lets
-     the summary stretch to the entire remaining width. */
+  /* Description / summary — capped at 310px so the meta column has
+     room to sit on the right. (300 → 310 per latest spec, +10.) */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-summary-preview {
-    max-width: 300px;
+    max-width: 310px;
   }
-  /* Right-side meta column — characters list + estimated duration
-     arranged as TWO SEPARATE horizontal columns with space between.
-     Re-enables the column on desktop (base rule hides it for mobile). */
+  /* Drag-dots icon — desktop spec bumps from 6×14 (mobile/base) to
+     7.47×19. Width is a fractional value because the SVG ships at
+     a non-integer aspect ratio that the new badge size formalizes. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-grip img {
+    width: 7.47px;
+    height: 19px;
+  }
+  /* Right-side meta column — characters cluster + duration arranged
+     as TWO SEPARATE horizontal columns with space between. Top-
+     aligned to the location text (align-self: flex-start +
+     padding-top matching beat-info's padding-top) so the chars
+     and the location share the same baseline. Pulled 40px to the
+     LEFT via margin-left: -40 per spec — the description's
+     max-width:310 cap leaves empty space in the info column that
+     the meta safely slides into. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-meta {
     flex: 0 0 auto;
-    align-self: center;
+    align-self: flex-start;
     display: flex;
     flex-direction: row;
-    align-items: center;
+    align-items: flex-start;
     gap: 40px;
-    /* Right-edge inset: 60px reserves room for the absolutely-
-       positioned 3-dot menu in the top-right corner. */
-    padding: 0 60px 0 16px;
+    /* padding-top matches beat-info's 18px so meta's content starts
+       at the same Y as the location text. Right-edge 60 reserves
+       room for the absolutely-positioned 3-dot menu. */
+    padding: 18px 60px 0 16px;
+    margin-left: -40px;
   }
   /* Character cluster — single icon on the left, stacked names on
      the right. Icon vertically aligns with first name. */
