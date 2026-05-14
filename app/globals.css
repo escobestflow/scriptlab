@@ -7924,73 +7924,6 @@ html[data-design="v2"] .record-label {
     width: 353px;
   }
 
-  /* ── V2 desktop empty-state overlay ───────────────────────────────
-     Mobile renders the overlay as a fixed-position banner anchored
-     ~378px below the safe-area top. Desktop wants the silhouette
-     pinned DIRECTLY below the tab nav (no space) and FLUSH against
-     the sidebar's right edge, at a precise 1116×561 render size.
-
-     Implementation: override mobile's `position: fixed` to `static`
-     so the overlay flows naturally after the tab bar. `margin-left:
-     -60` cancels `.studio-scroll`'s padding-left:60 so the image's
-     left edge lands at the sidebar's right edge. Background sized
-     `100% 100%` so the 1276×641 source PNG scales precisely to fit
-     the 1116×561 box.
-
-     The Characters tab uses a 2-column grid on desktop, so the
-     overlay needs `grid-column: 1 / -1` to span both tracks rather
-     than landing in the first cell. */
-  html[data-design="v2"] .studio-empty-overlay {
-    position: static;
-    top: auto;
-    left: auto;
-    right: auto;
-    width: 1116px;
-    height: 561px;
-    min-height: 0;
-    margin: 0 0 0 -60px;
-    /* Foreground content stack (draft picker, title, caption,
-       Add/Generate buttons) sits on the LEFT side of the silhouette
-       per spec. Inset offsets:
-         padding-top: 77 → draft picker 77px below the tab nav
-         padding-left: 157 → draft picker 157px from the sidebar's
-           right edge (which is also the overlay's left edge)
-       Background-clip defaults to border-box so the silhouette PNG
-       still covers the full 1116×561 box — only the foreground
-       stack is inset. */
-    padding: 77px 0 0 157px;
-    background-size: 100% 100%;
-    background-position: top left;
-    background-repeat: no-repeat;
-    grid-column: 1 / -1;
-  }
-  /* Drop the mobile draft-picker top margin on desktop — the
-     overlay's padding-top:77 already supplies the spec'd 77px
-     offset below the tab nav. Bottom margin stays so the picker
-     reads as separate from the title below. */
-  html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
-    margin: 0 0 11px;
-  }
-
-  /* Per-section desktop silhouettes. Mobile uses /v2/empty-state-
-     <section>.png (square-ish, mobile proportions); desktop swaps
-     to /v2/desktop-empty-state-<section>.png (landscape 1276×641,
-     rendered at 1116×561 here). Only Characters has the desktop
-     asset right now — Story / Script will follow as the user
-     provides them. */
-  html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
-    background-image: url("/v2/desktop-empty-state-characters.png");
-  }
-
-  /* When an empty state is active, suppress page scroll — the
-     1116×561 overlay is sized to fit comfortably within the visible
-     viewport, and the tab content area below it is empty anyway.
-     The :has() selector targets the studio-scroll container only
-     when the empty overlay is mounted somewhere inside it. */
-  html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
-    overflow: hidden;
-  }
-
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────
@@ -11054,5 +10987,78 @@ html[data-design="v2"] .menu-panel-utility {
 html[data-design="v2"] .menu-panel-account-row svg,
 html[data-design="v2"] .menu-panel-utility svg {
   stroke: var(--ds-color-gray-chip-label);
+}
+
+/* ============================================================
+ *  V2 desktop empty-state overlay — DESKTOP CASCADE OVERRIDE
+ * ============================================================
+ *
+ * This block must live at the END of the stylesheet because the
+ * bare mobile rules for `.studio-empty-overlay` (and the per-
+ * section `[data-section="..."]` background-image rules) sit
+ * around line 10720+ in this file. CSS source order tie-breaks
+ * same-specificity rules — any earlier-positioned desktop @media
+ * block would have its overrides defeated by the later bare
+ * rules at desktop widths. Putting the desktop overrides AFTER
+ * all the bare rules guarantees they win.
+ *
+ * What this overrides (vs mobile):
+ *   - Layout: position: fixed → static; full-viewport banner →
+ *     1116×561 box flush to the sidebar (margin-left:-60 cancels
+ *     .studio-scroll's padding-left:60); pinned directly under
+ *     the tab nav (no top margin/padding outside the box).
+ *   - Foreground content stack inset: padding-left 30 → 157,
+ *     padding-top 0 → 77 per spec. Draft picker lands 157px
+ *     from sidebar + 77px below tab nav.
+ *   - Draft picker top margin reset: mobile's 59 → 0 (the
+ *     overlay's own padding-top:77 supplies the spec'd offset).
+ *   - Background image swap: /v2/empty-state-characters.png →
+ *     /v2/desktop-empty-state-characters.png. Story / Script
+ *     keep their mobile PNG until desktop variants land.
+ *   - Title/caption widths reset to auto (mobile's 178/183
+ *     fixed widths force-wrap titles to two lines on a narrow
+ *     mobile column; desktop has room for natural wrapping).
+ *   - Scroll suppression: studio-scroll overflow:hidden while
+ *     the empty overlay is mounted so the page can't scroll
+ *     past the 1116×561 visual.
+ */
+@media (min-width: 1440px) {
+  html[data-design="v2"] .studio-empty-overlay {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    width: 1116px;
+    height: 561px;
+    min-height: 0;
+    margin: 0 0 0 -60px;
+    padding: 77px 0 0 157px;
+    background-size: 100% 100%;
+    background-position: top left;
+    background-repeat: no-repeat;
+    grid-column: 1 / -1;
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
+    margin: 0 0 11px;
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
+    /* Mobile rule pins to a fixed 178px width so the small-screen
+       title wraps to two lines. Desktop has the room to wrap
+       naturally at the token's font size, so we clear the width
+       cap. margin retains the -3/0/14 from the mobile rule. */
+    width: auto;
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-overlay-caption {
+    /* Same logic: mobile caps at 183px; desktop lets the line
+       run at the token's natural readable width. */
+    width: auto;
+    max-width: 480px;
+  }
+  html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
+    background-image: url("/v2/desktop-empty-state-characters.png");
+  }
+  html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
+    overflow: hidden;
+  }
 }
 
