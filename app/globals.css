@@ -7924,6 +7924,264 @@ html[data-design="v2"] .record-label {
     width: 353px;
   }
 
+  /* ── V2 desktop Script tab: list + scene-detail pane ──────────
+     Two-column layout. Left column = .v2-script-list (existing
+     scene cards). Right column = .v2-script-pane (scene image +
+     summary + CTA when unwritten, or full screenplay prose when
+     written). Each column is its own scroll context so the user
+     can browse a long scene list independently of a long prose
+     pane.
+
+     Scroll UX: the grid is min-height: 100vh + each column is
+     position: sticky; top: 0 + max-height: 100vh; overflow-y:
+     auto. The columns stick to the top of the viewport as the
+     hero scrolls off — once they're pinned, mouse-wheel inside
+     a column captures further scroll into its own overflow.
+     No JS, no fixed height calc, no fragile offsets. */
+  html[data-design="v2"] .v2-script-desktop-grid {
+    display: grid;
+    grid-template-columns: 353px minmax(0, 1fr);
+    column-gap: 80px;
+    align-items: start;
+    /* min-height (not height) so the grid expands if the right
+       pane prose is very long, but each column still gets its
+       own scroll context thanks to max-height: 100vh below. */
+    min-height: 100vh;
+    /* `grid-column: 1 / -1` for the wrap's other top-level
+       children (layer-bar, tip-card, partner-preview-empty-notice,
+       toast) is set further up in the .tab-content-wrap-script
+       rule; the grid wrapper itself is just one of those children
+       sitting in the grid the wrap defines. Reset width here so
+       the wrap's grid doesn't squeeze us. */
+    width: 100%;
+  }
+  html[data-design="v2"] .v2-script-list,
+  html[data-design="v2"] .v2-script-pane {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow-y: auto;
+    min-height: 0;
+    align-self: start;
+  }
+  html[data-design="v2"] .v2-script-list {
+    /* Match the existing card-row's -2 margin so the cards' outline
+       glow doesn't get clipped by overflow. */
+    padding: 2px 4px 60px 2px;
+  }
+  /* Selected card — warm-beige outline. Color sampled from the
+     screenshot. `outline` (not `border`) so the card's existing
+     0.7px border + radius are preserved without a layout shift. */
+  html[data-design="v2"] .v2-script-row.is-selected .beat-card.v2-script-card {
+    outline: 1.5px solid #C9A876;
+    outline-offset: -1px;
+  }
+
+  /* ── Right pane: header (SCENE N OF M + title + optional actions) */
+  html[data-design="v2"] .v2-script-pane {
+    padding: 6px 60px 60px 0;
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .v2-script-pane-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 20px;
+  }
+  html[data-design="v2"] .v2-script-pane-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  html[data-design="v2"] .v2-script-pane-index {
+    /* Small-caps tracking label above the scene title — same
+       `.ds-type-int-header` token the card slug uses. Color shifts
+       to the muted gray-chip-label so it reads as supportive metadata. */
+    color: var(--ds-color-gray-chip-label);
+  }
+  html[data-design="v2"] .v2-script-pane-title {
+    /* Big Poynter display title — same token the desktop empty
+       state uses for "Define Your Characters". 34px / lh 1, 400. */
+    margin: 0;
+    font-family: var(--ds-font-display);
+    font-weight: 400;
+    font-size: 34px;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+  /* Top-right action chips (written scenes only) — pencil + play
+     triangle. Circular surfaces matching the screenshot: pencil sits
+     on a white pill with a subtle outline, play on a black pill. */
+  html[data-design="v2"] .v2-script-pane-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex: 0 0 auto;
+  }
+  html[data-design="v2"] .v2-script-pane-action {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+  }
+  html[data-design="v2"] .v2-script-pane-action-edit {
+    background: var(--ds-color-white);
+    border: 1px solid var(--ds-color-gray-outline);
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .v2-script-pane-action-play {
+    background: var(--ds-color-black);
+    border: 1px solid var(--ds-color-black);
+    color: var(--ds-color-white);
+  }
+
+  /* ── Right pane: WRITTEN variant — screenplay prose ─────────── */
+  html[data-design="v2"] .v2-script-pane-prose {
+    margin: 0;
+    /* Courier mono per screenplay convention. Same metrics the
+       Script View sheet uses (`.script-view-prose` — 13/18). */
+    font-family: "Courier New", Courier, monospace;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--ds-color-black);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* ── Right pane: UNWRITTEN variant — image + meta + CTA ─────── */
+  html[data-design="v2"] .v2-script-pane-detail-row {
+    display: grid;
+    /* Image left (fixed proportion), meta right (fills). 24px
+       column gap matches the rhythm in the screenshot. */
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  html[data-design="v2"] .v2-script-pane-image {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    background: #1a1a1a;
+  }
+  html[data-design="v2"] .v2-script-pane-image > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  html[data-design="v2"] .v2-script-pane-image-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #1a1a1a;
+  }
+  /* "0:16" duration pill at bottom-right of the image — white
+     fill, dark text, clock icon left of the time. Matches the
+     screenshot's badge treatment. */
+  html[data-design="v2"] .v2-script-pane-duration {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--ds-color-black);
+    font-size: 11px;
+    line-height: 1;
+  }
+  html[data-design="v2"] .v2-script-pane-duration img {
+    width: 11px;
+    height: 11px;
+  }
+  /* Right side of the detail row — summary stacked above the
+     character avatar row. */
+  html[data-design="v2"] .v2-script-pane-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+  }
+  html[data-design="v2"] .v2-script-pane-summary {
+    margin: 0;
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .v2-script-pane-characters {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  html[data-design="v2"] .v2-script-pane-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: inline-block;
+    background: #e5e5e5;
+    border: 1px solid var(--ds-color-gray-outline);
+  }
+  html[data-design="v2"] .v2-script-pane-avatar.v2-script-pane-avatar-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--ds-color-gray-chip-label);
+  }
+  /* Primary "SCRIPT THIS SCENE" CTA — black pill spanning the pane
+     content width. Same height (52) + radius (15) family as the
+     desktop empty-state buttons so the system reads consistently. */
+  html[data-design="v2"] .v2-script-pane-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: 56px;
+    padding: 0 24px;
+    border-radius: 15px;
+    background: var(--ds-color-black);
+    color: var(--ds-color-white);
+    border: 1px solid var(--ds-color-black);
+    cursor: pointer;
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  html[data-design="v2"] .v2-script-pane-cta img {
+    width: 16px;
+    height: 16px;
+    filter: invert(1);
+  }
+  html[data-design="v2"] .v2-script-pane-cta:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+@media (max-width: 1439.98px) {
+  /* On mobile / tablet, the .v2-script-desktop-grid wrapper passes
+     through — its children (the .v2-script-list and any pane)
+     float up to be direct children of .tab-content-wrap-script so
+     the existing single-column mobile layout keeps working. The
+     pane is gated behind `isDesktop` in the JSX, so on mobile it
+     simply doesn't render. */
+  html[data-design="v2"] .v2-script-desktop-grid,
+  html[data-design="v2"] .v2-script-list {
+    display: contents;
+  }
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────

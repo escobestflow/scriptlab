@@ -2747,6 +2747,8 @@ export function Studio({
               onOpenUpdateTray={setUpdateTraySource}
               onOpenReadThrough={() => setReadThroughOpen(true)}
               runGenerateAll={runGenerateAll}
+              scenesInFlight={scenesInFlight}
+              charsInFlight={charsInFlight}
               onImportScript={importScriptFromFile}
               onImportPastedScript={importScriptFromText}
               onImportStoryDescription={importStoryFromDescription}
@@ -9339,6 +9341,8 @@ function ScriptTab({
   runGenerateAll,
   bgScriptJob,
   onStartBackgroundScriptLoop,
+  scenesInFlight,
+  charsInFlight,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -9346,6 +9350,11 @@ function ScriptTab({
   /** Forwarded from Studio so scene cards can render the moment text
    *  + type of everything the user linked in the Story tab. */
   moments: Moment[];
+  /** v2 desktop only — shimmer state for the right pane's scene
+   *  image and character avatars. Same shape as Story / Characters
+   *  tabs use; lets the pane mirror inflight regenerate state. */
+  scenesInFlight: Set<string>;
+  charsInFlight: Set<string>;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
   autosaveEnabled?: boolean;
@@ -9408,12 +9417,31 @@ function ScriptTab({
   ) => Promise<void>;
 }) {
   const isV2 = useIsV2();
+  const isDesktop = useIsDesktopStudio();
   const d = getActiveScriptDraft(story);
   const charactersDraft = getActiveCharactersDraft(story);
   const conceptDraft = getActiveConceptDraft(story);
   const writtenCount = beats.filter(b => b.status === "written").length;
   const hasProducedScript = writtenCount > 0;
   const hasBeats = beats.length > 0;
+
+  // ── v2 desktop two-column selection state ──────────────────────
+  // On desktop the Script tab renders as [scene list | scene pane].
+  // selectedBeatId drives which beat the right pane mirrors. We
+  // auto-select the first beat when none is selected (initial mount
+  // or after a beats reset) so the pane never sits empty when a
+  // selection is possible. On mobile this state is harmless (cards
+  // still route to popup / sheet).
+  const [selectedBeatId, setSelectedBeatId] = useState<string | null>(null);
+  useEffect(() => {
+    if (beats.length === 0) {
+      if (selectedBeatId !== null) setSelectedBeatId(null);
+      return;
+    }
+    if (selectedBeatId === null || !beats.find(b => b.id === selectedBeatId)) {
+      setSelectedBeatId(beats[0].id);
+    }
+  }, [beats, selectedBeatId]);
 
   // "Write all scenes with AI" — kicks off the same background-loop
   // machinery Easy mode uses. The scrim from runGenerateAll covers
@@ -9581,8 +9609,17 @@ function ScriptTab({
 
       {/* v2 layout — number column with dotted timeline + card with
           slug line, big serif title, body, page-range and per-scene
-          AI chip. Mirrors the Story tab's row pattern. */}
-      {isV2 && beats.map((beat, i) => {
+          AI chip. Mirrors the Story tab's row pattern.
+          The .v2-script-desktop-grid wrapper is `display: contents`
+          on mobile (passthrough — children float up to be direct
+          children of .tab-content-wrap-script and the legacy mobile
+          single-column layout keeps working) and a 2-column grid on
+          desktop (≥1440), pairing the .v2-script-list of scene
+          cards with a .v2-script-pane on the right. */}
+      {isV2 && hasBeats && (
+      <div className="v2-script-desktop-grid">
+      <div className="v2-script-list">
+      {beats.map((beat, i) => {
         // Estimate page range from accumulated word counts. Standard
         // screenplay convention: 1 page ≈ 250 words. We accumulate
         // pages from prior beats, so beat i's range starts where
@@ -9604,7 +9641,10 @@ function ScriptTab({
         const isInflight = bgScriptJob?.inflightBeatId === beat.id;
         const isQueued = !isInflight && bgScriptJob?.pendingBeatIds.has(beat.id) === true;
         return (
-          <div key={beat.id} className="v2-script-row">
+          <div
+            key={beat.id}
+            className={`v2-script-row${isDesktop && selectedBeatId === beat.id ? " is-selected" : ""}`}
+          >
             <div className="card v2-script-card beat-card">
               <span className={`v2-script-number-badge ${isWritten ? "written" : ""}`} aria-hidden="true">
                 {i + 1}
@@ -9620,12 +9660,19 @@ function ScriptTab({
                 type="button"
                 className="v2-script-card-tap"
                 onClick={() => {
-                  // Written scenes open the new full-prose Script
-                  // View sheet (read mode); unwritten scenes still
-                  // route to the lightweight preview popup so the
-                  // user has the same Edit-Scene affordance there.
-                  if (isWritten) openScriptViewSheet?.(beat.id);
-                  else openScenePopup?.(beat.id);
+                  // Desktop: clicking the card body selects the scene
+                  // for the right pane (no popup / sheet — the prose
+                  // and details render inline). Mobile keeps the
+                  // legacy behavior: written scenes open the
+                  // full-prose Script View sheet, unwritten open the
+                  // lightweight preview popup.
+                  if (isDesktop) {
+                    setSelectedBeatId(beat.id);
+                  } else if (isWritten) {
+                    openScriptViewSheet?.(beat.id);
+                  } else {
+                    openScenePopup?.(beat.id);
+                  }
                 }}
               >
                 <div className="v2-script-slug ds-type-int-header">{slug}</div>
@@ -9678,6 +9725,150 @@ function ScriptTab({
           </div>
         );
       })}
+      </div>
+      {isDesktop && (() => {
+        // ── Right pane: scene detail (unwritten) or script prose (written)
+        // Renders inline alongside the .v2-script-list on ≥1440. Below
+        // 1440 the CSS collapses .v2-script-desktop-grid to display:contents
+        // and we don't render the pane at all (the early `if (!isDesktop)`
+        // gate above the IIFE ensures the work is skipped on mobile).
+        const idx = beats.findIndex(b => b.id === selectedBeatId);
+        const beat = idx >= 0 ? beats[idx] : null;
+        if (!beat) return null;
+        const total = beats.length;
+        const cast = getActiveCharactersDraft(story).characters;
+        const beatChars = (beat.characterIds ?? [])
+          .map(id => cast.find(c => c.id === id))
+          .filter((c): c is Character => !!c);
+        // Same duration heuristic the scene popup uses (250 words/min
+        // is the screenplay-page convention). "—:—" when no prose yet.
+        const wordCount = (beat.sceneContent || "").trim().split(/\s+/).filter(Boolean).length;
+        const durationLabel = wordCount > 0
+          ? (() => {
+              const seconds = Math.max(1, Math.round((wordCount / 250) * 60));
+              const m = Math.floor(seconds / 60);
+              const s = seconds % 60;
+              return `${m}:${s.toString().padStart(2, "0")}`;
+            })()
+          : "—:—";
+        const isWritten = beat.status === "written";
+        const isInflight = bgScriptJob?.inflightBeatId === beat.id;
+        const isQueued = !isInflight && bgScriptJob?.pendingBeatIds.has(beat.id) === true;
+        return (
+          <div
+            className={`v2-script-pane v2-script-pane-${isWritten ? "written" : "unwritten"}`}
+            role="region"
+            aria-label={`Scene ${idx + 1} of ${total}: ${beat.name || "Untitled"}`}
+          >
+            <div className="v2-script-pane-header">
+              <div className="v2-script-pane-header-text">
+                <span className="v2-script-pane-index ds-type-int-header">
+                  SCENE {idx + 1} OF {total}
+                </span>
+                <h2 className="v2-script-pane-title ds-type-project-page-title-empty">
+                  {beat.name || "Untitled scene"}
+                </h2>
+              </div>
+              {isWritten && (
+                /* Top-right action chips for written scenes — pencil
+                   icon opens the edit-scene sheet, play triangle opens
+                   the read-through sheet. Mirrors the design in the
+                   second screenshot. */
+                <div className="v2-script-pane-actions">
+                  <button
+                    type="button"
+                    className="v2-script-pane-action v2-script-pane-action-edit"
+                    onClick={() => openScriptViewSheet?.(beat.id)}
+                    aria-label="Edit scene"
+                    title="Edit scene"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="v2-script-pane-action v2-script-pane-action-play"
+                    onClick={onOpenReadThrough}
+                    aria-label="Play read-through"
+                    title="Play read-through"
+                  >
+                    <svg width="12" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <polygon points="6 4 20 12 6 20 6 4" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {isWritten ? (
+              /* Written scene → render prose in monospace. The
+                 sceneContent string is already in screenplay format
+                 (FADE IN / EXT./INT. slugs / action / dialogue blocks)
+                 so a <pre> preserves the line breaks exactly. */
+              <pre className="v2-script-pane-prose">{beat.sceneContent}</pre>
+            ) : (
+              <>
+                {/* Image + meta two-column row. Mirrors the screenshot's
+                    image-left / description+characters-right layout. */}
+                <div className="v2-script-pane-detail-row">
+                  <div className="v2-script-pane-image">
+                    {scenesInFlight.has(beat.id)
+                      ? <div className="v2-script-pane-image-placeholder ds-image-shimmer is-dark" aria-label="Generating scene image" />
+                      : beat.thumbnail
+                        ? <img src={beat.thumbnail} alt="" />
+                        : <div className="v2-script-pane-image-placeholder" aria-hidden="true" />}
+                    <div className="v2-script-pane-duration ds-type-body">
+                      <img src="/icon-duration.svg" alt="" aria-hidden="true" />
+                      <span>{durationLabel}</span>
+                    </div>
+                  </div>
+                  <div className="v2-script-pane-meta">
+                    <p className="v2-script-pane-summary ds-type-body">
+                      {beat.summary || "No summary yet."}
+                    </p>
+                    {beatChars.length > 0 && (
+                      <div className="v2-script-pane-characters" aria-label="Characters in this scene">
+                        {beatChars.map(c => (
+                          charsInFlight.has(c.id)
+                            ? <div key={c.id} className="v2-script-pane-avatar ds-image-shimmer is-dark" aria-label="Generating character portrait" />
+                            : c.thumbnail
+                              ? <img key={c.id} src={c.thumbnail} alt="" className="v2-script-pane-avatar" />
+                              : <div key={c.id} className="v2-script-pane-avatar v2-script-pane-avatar-placeholder">
+                                  {c.name ? c.name[0].toUpperCase() : "?"}
+                                </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* Primary CTA — same generate action the per-row chip
+                    fires; black pill spanning the pane width. */}
+                <button
+                  type="button"
+                  className="v2-script-pane-cta"
+                  onClick={() => {
+                    if (busy || isInflight || isQueued) return;
+                    run(
+                      { type: "generate_scene", payload: { beatIndex: idx } },
+                      `Write · ${beat.name}`,
+                    );
+                  }}
+                  disabled={busy || isInflight || isQueued}
+                >
+                  <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                  <span>
+                    {isInflight ? "SCRIPTING…" : isQueued ? "QUEUED" : "SCRIPT THIS SCENE"}
+                  </span>
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })()}
+      </div>
+      )}
 
       {!isV2 && beats.map((beat, i) => {
         // Resolve the linked moments so the scene card can echo what the
