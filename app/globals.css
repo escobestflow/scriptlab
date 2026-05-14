@@ -7536,10 +7536,17 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .studio-tab-bar .studio-tab.active::after {
     content: "";
     position: absolute;
-    left: -30px;
-    right: -30px;
+    /* left/right tuned per latest spec:
+       - Underline moves 5px to the right of its prior position
+         (both edges shift +5).
+       - Width grows by 5px (right edge extends an extra 5).
+       Result: left edge +5 (was -30, now -25), right edge +10 in
+       the negative direction (was -30, now -40). Net: tab_w + 65
+       wide (was tab_w + 60), centered ~7.5px right of tab center. */
+    left: -25px;
+    right: -40px;
     bottom: -2px;
-    height: 6px;
+    height: 5px;
     width: auto;
     background: var(--ds-color-unfold-gold);
     border-radius: 0;
@@ -7586,6 +7593,13 @@ html[data-design="v2"] .record-label {
      breathing room previously here was removed per spec. */
   html[data-design="v2"] .v2-desktop-hero {
     margin-top: 0;
+  }
+
+  /* Scene popup — move up 150px on desktop. Base rule positions
+     the card 180px from viewport bottom; here we add 150 so it
+     lands well above the layer-sticky-bar's hot zone. */
+  html[data-design="v2"] .scene-popup-scrim {
+    padding: 0 20px 330px;
   }
 
   /* Attribute row labels on desktop pick up the gray-dark-fill
@@ -7707,28 +7721,28 @@ html[data-design="v2"] .record-label {
     margin-left: 0;
     margin-right: 0;
   }
-  /* Number column widens to hold the 38×38 badge (was 21×21 on
-     mobile; spec'd at 41 then trimmed 3px per latest feedback). */
+  /* Number column widens to hold the 35×35 badge (was 21×21 on
+     mobile; spec'd at 41 then trimmed twice — first to 38, now
+     35 per latest feedback). */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-col {
-    flex: 0 0 38px;
-    width: 38px;
+    flex: 0 0 35px;
+    width: 35px;
   }
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-badge {
-    width: 38px;
-    height: 38px;
-    /* Digit reads cleanly at the larger badge size — bump from 12px
-       (mobile) to 15px (proportional to the 38px badge). */
-    font-size: 15px;
+    width: 35px;
+    height: 35px;
+    /* Digit size eased from 15 (38 badge) to 14 (35 badge) so the
+       proportion stays cleanly readable. */
+    font-size: 14px;
   }
   /* Dashed connector line between consecutive badges. Geometry:
-       row height 157, badge 38 centered → badge top at 59.5,
-       badge bottom at 97.5. Next row's badge top sits at
-       margin-bottom (14, inherited) + 59.5 = 73.5 below current row
-       bottom. So `top: 98; bottom: -74` (rounded to integers) fills
-       the gap cleanly. */
+       row height 157, badge 35 centered → badge top at 61,
+       badge bottom at 96. Next row's badge top sits at
+       margin-bottom (14, inherited) + 61 = 75 below current row
+       bottom. So `top: 96; bottom: -75` fills the gap cleanly. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-col::before {
-    top: 98px;
-    bottom: -74px;
+    top: 96px;
+    bottom: -75px;
   }
   /* Card height 157, matches the row. Position relative so the
      absolute-positioned 3-dot menu inside it can anchor to the
@@ -7816,7 +7830,10 @@ html[data-design="v2"] .record-label {
        at the same Y as the location text. Right-edge 60 reserves
        room for the absolutely-positioned 3-dot menu. */
     padding: 18px 60px 0 16px;
-    margin-left: -40px;
+    /* margin-left: -108 = previous -40 plus an additional -68 per
+       latest feedback (moves the characters block 68px further
+       LEFT, pulling chars + duration closer to the description). */
+    margin-left: -108px;
   }
   /* Character cluster — single icon on the left, stacked names on
      the right. Icon vertically aligns with first name. */
@@ -7885,6 +7902,26 @@ html[data-design="v2"] .record-label {
      menu now. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-expand {
     display: none;
+  }
+
+  /* ── V2 desktop Script tab — left-aligned narrow card column ─────
+     The base rule earlier in this stylesheet caps `.tab-content-
+     wrap-script` at max-width:880 and centers it (margin auto) —
+     same as the Story/Characters tabs. Override here so the script
+     cards sit flush with the studio tab nav's left edge instead of
+     floating in the middle of the page. The tab nav has
+     `margin-left: 25px` on the .studio-tab-bar; matching that here
+     aligns the cards' left edge to the bar's outer left edge. */
+  html[data-design="v2"] .tab-content-wrap-script {
+    max-width: none;
+    margin-left: 25px;
+    margin-right: 0;
+  }
+  /* Each script-tab scene card is a fixed 353px wide column on
+     desktop. The bare `.beat-card.v2-script-card` rule above keeps
+     the surface (radius, outline, padding); this just locks width. */
+  html[data-design="v2"] .tab-content-wrap-script .beat-card.v2-script-card {
+    width: 353px;
   }
 
 }

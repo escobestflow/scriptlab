@@ -156,7 +156,11 @@ function DesktopSidebar({
   onMenu: () => void;
   userInitial: string | null;
 }) {
-  const projectsActive = !inStudio && activeMain === "projects";
+  // Projects stays "active" in the sidebar when the user is inside
+  // a project detail (Studio view) — Studio is conceptually a
+  // child of the Projects section, so the nav-rail visual reflects
+  // that. Ideas is only active when the user is on the Ideas tab.
+  const projectsActive = inStudio || activeMain === "projects";
   const ideasActive = !inStudio && activeMain === "moments";
   return (
     <aside className="desktop-sidebar" aria-label="Primary">
