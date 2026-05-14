@@ -31,11 +31,14 @@ function normalizeBeat(b: any, index: number): Beat {
   // Sticky auto-gen sentinel — once set, prevents future auto-image-
   // generation re-attempts for this beat across reloads.
   const imageGenAttempted = b?.imageGenAttempted === true ? true : undefined;
-  // Slugline / scene heading. Preserved verbatim; coerced to
-  // undefined if the value isn't a non-empty string so empty
-  // strings don't trigger an empty heading row.
+  // Slugline / scene heading. Both fields preserved verbatim;
+  // coerced to undefined if the value isn't a non-empty string so
+  // empty strings don't trigger an empty heading row downstream
+  // (display via formatSlugline returns null for null-or-empty).
   const location = typeof b?.location === "string" && b.location.trim()
     ? b.location : undefined;
+  const timeOfDay = typeof b?.timeOfDay === "string" && b.timeOfDay.trim()
+    ? b.timeOfDay : undefined;
   return {
     position: index,
     momentIds: [],
@@ -46,6 +49,7 @@ function normalizeBeat(b: any, index: number): Beat {
     thumbnail,
     imageGenAttempted,
     location,
+    timeOfDay,
   };
 }
 

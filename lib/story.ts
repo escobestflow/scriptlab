@@ -204,12 +204,17 @@ export interface Beat {
   weirdness?: number;
   status: BeatStatus;
   sceneContent?: string;
-  /** Slugline / scene heading shown ABOVE the beat title on the
-   *  Story-tab card (e.g. "INT. APARTMENT - NIGHT"). Optional —
-   *  empty/missing values hide the heading row. Display is
-   *  uppercased by CSS regardless of stored casing, since screenplay
-   *  convention is ALL CAPS for sluglines. */
+  /** Free-text location for the scene, e.g. "Apartment", "Forest
+   *  near the highway", or "INT. Office". Combined with `timeOfDay`
+   *  by `formatSlugline()` (lib/story.ts) into a screenplay-style
+   *  slugline ("INT. APARTMENT - NIGHT"). When the user's location
+   *  doesn't start with INT/EXT, the formatter prepends "INT." by
+   *  default. Empty/missing = no heading row rendered. */
   location?: string;
+  /** Free-text time-of-day for the scene, e.g. "Night", "Day",
+   *  "Sunset", "Continuous". Combined with `location` to produce
+   *  the slugline. Empty/missing renders without the " - TIME" tail. */
+  timeOfDay?: string;
   /** AI-generated cinematic scene thumbnail (7:5 painted still),
    *  stored as a base64 data URL the same way Character.thumbnail is.
    *  Optional — produced by /api/generate-scene-image after a beat is
@@ -1661,4 +1666,42 @@ export function markLayerSynced(story: Story, layer: "characters" | "story" | "s
     }),
     updatedAt: now,
   };
+}
+
+/** Format a screenplay-style slugline from a Beat's `location` and
+ *  `timeOfDay` free-text fields.
+ *
+ *  Behavior:
+ *  - Returns `null` when both fields are empty/missing (callers
+ *    suppress the heading row).
+ *  - When `location` is set but doesn't already start with an
+ *    `INT.` / `EXT.` prefix (case-insensitive, optional dot, one or
+ *    more whitespace chars), prepends `"INT. "` as a sensible
+ *    default. Existing prefixes pass through verbatim.
+ *  - Uppercases everything for screenplay convention.
+ *  - Joins location + " - " + time when both present.
+ *
+ *  Examples:
+ *    ("Apartment", "Night")      → "INT. APARTMENT - NIGHT"
+ *    ("INT. Apartment", "Night") → "INT. APARTMENT - NIGHT"
+ *    ("EXT. Forest", "Day")      → "EXT. FOREST - DAY"
+ *    ("Apartment", undefined)    → "INT. APARTMENT"
+ *    (undefined, "Night")        → "NIGHT"
+ *    (undefined, undefined)      → null
+ */
+export function formatSlugline(
+  location: string | undefined | null,
+  timeOfDay: string | undefined | null,
+): string | null {
+  const loc = (location ?? "").trim();
+  const tod = (timeOfDay ?? "").trim();
+  if (!loc && !tod) return null;
+  let locPart = "";
+  if (loc) {
+    const hasPrefix = /^(INT|EXT)\.?\s/i.test(loc);
+    locPart = hasPrefix ? loc.toUpperCase() : `INT. ${loc.toUpperCase()}`;
+  }
+  const todPart = tod.toUpperCase();
+  if (locPart && todPart) return `${locPart} - ${todPart}`;
+  return locPart || todPart;
 }

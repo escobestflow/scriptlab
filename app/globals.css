@@ -7761,10 +7761,11 @@ html[data-design="v2"] .record-label {
     padding: 18px 20px;
   }
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-location {
+    /* Re-enable the slugline row on desktop (the base rule above
+       hides it for mobile). Token `.ds-type-int-heading` supplies
+       font-family / weight / size / letter-spacing / case / color. */
+    display: block;
     margin: 0;
-    /* Token supplies font-family / weight / size / letter-spacing /
-       text-transform / color via `.ds-type-int-heading`. Local rule
-       only owns layout. */
   }
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-name {
     /* `.ds-type-project-card-title` token now drives font-family /
@@ -7772,24 +7773,28 @@ html[data-design="v2"] .record-label {
        handling so long titles don't break the card's fixed height. */
     line-height: 1;
   }
-  /* Right-side meta column — characters list + estimated duration.
-     Pushed to the right via flex's natural left-aligned info column +
-     this column's `margin-left: auto`. Fixed-ish width so meta lines
-     are uniform across cards. */
+  /* Description / summary — capped at 300px so the meta column has
+     room to sit on the right. The card's flex layout otherwise lets
+     the summary stretch to the entire remaining width. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-summary-preview {
+    max-width: 300px;
+  }
+  /* Right-side meta column — characters list + estimated duration
+     arranged as TWO SEPARATE horizontal columns with space between.
+     Re-enables the column on desktop (base rule hides it for mobile). */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-meta {
     flex: 0 0 auto;
     align-self: center;
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    flex-direction: row;
+    align-items: center;
+    gap: 40px;
     /* Right-edge inset: 60px reserves room for the absolutely-
-       positioned 3-dot menu in the top-right corner so the meta
-       column doesn't sit underneath it. */
+       positioned 3-dot menu in the top-right corner. */
     padding: 0 60px 0 16px;
-    min-width: 200px;
   }
   /* Character cluster — single icon on the left, stacked names on
-     the right. Icon vertically centers against the names column. */
+     the right. Icon vertically aligns with first name. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-meta-chars {
     display: flex;
     align-items: flex-start;
@@ -7834,10 +7839,11 @@ html[data-design="v2"] .record-label {
      as the character card's menu (`.v2-character-menu`) — small
      square hit target with the 13×3 dots glyph. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-menu {
+    /* Re-enable on desktop (base rule hides it for mobile). */
+    display: inline-flex;
     position: absolute;
     top: 16px;
     right: 18px;
-    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 24px;
@@ -9899,6 +9905,16 @@ html[data-design="v2"] .v2-beat-card .beat-summary-preview {
    from inside the card, expand chevron, momentIds count). */
 html[data-design="v2"] .v2-beat-card .beat-number,
 html[data-design="v2"] .v2-beat-card .beat-expand {
+  display: none;
+}
+
+/* Mobile baseline — the slugline heading, right-side meta column,
+   and 3-dot menu are DESKTOP-ONLY chrome (the desktop @media block
+   re-enables them with `display: flex` / `display: inline-flex`).
+   Mobile keeps the simpler 103×card layout with just thumb + info. */
+html[data-design="v2"] .v2-beat-location,
+html[data-design="v2"] .v2-beat-card .v2-beat-meta,
+html[data-design="v2"] .v2-beat-card .v2-beat-menu {
   display: none;
 }
 

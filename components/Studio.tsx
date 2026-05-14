@@ -17,6 +17,7 @@ import {
   getLayerSyncState, markLayerSynced,
   isLayerDraftEmpty,
   applySyncResult,
+  formatSlugline,
   copyPartnerLayerDraft,
   copyPartnerProjectDraft,
   upsertCharacterInActiveDraft,
@@ -9163,12 +9164,17 @@ function StoryTab({
                     {i + 1}
                   </div>
                   <div className="beat-info">
-                    {/* Slugline / scene heading — only renders when
-                        beat.location is set (otherwise the row is
-                        suppressed so the title sits flush at the top). */}
-                    {isV2 && beat.location?.trim() && (
-                      <div className="v2-beat-location ds-type-int-heading">{beat.location}</div>
-                    )}
+                    {/* Slugline / scene heading — formatSlugline
+                        composes `location` + `timeOfDay` and applies
+                        the INT/EXT default. Returns null when both
+                        fields are empty, in which case the row is
+                        suppressed. CSS hides this on mobile (the
+                        slugline display is desktop-only per spec). */}
+                    {isV2 && (() => {
+                      const slug = formatSlugline(beat.location, beat.timeOfDay);
+                      if (!slug) return null;
+                      return <div className="v2-beat-location ds-type-int-heading">{slug}</div>;
+                    })()}
                     <div className={`beat-name${isV2 ? " ds-type-project-card-title" : " ds-type-body-bold"}`}>{beat.name || "Untitled scene"}</div>
                     <div className={`beat-summary-preview${isV2 ? " ds-type-body" : ""}`}>{beat.summary || "No summary"}</div>
                   </div>
@@ -10340,6 +10346,26 @@ function SceneEditForm({
         value={beat.name}
         placeholder="Add a scene name"
         onChange={v => onUpdate({ name: v })}
+        inline
+      />
+
+      {/* Location + Time of Day — the two halves of the slugline.
+          Free text. `formatSlugline` (lib/story.ts) combines them
+          at display time, applying an "INT." prefix when the
+          location string doesn't already start with INT/EXT. The
+          beat card's desktop heading row reads them via the helper. */}
+      <TextAttrRow
+        label="Location"
+        value={beat.location ?? ""}
+        placeholder='e.g. "Apartment" or "INT. Office"'
+        onChange={v => onUpdate({ location: v })}
+        inline
+      />
+      <TextAttrRow
+        label="Time of day"
+        value={beat.timeOfDay ?? ""}
+        placeholder='e.g. "Night", "Day", "Sunset"'
+        onChange={v => onUpdate({ timeOfDay: v })}
         inline
       />
 
