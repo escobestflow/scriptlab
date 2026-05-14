@@ -932,36 +932,49 @@ export function Studio({
   }, [story]);
 
   // ── Background migration: inline base64 thumbnails → Storage URLs ──
-  // Walks every character/beat in the active drafts on story load.
-  // If a `thumbnail` is still in legacy `data:image/jpeg;base64,...`
-  // form, POSTs it to /api/migrate-image-thumbnail, swaps in the
-  // returned Storage URL, and lets the existing autosave persist the
-  // smaller row. Runs sequentially (one item at a time) to avoid
-  // hammering the migration endpoint when a project has 7 characters
-  // and 30 beats. Stops at the first 503 (Storage not configured) so
-  // we don't burn cycles when SUPABASE_SERVICE_ROLE_KEY is missing.
+  // Walks every character/beat in the drafts on story load. For each
+  // thumbnail that's still in legacy `data:image/jpeg;base64,...`
+  // form, POSTs it to /api/migrate-image-thumbnail and accumulates
+  // the resulting Storage URL. After ALL uploads have completed
+  // (or the user navigates away), applies every URL swap in a
+  // SINGLE setStory call so the autosave debouncer only fires once
+  // — on the now-small row.
   //
-  // Safe to re-fire on every story-state change: the dedupe ref
-  // prevents in-flight duplicates per id, and the `startsWith("data:")`
-  // gate means once an item is on Storage we skip it forever.
-  const thumbMigrationInFlight = useRef<Set<string>>(new Set());
+  // This batching is critical: a project with 20 inline thumbnails
+  // is ~2MB. If we setStory after every upload, the autosave fires
+  // 20 times, each one trying to upsert a still-mostly-2MB row, and
+  // Supabase Postgres cancels each query (statement_timeout / code
+  // 57014). All saves fail, all data stays inline, the next reload
+  // re-uploads everything and orphans 20 Storage blobs.
+  //
+  // With batching, only ONE save fires after the batch, on the row
+  // that's already shrunk to ~20 URLs (~ a few KB). It succeeds.
+  //
+  // The `thumbMigrationDone` ref dedupes successful uploads across
+  // re-entries so a setStory triggered partway doesn't redo work.
+  // `thumbMigrationDisabled` is the kill switch for the rest of the
+  // session when the migration endpoint reports 503 (no service-role
+  // key) or any other terminal failure.
   const thumbMigrationDone = useRef<Set<string>>(new Set());
   const thumbMigrationDisabled = useRef<boolean>(false);
+  const thumbMigrationRunning = useRef<boolean>(false);
   useEffect(() => {
     if (thumbMigrationDisabled.current) return;
+    // Guard against re-entry: while a batched migration pass is
+    // already running, ignore any [story] re-fires (which happen
+    // naturally when the user types, switches drafts, etc.). The
+    // pass currently in flight will see the existing data URLs and
+    // do the work; later passes can pick up anything new.
+    if (thumbMigrationRunning.current) return;
     let cancelled = false;
 
-    async function migrateOne(
+    async function uploadOne(
       bucket: "character-images" | "scene-images",
       idKey: string,
       dataUrl: string,
-      patch: (newUrl: string) => void,
-    ): Promise<boolean> {
-      if (cancelled) return false;
-      if (thumbMigrationDisabled.current) return false;
-      if (thumbMigrationDone.current.has(idKey)) return true;
-      if (thumbMigrationInFlight.current.has(idKey)) return false;
-      thumbMigrationInFlight.current.add(idKey);
+    ): Promise<string | null> {
+      if (cancelled || thumbMigrationDisabled.current) return null;
+      if (thumbMigrationDone.current.has(idKey)) return null;
       try {
         const res = await fetch("/api/migrate-image-thumbnail", {
           method: "POST",
@@ -969,10 +982,9 @@ export function Studio({
           body: JSON.stringify({ dataUrl, bucket }),
         });
         if (res.status === 503) {
-          // Storage not configured — abandon migration for this session.
           console.warn("[thumbnail migration] Storage not configured (SUPABASE_SERVICE_ROLE_KEY missing). Skipping.");
           thumbMigrationDisabled.current = true;
-          return false;
+          return null;
         }
         if (!res.ok) {
           let msg = `HTTP ${res.status}`;
@@ -981,110 +993,127 @@ export function Studio({
             if (data?.error) msg = String(data.error);
           } catch { /* ignore */ }
           console.error(`[thumbnail migration] ${idKey}: ${msg}`);
-          return false;
+          return null;
         }
         const data = await res.json();
         const url = typeof data?.url === "string" ? data.url : null;
         if (!url) {
           console.error(`[thumbnail migration] ${idKey}: API returned no url`);
-          return false;
+          return null;
         }
         thumbMigrationDone.current.add(idKey);
-        if (!cancelled) patch(url);
-        return true;
+        return url;
       } catch (err: any) {
         console.error(`[thumbnail migration] ${idKey} threw:`, err?.message || err);
-        return false;
-      } finally {
-        thumbMigrationInFlight.current.delete(idKey);
+        return null;
       }
     }
 
+    // Snapshot the work-list synchronously from the current story
+    // so partway-through setStory calls (which we DON'T make any
+    // more, but defensively) can't cause us to re-walk.
+    const work: Array<{
+      key: string;
+      bucket: "character-images" | "scene-images";
+      dataUrl: string;
+      // Pure functions: given a Story + new URL, return a new Story
+      // with the swap applied. Applied in batch at the end.
+      patchStory: (story: Story, url: string) => Story;
+    }> = [];
+
+    for (const cd of story.charactersDrafts) {
+      for (const c of cd.characters) {
+        if (typeof c.thumbnail !== "string" || !c.thumbnail.startsWith("data:image/")) continue;
+        const key = `char:${c.id}`;
+        if (thumbMigrationDone.current.has(key)) continue;
+        const characterDraftId = cd.id;
+        const characterId = c.id;
+        const dataUrl = c.thumbnail;
+        work.push({
+          key,
+          bucket: "character-images",
+          dataUrl,
+          patchStory: (s, url) => ({
+            ...s,
+            charactersDrafts: s.charactersDrafts.map(d =>
+              d.id !== characterDraftId ? d : {
+                ...d,
+                characters: d.characters.map(ch =>
+                  ch.id !== characterId ? ch :
+                  ch.thumbnail === dataUrl ? { ...ch, thumbnail: url } : ch,
+                ),
+              }
+            ),
+          }),
+        });
+      }
+    }
+    for (const sd of story.storyDrafts) {
+      const beatLists: Array<{ beats: typeof sd.beats; episodeId?: string }> = [];
+      if (sd.beats && sd.beats.length > 0) beatLists.push({ beats: sd.beats });
+      for (const ep of sd.episodes ?? []) beatLists.push({ beats: ep.beats, episodeId: ep.id });
+      for (const list of beatLists) {
+        for (const b of list.beats) {
+          if (typeof b.thumbnail !== "string" || !b.thumbnail.startsWith("data:image/")) continue;
+          const key = `beat:${b.id}`;
+          if (thumbMigrationDone.current.has(key)) continue;
+          const storyDraftId = sd.id;
+          const episodeId = list.episodeId;
+          const beatId = b.id;
+          const dataUrl = b.thumbnail;
+          work.push({
+            key,
+            bucket: "scene-images",
+            dataUrl,
+            patchStory: (s, url) => ({
+              ...s,
+              storyDrafts: s.storyDrafts.map(d => {
+                if (d.id !== storyDraftId) return d;
+                const swapBeat = (bb: Beat) =>
+                  bb.id === beatId && bb.thumbnail === dataUrl
+                    ? { ...bb, thumbnail: url } : bb;
+                if (episodeId) {
+                  return {
+                    ...d,
+                    episodes: (d.episodes ?? []).map(ep =>
+                      ep.id === episodeId
+                        ? { ...ep, beats: ep.beats.map(swapBeat) } : ep,
+                    ),
+                  };
+                }
+                return { ...d, beats: d.beats.map(swapBeat) };
+              }),
+            }),
+          });
+        }
+      }
+    }
+
+    if (work.length === 0) return;
+
+    thumbMigrationRunning.current = true;
+    console.log(`[thumbnail migration] queued ${work.length} legacy data-URL thumbnails to upload to Storage (batched — single setStory at end)`);
+
     (async () => {
-      // Snapshot the work-list synchronously so a setStory partway
-      // through doesn't cause us to re-walk the same drafts.
-      const work: Array<{ key: string; bucket: "character-images" | "scene-images"; dataUrl: string; apply: (url: string) => void }> = [];
-      for (const cd of story.charactersDrafts) {
-        for (const c of cd.characters) {
-          if (typeof c.thumbnail === "string" && c.thumbnail.startsWith("data:image/")) {
-            const characterDraftId = cd.id;
-            const characterId = c.id;
-            const dataUrl = c.thumbnail;
-            work.push({
-              key: `char:${characterId}`,
-              bucket: "character-images",
-              dataUrl,
-              apply: (url) => {
-                setStory(s => ({
-                  ...s,
-                  charactersDrafts: s.charactersDrafts.map(d =>
-                    d.id !== characterDraftId
-                      ? d
-                      : {
-                          ...d,
-                          characters: d.characters.map(ch =>
-                            ch.id !== characterId
-                              ? ch
-                              : ch.thumbnail === dataUrl
-                                ? { ...ch, thumbnail: url }
-                                : ch,
-                          ),
-                        }
-                  ),
-                }));
-              },
-            });
-          }
+      try {
+        // Upload all sequentially. Collect successful results.
+        const results: Array<{ patchStory: typeof work[0]["patchStory"]; url: string }> = [];
+        for (const item of work) {
+          if (cancelled || thumbMigrationDisabled.current) break;
+          const url = await uploadOne(item.bucket, item.key, item.dataUrl);
+          if (url) results.push({ patchStory: item.patchStory, url });
         }
-      }
-      for (const sd of story.storyDrafts) {
-        const beatLists: Array<{ beats: typeof sd.beats; episodeId?: string }> = [];
-        if (sd.beats && sd.beats.length > 0) beatLists.push({ beats: sd.beats });
-        for (const ep of sd.episodes ?? []) beatLists.push({ beats: ep.beats, episodeId: ep.id });
-        for (const list of beatLists) {
-          for (const b of list.beats) {
-            if (typeof b.thumbnail === "string" && b.thumbnail.startsWith("data:image/")) {
-              const storyDraftId = sd.id;
-              const episodeId = list.episodeId;
-              const beatId = b.id;
-              const dataUrl = b.thumbnail;
-              work.push({
-                key: `beat:${beatId}`,
-                bucket: "scene-images",
-                dataUrl,
-                apply: (url) => {
-                  setStory(s => ({
-                    ...s,
-                    storyDrafts: s.storyDrafts.map(d => {
-                      if (d.id !== storyDraftId) return d;
-                      const swapBeat = (bb: typeof b) =>
-                        bb.id === beatId && bb.thumbnail === dataUrl
-                          ? { ...bb, thumbnail: url }
-                          : bb;
-                      if (episodeId) {
-                        return {
-                          ...d,
-                          episodes: (d.episodes ?? []).map(ep =>
-                            ep.id === episodeId
-                              ? { ...ep, beats: ep.beats.map(swapBeat) }
-                              : ep,
-                          ),
-                        };
-                      }
-                      return { ...d, beats: d.beats.map(swapBeat) };
-                    }),
-                  }));
-                },
-              });
-            }
-          }
-        }
-      }
-      if (work.length === 0) return;
-      console.log(`[thumbnail migration] queued ${work.length} legacy data-URL thumbnails to upload to Storage`);
-      for (const item of work) {
-        if (cancelled || thumbMigrationDisabled.current) break;
-        await migrateOne(item.bucket, item.key, item.dataUrl, item.apply);
+        if (cancelled || results.length === 0) return;
+        // SINGLE setStory that applies every URL swap. The autosave
+        // debouncer fires once 1s later, on the now-small row.
+        setStory(s => {
+          let next = s;
+          for (const r of results) next = r.patchStory(next, r.url);
+          return next;
+        });
+        console.log(`[thumbnail migration] swapped ${results.length}/${work.length} thumbnails to Storage URLs — autosave will persist shortly`);
+      } finally {
+        thumbMigrationRunning.current = false;
       }
     })();
 
