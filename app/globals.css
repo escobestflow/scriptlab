@@ -11060,5 +11060,13 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
     overflow: hidden;
   }
+  /* Mobile uses opacity:0 to fade the layer-bar's draft pill out
+     when the overlay mounts, but the bar still takes height — on
+     desktop that left a visible empty band between the tab nav
+     and the silhouette graphic. display:none collapses it
+     entirely so the graphic sits 0px below the tab nav per spec. */
+  html[data-design="v2"]:has(.studio-empty-overlay) .layer-bar {
+    display: none;
+  }
 }
 
