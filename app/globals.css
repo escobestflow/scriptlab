@@ -7648,6 +7648,81 @@ html[data-design="v2"] .record-label {
     padding-top: 6px;
   }
 
+  /* ── V2 desktop Story tab — populated state ──────────────────────
+     Per spec:
+       - Number circle 41×41 (was 21×21 on mobile)
+       - Circle's left edge sits 75px from the main nav column
+       - 54px gap between circle and the scene card
+       - Card height 157 (was 103)
+       - Scene image 172×123 (was 101×72)
+       - Card right edge flush with the tab bar's right edge
+         (=1114px from the sidebar edge — same as tab bar width 1054
+          starting at studio-scroll's 60px content padding).
+     Box geometry (anchored to .tab-content-wrap-story):
+       - wrap width: 1054 (matches tab bar outer width)
+       - wrap padding-left: 15 (60 + 15 = 75 from sidebar to first
+         pixel of contents = circle's left edge)
+       - wrap padding-right: 0
+       → contents area inside wrap: 1054 − 15 = 1039 wide
+         = 41 (circle col) + 54 (gap) + 944 (card)
+     The card width auto-fills via the row's flex layout, so no
+     explicit width is needed on the card itself — it just stretches
+     from circle+gap to wrap right edge. Override specificity is
+     bumped via the `.tab-content-wrap-story` ancestor so the bare
+     `.v2-beat-row` / `.beat-card.v2-beat-card` rules later in the
+     stylesheet (which set the mobile 103px sizing) can't win on
+     source order. */
+  html[data-design="v2"] .tab-content-wrap-story {
+    width: 1054px;
+    max-width: 1054px;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 15px;
+    padding-right: 0;
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-row {
+    height: 157px;
+    gap: 54px;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  /* Number column widens to hold the 41×41 badge (was 21×21). */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-col {
+    flex: 0 0 41px;
+    width: 41px;
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-badge {
+    width: 41px;
+    height: 41px;
+    /* Digit reads cleanly at the larger badge size — bump from 12px
+       (mobile) to 16px. */
+    font-size: 16px;
+  }
+  /* Dashed connector line between consecutive badges. Geometry:
+       row height 157, badge 41 centered → badge top at 58,
+       badge bottom at 99. Next row's badge top sits at
+       margin-bottom (14, inherited) + 58 = 72 below current row
+       bottom. So `top: 99; bottom: -72` exactly fills the gap. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-col::before {
+    top: 99px;
+    bottom: -72px;
+  }
+  /* Card height 157, matches the row. */
+  html[data-design="v2"] .tab-content-wrap-story .beat-card.v2-beat-card {
+    height: 157px;
+  }
+  /* Scene thumbnail bumped to 172×123 (5×3-ish, slightly wider
+     aspect than the mobile 101×72). align-self:center keeps it
+     vertically centered in the 157-tall card. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-thumb {
+    width: 172px;
+    height: 123px;
+  }
+  /* Placeholder initial scales with the larger thumb. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-thumb-placeholder {
+    font-size: 40px;
+  }
+
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────
