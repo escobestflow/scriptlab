@@ -7949,11 +7949,27 @@ html[data-design="v2"] .record-label {
     height: 561px;
     min-height: 0;
     margin: 0 0 0 -60px;
-    padding: 0;
+    /* Foreground content stack (draft picker, title, caption,
+       Add/Generate buttons) sits on the LEFT side of the silhouette
+       per spec. Inset offsets:
+         padding-top: 77 → draft picker 77px below the tab nav
+         padding-left: 157 → draft picker 157px from the sidebar's
+           right edge (which is also the overlay's left edge)
+       Background-clip defaults to border-box so the silhouette PNG
+       still covers the full 1116×561 box — only the foreground
+       stack is inset. */
+    padding: 77px 0 0 157px;
     background-size: 100% 100%;
     background-position: top left;
     background-repeat: no-repeat;
     grid-column: 1 / -1;
+  }
+  /* Drop the mobile draft-picker top margin on desktop — the
+     overlay's padding-top:77 already supplies the spec'd 77px
+     offset below the tab nav. Bottom margin stays so the picker
+     reads as separate from the title below. */
+  html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
+    margin: 0 0 11px;
   }
 
   /* Per-section desktop silhouettes. Mobile uses /v2/empty-state-
