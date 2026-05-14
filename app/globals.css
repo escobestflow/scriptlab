@@ -7924,6 +7924,23 @@ html[data-design="v2"] .record-label {
     width: 353px;
   }
 
+  /* When rendered as a direct child of .tab-content-wrap-script
+     (desktop only — sibling of LayerBar and the desktop grid), the
+     action row sits on its own line, left-aligned with the scene
+     cards' left edge. Mobile still puts these chips in the
+     LayerBar's right slot via the legacy rightSlot path. */
+  html[data-design="v2"] .tab-content-wrap-script > .v2-script-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 16px;
+    /* Beat the grid-column: 1 / -1 rule that the tab-content-wrap-
+       script's grid layout applies to its top-level children. The
+       action row is naturally narrow; we want it to take its own
+       intrinsic width on the left side, not stretch across cols. */
+    justify-self: start;
+  }
+
   /* ── V2 desktop Script tab: list + scene-detail pane ──────────
      Two-column layout. Left column = .v2-script-list (existing
      scene cards). Right column = .v2-script-pane (scene image +
@@ -7960,8 +7977,12 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-script-list,
   html[data-design="v2"] .v2-script-pane {
     position: sticky;
-    top: 0;
-    max-height: 100vh;
+    /* 50px above-the-pane breathing room when the columns stick to
+       the top of the viewport — per spec. max-height shrinks by
+       the same 50 so the column's scrollable area still fits the
+       viewport without the bottom getting cut off. */
+    top: 50px;
+    max-height: calc(100vh - 50px);
     overflow-y: auto;
     min-height: 0;
     align-self: start;
@@ -8205,7 +8226,12 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-script-pane-cta img {
     width: 16px;
     height: 16px;
-    filter: invert(1);
+    /* `brightness(0)` flattens the source SVG's purple/colored
+       fill to pure black first, then `invert(1)` repaints to
+       white on the black button. Plain `invert(1)` alone
+       repainted purple as a complementary green — flatten step
+       removes the source color entirely. */
+    filter: brightness(0) invert(1);
   }
   html[data-design="v2"] .v2-script-pane-cta:disabled {
     opacity: 0.5;

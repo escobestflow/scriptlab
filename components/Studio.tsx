@@ -9570,8 +9570,14 @@ function ScriptTab({
         autosaveEnabled={autosaveEnabled}
         onOpenUpdateTray={onOpenUpdateTray}
         onOpenReadThrough={hasProducedScript && !isV2 ? onOpenReadThrough : undefined}
-        rightSlot={v2ScriptActions}
+        /* Desktop renders the action chips (Script All Scenes +
+           Download) as a separate left-aligned row below the
+           LayerBar — see the standalone {v2ScriptActions} render
+           directly below. On mobile the chips keep their legacy
+           home in the LayerBar's right slot. */
+        rightSlot={isDesktop ? null : v2ScriptActions}
       />
+      {isDesktop && hasBeats && v2ScriptActions}
 
       {/* Top-of-content Tip — only surfaces once at least one scene
           has been written. On an empty Script the empty state already
@@ -9656,13 +9662,15 @@ function ScriptTab({
               <span className={`v2-script-number-badge ${isWritten ? "written" : ""}`} aria-hidden="true">
                 {i + 1}
               </span>
-              <button
-                type="button"
-                className="v2-script-options"
-                aria-label="Scene options"
-              >
-                <img src="/icon-options.svg" alt="" aria-hidden="true" />
-              </button>
+              {!isDesktop && (
+                <button
+                  type="button"
+                  className="v2-script-options"
+                  aria-label="Scene options"
+                >
+                  <img src="/icon-options.svg" alt="" aria-hidden="true" />
+                </button>
+              )}
               <button
                 type="button"
                 className="v2-script-card-tap"
@@ -9688,26 +9696,30 @@ function ScriptTab({
               </button>
               <div className="v2-script-footer">
                 <span className="v2-script-pages ds-type-body">{pageLabel}</span>
+                {/* "View Script" chip is hidden on desktop — the right
+                    pane already shows the screenplay prose inline, and
+                    we never open the legacy script popup/sheet on
+                    desktop anymore. Mobile keeps the chip → sheet
+                    flow. The "Script Scene" chip on unwritten scenes
+                    fires the per-row generate action (no popup), so
+                    it stays visible on both. */}
                 {isWritten ? (
-                  /* Written → "View Script" chip. Same chip
-                     styling/position as the Script Scene CTA;
-                     only the glyph + label change. Click opens
-                     the Script View sheet (same as a card-body
-                     tap). */
-                  <button
-                    type="button"
-                    className="add-all-scenes-chip v2-script-scene-chip"
-                    onClick={() => openScriptViewSheet?.(beat.id)}
-                  >
-                    <img
-                      src="/icon-script-sml.svg"
-                      alt=""
-                      aria-hidden="true"
-                      width={10.86}
-                      height={11.27}
-                    />
-                    <span>View Script</span>
-                  </button>
+                  !isDesktop && (
+                    <button
+                      type="button"
+                      className="add-all-scenes-chip v2-script-scene-chip"
+                      onClick={() => openScriptViewSheet?.(beat.id)}
+                    >
+                      <img
+                        src="/icon-script-sml.svg"
+                        alt=""
+                        aria-hidden="true"
+                        width={10.86}
+                        height={11.27}
+                      />
+                      <span>View Script</span>
+                    </button>
+                  )
                 ) : (
                   <button
                     type="button"
@@ -9747,17 +9759,26 @@ function ScriptTab({
         const beatChars = (beat.characterIds ?? [])
           .map(id => cast.find(c => c.id === id))
           .filter((c): c is Character => !!c);
-        // Same duration heuristic the scene popup uses (250 words/min
-        // is the screenplay-page convention). "—:—" when no prose yet.
-        const wordCount = (beat.sceneContent || "").trim().split(/\s+/).filter(Boolean).length;
-        const durationLabel = wordCount > 0
-          ? (() => {
-              const seconds = Math.max(1, Math.round((wordCount / 250) * 60));
-              const m = Math.floor(seconds / 60);
-              const s = seconds % 60;
-              return `${m}:${s.toString().padStart(2, "0")}`;
-            })()
-          : "—:—";
+        // Duration shown on the scene image. Resolution order:
+        //   1. `beat.lengthMinutes` — the explicit time the user
+        //      picked in the scene-edit sheet (whole or fractional
+        //      minutes). Takes precedence per spec.
+        //   2. Word-count estimate from sceneContent at 250 wpm.
+        //   3. "—:—" when neither source has a value.
+        const durationLabel = (() => {
+          if (typeof beat.lengthMinutes === "number" && beat.lengthMinutes > 0) {
+            const totalSeconds = Math.max(1, Math.round(beat.lengthMinutes * 60));
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return `${m}:${s.toString().padStart(2, "0")}`;
+          }
+          const wordCount = (beat.sceneContent || "").trim().split(/\s+/).filter(Boolean).length;
+          if (wordCount === 0) return "—:—";
+          const seconds = Math.max(1, Math.round((wordCount / 250) * 60));
+          const m = Math.floor(seconds / 60);
+          const s = seconds % 60;
+          return `${m}:${s.toString().padStart(2, "0")}`;
+        })();
         const isWritten = beat.status === "written";
         const isInflight = bgScriptJob?.inflightBeatId === beat.id;
         const isQueued = !isInflight && bgScriptJob?.pendingBeatIds.has(beat.id) === true;
