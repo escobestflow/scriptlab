@@ -11053,14 +11053,14 @@ html[data-design="v2"] .menu-panel-utility svg {
   /* In-overlay draft picker — shown on desktop as the FIRST element
      of the foreground content stack (dropdown above the title), per
      spec. The 59px mobile margin is dropped so the dropdown sits at
-     the overlay's padding-top (77px) with the spec-mandated 35px
-     gap to the title below. Just the LayerDraftPicker trigger
-     button renders here — no save-draft sub-button (only appears
-     when autosave+dirty) and the popup menu only renders when
-     opened. */
+     the overlay's padding-top (77px) with a 25px gap to the title
+     below (was 35; tightened by -10 per spec). Just the
+     LayerDraftPicker trigger button renders here — no save-draft
+     sub-button (only appears when autosave+dirty) and the popup
+     menu only renders when opened. */
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
     display: block;
-    margin: 0 0 35px;
+    margin: 0 0 25px;
   }
   /* Title — fixed 240px column on desktop. The 34px Poynter display
      wraps "Define Your Characters" onto 2 lines at 240; matches the
@@ -11111,6 +11111,48 @@ html[data-design="v2"] .menu-panel-utility svg {
      entirely so the graphic sits 0px below the tab nav per spec. */
   html[data-design="v2"]:has(.studio-empty-overlay) .layer-bar {
     display: none;
+  }
+
+  /* ── Tab nav bottom-outline extension on empty states ─────────
+     The `.studio-tab-bar` carries a 2px bottom border that visually
+     divides the tab bar from the content below. The bar sits inside
+     `.studio-scroll` (padding-left:60) and has its own margin-left:25,
+     so the border starts 85px right of the sidebar's right edge —
+     leaving an 85px gap between the sidebar and where the outline
+     begins. On empty states the user wants that gap filled so the
+     outline reads as a continuous horizontal line meeting the top
+     of the silhouette graphic.
+
+     Implementation: a 2px-tall pseudo-element on `.studio-tabs-row`
+     (the full-width parent of the bar) anchored at `bottom: 0`
+     with `left: -60px; width: 85px` — that lands it at the same y
+     as the bar's existing border-bottom, filling the 60+25 gap
+     from the sidebar edge to the bar's left edge. No element
+     position changes; only the visible outline extends. */
+  html[data-design="v2"]:has(.studio-empty-overlay) .studio-tabs-row {
+    position: relative;
+  }
+  html[data-design="v2"]:has(.studio-empty-overlay) .studio-tabs-row::before {
+    content: "";
+    position: absolute;
+    left: -60px;
+    bottom: 0;
+    width: 85px;
+    height: 2px;
+    background: var(--ds-color-gray-divider);
+    pointer-events: none;
+  }
+
+  /* Script tab's `.tab-content-wrap-script` carries an extra
+     `margin-left: 25px` (see line ~7915) to align the populated
+     state's 353px scene cards with the tab bar's offset. That
+     margin is fine in the populated layout but pushes the empty
+     overlay 25px to the right of the sidebar, breaking the flush
+     left-edge spec. Pull it back with an additional -25 on the
+     margin-left so the script empty overlay lands flush against
+     the sidebar like Characters and Story. */
+  html[data-design="v2"] .tab-content-wrap-script > .studio-empty-overlay {
+    margin-left: -107px;
   }
 
   /* The mobile empty-state stack overlays a white project title +

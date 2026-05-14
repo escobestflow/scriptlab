@@ -8991,7 +8991,7 @@ function StoryTab({
                   ? "Build your story outline. Add scenes, and key moments to bring your idea to life."
                   : "Start building your story structure — add your first scene."
               }
-              addLabel={isV2 ? "Add Scene" : "Add scene"}
+              addLabel={isV2 ? "Add a Scene" : "Add scene"}
               onAdd={() => openNewScene(0)}
               onGenerate={generateAllBeats}
               generating={genBusy}
