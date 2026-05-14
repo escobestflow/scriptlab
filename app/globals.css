@@ -11030,10 +11030,10 @@ html[data-design="v2"] .menu-panel-utility svg {
     right: auto;
     width: 1116px;
     /* Height is the proportional scale of the native asset
-       (currently 1547×641 — see public/v2/desktop-empty-state-*.png):
-       1116 × (641 / 1547) ≈ 462. Update this if the asset's native
+       (currently 1408×641 — see public/v2/desktop-empty-state-*.png):
+       1116 × (641 / 1408) ≈ 508. Update this if the asset's native
        aspect ratio changes again. */
-    height: 462px;
+    height: 508px;
     min-height: 0;
     /* Cancel BOTH parent insets so the graphic is flush with the tab
        nav (top) and the sidebar (left), per spec.
@@ -11087,8 +11087,19 @@ html[data-design="v2"] .menu-panel-utility svg {
     line-height: 18px;
     letter-spacing: 0;
   }
+  /* Section-specific desktop hero assets. All three share the same
+     native aspect ratio (1408×641) so the parent overlay's 1116×508
+     box scales them proportionally. The mobile rules earlier in the
+     stylesheet (which point at the narrower `/v2/empty-state-*.png`
+     assets) are overridden here on desktop. */
   html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
     background-image: url("/v2/desktop-empty-state-characters.png");
+  }
+  html[data-design="v2"] .studio-empty-overlay[data-section="story"] {
+    background-image: url("/v2/desktop-empty-state-story.png");
+  }
+  html[data-design="v2"] .studio-empty-overlay[data-section="script"] {
+    background-image: url("/v2/desktop-empty-state-script.png");
   }
   html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
     overflow: hidden;
