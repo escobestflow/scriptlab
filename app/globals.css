@@ -7941,7 +7941,9 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-script-desktop-grid {
     display: grid;
     grid-template-columns: 353px minmax(0, 1fr);
-    column-gap: 80px;
+    /* Spec: 60px between the scene list (left) and the scene
+       info/script pane (right). */
+    column-gap: 60px;
     align-items: start;
     /* min-height (not height) so the grid expands if the right
        pane prose is very long, but each column still gets its
@@ -8054,20 +8056,25 @@ html[data-design="v2"] .record-label {
     word-break: break-word;
   }
 
-  /* ── Right pane: UNWRITTEN variant — image + meta + CTA ─────── */
+  /* ── Right pane: UNWRITTEN variant — image + meta column ─────
+     The image is fixed at 363×225; the meta column (description,
+     characters, CTA) is 255 wide and aligns to a `min-height` that
+     matches the image height. `margin-top: auto` on the CTA pushes
+     it to the bottom of the meta column so it bottom-aligns with
+     the image edge when description + characters are short, and
+     extends below naturally when they're long. */
   html[data-design="v2"] .v2-script-pane-detail-row {
-    display: grid;
-    /* Image left (fixed proportion), meta right (fills). 24px
-       column gap matches the rhythm in the screenshot. */
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    display: flex;
+    align-items: flex-start;
     gap: 24px;
-    margin-bottom: 24px;
   }
   html[data-design="v2"] .v2-script-pane-image {
     position: relative;
+    width: 363px;
+    height: 225px;
+    flex: 0 0 363px;
     border-radius: 12px;
     overflow: hidden;
-    aspect-ratio: 16 / 10;
     background: #1a1a1a;
   }
   html[data-design="v2"] .v2-script-pane-image > img {
@@ -8081,48 +8088,77 @@ html[data-design="v2"] .record-label {
     height: 100%;
     background: #1a1a1a;
   }
-  /* "0:16" duration pill at bottom-right of the image — white
-     fill, dark text, clock icon left of the time. Matches the
-     screenshot's badge treatment. */
+  /* "0:16" duration pill — bottom-LEFT of the image per spec.
+     Clock SVG (the same one used for the project hero's "Updated
+     X ago" line) sits to the left of the time. White-on-dark
+     glyph + label. */
   html[data-design="v2"] .v2-script-pane-duration {
     position: absolute;
-    right: 12px;
+    left: 12px;
     bottom: 12px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.92);
-    color: var(--ds-color-black);
-    font-size: 11px;
+    color: var(--ds-color-white);
+    font-size: 12px;
     line-height: 1;
   }
-  html[data-design="v2"] .v2-script-pane-duration img {
+  html[data-design="v2"] .v2-script-pane-duration svg {
     width: 11px;
     height: 11px;
   }
-  /* Right side of the detail row — summary stacked above the
-     character avatar row. */
+  /* Edit Scene chip — overlayed bottom-RIGHT of the image. Fixed
+     77×27, no fill, 0.7px outline + label color both
+     `--ds-color-gray-outline` (#E4E3E4) per spec. The token is the
+     designer's source of truth — never inline #E4E3E4 anywhere. */
+  html[data-design="v2"] .v2-script-pane-edit-overlay {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 77px;
+    height: 27px;
+    border-radius: 13.5px;
+    background: transparent;
+    border: 0.7px solid var(--ds-color-gray-outline);
+    color: var(--ds-color-gray-outline);
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Right side — flex column. min-height matches image height so
+     the CTA at the bottom (via `margin-top: auto`) bottom-aligns
+     with the image's lower edge when content is short. */
   html[data-design="v2"] .v2-script-pane-meta {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    width: 255px;
+    flex: 0 0 255px;
+    min-height: 225px;
     min-width: 0;
   }
   html[data-design="v2"] .v2-script-pane-summary {
     margin: 0;
     color: var(--ds-color-black);
   }
+  /* Character circles — sit 20px below the description per spec. */
   html[data-design="v2"] .v2-script-pane-characters {
+    margin-top: 20px;
     display: inline-flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
   }
   html[data-design="v2"] .v2-script-pane-avatar {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     object-fit: cover;
     display: inline-block;
@@ -8138,16 +8174,22 @@ html[data-design="v2"] .record-label {
     font-size: 13px;
     color: var(--ds-color-gray-chip-label);
   }
-  /* Primary "SCRIPT THIS SCENE" CTA — black pill spanning the pane
-     content width. Same height (52) + radius (15) family as the
-     desktop empty-state buttons so the system reads consistently. */
+  /* "SCRIPT THIS SCENE" CTA — 235 wide, NOT full-width, sits in
+     the meta column below the characters (next to the scene
+     image, never below it). `margin-top: auto` pushes it to the
+     column's bottom edge; combined with the column's min-height
+     = image height, the button bottom-aligns with the image
+     bottom when the description + characters are short.
+     If they're long enough to push the column past 225px, the
+     button moves down with them naturally. */
   html[data-design="v2"] .v2-script-pane-cta {
+    margin-top: auto;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    width: 100%;
-    height: 56px;
+    width: 235px;
+    height: 52px;
     padding: 0 24px;
     border-radius: 15px;
     background: var(--ds-color-black);

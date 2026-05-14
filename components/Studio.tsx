@@ -2749,6 +2749,7 @@ export function Studio({
               runGenerateAll={runGenerateAll}
               scenesInFlight={scenesInFlight}
               charsInFlight={charsInFlight}
+              onEditScene={openExistingSceneSheet}
               onImportScript={importScriptFromFile}
               onImportPastedScript={importScriptFromText}
               onImportStoryDescription={importStoryFromDescription}
@@ -9343,6 +9344,7 @@ function ScriptTab({
   onStartBackgroundScriptLoop,
   scenesInFlight,
   charsInFlight,
+  onEditScene,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
@@ -9355,6 +9357,11 @@ function ScriptTab({
    *  tabs use; lets the pane mirror inflight regenerate state. */
   scenesInFlight: Set<string>;
   charsInFlight: Set<string>;
+  /** v2 desktop only — opens the existing-scene edit sheet from
+   *  the Edit Scene chip overlayed on the right pane's scene image
+   *  (unwritten variant). Same action the legacy ScenePopup's Edit
+   *  Scene button fires. */
+  onEditScene: (beatId: string) => void;
   run: (a: ActionRequest, title: string) => void;
   busy: boolean;
   autosaveEnabled?: boolean;
@@ -9809,60 +9816,80 @@ function ScriptTab({
                  so a <pre> preserves the line breaks exactly. */
               <pre className="v2-script-pane-prose">{beat.sceneContent}</pre>
             ) : (
-              <>
-                {/* Image + meta two-column row. Mirrors the screenshot's
-                    image-left / description+characters-right layout. */}
-                <div className="v2-script-pane-detail-row">
-                  <div className="v2-script-pane-image">
-                    {scenesInFlight.has(beat.id)
-                      ? <div className="v2-script-pane-image-placeholder ds-image-shimmer is-dark" aria-label="Generating scene image" />
-                      : beat.thumbnail
-                        ? <img src={beat.thumbnail} alt="" />
-                        : <div className="v2-script-pane-image-placeholder" aria-hidden="true" />}
-                    <div className="v2-script-pane-duration ds-type-body">
-                      <img src="/icon-duration.svg" alt="" aria-hidden="true" />
-                      <span>{durationLabel}</span>
-                    </div>
+              <div className="v2-script-pane-detail-row">
+                <div className="v2-script-pane-image">
+                  {scenesInFlight.has(beat.id)
+                    ? <div className="v2-script-pane-image-placeholder ds-image-shimmer is-dark" aria-label="Generating scene image" />
+                    : beat.thumbnail
+                      ? <img src={beat.thumbnail} alt="" />
+                      : <div className="v2-script-pane-image-placeholder" aria-hidden="true" />}
+                  {/* Duration pill — bottom-LEFT of the image per spec.
+                      Reuses the project hero's "Updated 2d ago" clock
+                      SVG so the same glyph reads across the app. */}
+                  <div className="v2-script-pane-duration ds-type-body">
+                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" />
+                      <polyline points="12 7 12 12 15 14" />
+                    </svg>
+                    <span>{durationLabel}</span>
                   </div>
-                  <div className="v2-script-pane-meta">
-                    <p className="v2-script-pane-summary ds-type-body">
-                      {beat.summary || "No summary yet."}
-                    </p>
-                    {beatChars.length > 0 && (
-                      <div className="v2-script-pane-characters" aria-label="Characters in this scene">
-                        {beatChars.map(c => (
-                          charsInFlight.has(c.id)
-                            ? <div key={c.id} className="v2-script-pane-avatar ds-image-shimmer is-dark" aria-label="Generating character portrait" />
-                            : c.thumbnail
-                              ? <img key={c.id} src={c.thumbnail} alt="" className="v2-script-pane-avatar" />
-                              : <div key={c.id} className="v2-script-pane-avatar v2-script-pane-avatar-placeholder">
-                                  {c.name ? c.name[0].toUpperCase() : "?"}
-                                </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {/* Edit Scene chip — overlayed bottom-right of the
+                      scene image. Opens the existing-scene edit sheet
+                      (same action the legacy ScenePopup's "Edit Scene"
+                      button fires). Outline-only chip per spec, no
+                      fill, label + border both #E4E3E4. */}
+                  <button
+                    type="button"
+                    className="v2-script-pane-edit-overlay"
+                    onClick={() => onEditScene(beat.id)}
+                    aria-label={`Edit ${beat.name}`}
+                  >
+                    EDIT SCENE
+                  </button>
                 </div>
-                {/* Primary CTA — same generate action the per-row chip
-                    fires; black pill spanning the pane width. */}
-                <button
-                  type="button"
-                  className="v2-script-pane-cta"
-                  onClick={() => {
-                    if (busy || isInflight || isQueued) return;
-                    run(
-                      { type: "generate_scene", payload: { beatIndex: idx } },
-                      `Write · ${beat.name}`,
-                    );
-                  }}
-                  disabled={busy || isInflight || isQueued}
-                >
-                  <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
-                  <span>
-                    {isInflight ? "SCRIPTING…" : isQueued ? "QUEUED" : "SCRIPT THIS SCENE"}
-                  </span>
-                </button>
-              </>
+                <div className="v2-script-pane-meta">
+                  <p className="v2-script-pane-summary ds-type-body">
+                    {beat.summary || "No summary yet."}
+                  </p>
+                  {beatChars.length > 0 && (
+                    <div className="v2-script-pane-characters" aria-label="Characters in this scene">
+                      {beatChars.map(c => (
+                        charsInFlight.has(c.id)
+                          ? <div key={c.id} className="v2-script-pane-avatar ds-image-shimmer is-dark" aria-label="Generating character portrait" />
+                          : c.thumbnail
+                            ? <img key={c.id} src={c.thumbnail} alt="" className="v2-script-pane-avatar" />
+                            : <div key={c.id} className="v2-script-pane-avatar v2-script-pane-avatar-placeholder">
+                                {c.name ? c.name[0].toUpperCase() : "?"}
+                              </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Primary CTA — inside the meta column (NOT below
+                      the detail row) so it sits next to the scene
+                      image. `margin-top: auto` in CSS pushes it to
+                      the bottom of the column; the column's
+                      min-height = image height keeps the button
+                      bottom-aligned with the image bottom edge when
+                      description + characters are short. */}
+                  <button
+                    type="button"
+                    className="v2-script-pane-cta"
+                    onClick={() => {
+                      if (busy || isInflight || isQueued) return;
+                      run(
+                        { type: "generate_scene", payload: { beatIndex: idx } },
+                        `Write · ${beat.name}`,
+                      );
+                    }}
+                    disabled={busy || isInflight || isQueued}
+                  >
+                    <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                    <span>
+                      {isInflight ? "SCRIPTING…" : isQueued ? "QUEUED" : "SCRIPT THIS SCENE"}
+                    </span>
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         );
