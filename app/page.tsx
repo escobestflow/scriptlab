@@ -837,18 +837,77 @@ export default function Page() {
     refreshPartnerEmail,
   ]);
 
-  // Debounced save: when projects change, save to DB after 1s of inactivity
-  const saveProjectsDebounced = useCallback((ps: Story[]) => {
-    if (!user) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      ps.forEach(p => saveProjectToDB(user.id, p));
-    }, 1000);
-  }, [user]);
+  // Debounced, change-only autosave.
+  //
+  // Old behavior (problematic): on every `projects` state change,
+  // re-uploaded EVERY project's full row. Typing one character in
+  // project A caused projects B, C, D, E to be re-saved too — and
+  // since some rows were multi-MB (pre-Storage migration), unrelated
+  // big rows would silently fail with statement_timeout (code 57014)
+  // while the relevant change tried to land. Lots of noise and lost
+  // writes.
+  //
+  // New behavior: diff incoming `projects` against the last-seen
+  // snapshot (reference-equality — React mutates immutably, so an
+  // untouched project keeps the same object reference across state
+  // updates). Only the IDs whose reference changed since last
+  // observation are queued. Pending IDs accumulate across rapid
+  // edits so debounced resets don't drop a previous change.
+  //
+  // The first post-hydration fire is suppressed: when we initially
+  // load N projects from DB, that's not a "change" — it's just data
+  // arriving. We snapshot the references and skip the save.
+  const previousProjectRefs = useRef<Map<string, Story>>(new Map());
+  const pendingSaveIds = useRef<Set<string>>(new Set());
+  const initialHydrationSnapshotted = useRef<boolean>(false);
 
   useEffect(() => {
-    if (hydrated && user) saveProjectsDebounced(projects);
-  }, [projects, hydrated, user, saveProjectsDebounced]);
+    if (!hydrated || !user) return;
+
+    // First fire after hydration completes: snapshot what we just
+    // loaded, do not save (it's the data we just received).
+    if (!initialHydrationSnapshotted.current) {
+      initialHydrationSnapshotted.current = true;
+      const seed = new Map<string, Story>();
+      for (const p of projects) seed.set(p.id, p);
+      previousProjectRefs.current = seed;
+      return;
+    }
+
+    // Diff: identify projects whose object reference changed since
+    // last observation. Reference inequality = state was mutated
+    // (React immutability guarantees a fresh object on every setStory
+    // touch). Brand-new projects (no entry in prev map) also count
+    // as changed.
+    const prev = previousProjectRefs.current;
+    let anyChanged = false;
+    for (const p of projects) {
+      if (prev.get(p.id) !== p) {
+        pendingSaveIds.current.add(p.id);
+        anyChanged = true;
+      }
+    }
+    // Update snapshot to the new state so the NEXT diff is correct,
+    // regardless of whether we kick a save now.
+    const nextSnap = new Map<string, Story>();
+    for (const p of projects) nextSnap.set(p.id, p);
+    previousProjectRefs.current = nextSnap;
+
+    if (!anyChanged) return;
+
+    // Debounce: reset the 1s timer on every change. When it finally
+    // fires, save the latest reference of every accumulated id.
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const idsToSave = Array.from(pendingSaveIds.current);
+      pendingSaveIds.current.clear();
+      const latest = previousProjectRefs.current;
+      for (const id of idsToSave) {
+        const p = latest.get(id);
+        if (p) void saveProjectToDB(user.id, p);
+      }
+    }, 1000);
+  }, [projects, hydrated, user]);
 
   // (Older one-shot auto-gen was removed — the `generateThumbnail` +
   // thumbsInFlight loop below supersedes it. Keeping just one path
