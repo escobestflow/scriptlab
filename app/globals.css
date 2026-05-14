@@ -11031,15 +11031,31 @@ html[data-design="v2"] .menu-panel-utility svg {
     width: 1116px;
     height: 561px;
     min-height: 0;
-    margin: 0 0 0 -60px;
+    /* Cancel BOTH parent insets so the graphic is flush with the tab
+       nav (top) and the sidebar (left), per spec.
+       - margin-top: -8px → cancels .tab-content-wrap inline
+         padding-top: 8 (Studio.tsx: `padding: 8px 22px 40px`).
+       - margin-left: -82px → cancels .studio-scroll padding-left: 60
+         AND .tab-content-wrap inline padding-left: 22 (sum = 82).
+         An earlier -60 only ate the scroll padding, leaving a 22px
+         visible gap between the sidebar and the graphic's left edge. */
+    margin: -8px 0 0 -82px;
     padding: 77px 0 0 157px;
     background-size: 100% 100%;
     background-position: top left;
     background-repeat: no-repeat;
     grid-column: 1 / -1;
   }
+  /* Hide the in-overlay draft picker on desktop. The silhouette
+     graphic is designed as a single hero composition — overlaying a
+     real LayerDraftPicker pill at the 157/77 inset produced a
+     "floating pill below the tab nav" that read as an extra control
+     against the empty white space in the graphic's top-left quadrant.
+     The populated state's layer-bar picker remains the canonical
+     draft switcher; on the empty state there's nothing to switch
+     between functionally, so hiding it costs nothing. */
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
-    margin: 0 0 11px;
+    display: none;
   }
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
     /* Mobile rule pins to a fixed 178px width so the small-screen
