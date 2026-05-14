@@ -11085,6 +11085,19 @@ html[data-design="v2"] .menu-panel-utility svg {
     display: none;
   }
 
+  /* The mobile empty-state stack overlays a white project title +
+     divider + draft trigger on top of the project thumbnail at
+     `position: fixed; left: 50px; top: env+96`. There IS an earlier
+     desktop rule (~line 7163) that sets `display: none`, but the
+     bare base rule for this class (~line 8855) sets `display: flex`
+     LATER in source order at equal specificity, so flex wins on
+     desktop and the white title bleeds onto the 60px-wide sidebar.
+     Re-asserting `display: none` here (well after the bare rule)
+     reliably wins on cascade tie-break. */
+  html[data-design="v2"] .studio-thumb-empty-title {
+    display: none;
+  }
+
   /* ── Empty-state CTAs as REAL buttons on desktop ──────────────
      The bare-mobile `.empty-layer-actions .ds-btn` rule earlier in
      this stylesheet strips chrome (transparent bg, no border, just
