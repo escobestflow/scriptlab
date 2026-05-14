@@ -966,21 +966,33 @@ export function Studio({
     // pass currently in flight will see the existing data URLs and
     // do the work; later passes can pick up anything new.
     if (thumbMigrationRunning.current) return;
-    let cancelled = false;
+    // INTENTIONALLY NO `cancelled` flag — the previous implementation
+    // tracked a closure-scoped `cancelled` boolean set by useEffect's
+    // cleanup function. But ANY [story] re-fire (autosave-driven
+    // re-renders, autoGenCharacterImage's imageGenAttempted setStory,
+    // etc.) called that cleanup, set cancelled=true, and the running
+    // IIFE aborted at its first cancellation check — before the
+    // fetch() even fired. Result: "queued 1" logged, no network
+    // request, no swap log, migration silently dead. Letting the
+    // migration always run to completion is safe: if Studio unmounts
+    // mid-flight, the trailing setStory becomes a no-op on the
+    // unmounted tree, which is harmless.
 
     async function uploadOne(
       bucket: "character-images" | "scene-images",
       idKey: string,
       dataUrl: string,
     ): Promise<string | null> {
-      if (cancelled || thumbMigrationDisabled.current) return null;
+      if (thumbMigrationDisabled.current) return null;
       if (thumbMigrationDone.current.has(idKey)) return null;
+      console.log(`[thumbnail migration] uploadOne POST starting for ${idKey} (dataUrl length ${dataUrl.length})`);
       try {
         const res = await fetch("/api/migrate-image-thumbnail", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ dataUrl, bucket }),
         });
+        console.log(`[thumbnail migration] uploadOne POST returned status ${res.status} for ${idKey}`);
         if (res.status === 503) {
           console.warn("[thumbnail migration] Storage not configured (SUPABASE_SERVICE_ROLE_KEY missing). Skipping.");
           thumbMigrationDisabled.current = true;
@@ -1002,6 +1014,7 @@ export function Studio({
           return null;
         }
         thumbMigrationDone.current.add(idKey);
+        console.log(`[thumbnail migration] uploadOne SUCCESS for ${idKey} → ${url}`);
         return url;
       } catch (err: any) {
         console.error(`[thumbnail migration] ${idKey} threw:`, err?.message || err);
@@ -1098,12 +1111,20 @@ export function Studio({
       try {
         // Upload all sequentially. Collect successful results.
         const results: Array<{ patchStory: typeof work[0]["patchStory"]; url: string }> = [];
-        for (const item of work) {
-          if (cancelled || thumbMigrationDisabled.current) break;
+        for (let i = 0; i < work.length; i++) {
+          const item = work[i];
+          console.log(`[thumbnail migration] iter ${i + 1}/${work.length} for ${item.key}`);
+          if (thumbMigrationDisabled.current) {
+            console.log(`[thumbnail migration] iter ${i + 1} skipped — disabled`);
+            break;
+          }
           const url = await uploadOne(item.bucket, item.key, item.dataUrl);
           if (url) results.push({ patchStory: item.patchStory, url });
         }
-        if (cancelled || results.length === 0) return;
+        if (results.length === 0) {
+          console.log(`[thumbnail migration] loop completed — 0 successes, nothing to setStory`);
+          return;
+        }
         // SINGLE setStory that applies every URL swap. The autosave
         // debouncer fires once 1s later, on the now-small row.
         setStory(s => {
@@ -1112,12 +1133,12 @@ export function Studio({
           return next;
         });
         console.log(`[thumbnail migration] swapped ${results.length}/${work.length} thumbnails to Storage URLs — autosave will persist shortly`);
+      } catch (e: any) {
+        console.error(`[thumbnail migration] IIFE threw:`, e?.message || e);
       } finally {
         thumbMigrationRunning.current = false;
       }
     })();
-
-    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story]);
 
