@@ -11049,26 +11049,39 @@ html[data-design="v2"] .menu-panel-utility svg {
   /* In-overlay draft picker — shown on desktop as the FIRST element
      of the foreground content stack (dropdown above the title), per
      spec. The 59px mobile margin is dropped so the dropdown sits at
-     the overlay's padding-top (77px) with just a small gap to the
-     title below. Just the LayerDraftPicker trigger button renders
-     here — no save-draft sub-button (only appears when autosave+dirty)
-     and the popup menu only renders when opened. */
+     the overlay's padding-top (77px) with the spec-mandated 35px
+     gap to the title below. Just the LayerDraftPicker trigger
+     button renders here — no save-draft sub-button (only appears
+     when autosave+dirty) and the popup menu only renders when
+     opened. */
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
     display: block;
-    margin: 0 0 22px;
+    margin: 0 0 35px;
   }
+  /* Title — fixed 240px column on desktop. The 34px Poynter display
+     wraps "Define Your Characters" onto 2 lines at 240; matches the
+     content-column rhythm with the caption and CTAs below. The
+     mobile rule pins width:178 + margin:-3/0/14; both are overridden
+     here. */
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
-    /* Mobile rule pins to a fixed 178px width so the small-screen
-       title wraps to two lines. Desktop has the room to wrap
-       naturally at the token's font size, so we clear the width
-       cap. margin retains the -3/0/14 from the mobile rule. */
-    width: auto;
+    width: 240px;
+    margin: 0 0 15px;
   }
+  /* Caption — same 240px column. Typography flipped from the
+     mobile `.ds-type-body-sm` token (10/14/0.03) to the desktop
+     `.ds-type-body` token (13/18/0) per spec — applied here
+     directly on the element so the mobile JSX class can stay
+     untouched. margin-bottom is owned by the actions' margin-top
+     below (35px), so this rule just zeroes its own bottom. */
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-caption {
-    /* Same logic: mobile caps at 183px; desktop lets the line
-       run at the token's natural readable width. */
-    width: auto;
-    max-width: 480px;
+    width: 240px;
+    max-width: 240px;
+    margin: 0;
+    font-family: var(--ds-font-body);
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 18px;
+    letter-spacing: 0;
   }
   html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
     background-image: url("/v2/desktop-empty-state-characters.png");
@@ -11110,26 +11123,27 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-actions {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
-    /* Override the v1 base `.empty-layer-actions { max-width: 260px }`
-       so the column can grow to fit the 480px-wide pill buttons below.
-       The buttons are sized explicitly; the container just needs to
-       stop clipping its own width to 260. */
+    /* 15px between buttons + 35px gap from the caption above, per
+       spec. max-width:none defeats the v1 base
+       `.empty-layer-actions { max-width: 260px }` so the column
+       grows to fit the 240px-wide buttons cleanly. */
+    gap: 15px;
     max-width: none;
-    margin: 22px 0 0;
+    margin: 35px 0 0;
   }
   html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn {
-    /* Width matches the caption's max-width above so the stack
-       reads as a coherent left-anchored column. Height 52 + radius
-       26 = full pill, same proportions as `.ds-btn-lg`. */
+    /* Width 240 matches the title/caption column above so the
+       foreground stack reads as a single left-anchored column.
+       Height 52 (same as `.ds-btn-lg`) + radius 15 gives a rounded
+       rectangle rather than a full pill, per spec. */
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    width: 480px;
+    width: 240px;
     height: 52px;
     padding: 0 24px;
-    border-radius: 26px;
+    border-radius: 15px;
     font-size: 12px;
     background: transparent;
     box-shadow: none;
