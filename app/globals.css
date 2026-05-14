@@ -11046,16 +11046,16 @@ html[data-design="v2"] .menu-panel-utility svg {
     background-repeat: no-repeat;
     grid-column: 1 / -1;
   }
-  /* Hide the in-overlay draft picker on desktop. The silhouette
-     graphic is designed as a single hero composition — overlaying a
-     real LayerDraftPicker pill at the 157/77 inset produced a
-     "floating pill below the tab nav" that read as an extra control
-     against the empty white space in the graphic's top-left quadrant.
-     The populated state's layer-bar picker remains the canonical
-     draft switcher; on the empty state there's nothing to switch
-     between functionally, so hiding it costs nothing. */
+  /* In-overlay draft picker — shown on desktop as the FIRST element
+     of the foreground content stack (dropdown above the title), per
+     spec. The 59px mobile margin is dropped so the dropdown sits at
+     the overlay's padding-top (77px) with just a small gap to the
+     title below. Just the LayerDraftPicker trigger button renders
+     here — no save-draft sub-button (only appears when autosave+dirty)
+     and the popup menu only renders when opened. */
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-draft {
-    display: none;
+    display: block;
+    margin: 0 0 22px;
   }
   html[data-design="v2"] .studio-empty-overlay .empty-overlay-title {
     /* Mobile rule pins to a fixed 178px width so the small-screen
@@ -11083,6 +11083,80 @@ html[data-design="v2"] .menu-panel-utility svg {
      entirely so the graphic sits 0px below the tab nav per spec. */
   html[data-design="v2"]:has(.studio-empty-overlay) .layer-bar {
     display: none;
+  }
+
+  /* ── Empty-state CTAs as REAL buttons on desktop ──────────────
+     The bare-mobile `.empty-layer-actions .ds-btn` rule earlier in
+     this stylesheet strips chrome (transparent bg, no border, just
+     a circular glyph badge + label). That treatment reads correctly
+     on the cramped mobile empty state, but the desktop spec calls
+     for full pill buttons stacked vertically below the caption.
+     Selector specificity is bumped via the `.studio-empty-overlay`
+     ancestor so these overrides win over the bare rules without
+     needing !important. */
+  html[data-design="v2"] .studio-empty-overlay .empty-overlay-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    /* Override the v1 base `.empty-layer-actions { max-width: 260px }`
+       so the column can grow to fit the 480px-wide pill buttons below.
+       The buttons are sized explicitly; the container just needs to
+       stop clipping its own width to 260. */
+    max-width: none;
+    margin: 22px 0 0;
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn {
+    /* Width matches the caption's max-width above so the stack
+       reads as a coherent left-anchored column. Height 52 + radius
+       26 = full pill, same proportions as `.ds-btn-lg`. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 480px;
+    height: 52px;
+    padding: 0 24px;
+    border-radius: 26px;
+    font-size: 12px;
+    background: transparent;
+    box-shadow: none;
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn-primary {
+    background: var(--ds-color-black);
+    color: var(--ds-color-white);
+    border: 1px solid var(--ds-color-black);
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn-secondary {
+    background: var(--ds-color-white);
+    color: var(--ds-color-black);
+    border: 1px solid var(--ds-color-gray-outline);
+  }
+  /* Reset the v2 glyph-badge circle wrapper — desktop wants a plain
+     inline icon next to the label, not a circular badge. Mobile rule
+     sets width:25/26, white fill, ring shadow; clear it all. */
+  html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn .ds-btn-icon {
+    width: 16px;
+    height: 16px;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+    margin: 0;
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn-secondary .ds-btn-icon {
+    width: 16px;
+    height: 16px;
+  }
+  html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn .ds-btn-icon img {
+    width: 100%;
+    height: 100%;
+  }
+  /* Primary keeps the inverted (white-on-black) icon via the existing
+     `filter: invert(1)` on `.empty-layer-actions .ds-btn-primary
+     .ds-btn-icon img`. Secondary's source SVGs ship dark, which is
+     what we want on the white pill — un-do any mobile filter so the
+     icon stays dark. */
+  html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn-secondary .ds-btn-icon img {
+    filter: none;
   }
 }
 
