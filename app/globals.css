@@ -11029,7 +11029,11 @@ html[data-design="v2"] .menu-panel-utility svg {
     left: auto;
     right: auto;
     width: 1116px;
-    height: 561px;
+    /* Height is the proportional scale of the native asset
+       (currently 1547×641 — see public/v2/desktop-empty-state-*.png):
+       1116 × (641 / 1547) ≈ 462. Update this if the asset's native
+       aspect ratio changes again. */
+    height: 462px;
     min-height: 0;
     /* Cancel BOTH parent insets so the graphic is flush with the tab
        nav (top) and the sidebar (left), per spec.
