@@ -215,6 +215,11 @@ export interface Beat {
    *  "Sunset", "Continuous". Combined with `location` to produce
    *  the slugline. Empty/missing renders without the " - TIME" tail. */
   timeOfDay?: string;
+  /** Explicit scene length in minutes (whole or fractional). When
+   *  set, takes precedence over the word-count-based estimate in
+   *  the Story-tab card's duration chip. `undefined` = unset →
+   *  card falls back to estimating from `sceneContent` words. */
+  lengthMinutes?: number;
   /** AI-generated cinematic scene thumbnail (7:5 painted still),
    *  stored as a base64 data URL the same way Character.thumbnail is.
    *  Optional — produced by /api/generate-scene-image after a beat is

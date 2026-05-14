@@ -8912,11 +8912,21 @@ function StoryTab({
     return m;
   }, [story]);
   // Estimate scene duration from `sceneContent` word count. Returns
-  // null when there's no content — the meta column hides the duration
-  // chip rather than showing "0 min". ~200 words/min is a loose
-  // screen-time approximation (a screenplay page is ~250 words / 1
-  // minute, but written-prose scene drafts run denser).
+  // Returns the duration label number for the Story-tab card's
+  // meta column. Resolution order:
+  //   1. `beat.lengthMinutes` if explicitly set by the user
+  //      (Scene length input in the edit sheet) — takes precedence.
+  //   2. Estimate from `sceneContent` word count at ~200 words/min.
+  //   3. null when neither source produces a value — the meta column
+  //      hides the duration chip rather than showing "0 min" / "—".
   function estimateBeatMinutes(beat: Beat): number | null {
+    if (typeof beat.lengthMinutes === "number" && beat.lengthMinutes > 0) {
+      // Round to nearest whole minute for display — the stored
+      // value may be fractional (e.g. 0.5) but the chip shows
+      // integers. Math.max(1, …) ensures "0 min" never renders
+      // for tiny but-non-zero values.
+      return Math.max(1, Math.round(beat.lengthMinutes));
+    }
     const text = (beat.sceneContent ?? "").trim();
     if (!text) return null;
     const words = text.split(/\s+/).filter(w => w.length > 0).length;
@@ -10366,6 +10376,33 @@ function SceneEditForm({
         value={beat.timeOfDay ?? ""}
         placeholder='e.g. "Night", "Day", "Sunset"'
         onChange={v => onUpdate({ timeOfDay: v })}
+        inline
+      />
+
+      {/* Scene length (minutes). Stored on Beat.lengthMinutes as a
+          positive finite number. Empty / non-numeric input clears
+          the field (undefined), at which point the card's duration
+          chip falls back to estimating from sceneContent words. */}
+      <TextAttrRow
+        label="Length (min)"
+        value={beat.lengthMinutes != null ? String(beat.lengthMinutes) : ""}
+        placeholder='e.g. "3" or "1.5"'
+        onChange={v => {
+          const trimmed = v.trim();
+          if (!trimmed) {
+            onUpdate({ lengthMinutes: undefined });
+            return;
+          }
+          const n = parseFloat(trimmed);
+          if (Number.isFinite(n) && n > 0) {
+            onUpdate({ lengthMinutes: n });
+          } else {
+            // Invalid numeric — leave existing value alone. (User
+            // gets the offending text echoed by the controlled input
+            // but no patch is dispatched.)
+            onUpdate({ lengthMinutes: undefined });
+          }
+        }}
         inline
       />
 

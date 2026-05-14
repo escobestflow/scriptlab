@@ -39,6 +39,13 @@ function normalizeBeat(b: any, index: number): Beat {
     ? b.location : undefined;
   const timeOfDay = typeof b?.timeOfDay === "string" && b.timeOfDay.trim()
     ? b.timeOfDay : undefined;
+  // Explicit user-entered scene length (minutes). Accept any
+  // positive finite number — non-numeric / non-positive / NaN
+  // values fall back to undefined so the display estimator can
+  // take over.
+  const lengthMinutes =
+    typeof b?.lengthMinutes === "number" && Number.isFinite(b.lengthMinutes) && b.lengthMinutes > 0
+      ? b.lengthMinutes : undefined;
   return {
     position: index,
     momentIds: [],
@@ -50,6 +57,7 @@ function normalizeBeat(b: any, index: number): Beat {
     imageGenAttempted,
     location,
     timeOfDay,
+    lengthMinutes,
   };
 }
 
