@@ -7924,6 +7924,57 @@ html[data-design="v2"] .record-label {
     width: 353px;
   }
 
+  /* ── V2 desktop empty-state overlay ───────────────────────────────
+     Mobile renders the overlay as a fixed-position banner anchored
+     ~378px below the safe-area top. Desktop wants the silhouette
+     pinned DIRECTLY below the tab nav (no space) and FLUSH against
+     the sidebar's right edge, at a precise 1116×561 render size.
+
+     Implementation: override mobile's `position: fixed` to `static`
+     so the overlay flows naturally after the tab bar. `margin-left:
+     -60` cancels `.studio-scroll`'s padding-left:60 so the image's
+     left edge lands at the sidebar's right edge. Background sized
+     `100% 100%` so the 1276×641 source PNG scales precisely to fit
+     the 1116×561 box.
+
+     The Characters tab uses a 2-column grid on desktop, so the
+     overlay needs `grid-column: 1 / -1` to span both tracks rather
+     than landing in the first cell. */
+  html[data-design="v2"] .studio-empty-overlay {
+    position: static;
+    top: auto;
+    left: auto;
+    right: auto;
+    width: 1116px;
+    height: 561px;
+    min-height: 0;
+    margin: 0 0 0 -60px;
+    padding: 0;
+    background-size: 100% 100%;
+    background-position: top left;
+    background-repeat: no-repeat;
+    grid-column: 1 / -1;
+  }
+
+  /* Per-section desktop silhouettes. Mobile uses /v2/empty-state-
+     <section>.png (square-ish, mobile proportions); desktop swaps
+     to /v2/desktop-empty-state-<section>.png (landscape 1276×641,
+     rendered at 1116×561 here). Only Characters has the desktop
+     asset right now — Story / Script will follow as the user
+     provides them. */
+  html[data-design="v2"] .studio-empty-overlay[data-section="characters"] {
+    background-image: url("/v2/desktop-empty-state-characters.png");
+  }
+
+  /* When an empty state is active, suppress page scroll — the
+     1116×561 overlay is sized to fit comfortably within the visible
+     viewport, and the tab content area below it is empty anyway.
+     The :has() selector targets the studio-scroll container only
+     when the empty overlay is mounted somewhere inside it. */
+  html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
+    overflow: hidden;
+  }
+
 }
 
 /* ── V2 Project cards — overlay-style with gray placeholder ─────
