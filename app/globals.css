@@ -6133,6 +6133,18 @@ html[data-design="v2"] .ds-type-project-card-title {
   line-height: normal;
   letter-spacing: 0;
 }
+/* Scene heading / slugline — INT./EXT. line shown above a scene's
+   title on Story-tab cards. Small-caps Lato, muted gray. Letter
+   spacing widened so the ALL-CAPS slugline reads as a label, not
+   as body copy. Desktop override below in the @media block. */
+html[data-design="v2"] .ds-type-int-heading {
+  font-family: var(--ds-font-body);
+  font-weight: 600;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ds-color-gray-dark-fill);
+}
 html[data-design="v2"] .ds-type-empty {
   font-family: var(--ds-font-display);
   font-weight: 400;
@@ -6288,6 +6300,10 @@ html[data-design="v2"] .ds-type-project-page-title-empty {
   }
   html[data-design="v2"] .ds-type-project-card-title {
     font-size: 24px;
+  }
+  html[data-design="v2"] .ds-type-int-heading {
+    font-size: 12px;
+    letter-spacing: 0.08em;
   }
   html[data-design="v2"] .ds-type-empty {
     font-size: 44px;
@@ -7686,30 +7702,44 @@ html[data-design="v2"] .record-label {
     margin-left: 0;
     margin-right: 0;
   }
-  /* Number column widens to hold the 41×41 badge (was 21×21). */
+  /* Number column widens to hold the 38×38 badge (was 21×21 on
+     mobile; spec'd at 41 then trimmed 3px per latest feedback). */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-col {
-    flex: 0 0 41px;
-    width: 41px;
+    flex: 0 0 38px;
+    width: 38px;
   }
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-badge {
-    width: 41px;
-    height: 41px;
+    width: 38px;
+    height: 38px;
     /* Digit reads cleanly at the larger badge size — bump from 12px
-       (mobile) to 16px. */
-    font-size: 16px;
+       (mobile) to 15px (proportional to the 38px badge). */
+    font-size: 15px;
   }
   /* Dashed connector line between consecutive badges. Geometry:
-       row height 157, badge 41 centered → badge top at 58,
-       badge bottom at 99. Next row's badge top sits at
-       margin-bottom (14, inherited) + 58 = 72 below current row
-       bottom. So `top: 99; bottom: -72` exactly fills the gap. */
+       row height 157, badge 38 centered → badge top at 59.5,
+       badge bottom at 97.5. Next row's badge top sits at
+       margin-bottom (14, inherited) + 59.5 = 73.5 below current row
+       bottom. So `top: 98; bottom: -74` (rounded to integers) fills
+       the gap cleanly. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-number-col::before {
-    top: 99px;
-    bottom: -72px;
+    top: 98px;
+    bottom: -74px;
   }
-  /* Card height 157, matches the row. */
+  /* Card height 157, matches the row. Position relative so the
+     absolute-positioned 3-dot menu inside it can anchor to the
+     card's top-right corner. */
   html[data-design="v2"] .tab-content-wrap-story .beat-card.v2-beat-card {
     height: 157px;
+    position: relative;
+  }
+  /* Drag-grip rail repositioned per spec:
+       - 20px from the card's LEFT edge to the icon
+       - 20px from the icon's RIGHT edge to the scene thumbnail
+     So the grip column is 20 (left pad) + 6 (icon) + 20 (right pad)
+     = 46px wide. Overrides the mobile 22px column. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-grip {
+    width: 46px;
+    padding: 0 20px;
   }
   /* Scene thumbnail bumped to 172×123 (5×3-ish, slightly wider
      aspect than the mobile 101×72). align-self:center keeps it
@@ -7721,6 +7751,109 @@ html[data-design="v2"] .record-label {
   /* Placeholder initial scales with the larger thumb. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-thumb-placeholder {
     font-size: 40px;
+  }
+  /* The body column now stacks three rows: scene-heading slugline
+     (when present), title, summary preview. Bumped gap from 5 to 8
+     and gave the body a generous 20px left padding (was 12 on mobile)
+     so the title doesn't sit cramped against the 172-wide thumb. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-info {
+    gap: 8px;
+    padding: 18px 20px;
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-location {
+    margin: 0;
+    /* Token supplies font-family / weight / size / letter-spacing /
+       text-transform / color via `.ds-type-int-heading`. Local rule
+       only owns layout. */
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-name {
+    /* `.ds-type-project-card-title` token now drives font-family /
+       weight / size on the JSX. Local rule keeps single-line ellipsis
+       handling so long titles don't break the card's fixed height. */
+    line-height: 1;
+  }
+  /* Right-side meta column — characters list + estimated duration.
+     Pushed to the right via flex's natural left-aligned info column +
+     this column's `margin-left: auto`. Fixed-ish width so meta lines
+     are uniform across cards. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-meta {
+    flex: 0 0 auto;
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    /* Right-edge inset: 60px reserves room for the absolutely-
+       positioned 3-dot menu in the top-right corner so the meta
+       column doesn't sit underneath it. */
+    padding: 0 60px 0 16px;
+    min-width: 200px;
+  }
+  /* Character cluster — single icon on the left, stacked names on
+     the right. Icon vertically centers against the names column. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-meta-chars {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-meta-icon {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+    /* Nudge down a hair so the icon sits flush with the first name
+       line's baseline (icon is taller than text x-height). */
+    margin-top: 2px;
+    /* The mask asset ships dark; v2 wants gray-chip-label tint to
+       match the muted-meta vibe. */
+    filter: brightness(0) saturate(100%) invert(43%) sepia(8%) saturate(204%) hue-rotate(202deg) brightness(95%) contrast(89%);
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-meta-char-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: var(--ds-font-body);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-meta-duration {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--ds-font-body);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ds-color-gray-chip-label);
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-meta-duration svg {
+    flex: 0 0 14px;
+  }
+  /* 3-dot menu pinned to the card's top-right corner. Same chrome
+     as the character card's menu (`.v2-character-menu`) — small
+     square hit target with the 13×3 dots glyph. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-menu {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    pointer-events: none;
+  }
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .v2-beat-menu img {
+    width: 13px;
+    height: 3px;
+    display: block;
+  }
+  /* Hide the legacy v1 chevron in v2 — the row-tap interaction is
+     unchanged but the right edge is owned by the meta column +
+     menu now. */
+  html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-expand {
+    display: none;
   }
 
 }

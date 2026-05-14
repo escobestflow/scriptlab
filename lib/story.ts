@@ -204,6 +204,12 @@ export interface Beat {
   weirdness?: number;
   status: BeatStatus;
   sceneContent?: string;
+  /** Slugline / scene heading shown ABOVE the beat title on the
+   *  Story-tab card (e.g. "INT. APARTMENT - NIGHT"). Optional —
+   *  empty/missing values hide the heading row. Display is
+   *  uppercased by CSS regardless of stored casing, since screenplay
+   *  convention is ALL CAPS for sluglines. */
+  location?: string;
   /** AI-generated cinematic scene thumbnail (7:5 painted still),
    *  stored as a base64 data URL the same way Character.thumbnail is.
    *  Optional — produced by /api/generate-scene-image after a beat is

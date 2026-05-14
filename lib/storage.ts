@@ -31,6 +31,11 @@ function normalizeBeat(b: any, index: number): Beat {
   // Sticky auto-gen sentinel — once set, prevents future auto-image-
   // generation re-attempts for this beat across reloads.
   const imageGenAttempted = b?.imageGenAttempted === true ? true : undefined;
+  // Slugline / scene heading. Preserved verbatim; coerced to
+  // undefined if the value isn't a non-empty string so empty
+  // strings don't trigger an empty heading row.
+  const location = typeof b?.location === "string" && b.location.trim()
+    ? b.location : undefined;
   return {
     position: index,
     momentIds: [],
@@ -40,6 +45,7 @@ function normalizeBeat(b: any, index: number): Beat {
     weirdness,
     thumbnail,
     imageGenAttempted,
+    location,
   };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, useLayoutEffect, createContext, useContext } from "react";
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings, Reference,
@@ -8898,6 +8898,30 @@ function StoryTab({
   const hasBeats = beats.length > 0;
   const activeStoryDraft = getActiveStoryLayerDraft(story);
   const direction = activeStoryDraft.direction ?? "";
+  // Resolve Beat.characterIds → Character.name once per render. The
+  // v2 desktop card's right-side meta column iterates each beat's
+  // character ids and looks them up here. Falls back to "Unknown"
+  // for IDs that no longer match a character (e.g. character deleted
+  // after the beat was authored).
+  const charNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of getActiveCharactersDraft(story).characters) {
+      m.set(c.id, c.name);
+    }
+    return m;
+  }, [story]);
+  // Estimate scene duration from `sceneContent` word count. Returns
+  // null when there's no content — the meta column hides the duration
+  // chip rather than showing "0 min". ~200 words/min is a loose
+  // screen-time approximation (a screenplay page is ~250 words / 1
+  // minute, but written-prose scene drafts run denser).
+  function estimateBeatMinutes(beat: Beat): number | null {
+    const text = (beat.sceneContent ?? "").trim();
+    if (!text) return null;
+    const words = text.split(/\s+/).filter(w => w.length > 0).length;
+    if (words === 0) return null;
+    return Math.max(1, Math.round(words / 200));
+  }
   const [directionSheetOpen, setDirectionSheetOpen] = useState(false);
 
   // Add-All-Scenes chip on the populated layer-bar's right slot.
@@ -9139,9 +9163,55 @@ function StoryTab({
                     {i + 1}
                   </div>
                   <div className="beat-info">
-                    <div className={`beat-name${isV2 ? " ds-type-body-bold" : ""}`}>{beat.name || "Untitled scene"}</div>
+                    {/* Slugline / scene heading — only renders when
+                        beat.location is set (otherwise the row is
+                        suppressed so the title sits flush at the top). */}
+                    {isV2 && beat.location?.trim() && (
+                      <div className="v2-beat-location ds-type-int-heading">{beat.location}</div>
+                    )}
+                    <div className={`beat-name${isV2 ? " ds-type-project-card-title" : " ds-type-body-bold"}`}>{beat.name || "Untitled scene"}</div>
                     <div className={`beat-summary-preview${isV2 ? " ds-type-body" : ""}`}>{beat.summary || "No summary"}</div>
                   </div>
+                  {isV2 && (() => {
+                    // Right-side meta column: character chips + estimated
+                    // duration. Both are conditional — characters only
+                    // render when beat.characterIds is populated, duration
+                    // only when sceneContent yields a non-zero estimate.
+                    const charIds = beat.characterIds ?? [];
+                    const charNames = charIds
+                      .map(id => charNameMap.get(id))
+                      .filter((n): n is string => typeof n === "string" && n.length > 0);
+                    const minutes = estimateBeatMinutes(beat);
+                    if (charNames.length === 0 && minutes === null) return null;
+                    return (
+                      <div className="v2-beat-meta">
+                        {charNames.length > 0 && (
+                          <div className="v2-beat-meta-chars">
+                            <img
+                              src="/v2/icons/icon-characters.svg"
+                              alt=""
+                              aria-hidden="true"
+                              className="v2-beat-meta-icon"
+                            />
+                            <ul className="v2-beat-meta-char-list">
+                              {charNames.slice(0, 4).map((name, idx) => (
+                                <li key={idx}>{name}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {minutes !== null && (
+                          <div className="v2-beat-meta-duration">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <circle cx="12" cy="12" r="9" />
+                              <polyline points="12 7 12 12 15 14" />
+                            </svg>
+                            <span>{minutes} min</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {!isV2 && beat.momentIds.length > 0 && (
                     <span className="caption" style={{ flexShrink: 0 }}>
                       {beat.momentIds.length}m
@@ -9149,6 +9219,11 @@ function StoryTab({
                   )}
                   <span className="beat-expand">›</span>
                   </button>
+                  {isV2 && (
+                    <span className="v2-beat-menu" aria-hidden="true">
+                      <img src="/icon-options.svg" alt="" />
+                    </span>
+                  )}
                 </div>
               </div>
 
