@@ -7924,21 +7924,13 @@ html[data-design="v2"] .record-label {
     width: 353px;
   }
 
-  /* When rendered as a direct child of .tab-content-wrap-script
-     (desktop only — sibling of LayerBar and the desktop grid), the
-     action row sits on its own line, left-aligned with the scene
-     cards' left edge. Mobile still puts these chips in the
-     LayerBar's right slot via the legacy rightSlot path. */
-  html[data-design="v2"] .tab-content-wrap-script > .v2-script-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    margin: 0 0 16px;
-    /* Beat the grid-column: 1 / -1 rule that the tab-content-wrap-
-       script's grid layout applies to its top-level children. The
-       action row is naturally narrow; we want it to take its own
-       intrinsic width on the left side, not stretch across cols. */
-    justify-self: start;
+  /* Script tab's LayerBar — pull the right-slot in-line with the
+     SCRIPT DRAFT N pill so "Script All Scenes" + Download sit
+     immediately to its right (rather than at the bar's far-right
+     edge per the default `margin-left: auto`). Scoped to the
+     script tab so other tabs' right-slot alignment is untouched. */
+  html[data-design="v2"] .tab-content-wrap-script .layer-bar-right-slot {
+    margin-left: 14px;
   }
 
   /* ── V2 desktop Script tab: list + scene-detail pane ──────────
@@ -8132,21 +8124,21 @@ html[data-design="v2"] .record-label {
      77×27, no fill, 0.7px outline + label color both
      `--ds-color-gray-outline` (#E4E3E4) per spec. The token is the
      designer's source of truth — never inline #E4E3E4 anywhere. */
+  /* Edit Scene chip — 77×27 rect with squared corners (5px radius)
+     per latest spec. Typography is owned by the `.ds-type-selected-
+     option-label` utility class added on the JSX; this rule only
+     handles box / color / outline. Outline + label color both
+     `--ds-color-gray-outline` (#E4E3E4 token). */
   html[data-design="v2"] .v2-script-pane-edit-overlay {
     position: absolute;
     right: 12px;
     bottom: 12px;
     width: 77px;
     height: 27px;
-    border-radius: 13.5px;
+    border-radius: 5px;
     background: transparent;
     border: 0.7px solid var(--ds-color-gray-outline);
     color: var(--ds-color-gray-outline);
-    font-family: var(--ds-font-body);
-    font-weight: 500;
-    font-size: 9px;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
     cursor: pointer;
     padding: 0;
     display: inline-flex;

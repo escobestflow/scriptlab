@@ -9570,14 +9570,14 @@ function ScriptTab({
         autosaveEnabled={autosaveEnabled}
         onOpenUpdateTray={onOpenUpdateTray}
         onOpenReadThrough={hasProducedScript && !isV2 ? onOpenReadThrough : undefined}
-        /* Desktop renders the action chips (Script All Scenes +
-           Download) as a separate left-aligned row below the
-           LayerBar — see the standalone {v2ScriptActions} render
-           directly below. On mobile the chips keep their legacy
-           home in the LayerBar's right slot. */
-        rightSlot={isDesktop ? null : v2ScriptActions}
+        /* Action chips (Script All Scenes + Download) live in the
+           LayerBar's right slot on every viewport. Desktop CSS
+           (.tab-content-wrap-script .layer-bar-right-slot) drops
+           the bar's right-slot `margin-left: auto` so the chips
+           sit immediately to the right of the SCRIPT DRAFT
+           dropdown rather than at the bar's far right edge. */
+        rightSlot={v2ScriptActions}
       />
-      {isDesktop && hasBeats && v2ScriptActions}
 
       {/* Top-of-content Tip — only surfaces once at least one scene
           has been written. On an empty Script the empty state already
@@ -9861,7 +9861,7 @@ function ScriptTab({
                       fill, label + border both #E4E3E4. */}
                   <button
                     type="button"
-                    className="v2-script-pane-edit-overlay"
+                    className="v2-script-pane-edit-overlay ds-type-selected-option-label"
                     onClick={() => onEditScene(beat.id)}
                     aria-label={`Edit ${beat.name}`}
                   >
