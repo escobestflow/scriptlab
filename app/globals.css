@@ -6067,6 +6067,12 @@ html[data-design="v2"] {
      darker than --ds-color-gray-outline so the 48x42 buttons read
      as solid affordances against the white pane background. */
   --ds-color-gray-button-stroke: #BEBEBE;
+  /* Warm-beige fill for the SELECTED scene-card in the Script
+     tab's list. Coordinates with the existing #C9A876 outline
+     used on the same row — the fill is a near-white tint of the
+     same hue family so the selection reads as "warm highlight"
+     without overwhelming the card content. */
+  --ds-color-light-gold-fill: #FBF7F3;
   --ds-color-gray-chip-outline: #EDEDED;
   --ds-color-gray-chip-fill:    #F4F4F4;
   --ds-color-gray-sidebar:      #F3F2F2; /* Desktop left-nav column fill. */
@@ -7931,10 +7937,11 @@ html[data-design="v2"] .record-label {
   /* Script tab's LayerBar — pull the right-slot in-line with the
      SCRIPT DRAFT N pill so "Script All Scenes" + Download sit
      immediately to its right (rather than at the bar's far-right
-     edge per the default `margin-left: auto`). Scoped to the
+     edge per the default `margin-left: auto`). 34 = 14 base + 20
+     per the latest "+20 to the right" spec nudge. Scoped to the
      script tab so other tabs' right-slot alignment is untouched. */
   html[data-design="v2"] .tab-content-wrap-script .layer-bar-right-slot {
-    margin-left: 14px;
+    margin-left: 34px;
   }
 
   /* ── V2 desktop Script tab: list + scene-detail pane ──────────
@@ -7988,12 +7995,43 @@ html[data-design="v2"] .record-label {
        glow doesn't get clipped by overflow. */
     padding: 2px 4px 60px 2px;
   }
-  /* Selected card — warm-beige outline. Color sampled from the
-     screenshot. `outline` (not `border`) so the card's existing
-     0.7px border + radius are preserved without a layout shift. */
+  /* Selected card — warm-beige outline + light-gold fill. The
+     outline color was sampled from the design's selection ring;
+     the fill is the new `--ds-color-light-gold-fill` token (a
+     near-white tint of the same hue) so the row reads as warm
+     without losing readability of the card content. `outline`
+     (not `border`) preserves the card's existing 0.7px border +
+     radius without a layout shift. */
   html[data-design="v2"] .v2-script-row.is-selected .beat-card.v2-script-card {
+    background: var(--ds-color-light-gold-fill);
     outline: 1.5px solid #C9A876;
     outline-offset: -1px;
+  }
+  /* "Scripted" indicator on the right side of a written-scene card
+     footer. Same typography as `.add-all-scenes-chip` (Lato 700 /
+     8 / 0.07em UPPER) per spec, but rendered as a non-interactive
+     span — no background, no border, no shadow. Green-check icon
+     to the left of the label, sized so the colored ring inside
+     the source SVG renders ~14px (the icon's viewBox is 51×51 to
+     accommodate a drop shadow, with the ring sitting at 19/51
+     ≈ 37% of the viewBox). */
+  html[data-design="v2"] .v2-script-scripted-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ds-color-black);
+    font-family: var(--ds-font-body);
+    font-weight: 700;
+    font-size: 8px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  html[data-design="v2"] .v2-script-scripted-indicator-icon {
+    width: 30px;
+    height: 30px;
+    margin: -8px -4px -8px -8px;
+    flex: 0 0 auto;
   }
 
   /* ── Right pane: header (SCENE N OF M + title + optional actions) */

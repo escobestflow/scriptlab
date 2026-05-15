@@ -9703,15 +9703,23 @@ function ScriptTab({
               </button>
               <div className="v2-script-footer">
                 <span className="v2-script-pages ds-type-body">{pageLabel}</span>
-                {/* "View Script" chip is hidden on desktop — the right
-                    pane already shows the screenplay prose inline, and
-                    we never open the legacy script popup/sheet on
-                    desktop anymore. Mobile keeps the chip → sheet
-                    flow. The "Script Scene" chip on unwritten scenes
-                    fires the per-row generate action (no popup), so
-                    it stays visible on both. */}
+                {/* Written-scene footer on desktop is a non-interactive
+                    "SCRIPTED" indicator — green-check icon + label,
+                    same typography as the Script Scene chip below.
+                    Mobile keeps the legacy "View Script" chip that
+                    opens the script-view sheet. */}
                 {isWritten ? (
-                  !isDesktop && (
+                  isDesktop ? (
+                    <span className="v2-script-scripted-indicator" aria-label="Scripted">
+                      <img
+                        src="/icon-scripted.svg"
+                        alt=""
+                        aria-hidden="true"
+                        className="v2-script-scripted-indicator-icon"
+                      />
+                      <span>Scripted</span>
+                    </span>
+                  ) : (
                     <button
                       type="button"
                       className="add-all-scenes-chip v2-script-scene-chip"
