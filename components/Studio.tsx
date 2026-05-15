@@ -9857,37 +9857,45 @@ function ScriptTab({
                   />
                 </button>
               </div>
-              <div className="v2-script-pane-actions-group">
-                <button
-                  type="button"
-                  className="v2-script-pane-mode-btn"
-                  onClick={() => setHighlightModeOn(v => !v)}
-                  aria-pressed={highlightModeOn}
-                  aria-label="Highlight mode"
-                  title="Highlight mode"
-                >
-                  <img
-                    src="/icon-highlight-mode.svg"
-                    alt=""
-                    aria-hidden="true"
-                    className="v2-script-pane-mode-btn-icon-hm"
-                  />
-                </button>
-                <button
-                  type="button"
-                  className="v2-script-pane-mode-btn"
-                  onClick={onOpenReadThrough}
-                  aria-label="Play read-through"
-                  title="Play read-through"
-                >
-                  <img
-                    src="/icon-play.svg"
-                    alt=""
-                    aria-hidden="true"
-                    className="v2-script-pane-mode-btn-icon-play"
-                  />
-                </button>
-              </div>
+              {/* HM + Play only render for SCRIPTED scenes — they
+                  operate on the prose (HM toggles drag-highlight on
+                  the screenplay text; Play opens the read-through
+                  sheet which renders scene prose). Prev/Next above
+                  remain visible always since they navigate the
+                  scene list regardless of scripted state. */}
+              {isWritten && (
+                <div className="v2-script-pane-actions-group">
+                  <button
+                    type="button"
+                    className="v2-script-pane-mode-btn"
+                    onClick={() => setHighlightModeOn(v => !v)}
+                    aria-pressed={highlightModeOn}
+                    aria-label="Highlight mode"
+                    title="Highlight mode"
+                  >
+                    <img
+                      src="/icon-highlight-mode.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="v2-script-pane-mode-btn-icon-hm"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="v2-script-pane-mode-btn"
+                    onClick={onOpenReadThrough}
+                    aria-label="Play read-through"
+                    title="Play read-through"
+                  >
+                    <img
+                      src="/icon-play.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="v2-script-pane-mode-btn-icon-play"
+                    />
+                  </button>
+                </div>
+              )}
             </div>
             <div className="v2-script-pane-header">
               <div className="v2-script-pane-header-text">
