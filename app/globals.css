@@ -6063,6 +6063,10 @@ html[data-design="v2"] {
   --ds-color-gray-lightest:     #FCFBFB;
   --ds-color-gray-fill:         #FBF9F9;
   --ds-color-gray-outline:      #E4E3E4;
+  /* Medium-weight stroke used on script-pane nav / mode buttons —
+     darker than --ds-color-gray-outline so the 48x42 buttons read
+     as solid affordances against the white pane background. */
+  --ds-color-gray-button-stroke: #BEBEBE;
   --ds-color-gray-chip-outline: #EDEDED;
   --ds-color-gray-chip-fill:    #F4F4F4;
   --ds-color-gray-sidebar:      #F3F2F2; /* Desktop left-nav column fill. */
@@ -8026,34 +8030,81 @@ html[data-design="v2"] .record-label {
     line-height: 1;
     letter-spacing: 0;
   }
-  /* Top-right action chips (written scenes only) — pencil + play
-     triangle. Circular surfaces matching the screenshot: pencil sits
-     on a white pill with a subtle outline, play on a black pill. */
+  /* ── Written-scene action row ─────────────────────────────────
+     Four 48×42 buttons on a single row ABOVE the SCENE label and
+     title. Prev/Next on the LEFT, Highlight Mode + Play on the
+     RIGHT. justify-content: space-between splits the two groups
+     to opposite edges of the pane content; each group has a 10px
+     inner gap per spec. The whole row carries 24px margin-bottom
+     so the script section (SCENE label / title / prose) starts
+     24px below it. */
   html[data-design="v2"] .v2-script-pane-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  html[data-design="v2"] .v2-script-pane-actions-group {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    flex: 0 0 auto;
   }
-  html[data-design="v2"] .v2-script-pane-action {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+  /* Base button — applies to all 4. 48×42 with a 10px corner
+     radius and a 0.7px `--ds-color-gray-button-stroke` (#BEBEBE)
+     outline. Fill varies per role (white for nav, #FCFBFB for
+     mode) so the spec's distinction reads. */
+  html[data-design="v2"] .v2-script-pane-nav-btn,
+  html[data-design="v2"] .v2-script-pane-mode-btn {
+    width: 48px;
+    height: 42px;
+    border-radius: 10px;
+    border: 0.7px solid var(--ds-color-gray-button-stroke);
+    cursor: pointer;
+    padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    padding: 0;
   }
-  html[data-design="v2"] .v2-script-pane-action-edit {
+  /* Prev / Next — white fill. Disabled state grays the icon so
+     the user knows they've hit the first / last scene. */
+  html[data-design="v2"] .v2-script-pane-nav-btn {
     background: var(--ds-color-white);
-    border: 1px solid var(--ds-color-gray-outline);
-    color: var(--ds-color-black);
   }
-  html[data-design="v2"] .v2-script-pane-action-play {
-    background: var(--ds-color-black);
-    border: 1px solid var(--ds-color-black);
-    color: var(--ds-color-white);
+  html[data-design="v2"] .v2-script-pane-nav-btn:disabled {
+    cursor: default;
+  }
+  html[data-design="v2"] .v2-script-pane-nav-btn:disabled .v2-script-pane-nav-btn-icon {
+    /* `brightness(0)` flattens the source SVG (which ships as
+       solid black) to pure black first, then `invert(0.6)`
+       lifts it to a mid-gray indicator. */
+    filter: brightness(0) invert(0.6);
+  }
+  /* Same icon for prev + next — flipped horizontally on the prev
+     variant via .v2-script-pane-nav-btn-icon-prev. */
+  html[data-design="v2"] .v2-script-pane-nav-btn-icon {
+    width: 7.81px;
+    height: 13.5px;
+  }
+  html[data-design="v2"] .v2-script-pane-nav-btn-icon-prev {
+    transform: scaleX(-1);
+  }
+  /* Highlight Mode + Play — `--ds-color-gray-lightest` (#FCFBFB)
+     fill. Active highlight-mode state gets a subtle inset ring
+     so the button reads as "pressed" without changing footprint. */
+  html[data-design="v2"] .v2-script-pane-mode-btn {
+    background: var(--ds-color-gray-lightest);
+  }
+  html[data-design="v2"] .v2-script-pane-mode-btn[aria-pressed="true"] {
+    box-shadow: inset 0 0 0 1px var(--ds-color-gray-button-stroke);
+  }
+  html[data-design="v2"] .v2-script-pane-mode-btn-icon-hm {
+    width: 16px;
+    height: 16px;
+  }
+  html[data-design="v2"] .v2-script-pane-mode-btn-icon-play {
+    width: 10.14px;
+    height: 12.36px;
   }
 
   /* ── Right pane: WRITTEN variant — screenplay prose ─────────── */

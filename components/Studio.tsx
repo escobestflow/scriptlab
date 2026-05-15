@@ -9440,6 +9440,13 @@ function ScriptTab({
   // selection is possible. On mobile this state is harmless (cards
   // still route to popup / sheet).
   const [selectedBeatId, setSelectedBeatId] = useState<string | null>(null);
+  // Highlight mode toggle for the written-scene pane's HM button.
+  // Pressed state is reflected on the button via aria-pressed +
+  // `.is-active` for future styling; functional drag-highlight
+  // behaviour is owned by the existing ScriptViewSheet and will be
+  // ported in a follow-up — the button + state hook are wired now
+  // so the visual affordance is in place.
+  const [highlightModeOn, setHighlightModeOn] = useState(false);
   useEffect(() => {
     if (beats.length === 0) {
       if (selectedBeatId !== null) setSelectedBeatId(null);
@@ -9788,6 +9795,78 @@ function ScriptTab({
             role="region"
             aria-label={`Scene ${idx + 1} of ${total}: ${beat.name || "Untitled"}`}
           >
+            {/* Written-scene action row sits ABOVE the SCENE/title
+                block per spec. 4 buttons total — prev/next on the
+                left (navigate selectedBeatId through the scene list),
+                highlight-mode + play on the right (HM toggles a
+                local highlight mode state, play opens the read-
+                through sheet). Each button 48×42 with a 10px
+                corner radius and a #BEBEBE outline (token). */}
+            {isWritten && (
+              <div className="v2-script-pane-actions">
+                <div className="v2-script-pane-actions-group">
+                  <button
+                    type="button"
+                    className="v2-script-pane-nav-btn"
+                    onClick={() => idx > 0 && setSelectedBeatId(beats[idx - 1].id)}
+                    disabled={idx === 0}
+                    aria-label="Previous scene"
+                  >
+                    <img
+                      src="/icon-prev-next.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="v2-script-pane-nav-btn-icon v2-script-pane-nav-btn-icon-prev"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="v2-script-pane-nav-btn"
+                    onClick={() => idx < beats.length - 1 && setSelectedBeatId(beats[idx + 1].id)}
+                    disabled={idx === beats.length - 1}
+                    aria-label="Next scene"
+                  >
+                    <img
+                      src="/icon-prev-next.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="v2-script-pane-nav-btn-icon"
+                    />
+                  </button>
+                </div>
+                <div className="v2-script-pane-actions-group">
+                  <button
+                    type="button"
+                    className="v2-script-pane-mode-btn"
+                    onClick={() => setHighlightModeOn(v => !v)}
+                    aria-pressed={highlightModeOn}
+                    aria-label="Highlight mode"
+                    title="Highlight mode"
+                  >
+                    <img
+                      src="/icon-highlight-mode.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="v2-script-pane-mode-btn-icon-hm"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    className="v2-script-pane-mode-btn"
+                    onClick={onOpenReadThrough}
+                    aria-label="Play read-through"
+                    title="Play read-through"
+                  >
+                    <img
+                      src="/icon-play.svg"
+                      alt=""
+                      aria-hidden="true"
+                      className="v2-script-pane-mode-btn-icon-play"
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="v2-script-pane-header">
               <div className="v2-script-pane-header-text">
                 <span className="v2-script-pane-index ds-type-int-header">
@@ -9797,37 +9876,6 @@ function ScriptTab({
                   {beat.name || "Untitled scene"}
                 </h2>
               </div>
-              {isWritten && (
-                /* Top-right action chips for written scenes — pencil
-                   icon opens the edit-scene sheet, play triangle opens
-                   the read-through sheet. Mirrors the design in the
-                   second screenshot. */
-                <div className="v2-script-pane-actions">
-                  <button
-                    type="button"
-                    className="v2-script-pane-action v2-script-pane-action-edit"
-                    onClick={() => openScriptViewSheet?.(beat.id)}
-                    aria-label="Edit scene"
-                    title="Edit scene"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    className="v2-script-pane-action v2-script-pane-action-play"
-                    onClick={onOpenReadThrough}
-                    aria-label="Play read-through"
-                    title="Play read-through"
-                  >
-                    <svg width="12" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <polygon points="6 4 20 12 6 20 6 4" />
-                    </svg>
-                  </button>
-                </div>
-              )}
             </div>
 
             {isWritten ? (
