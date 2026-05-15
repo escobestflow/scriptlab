@@ -7953,6 +7953,7 @@ function CharactersTab({
   // affordance is dead-simple. Runs inside runGenerateAll so the full
   // dark scrim + spinner is shown until the sync resolves.
   const [genBusy, setGenBusy] = useState(false);
+  const isDesktop = useIsDesktopStudio();
   async function generateAllCharacters() {
     if (genBusy) return;
     setGenBusy(true);
@@ -7966,6 +7967,93 @@ function CharactersTab({
       if (typeof window !== "undefined") window.alert(msg);
     } finally {
       setGenBusy(false);
+    }
+  }
+
+  // ── Single-character AI add ─────────────────────────────────
+  // Wired to the desktop populated-state "Add a Character" white
+  // chip. Calls the new `generate_character` action (parallel to
+  // `generate_beat`) which returns ONE complete character JSON
+  // shaped for direct append. The new row lands at the end of
+  // the active draft per spec. Image generation is NOT triggered
+  // here — the existing auto-fill effect at Studio scope picks
+  // up new characters with a name and queues their portrait on
+  // next render.
+  const [addOneBusy, setAddOneBusy] = useState(false);
+  async function addOneCharacter() {
+    if (addOneBusy) return;
+    setAddOneBusy(true);
+    try {
+      const action: ActionRequest = {
+        type: "generate_character",
+        payload: {},
+      };
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ story, action, profile }),
+      });
+      if (!res.ok || !res.body) {
+        throw new Error("Failed to generate character");
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "", full = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.type === "text") full += msg.value;
+          } catch {}
+        }
+      }
+      const match = full.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("Empty model response");
+      const parsed = JSON.parse(match[0]);
+      const allowedRoles = new Set([
+        "protagonist", "antagonist", "supporting",
+        "mentor", "love_interest", "comic_relief",
+      ]);
+      const role = allowedRoles.has(parsed.role) ? parsed.role : "supporting";
+      // Inline TV-episode lookup to avoid depending on isTV /
+      // activeStoryLayer constants that are declared further down
+      // in the component body (TDZ for `const`s used before their
+      // declaration line).
+      const isTVProject = story.projectType === "tv-show";
+      const storyLayer = getActiveStoryLayerDraft(story);
+      const creatorEpisodeId = isTVProject
+        ? (activeEpisodeId ?? storyLayer.episodes?.[0]?.id ?? null)
+        : null;
+      const newChar: Character = {
+        id: "ch_" + Math.random().toString(36).slice(2),
+        name: String(parsed.name ?? "").trim(),
+        role,
+        archetype: String(parsed.archetype ?? "").trim(),
+        backstory: String(parsed.backstory ?? "").trim(),
+        motivations: String(parsed.motivations ?? "").trim(),
+        flaws: String(parsed.flaws ?? "").trim(),
+        want: String(parsed.want ?? "").trim(),
+        need: String(parsed.need ?? "").trim(),
+        relationships: [],
+        voice: String(parsed.voice ?? "").trim(),
+        arc: String(parsed.arc ?? "").trim(),
+        notes: String(parsed.notes ?? "").trim(),
+        ...(creatorEpisodeId ? { createdInEpisodeId: creatorEpisodeId } : {}),
+      };
+      setStory(s => updateCharactersDraft(s, {
+        characters: [...getActiveCharactersDraft(s).characters, newChar],
+      }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") window.alert(msg);
+    } finally {
+      setAddOneBusy(false);
     }
   }
 
@@ -8003,16 +8091,44 @@ function CharactersTab({
   // (icon-ai-button.svg). 30px-from-screen-edge inset comes from
   // the layer-bar's own padding-right: 30 — no extra margin
   // needed on the chip itself. Hidden during partner-previewing.
+  // Desktop populated state — pair of buttons in the layer-bar's
+  // right slot. Black (primary) opens the manual character sheet;
+  // white (secondary) fires the AI single-add. Mobile keeps the
+  // legacy single "Add All Characters" chip so the bar doesn't
+  // crowd at small widths.
   const v2CastActions = isV2 && hasCharacters && !previewActive ? (
-    <button
-      type="button"
-      className="add-all-characters-chip"
-      onClick={generateAllCharacters}
-      disabled={genBusy}
-    >
-      <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
-      <span>{genBusy ? "Creating…" : "Add All Characters"}</span>
-    </button>
+    isDesktop ? (
+      <div className="v2-add-one-actions">
+        <button
+          type="button"
+          className="add-one-chip-primary"
+          onClick={openNewCharacter}
+          disabled={addOneBusy || genBusy}
+        >
+          <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
+          <span>Add a Character</span>
+        </button>
+        <button
+          type="button"
+          className="add-one-chip"
+          onClick={addOneCharacter}
+          disabled={addOneBusy || genBusy}
+        >
+          <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+          <span>{addOneBusy ? "Creating…" : "Add a Character"}</span>
+        </button>
+      </div>
+    ) : (
+      <button
+        type="button"
+        className="add-all-characters-chip"
+        onClick={generateAllCharacters}
+        disabled={genBusy}
+      >
+        <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+        <span>{genBusy ? "Creating…" : "Add All Characters"}</span>
+      </button>
+    )
   ) : null;
 
   return (
@@ -8877,11 +8993,19 @@ function StoryTab({
   const beatRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cloneRef = useRef<HTMLDivElement | null>(null);
 
+  const isDesktop = useIsDesktopStudio();
   // "Create everything for me" — one-tap beat generation. Derives from
   // Characters if the cast is populated (richer source), otherwise falls
   // back to Concept so the button still works on a brand-new project.
   const { profile } = useProfileCapture();
   const [genBusy, setGenBusy] = useState(false);
+  // State for the desktop AI single-scene popup. When `insertAfterIdx`
+  // is non-null, the popup is open; the user picks "Insert at start"
+  // (-1) or "After scene N" (0..beats.length-1), then we call
+  // `generate_beat` with the resolved position.
+  const [aiSceneInsertOpen, setAiSceneInsertOpen] = useState(false);
+  const [aiScenePickedIdx, setAiScenePickedIdx] = useState<number | null>(null);
+  const [aiSceneBusy, setAiSceneBusy] = useState(false);
   async function generateAllBeats() {
     if (genBusy) return;
     setGenBusy(true);
@@ -8896,6 +9020,92 @@ function StoryTab({
       if (typeof window !== "undefined") window.alert(msg);
     } finally {
       setGenBusy(false);
+    }
+  }
+
+  // ── Single-scene AI add ──────────────────────────────────────
+  // Wired to the desktop populated-state "Add a Scene" white chip.
+  // The user picks where to insert in the popup (`aiScenePickedIdx`
+  // = -1 → at start, N → after beat at index N), then we call
+  // `generate_beat` for a fresh beat that fits the project bible
+  // and insert it at the chosen position. The new beat lands in
+  // status: "design" so the user can edit it via the existing
+  // scene-edit flow; the existing auto-fill effect at Studio
+  // scope queues the thumbnail.
+  async function addOneScene(insertAfterIdx: number) {
+    if (aiSceneBusy) return;
+    setAiSceneBusy(true);
+    try {
+      const action: ActionRequest = {
+        type: "generate_beat",
+        payload: {
+          // Pass a human-readable position hint to the prompt so
+          // the model places the beat with the right narrative
+          // shape. The actual array insertion happens client-side
+          // below.
+          position: insertAfterIdx < 0
+            ? "the opening beat"
+            : `after beat ${insertAfterIdx + 1} ("${beats[insertAfterIdx]?.name || "Untitled"}")`,
+          weirdness: 5,
+          darkness: 5,
+          humor: 3,
+          length: 5,
+        },
+      };
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ story, action, profile }),
+      });
+      if (!res.ok || !res.body) throw new Error("Failed to generate scene");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "", full = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+            if (msg.type === "text") full += msg.value;
+          } catch {}
+        }
+      }
+      const match = full.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("Empty model response");
+      const parsed = JSON.parse(match[0]);
+      const newBeat: Beat = {
+        id: "b_" + Math.random().toString(36).slice(2),
+        name: String(parsed.name ?? "").trim() || "New Scene",
+        summary: String(parsed.summary ?? "").trim(),
+        purpose: "",
+        position: 0,
+        momentIds: [],
+        characterIds: [],
+        status: "design",
+      };
+      const insertAt = insertAfterIdx + 1;
+      setStory(s => {
+        const sl = getActiveStoryLayerDraft(s);
+        const existing = sl.beats;
+        const updated = [
+          ...existing.slice(0, insertAt),
+          newBeat,
+          ...existing.slice(insertAt),
+        ].map((b, i) => ({ ...b, position: i }));
+        return updateStoryLayerDraft(s, { beats: updated });
+      });
+      setAiSceneInsertOpen(false);
+      setAiScenePickedIdx(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") window.alert(msg);
+    } finally {
+      setAiSceneBusy(false);
     }
   }
 
@@ -8944,16 +9154,50 @@ function StoryTab({
   // Reuses generateAllBeats so the bulk-create behavior stays one
   // code path. Hidden on the empty state (no need to teach the
   // affordance twice — the empty state has its own CTA).
+  // Desktop populated state — pair of buttons in the layer-bar's
+  // right slot. Black (primary) opens the manual new-scene sheet;
+  // white (secondary) opens the insertion-point popup, then fires
+  // a single-scene AI add. Mobile keeps the legacy bulk
+  // "Add All Scenes" chip.
   const v2ScenesActions = isV2 && hasBeats ? (
-    <button
-      type="button"
-      className="add-all-scenes-chip"
-      onClick={generateAllBeats}
-      disabled={genBusy}
-    >
-      <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
-      <span>{genBusy ? "Creating…" : "Add All Scenes"}</span>
-    </button>
+    isDesktop ? (
+      <div className="v2-add-one-actions">
+        <button
+          type="button"
+          className="add-one-chip-primary"
+          onClick={() => openNewScene(beats.length)}
+          disabled={aiSceneBusy || genBusy}
+        >
+          <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
+          <span>Add a Scene</span>
+        </button>
+        <button
+          type="button"
+          className="add-one-chip"
+          onClick={() => {
+            // Default to "at the end" so a single confirm without
+            // touching the picker drops the new scene after the
+            // current last beat.
+            setAiScenePickedIdx(beats.length - 1);
+            setAiSceneInsertOpen(true);
+          }}
+          disabled={aiSceneBusy || genBusy}
+        >
+          <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+          <span>{aiSceneBusy ? "Creating…" : "Add a Scene"}</span>
+        </button>
+      </div>
+    ) : (
+      <button
+        type="button"
+        className="add-all-scenes-chip"
+        onClick={generateAllBeats}
+        disabled={genBusy}
+      >
+        <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+        <span>{genBusy ? "Creating…" : "Add All Scenes"}</span>
+      </button>
+    )
   ) : null;
 
   return (
@@ -8967,6 +9211,65 @@ function StoryTab({
         onOpenUpdateTray={onOpenUpdateTray}
         rightSlot={v2ScenesActions}
       />
+
+      {/* Desktop AI single-scene insertion popup. Opens when the
+          user clicks the white "Add a Scene" chip; user picks
+          where to drop the new beat (start / after scene N), then
+          confirm fires `generate_beat` and inserts the returned
+          scene at that position. Closes on scrim click or Cancel. */}
+      {aiSceneInsertOpen && (
+        <div
+          className="v2-ai-scene-insert-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Where should the new scene go?"
+          onClick={() => !aiSceneBusy && setAiSceneInsertOpen(false)}
+        >
+          <div
+            className="v2-ai-scene-insert-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="v2-ai-scene-insert-title">Where should this scene go?</h3>
+            <p className="v2-ai-scene-insert-caption">
+              Pick where AI should drop the new scene. It&apos;ll be inserted just after the scene you choose.
+            </p>
+            <label className="v2-ai-scene-insert-field">
+              <span className="v2-ai-scene-insert-field-label">Insert position</span>
+              <select
+                className="v2-ai-scene-insert-select"
+                value={aiScenePickedIdx ?? -1}
+                onChange={e => setAiScenePickedIdx(parseInt(e.target.value, 10))}
+                disabled={aiSceneBusy}
+              >
+                <option value={-1}>At the beginning</option>
+                {beats.map((b, i) => (
+                  <option key={b.id} value={i}>
+                    After scene {i + 1}: {b.name || "Untitled scene"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="v2-ai-scene-insert-actions">
+              <button
+                type="button"
+                className="v2-ai-scene-insert-cancel"
+                onClick={() => setAiSceneInsertOpen(false)}
+                disabled={aiSceneBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="v2-ai-scene-insert-confirm"
+                onClick={() => addOneScene(aiScenePickedIdx ?? -1)}
+                disabled={aiSceneBusy}
+              >
+                {aiSceneBusy ? "Creating…" : "Create Scene"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top-of-content Tip — only surfaces once the user has added a
           first scene. The empty state carries its own teaching; a tip

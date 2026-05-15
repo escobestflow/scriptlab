@@ -59,6 +59,13 @@ export type ActionType =
   // (title, projectType, genres) are stripped from the response client-
   // side, same defense-in-depth as the sync_*_to_concept actions.
   | "generate_full_concept"
+  // Whole-character single-add: returns ONE new character that
+  // fits the current story. Mirrors `generate_beat` for scenes —
+  // append-at-end UX for the populated Characters tab's white AI
+  // chip. Distinct from `sync_concept_to_characters` (which
+  // regenerates the entire layer) and from the per-field
+  // generators below.
+  | "generate_character"
   // Character-tab per-field generators (Haiku, JSON-out)
   | "generate_character_name"
   | "generate_character_archetype"
@@ -136,6 +143,7 @@ export function modelForAction(type: ActionType): string {
     case "brainstorm":
     case "clean_beat":
     case "generate_beat":
+    case "generate_character":
     case "clean_moment":
     case "generate_concept_title":
     case "generate_concept_logline":

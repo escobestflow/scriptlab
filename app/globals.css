@@ -9808,8 +9808,15 @@ html[data-design="v2"] .ai-wand img {
    ("Add All Characters") and Story tab ("Add All Scenes"). The
    layer-bar's own padding-right:30 supplies the 30-from-screen-edge
    inset. */
+/* Both `.add-one-chip` and `.add-one-chip-primary` inherit the
+   exact chip styling of `.add-all-scenes-chip` per spec ("styled
+   exactly like the script all scenes button"). The primary
+   variant overrides background + text color + box-shadow further
+   down for the black-fill treatment with a plus icon. */
 html[data-design="v2"] .add-all-characters-chip,
-html[data-design="v2"] .add-all-scenes-chip {
+html[data-design="v2"] .add-all-scenes-chip,
+html[data-design="v2"] .add-one-chip,
+html[data-design="v2"] .add-one-chip-primary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -9832,25 +9839,173 @@ html[data-design="v2"] .add-all-scenes-chip {
   transition: box-shadow 160ms var(--ease, ease), transform 120ms var(--ease, ease);
 }
 html[data-design="v2"] .add-all-characters-chip:hover,
-html[data-design="v2"] .add-all-scenes-chip:hover {
+html[data-design="v2"] .add-all-scenes-chip:hover,
+html[data-design="v2"] .add-one-chip:hover,
+html[data-design="v2"] .add-one-chip-primary:hover {
   box-shadow:
     inset 0 0 0 0.7px var(--ds-color-gray-outline),
     0 0 6px 0 rgba(0, 0, 0, 0.14);
 }
 html[data-design="v2"] .add-all-characters-chip:active,
-html[data-design="v2"] .add-all-scenes-chip:active {
+html[data-design="v2"] .add-all-scenes-chip:active,
+html[data-design="v2"] .add-one-chip:active,
+html[data-design="v2"] .add-one-chip-primary:active {
   transform: scale(0.97);
 }
 html[data-design="v2"] .add-all-characters-chip:disabled,
-html[data-design="v2"] .add-all-scenes-chip:disabled {
+html[data-design="v2"] .add-all-scenes-chip:disabled,
+html[data-design="v2"] .add-one-chip:disabled,
+html[data-design="v2"] .add-one-chip-primary:disabled {
   opacity: 0.55;
   cursor: default;
 }
 html[data-design="v2"] .add-all-characters-chip img,
-html[data-design="v2"] .add-all-scenes-chip img {
+html[data-design="v2"] .add-all-scenes-chip img,
+html[data-design="v2"] .add-one-chip img,
+html[data-design="v2"] .add-one-chip-primary img {
   width: 7px;
   height: 9.5px;
   display: block;
+}
+
+/* Primary "Add a ___" variant — black fill, white label + plus
+   icon. Same footprint as the white variant above; just inverts
+   the surface and clears the inner stroke / outer drop shadow
+   that read on the lighter fill. */
+html[data-design="v2"] .add-one-chip-primary {
+  background: var(--ds-color-black);
+  color: var(--ds-color-white);
+  box-shadow: none;
+}
+html[data-design="v2"] .add-one-chip-primary:hover {
+  box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.18);
+}
+/* Plus glyph on the primary variant — source SVG ships as dark
+   black, so `brightness(0) invert(1)` flattens any source color
+   to pure white on the black pill. */
+html[data-design="v2"] .add-one-chip-primary img {
+  filter: brightness(0) invert(1);
+}
+
+/* Two-button group container — wraps the primary (black, manual)
+   + secondary (white, AI) chip pair that sits in the LayerBar
+   right slot of the populated Characters / Story tabs. Used on
+   desktop only (rendered conditionally in the JSX). Mobile keeps
+   the legacy single-chip treatment so the right-slot doesn't
+   crowd the bar. */
+html[data-design="v2"] .v2-add-one-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── AI single-scene insertion popup (Story tab desktop) ──────
+   Modal scrim + centered card. Opens when the user clicks the
+   white "Add a Scene" chip — asks them to pick the insertion
+   point, then fires `generate_beat` for a fresh scene. */
+html[data-design="v2"] .v2-ai-scene-insert-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: studio-empty-overlay-fade-in 0.18s var(--ease) both;
+}
+html[data-design="v2"] .v2-ai-scene-insert-card {
+  background: var(--ds-color-white);
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 18px 60px 0 rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+html[data-design="v2"] .v2-ai-scene-insert-title {
+  margin: 0;
+  font-family: var(--ds-font-display);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-ai-scene-insert-caption {
+  margin: 0;
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .v2-ai-scene-insert-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+html[data-design="v2"] .v2-ai-scene-insert-field-label {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .v2-ai-scene-insert-select {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ds-color-black);
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  -webkit-appearance: menulist;
+  appearance: menulist;
+}
+html[data-design="v2"] .v2-ai-scene-insert-select:focus {
+  outline: 1.5px solid var(--ds-color-black);
+  outline-offset: -1px;
+}
+html[data-design="v2"] .v2-ai-scene-insert-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+html[data-design="v2"] .v2-ai-scene-insert-cancel,
+html[data-design="v2"] .v2-ai-scene-insert-confirm {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+html[data-design="v2"] .v2-ai-scene-insert-cancel {
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-ai-scene-insert-confirm {
+  background: var(--ds-color-black);
+  border: 1px solid var(--ds-color-black);
+  color: var(--ds-color-white);
+}
+html[data-design="v2"] .v2-ai-scene-insert-confirm:disabled,
+html[data-design="v2"] .v2-ai-scene-insert-cancel:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* ── V2 character cards — populated state ──────────────────────

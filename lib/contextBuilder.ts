@@ -376,6 +376,42 @@ Return STRICT JSON: { "name": string, "summary": string }
 - "summary" = what happens in this beat, matching the length setting`;
     }
 
+    // Whole-character single-add. Returns ONE complete new character
+    // appended to the project's roster — distinct from
+    // sync_concept_to_characters (regenerates the entire layer) and
+    // the per-field generators (operate on an existing character).
+    // The model gets the project bible above plus the existing roster
+    // so the new character feels relevant to the story and doesn't
+    // duplicate an existing archetype / role.
+    case "generate_character": {
+      const ch = getActiveCharactersDraft(story);
+      const existing = ch.characters
+        .map(c => `- ${c.name || "(unnamed)"} [${c.role}]${c.archetype ? ` — ${c.archetype}` : ""}`)
+        .join("\n") || "(none yet)";
+      return `Generate ONE new character for this project. Use the full project bible above (format, genre, logline, summary, tone, themes, ending, existing beats) so the character feels relevant to the story being told. Do not duplicate an existing archetype or role — fill a clear narrative gap.
+
+## Existing characters in this project
+${existing}
+
+## Required output
+Return STRICT JSON matching this shape exactly:
+{
+  "name": string,           // given + optional last name; fits genre + period
+  "role": "protagonist" | "antagonist" | "supporting" | "mentor" | "love_interest" | "comic_relief",
+  "archetype": string,      // 1-4 words, e.g. "reluctant mentor"
+  "backstory": string,      // 2-3 sentences of history that inform who they are now
+  "motivations": string,    // 1-2 sentences on what drives them
+  "flaws": string,          // 1-2 sentences naming 1-2 genuine flaws
+  "want": string,           // external concrete objective, 1 sentence
+  "need": string,           // internal truth they must learn, 1 sentence (often in tension with want)
+  "voice": string,          // 1-2 sentences on cadence / diction / verbal tics
+  "arc": string,            // 1-3 sentences mapping start → end
+  "notes": string           // optional supplementary detail (physicality, iconic object). Can be empty string.
+}
+
+Pick the role that best fills an obvious gap in the roster — if the roster already has a protagonist and antagonist, lean toward supporting / mentor / love_interest / comic_relief based on what the story needs. Avoid duplicating archetypes already present. Keep field tone consistent with the project bible.`;
+    }
+
     case "clean_moment":
       return `The user recorded a creative moment via speech-to-text. Clean it up — fix grammar, add clarity, tighten the prose — but preserve the original intent, voice, and raw creative energy. This is a captured idea, not a polished script.
 
