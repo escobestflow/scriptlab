@@ -7961,6 +7961,17 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-script-desktop-grid {
     display: grid;
     grid-template-columns: 353px minmax(0, 1fr);
+    /* Two named rows so the right pane can span BOTH (top to
+       bottom of the grid). That puts the pane's top — and its
+       first child, the 4 action buttons — at the same y as the
+       LayerBar's top (row 1), per the "buttons top-aligned with
+       the script draft dropdown" spec. The LayerBar sits in
+       col 1 of row 1; the scene list sits in col 1 of row 2;
+       the pane covers col 2 of both rows. */
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "layerbar pane"
+      "list     pane";
     /* Spec: 60px between the scene list (left) and the scene
        info/script pane (right). */
     column-gap: 60px;
@@ -7969,31 +7980,39 @@ html[data-design="v2"] .record-label {
        pane prose is very long, but each column still gets its
        own scroll context thanks to max-height: 100vh below. */
     min-height: 100vh;
-    /* `grid-column: 1 / -1` for the wrap's other top-level
-       children (layer-bar, tip-card, partner-preview-empty-notice,
-       toast) is set further up in the .tab-content-wrap-script
-       rule; the grid wrapper itself is just one of those children
-       sitting in the grid the wrap defines. Reset width here so
-       the wrap's grid doesn't squeeze us. */
     width: 100%;
   }
-  /* LayerBar now lives INSIDE the grid (first row) so the SCRIPT
-     DRAFT pill + Script All Scenes + Download chips share a
-     container with the cards/pane below. Span both columns so
-     it reads as a full-width header row above the column split. */
+  /* Explicit grid-area placement so the LayerBar is col 1 only
+     (lets the pane occupy col 2 across both rows). Was previously
+     grid-column: 1 / -1 (spanning both cols). */
   html[data-design="v2"] .v2-script-desktop-grid > .layer-bar {
-    grid-column: 1 / -1;
+    grid-area: layerbar;
   }
-  html[data-design="v2"] .v2-script-list,
-  html[data-design="v2"] .v2-script-pane {
+  html[data-design="v2"] .v2-script-list {
+    grid-area: list;
     position: sticky;
-    /* 50px above-the-pane breathing room when the columns stick to
-       the top of the viewport — per spec. max-height shrinks by
-       the same 50 so the column's scrollable area still fits the
-       viewport without the bottom getting cut off. */
+    /* 50px breathing room when the column sticks to the top of
+       the viewport — per spec. max-height shrinks by the same 50
+       so the column's scrollable area still fits the viewport. */
     top: 50px;
     max-height: calc(100vh - 50px);
     overflow-y: auto;
+    min-height: 0;
+    align-self: start;
+  }
+  html[data-design="v2"] .v2-script-pane {
+    grid-area: pane;
+    position: sticky;
+    top: 50px;
+    max-height: calc(100vh - 50px);
+    /* Pane is a vertical flex stack: actions + scene header at
+       the top (never scroll) and the body (prose / detail row)
+       takes the remaining height with its own overflow-y. The
+       pane itself sets overflow:hidden so only the body
+       scrolls — the persistent header stays in place per spec. */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     min-height: 0;
     align-self: start;
   }
@@ -8043,8 +8062,26 @@ html[data-design="v2"] .record-label {
 
   /* ── Right pane: header (SCENE N OF M + title + optional actions) */
   html[data-design="v2"] .v2-script-pane {
-    padding: 6px 60px 60px 0;
+    /* padding-top: 12 aligns the FIRST child (the 4 button row)
+       with the dropdown above — the LayerBar carries the same
+       12px padding-top on its content, so the dropdown's top y
+       equals the buttons' top y. padding-right: 60 keeps the
+       breathing room from the viewport; padding-bottom is set
+       on .v2-script-pane-body where it belongs (the bottom of
+       the scrollable region, not the pane wrapper). */
+    padding: 12px 60px 0 0;
     color: var(--ds-color-black);
+  }
+  /* Pane body — the part of the pane that actually scrolls.
+     `flex: 1` claims all remaining vertical space; min-height: 0
+     allows the flex item to shrink past its natural content
+     height; overflow-y: auto enables internal scroll for long
+     prose or tall detail rows. */
+  html[data-design="v2"] .v2-script-pane-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 60px;
   }
   html[data-design="v2"] .v2-script-pane-header {
     display: flex;

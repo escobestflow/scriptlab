@@ -9818,78 +9818,77 @@ function ScriptTab({
             role="region"
             aria-label={`Scene ${idx + 1} of ${total}: ${beat.name || "Untitled"}`}
           >
-            {/* Written-scene action row sits ABOVE the SCENE/title
-                block per spec. 4 buttons total — prev/next on the
-                left (navigate selectedBeatId through the scene list),
-                highlight-mode + play on the right (HM toggles a
-                local highlight mode state, play opens the read-
-                through sheet). Each button 48×42 with a 10px
-                corner radius and a #BEBEBE outline (token). */}
-            {isWritten && (
-              <div className="v2-script-pane-actions">
-                <div className="v2-script-pane-actions-group">
-                  <button
-                    type="button"
-                    className="v2-script-pane-nav-btn"
-                    onClick={() => idx > 0 && setSelectedBeatId(beats[idx - 1].id)}
-                    disabled={idx === 0}
-                    aria-label="Previous scene"
-                  >
-                    <img
-                      src="/icon-prev-next.svg"
-                      alt=""
-                      aria-hidden="true"
-                      className="v2-script-pane-nav-btn-icon v2-script-pane-nav-btn-icon-prev"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    className="v2-script-pane-nav-btn"
-                    onClick={() => idx < beats.length - 1 && setSelectedBeatId(beats[idx + 1].id)}
-                    disabled={idx === beats.length - 1}
-                    aria-label="Next scene"
-                  >
-                    <img
-                      src="/icon-prev-next.svg"
-                      alt=""
-                      aria-hidden="true"
-                      className="v2-script-pane-nav-btn-icon"
-                    />
-                  </button>
-                </div>
-                <div className="v2-script-pane-actions-group">
-                  <button
-                    type="button"
-                    className="v2-script-pane-mode-btn"
-                    onClick={() => setHighlightModeOn(v => !v)}
-                    aria-pressed={highlightModeOn}
-                    aria-label="Highlight mode"
-                    title="Highlight mode"
-                  >
-                    <img
-                      src="/icon-highlight-mode.svg"
-                      alt=""
-                      aria-hidden="true"
-                      className="v2-script-pane-mode-btn-icon-hm"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    className="v2-script-pane-mode-btn"
-                    onClick={onOpenReadThrough}
-                    aria-label="Play read-through"
-                    title="Play read-through"
-                  >
-                    <img
-                      src="/icon-play.svg"
-                      alt=""
-                      aria-hidden="true"
-                      className="v2-script-pane-mode-btn-icon-play"
-                    />
-                  </button>
-                </div>
+            {/* PERSISTENT top — actions + scene info. Always rendered
+                regardless of `isWritten` so they stay in place when
+                the user switches between scripted and unscripted
+                scenes (React keeps the same DOM nodes; only the text
+                content of the SCENE label / title updates). They
+                also live OUTSIDE the .v2-script-pane-body scroll
+                region below, so they remain visible while the body
+                content scrolls under them. */}
+            <div className="v2-script-pane-actions">
+              <div className="v2-script-pane-actions-group">
+                <button
+                  type="button"
+                  className="v2-script-pane-nav-btn"
+                  onClick={() => idx > 0 && setSelectedBeatId(beats[idx - 1].id)}
+                  disabled={idx === 0}
+                  aria-label="Previous scene"
+                >
+                  <img
+                    src="/icon-prev-next.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="v2-script-pane-nav-btn-icon v2-script-pane-nav-btn-icon-prev"
+                  />
+                </button>
+                <button
+                  type="button"
+                  className="v2-script-pane-nav-btn"
+                  onClick={() => idx < beats.length - 1 && setSelectedBeatId(beats[idx + 1].id)}
+                  disabled={idx === beats.length - 1}
+                  aria-label="Next scene"
+                >
+                  <img
+                    src="/icon-prev-next.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="v2-script-pane-nav-btn-icon"
+                  />
+                </button>
               </div>
-            )}
+              <div className="v2-script-pane-actions-group">
+                <button
+                  type="button"
+                  className="v2-script-pane-mode-btn"
+                  onClick={() => setHighlightModeOn(v => !v)}
+                  aria-pressed={highlightModeOn}
+                  aria-label="Highlight mode"
+                  title="Highlight mode"
+                >
+                  <img
+                    src="/icon-highlight-mode.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="v2-script-pane-mode-btn-icon-hm"
+                  />
+                </button>
+                <button
+                  type="button"
+                  className="v2-script-pane-mode-btn"
+                  onClick={onOpenReadThrough}
+                  aria-label="Play read-through"
+                  title="Play read-through"
+                >
+                  <img
+                    src="/icon-play.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="v2-script-pane-mode-btn-icon-play"
+                  />
+                </button>
+              </div>
+            </div>
             <div className="v2-script-pane-header">
               <div className="v2-script-pane-header-text">
                 <span className="v2-script-pane-index ds-type-int-header">
@@ -9901,6 +9900,12 @@ function ScriptTab({
               </div>
             </div>
 
+            {/* Scrollable body — switches between prose (written) and
+                detail-row (unwritten) based on the SELECTED scene.
+                The wrapper exists so internal overflow can scroll
+                independently while the actions + header above stay
+                pinned to the pane's top. */}
+            <div className="v2-script-pane-body">
             {isWritten ? (
               /* Written scene → render prose in monospace. The
                  sceneContent string is already in screenplay format
@@ -9983,6 +9988,7 @@ function ScriptTab({
                 </div>
               </div>
             )}
+            </div>
           </div>
         );
       })()}
