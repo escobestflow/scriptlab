@@ -9563,28 +9563,42 @@ function ScriptTab({
     </div>
   ) : null;
 
+  // Extracted so the same LayerBar element can be rendered in TWO
+  // places without duplication: outside the script-desktop-grid for
+  // the empty state and v1 path, OR inside the grid (as the first
+  // row spanning both columns) for the v2 populated path. The
+  // previous always-outside placement meant the SCRIPT DRAFT pill
+  // + Script All Scenes + Download chips lived in a visual bar
+  // that was a sibling of the content grid — when the columns
+  // pinned via sticky, the bar would scroll away in a way that
+  // felt disconnected. Putting it inside the grid keeps it in the
+  // same container as the cards/pane so they scroll as one piece.
+  const scriptLayerBar = (
+    <LayerBar
+      layer="script"
+      label="Script"
+      story={story}
+      setStory={setStory}
+      autosaveEnabled={autosaveEnabled}
+      onOpenUpdateTray={onOpenUpdateTray}
+      onOpenReadThrough={hasProducedScript && !isV2 ? onOpenReadThrough : undefined}
+      /* Action chips (Script All Scenes + Download) live in the
+         LayerBar's right slot on every viewport. Desktop CSS
+         (.tab-content-wrap-script .layer-bar-right-slot) drops
+         the bar's right-slot `margin-left: auto` so the chips
+         sit immediately to the right of the SCRIPT DRAFT
+         dropdown rather than at the bar's far right edge. */
+      rightSlot={v2ScriptActions}
+    />
+  );
+
   return (
     <>
       {/* onOpenReadThrough gated on hasProducedScript: the read-through
           sheet renders written scene prose, so the icon is meaningless
           when the Script tab is in its empty state (no beats written).
           Passing `undefined` tells LayerBar to skip the button entirely. */}
-      <LayerBar
-        layer="script"
-        label="Script"
-        story={story}
-        setStory={setStory}
-        autosaveEnabled={autosaveEnabled}
-        onOpenUpdateTray={onOpenUpdateTray}
-        onOpenReadThrough={hasProducedScript && !isV2 ? onOpenReadThrough : undefined}
-        /* Action chips (Script All Scenes + Download) live in the
-           LayerBar's right slot on every viewport. Desktop CSS
-           (.tab-content-wrap-script .layer-bar-right-slot) drops
-           the bar's right-slot `margin-left: auto` so the chips
-           sit immediately to the right of the SCRIPT DRAFT
-           dropdown rather than at the bar's far right edge. */
-        rightSlot={v2ScriptActions}
-      />
+      {(!isV2 || !hasBeats) && scriptLayerBar}
 
       {/* Top-of-content Tip — only surfaces once at least one scene
           has been written. On an empty Script the empty state already
@@ -9638,6 +9652,7 @@ function ScriptTab({
           cards with a .v2-script-pane on the right. */}
       {isV2 && hasBeats && (
       <div className="v2-script-desktop-grid">
+      {scriptLayerBar}
       <div className="v2-script-list">
       {beats.map((beat, i) => {
         // Estimate page range from accumulated word counts. Standard

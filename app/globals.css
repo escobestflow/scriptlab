@@ -7977,6 +7977,13 @@ html[data-design="v2"] .record-label {
        the wrap's grid doesn't squeeze us. */
     width: 100%;
   }
+  /* LayerBar now lives INSIDE the grid (first row) so the SCRIPT
+     DRAFT pill + Script All Scenes + Download chips share a
+     container with the cards/pane below. Span both columns so
+     it reads as a full-width header row above the column split. */
+  html[data-design="v2"] .v2-script-desktop-grid > .layer-bar {
+    grid-column: 1 / -1;
+  }
   html[data-design="v2"] .v2-script-list,
   html[data-design="v2"] .v2-script-pane {
     position: sticky;
