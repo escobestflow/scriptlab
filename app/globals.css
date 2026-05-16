@@ -310,8 +310,26 @@ html[data-theme="dark"] .topbar {
    Studio project. Slightly bigger displacement + scale than
    .page-enter so it reads as a "page change" rather than just a
    subtle reflow. `will-change` opt-in keeps the GPU layer warm
-   for the duration of the animation. */
+   for the duration of the animation.
+
+   IMPORTANT — sizing: `.app-content` is `display: flex; flex-
+   direction: column; flex: 1; min-height: 0`. This wrapper is
+   inserted as a flex child of `.app-content`, so it needs
+   `flex: 1; min-height: 0` to fill the parent's height. And
+   because `transform` creates a containing block for absolute
+   descendants, the Studio component's `.studio-scroll`
+   (`position: absolute; inset: 0`) now positions relative to
+   THIS wrapper instead of the viewport — so `position: relative`
+   here makes that explicit and the wrapper's height anchors the
+   absolute child correctly. Without these properties, the
+   wrapper collapses to 0 height and the Studio renders into a
+   0×0 box (blank screen). */
 .view-transition {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   animation: viewTransitionIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: opacity, transform;
 }
