@@ -608,6 +608,36 @@ html[data-theme="dark"] .topbar {
   background: transparent;
   border: none;
 }
+/* Project-card collaborator chips — overlay sits on top of the
+   project image, so the spec calls for a translucent white fill
+   (26%) + a light backdrop blur so the chip frosts the image
+   underneath without losing legibility. Scoped via the
+   `.project-card-initials` ancestor so the studio layer-bar
+   variant (`.collab-initials-pair` without `.project-card-initials`)
+   keeps its existing solid white treatment. Mobile: 22×22 each.
+   Desktop: bumped to 34×34 via the @media block further down. */
+.project-card-initials .collab-initial {
+  width: 22px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.26);
+  /* `-webkit-backdrop-filter` is the Safari prefix — still needed
+     on iOS Safari at the time of writing. 1px blur per spec. */
+  -webkit-backdrop-filter: blur(1px);
+  backdrop-filter: blur(1px);
+  border: none;
+  color: var(--ds-color-white, #fff);
+  /* Existing rule sets `padding-bottom: 1px` for Lato baseline.
+     With the new larger sizes + ds-type-button-label metrics,
+     the optical center sits naturally; clear the offset. */
+  padding-bottom: 0;
+}
+/* Overlap nudge — keep the second chip pulled into the first's
+   right edge, but at the new larger size. Mobile -6, desktop
+   -8 (set further down) so the chips visually overlap by the
+   same proportion as before. */
+.project-card-initials .collab-initial + .collab-initial {
+  margin-left: -6px;
+}
 .project-card:active {
   transform: scale(0.985);
   box-shadow:
@@ -11847,6 +11877,22 @@ html[data-design="v2"] .menu-panel-utility svg {
      icon stays dark. */
   html[data-design="v2"] .studio-empty-overlay .empty-layer-actions .ds-btn-secondary .ds-btn-icon img {
     filter: none;
+  }
+
+  /* ── Project-card collaborator chips at desktop sizing ────────
+     34×34 each (was 22×22 on mobile) and the pair moves 20px from
+     the card's top-right corner (was 10×10 on mobile). Overlap
+     nudge widens proportionally so the visual ratio matches. */
+  .project-card-initials {
+    top: 20px;
+    right: 20px;
+  }
+  .project-card-initials .collab-initial {
+    width: 34px;
+    height: 34px;
+  }
+  .project-card-initials .collab-initial + .collab-initial {
+    margin-left: -8px;
   }
 }
 

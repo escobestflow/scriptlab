@@ -3284,8 +3284,13 @@ function ProjectsTab({
                 className="collab-initials-pair project-card-initials"
                 aria-label="Collaborators"
               >
-                {leftChar && <span className="collab-initial">{leftChar}</span>}
-                {rightChar && <span className="collab-initial">{rightChar}</span>}
+                {/* `.ds-type-button-label` carries the design-system
+                    type token used for the initials per spec — Lato
+                    400 / 12 / 0.07em / UPPER. The `.collab-initial`
+                    base styles still apply (existing v1 mobile font
+                    falls back when `data-design="v2"` isn't set). */}
+                {leftChar && <span className="collab-initial ds-type-button-label">{leftChar}</span>}
+                {rightChar && <span className="collab-initial ds-type-button-label">{rightChar}</span>}
               </span>
             )}
           </button>
