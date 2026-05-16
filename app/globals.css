@@ -10063,6 +10063,111 @@ html[data-design="v2"] .v2-add-one-actions {
   gap: 8px;
 }
 
+/* ── Direction-on-generate popup (Story tab empty state) ──────
+   Opens when the user clicks the empty-state "Create With AI"
+   button. Same scrim/card pattern as the AI single-scene
+   insertion popup further down; only the body shape (large
+   textarea + caption block) differs. */
+html[data-design="v2"] .v2-direction-prompt-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: studio-empty-overlay-fade-in 0.18s var(--ease) both;
+}
+html[data-design="v2"] .v2-direction-prompt-card {
+  background: var(--ds-color-white);
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 560px;
+  width: 100%;
+  box-shadow: 0 18px 60px 0 rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+html[data-design="v2"] .v2-direction-prompt-title {
+  margin: 0;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-direction-prompt-caption {
+  margin: 0;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .v2-direction-prompt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+html[data-design="v2"] .v2-direction-prompt-field-label {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .v2-direction-prompt-textarea {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ds-color-black);
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  border-radius: 10px;
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 140px;
+  outline: none;
+}
+html[data-design="v2"] .v2-direction-prompt-textarea:focus {
+  border-color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-direction-prompt-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+html[data-design="v2"] .v2-direction-prompt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+html[data-design="v2"] .v2-direction-prompt-cancel,
+html[data-design="v2"] .v2-direction-prompt-confirm {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+html[data-design="v2"] .v2-direction-prompt-cancel {
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-direction-prompt-confirm {
+  background: var(--ds-color-black);
+  border: 1px solid var(--ds-color-black);
+  color: var(--ds-color-white);
+}
+html[data-design="v2"] .v2-direction-prompt-confirm:disabled,
+html[data-design="v2"] .v2-direction-prompt-cancel:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* ── AI single-scene insertion popup (Story tab desktop) ──────
    Modal scrim + centered card. Opens when the user clicks the
    white "Add a Scene" chip — asks them to pick the insertion

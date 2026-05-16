@@ -9242,6 +9242,16 @@ function StoryTab({
     return Math.max(1, Math.round(words / 200));
   }
   const [directionSheetOpen, setDirectionSheetOpen] = useState(false);
+  // Direction-on-generate popup (empty state). When the user clicks
+  // "Create With AI" we open this popup first so they can write
+  // optional direction guidance that AI weights when generating all
+  // scenes. The textarea is bound to the SAME `direction` field on
+  // the story-layer draft as the existing direction sheet, so any
+  // prior direction shows up here pre-filled and the AI sees the
+  // text directly through the standard sync prompt path. Confirm
+  // fires `generateAllBeats`; cancel just closes (direction stays
+  // persisted either way).
+  const [directionPromptOpen, setDirectionPromptOpen] = useState(false);
 
   // Add-All-Scenes chip on the populated layer-bar's right slot.
   // Mirrors the Characters tab's chip — same fill / inset stroke /
@@ -9394,7 +9404,15 @@ function StoryTab({
               }
               addLabel={isV2 ? "Add a Scene" : "Add scene"}
               onAdd={() => openNewScene(0)}
-              onGenerate={generateAllBeats}
+              /* On v2, route the Create With AI button through the
+                 direction-prompt popup so the user can write
+                 optional guidance first. v1 keeps the legacy
+                 immediate-generate flow. */
+              onGenerate={
+                isV2
+                  ? () => setDirectionPromptOpen(true)
+                  : generateAllBeats
+              }
               generating={genBusy}
               generateLabel={isV2 ? "Create With AI" : "Write all with AI"}
               generatingLabel="Writing…"
@@ -9681,6 +9699,92 @@ function StoryTab({
             icon={<span style={{ fontSize: 18, lineHeight: 1, fontWeight: 300 }}>+</span>}
           />
         </>
+      )}
+
+      {/* Direction-on-generate popup. Opens when the user clicks the
+          empty-state "Create With AI" button (v2). The user can write
+          optional direction that the AI weights when generating all
+          scenes, or proceed without any. Textarea is bound to the
+          SAME `direction` field as the legacy direction sheet so
+          guidance entered here persists into the standard sync
+          prompt path. Generate fires `generateAllBeats`; cancel
+          just closes — the prior `direction` value, if any, is
+          preserved either way. */}
+      {directionPromptOpen && (
+        <div
+          className="v2-direction-prompt-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="v2-direction-prompt-title"
+          onClick={() => {
+            if (!genBusy) setDirectionPromptOpen(false);
+          }}
+        >
+          <div
+            className="v2-direction-prompt-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2
+              id="v2-direction-prompt-title"
+              className="v2-direction-prompt-title ds-type-empty-header"
+            >
+              Direct the AI
+            </h2>
+            <p className="v2-direction-prompt-caption ds-type-body">
+              Add optional direction for how the scenes should play out
+              — tone, pacing, key beats, anything you want the AI to
+              lean into. Your concept and characters are already taken
+              into account; this is just extra guidance. Leave it
+              blank to generate purely from what's already in the
+              project.
+            </p>
+            <label className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">
+                Direction (optional)
+              </span>
+              <textarea
+                className="v2-direction-prompt-textarea"
+                value={direction}
+                onChange={e =>
+                  setStory(s =>
+                    updateStoryLayerDraft(s, { direction: e.target.value }),
+                  )
+                }
+                placeholder="e.g. Lean into the contrast between the protagonist's exterior calm and the chaos around them. Keep act two short. End scene 3 on a hard cliffhanger."
+                rows={8}
+                disabled={genBusy}
+                autoFocus
+              />
+            </label>
+            <div className="v2-direction-prompt-actions">
+              <button
+                type="button"
+                className="v2-direction-prompt-cancel"
+                onClick={() => setDirectionPromptOpen(false)}
+                disabled={genBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="v2-direction-prompt-confirm"
+                onClick={async () => {
+                  // Generate all beats; the direction has already
+                  // been persisted to the story-layer draft via the
+                  // textarea's onChange, so generateAllBeats picks
+                  // it up automatically through the sync prompt path.
+                  // Close on completion (runGenerateAll wraps with
+                  // its own scrim + spinner).
+                  setDirectionPromptOpen(false);
+                  await generateAllBeats();
+                }}
+                disabled={genBusy}
+              >
+                {genBusy ? "Generating…" : "Generate Scenes"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Direction sheet — opens from the empty-state card above. Holds a
