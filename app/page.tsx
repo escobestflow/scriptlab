@@ -3297,15 +3297,20 @@ function ProjectsTab({
         {/* v1: rotating poster-stack illustration. v2: the door graphic is
              painted as the screen background via CSS, no inline element. */}
         {!isV2 && <EmptyPosterStack />}
-        <h1 className="projects-empty-title ds-type-empty-header">
-          Your story starts here
-        </h1>
-        <p className="projects-empty-sub">
-          Begin with an idea, shape the world around it,<br />and watch your story unfold.
-        </p>
-        <Button variant="primary" size="lg" onClick={onNew} style={{ minWidth: 180 }}>
-          GET STARTED
-        </Button>
+        {/* Copy stack wrapped so desktop CSS can position the whole
+            block absolutely on the graphic (top:627, horizontally
+            centered to the 963-wide image). Mobile flexes normally. */}
+        <div className="projects-empty-copy">
+          <h1 className="projects-empty-title ds-type-empty-header">
+            Your story starts here
+          </h1>
+          <p className="projects-empty-sub">
+            Begin with an idea, shape the world around it,<br />and watch your story unfold.
+          </p>
+          <Button variant="primary" size="lg" onClick={onNew} style={{ minWidth: 180 }}>
+            GET STARTED
+          </Button>
+        </div>
       </div>
     );
   }
@@ -3827,15 +3832,20 @@ function IdeasEmptyState({
 }) {
   return (
     <div className="projects-empty">
-      <h1 className="projects-empty-title ds-type-empty-header">
-        Ideas become stories
-      </h1>
-      <p className="projects-empty-sub">
-        Capture your moments, dreams and memories.<br />Build the story only you can tell.
-      </p>
-      <Button variant="primary" size="lg" onClick={onStartRecording} style={{ minWidth: 180 }}>
-        SAVE AN IDEA
-      </Button>
+      {/* Same copy-stack wrapper as Projects empty — desktop CSS
+          positions the wrapper on the 963×642 graphic; mobile
+          flexes normally. */}
+      <div className="projects-empty-copy">
+        <h1 className="projects-empty-title ds-type-empty-header">
+          Ideas become stories
+        </h1>
+        <p className="projects-empty-sub">
+          Capture your moments, dreams and memories.<br />Build the story only you can tell.
+        </p>
+        <Button variant="primary" size="lg" onClick={onStartRecording} style={{ minWidth: 180 }}>
+          SAVE AN IDEA
+        </Button>
+      </div>
     </div>
   );
 }

@@ -11895,6 +11895,65 @@ html[data-design="v2"] .menu-panel-utility svg {
     margin-left: -8px;
   }
 
+  /* ── V2 desktop empty Projects / Ideas screens ───────────────
+     Replaces the mobile full-bleed door graphic with a positioned
+     963×642 PNG painted at fixed offsets per spec:
+       - 105px from the sidebar's right edge (= left padding from
+         the main nav column)
+       - 132px from the top of the screen
+       - Copy stack (header + sub + CTA) overlayed on the graphic,
+         pinned to top:627 and horizontally centered on the
+         graphic's center.
+     Same graphic for Projects and Ideas (the mobile path also
+     shares classnames; only the copy + CTA differ). */
+  html[data-design="v2"]:has(.projects-empty) {
+    /* Reset the html-level mobile bg-image paint — desktop owns
+       its own positioned graphic on the inner container below. */
+    background-image: none;
+  }
+  /* Strip the .screen-scroll's desktop padding-left: 60 AND the
+     mobile-default padding-top: 55 when an empty Projects/Ideas
+     state is rendered, so the inner .projects-empty starts flush
+     at viewport top-left (after the sidebar). Without these the
+     graphic painted at `background-position: 105px 132px` would
+     sit 60px further right + 55px further down than the spec
+     calls for. */
+  html[data-design="v2"] .screen-scroll:has(.projects-empty) {
+    padding-left: 0;
+    padding-top: 0;
+  }
+  html[data-design="v2"] .projects-empty {
+    background-image: url("/v2/desktop-empty-projects-graphic.png");
+    background-size: 963px 642px;
+    background-position: 105px 132px;
+    background-repeat: no-repeat;
+    /* Reset the mobile rule's flex stack + negative margins.
+       Desktop uses absolute positioning on the copy wrapper. */
+    margin: 0;
+    padding: 0;
+    display: block;
+    position: relative;
+    text-align: initial;
+    min-height: 100vh;
+  }
+  html[data-design="v2"] .projects-empty .projects-empty-copy {
+    /* Pinned to graphic.center_x (105 + 963/2 = 586.5) with
+       translateX(-50%) so the stack centers regardless of width.
+       Top 627 is measured from the screen top per spec — the
+       container starts at the screen top thanks to the .app-content
+       layout above, so the wrapper's top:627 lands on the screen
+       at the correct y. */
+    position: absolute;
+    left: 586.5px;
+    top: 627px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    max-width: 963px;
+  }
+
   /* ── V2 desktop Settings screen ───────────────────────────────
      Full-page settings surface that lives inside .app-content and
      replaces the legacy .menu-panel dropdown on desktop. Layout:
