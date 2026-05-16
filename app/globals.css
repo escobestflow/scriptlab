@@ -305,6 +305,44 @@ html[data-theme="dark"] .topbar {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Top-level view transition wrapper. Re-fires whenever the user
+   moves between Projects, Ideas, Settings, or into / out of a
+   Studio project. Slightly bigger displacement + scale than
+   .page-enter so it reads as a "page change" rather than just a
+   subtle reflow. `will-change` opt-in keeps the GPU layer warm
+   for the duration of the animation. */
+.view-transition {
+  animation: viewTransitionIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity, transform;
+}
+@keyframes viewTransitionIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);     }
+}
+
+/* Tab content transition inside a Studio project. Shorter +
+   lighter than the view-level transition so Concept → Characters
+   → Story → Script feels snappy, not page-y. Tied to the
+   `key={section}` on `.tab-content-wrap` in Studio.tsx — every
+   section change remounts the wrapper, replaying the animation. */
+.tab-content-wrap {
+  animation: tabContentIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes tabContentIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+/* Honor users who've requested reduced motion — skip both
+   transitions outright so the UI cuts cleanly instead of
+   animating. */
+@media (prefers-reduced-motion: reduce) {
+  .view-transition,
+  .tab-content-wrap {
+    animation: none;
+  }
+}
+
 /* ======= PROJECT CARDS ======= */
 /* Compact elevated list row — square cover on the left, content on the
    right. Short enough that the next card always peeks below the viewport.

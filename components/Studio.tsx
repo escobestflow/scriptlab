@@ -2685,6 +2685,14 @@ export function Studio({
           return (
             <>
               <div
+                /* `key={section}` forces React to unmount/remount the
+                    wrapper on section change. That re-triggers the
+                    `.tab-content-wrap` CSS animation (defined in
+                    globals.css) every time the user switches tabs,
+                    giving Concept → Characters → Story → Script a
+                    short, snappy fade-up transition instead of a
+                    hard cut. */
+                key={section}
                 style={{ padding: "8px 22px 40px" }}
                 className={`tab-content-wrap tab-content-wrap-${section}${previewActive ? " partner-preview-locked" : ""}`}
                 aria-hidden={previewActive ? true : undefined}
@@ -8323,7 +8331,12 @@ function CharactersTab({
         </div>
       );})}
 
-      {hasCharacters && (
+      {/* Bottom sticky "Add character" bar is mobile-only. Desktop
+          already exposes BOTH a manual add chip and an AI add chip
+          inline with the LayerBar (top of the tab), so the persistent
+          bottom bar would be redundant — and on a wide viewport its
+          full-width pill looked oddly stranded against the content. */}
+      {hasCharacters && !isDesktop && (
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
