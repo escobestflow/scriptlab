@@ -3344,8 +3344,41 @@ function SectionTabs({
     { key: "script",     label: "SCRIPT",     layer: "script" },
   ];
 
+  // Sliding underline (desktop). useLayoutEffect measures the active
+  // tab's position inside the bar after each render and writes
+  // `--underline-x` + `--underline-w` to the bar's style. The
+  // `.studio-tab-underline` element below uses those CSS variables
+  // with a transition on `left` and `width` — so the bar smoothly
+  // moves from one tab to the next instead of cutting. The +/−65
+  // span / -25 offset replicates the existing per-tab `::after`
+  // geometry (left: -25 / right: -40 on the active tab).
+  //
+  // useLayoutEffect (not useEffect) runs before paint so the first
+  // paint after a section change already has the new coordinates;
+  // no flash of mispositioned underline. The resize listener keeps
+  // the underline aligned if the viewport changes (e.g. devtools
+  // open / close).
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const measure = () => {
+      const active = bar.querySelector(".studio-tab.active") as HTMLElement | null;
+      if (!active) return;
+      const barRect = bar.getBoundingClientRect();
+      const tabRect = active.getBoundingClientRect();
+      const left = tabRect.left - barRect.left - 25;
+      const width = tabRect.width + 65;
+      bar.style.setProperty("--underline-x", `${left}px`);
+      bar.style.setProperty("--underline-w", `${width}px`);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [section]);
+
   return (
-    <div className="studio-tab-bar">
+    <div className="studio-tab-bar" ref={barRef}>
       {tabs.map(t => {
         // Tab dirty-dot rendering rule: only show when autosave is
         // TOGGLED ON in the main menu AND the layer has unsaved changes.
@@ -3371,6 +3404,13 @@ function SectionTabs({
           </button>
         );
       })}
+      {/* Sliding underline indicator (desktop only — CSS gates
+          `display`). Position + width driven by the `--underline-x`
+          / `--underline-w` CSS variables set by the measurement
+          effect above. Replaces the per-tab `::after` so the
+          underline moves continuously between tabs instead of
+          disappearing on the old tab and reappearing on the new. */}
+      <span className="studio-tab-underline" aria-hidden="true" />
     </div>
   );
 }
@@ -9584,7 +9624,12 @@ function StoryTab({
         })}
       </div>
 
-      {hasBeats && (
+      {/* Bottom sticky "Add scene" bar is mobile-only — same logic
+          as the Characters tab. Desktop already exposes BOTH a
+          manual add chip and an AI add chip inline with the
+          LayerBar at the top of the tab, so the persistent
+          bottom bar would be redundant on a wide viewport. */}
+      {hasBeats && !isDesktop && (
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
