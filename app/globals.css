@@ -10063,6 +10063,169 @@ html[data-design="v2"] .v2-add-one-actions {
   gap: 8px;
 }
 
+/* ── Import-script popup (Script tab empty state, v2 desktop) ─
+   Opens from the empty Script tab's "Import a Script" secondary
+   CTA. Same scrim/card pattern as the direction-prompt + scene-
+   insert popups; three stacked import options inside (file upload,
+   paste a script, paste a story description). Each option's body
+   collapses inline when its trigger is tapped, revealing a
+   textarea + a submit button. The submit hands off to the same
+   `onImportScript` / `onImportPastedScript` /
+   `onImportStoryDescription` pipeline the v1 ImportScriptCard
+   uses — identical backend generation flow. */
+html[data-design="v2"] .v2-import-script-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: studio-empty-overlay-fade-in 0.18s var(--ease) both;
+}
+html[data-design="v2"] .v2-import-script-card {
+  background: var(--ds-color-white);
+  border-radius: 16px;
+  padding: 28px;
+  max-width: 600px;
+  width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  box-shadow: 0 18px 60px 0 rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+html[data-design="v2"] .v2-import-script-title {
+  margin: 0;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-import-script-caption {
+  margin: 0;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .v2-import-script-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+html[data-design="v2"] .v2-import-script-option {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+html[data-design="v2"] .v2-import-script-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  color: var(--ds-color-black);
+  cursor: pointer;
+  text-align: left;
+  transition: background 140ms var(--ease, ease), border-color 140ms var(--ease, ease);
+}
+html[data-design="v2"] .v2-import-script-option-btn:hover {
+  background: var(--ds-color-gray-lightest);
+}
+html[data-design="v2"] .v2-import-script-option-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+html[data-design="v2"] .v2-import-script-option-btn[aria-expanded="true"] {
+  background: var(--ds-color-gray-lightest);
+  border-color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-import-script-option-label {
+  font-family: var(--ds-font-body);
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-import-script-option-sub {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ds-color-gray-chip-label);
+}
+html[data-design="v2"] .v2-import-script-paste-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 0 4px;
+}
+html[data-design="v2"] .v2-import-script-textarea {
+  font-family: var(--ds-font-body);
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ds-color-black);
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  border-radius: 10px;
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 160px;
+  outline: none;
+}
+html[data-design="v2"] .v2-import-script-textarea:focus {
+  border-color: var(--ds-color-black);
+}
+html[data-design="v2"] .v2-import-script-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+html[data-design="v2"] .v2-import-script-paste-submit {
+  align-self: stretch;
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: var(--ds-color-black);
+  border: 1px solid var(--ds-color-black);
+  color: var(--ds-color-white);
+  cursor: pointer;
+}
+html[data-design="v2"] .v2-import-script-paste-submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+html[data-design="v2"] .v2-import-script-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+html[data-design="v2"] .v2-import-script-cancel {
+  font-family: var(--ds-font-body);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: var(--ds-color-white);
+  border: 0.7px solid var(--ds-color-gray-outline);
+  color: var(--ds-color-black);
+  cursor: pointer;
+}
+html[data-design="v2"] .v2-import-script-cancel:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* ── Direction-on-generate popup (Story tab empty state) ──────
    Opens when the user clicks the empty-state "Create With AI"
    button. Same scrim/card pattern as the AI single-scene

@@ -9970,6 +9970,44 @@ function ScriptTab({
     }
   }, [beats, selectedBeatId]);
 
+  // ── Import-script popup (desktop empty state only) ─────────────
+  // v2 desktop surfaces the import affordance through a popup
+  // launched from the empty-state's secondary CTA. Reuses the v1
+  // `onImportScript` / `onImportPastedScript` / `onImportStoryDescription`
+  // pipeline ScriptTab already receives as props — same backend,
+  // same 4-step generation flow.
+  const [importPopupOpen, setImportPopupOpen] = useState(false);
+  const [importPasteMode, setImportPasteMode] = useState<"script" | "description" | null>(null);
+  const [importPastedScript, setImportPastedScript] = useState("");
+  const [importPastedDescription, setImportPastedDescription] = useState("");
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
+  async function handleImportFileChoice(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (importFileInputRef.current) importFileInputRef.current.value = "";
+    if (!file) return;
+    setImportPopupOpen(false);
+    setImportPasteMode(null);
+    await onImportScript(file);
+  }
+  async function submitImportPastedScript() {
+    if (importing) return;
+    const t = importPastedScript.trim();
+    if (!t) return;
+    setImportPopupOpen(false);
+    setImportPastedScript("");
+    setImportPasteMode(null);
+    await onImportPastedScript(t);
+  }
+  async function submitImportPastedDescription() {
+    if (importing) return;
+    const t = importPastedDescription.trim();
+    if (!t) return;
+    setImportPopupOpen(false);
+    setImportPastedDescription("");
+    setImportPasteMode(null);
+    await onImportStoryDescription(t);
+  }
+
   // "Write all scenes with AI" — kicks off the same background-loop
   // machinery Easy mode uses. The scrim from runGenerateAll covers
   // exactly the FIRST scene's generation; once scene 1 lands, the
@@ -10151,6 +10189,18 @@ function ScriptTab({
           addLabel={isV2 ? "Go to Story" : undefined}
           onAdd={isV2 ? onGoToStory : undefined}
           addIcon={isV2 ? <img src="/v2/icons/icon-back.svg" alt="" aria-hidden="true" /> : undefined}
+          /* v2 desktop only — secondary CTA opens the import-script
+             popup so the user can upload / paste a screenplay or
+             story description. Same 3-path pipeline the v1 mobile
+             ImportScriptCard exposes. Hidden on mobile + v1 since
+             those surfaces already have their own import affordance
+             (project-creation flow + bottom card). */
+          onGenerate={isV2 && isDesktop ? () => setImportPopupOpen(true) : undefined}
+          generateLabel={isV2 && isDesktop
+            ? (importing ? "Importing…" : "Import a Script")
+            : undefined}
+          generating={importing}
+          generatingLabel="Importing…"
         />
       )}
 
@@ -10685,6 +10735,164 @@ function ScriptTab({
           importing={importing}
           importStep={importStep}
         />
+      )}
+
+      {/* v2 desktop empty-script import popup. Wraps the same 3
+          paths as the v1 ImportScriptCard sheet (upload a file,
+          paste a screenplay, paste a story description) in a
+          centered desktop modal. State + handlers (importing,
+          paste buffers, file ref, the three submit functions)
+          live at the top of ScriptTab so they share scope with
+          the EmptyLayerState onGenerate that opens this popup.
+          Reuses the existing `onImportScript` /
+          `onImportPastedScript` / `onImportStoryDescription`
+          pipeline — identical backend, identical generation flow. */}
+      {importPopupOpen && (
+        <div
+          className="v2-import-script-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="v2-import-script-title"
+          onClick={() => {
+            if (!importing) {
+              setImportPopupOpen(false);
+              setImportPasteMode(null);
+            }
+          }}
+        >
+          <div
+            className="v2-import-script-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2
+              id="v2-import-script-title"
+              className="v2-import-script-title ds-type-empty-header"
+            >
+              Import a Script
+            </h2>
+            <p className="v2-import-script-caption ds-type-body">
+              Upload a screenplay file, paste a script, or paste a story
+              description. Unfold splits the source into scenes,
+              extracts beats and characters, and seeds a fresh Concept
+              draft — preserving your title, format, and genres.
+            </p>
+
+            {/* Hidden file picker — opened programmatically by the
+                Upload row's button below. */}
+            <input
+              ref={importFileInputRef}
+              type="file"
+              accept={IMPORT_ACCEPT}
+              onChange={handleImportFileChoice}
+              style={{ display: "none" }}
+            />
+
+            <div className="v2-import-script-options">
+              {/* Option 1 — Upload a file */}
+              <div className="v2-import-script-option">
+                <button
+                  type="button"
+                  className="v2-import-script-option-btn"
+                  onClick={() => importFileInputRef.current?.click()}
+                  disabled={importing}
+                >
+                  <span className="v2-import-script-option-label">Upload script file</span>
+                  <span className="v2-import-script-option-sub">
+                    .txt or .pdf — split into scenes word-for-word.
+                  </span>
+                </button>
+              </div>
+
+              {/* Option 2 — Paste a script */}
+              <div className="v2-import-script-option">
+                <button
+                  type="button"
+                  className="v2-import-script-option-btn"
+                  onClick={() => setImportPasteMode(m => m === "script" ? null : "script")}
+                  disabled={importing}
+                  aria-expanded={importPasteMode === "script"}
+                >
+                  <span className="v2-import-script-option-label">Paste a script</span>
+                  <span className="v2-import-script-option-sub">
+                    Plain-text screenplay — same processing as the file path.
+                  </span>
+                </button>
+                {importPasteMode === "script" && (
+                  <div className="v2-import-script-paste-row">
+                    <textarea
+                      className="v2-import-script-textarea"
+                      value={importPastedScript}
+                      onChange={e => setImportPastedScript(e.target.value)}
+                      placeholder="Paste the full screenplay here. Standard format with INT./EXT. scene slugs works best."
+                      rows={8}
+                      disabled={importing}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="v2-import-script-paste-submit"
+                      onClick={submitImportPastedScript}
+                      disabled={importing || !importPastedScript.trim()}
+                    >
+                      Import This Script
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Option 3 — Paste a story description */}
+              <div className="v2-import-script-option">
+                <button
+                  type="button"
+                  className="v2-import-script-option-btn"
+                  onClick={() => setImportPasteMode(m => m === "description" ? null : "description")}
+                  disabled={importing}
+                  aria-expanded={importPasteMode === "description"}
+                >
+                  <span className="v2-import-script-option-label">Paste a story description</span>
+                  <span className="v2-import-script-option-sub">
+                    Free-form description — generates beats, characters, and a script.
+                  </span>
+                </button>
+                {importPasteMode === "description" && (
+                  <div className="v2-import-script-paste-row">
+                    <textarea
+                      className="v2-import-script-textarea"
+                      value={importPastedDescription}
+                      onChange={e => setImportPastedDescription(e.target.value)}
+                      placeholder="Describe the story in detail — characters, world, what happens scene by scene. Unfold will turn it into beats, characters, and a screenplay."
+                      rows={8}
+                      disabled={importing}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className="v2-import-script-paste-submit"
+                      onClick={submitImportPastedDescription}
+                      disabled={importing || !importPastedDescription.trim()}
+                    >
+                      Import This Description
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="v2-import-script-actions">
+              <button
+                type="button"
+                className="v2-import-script-cancel"
+                onClick={() => {
+                  setImportPopupOpen(false);
+                  setImportPasteMode(null);
+                }}
+                disabled={importing}
+              >
+                {importing ? "Importing…" : "Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Sticky bottom action bar — v1 only. v2 uses the
