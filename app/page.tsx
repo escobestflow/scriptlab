@@ -3400,6 +3400,11 @@ function ProjectsTab({
         {/* v1: rotating poster-stack illustration. v2: the door graphic is
              painted as the screen background via CSS, no inline element. */}
         {!isV2 && <EmptyPosterStack />}
+        {/* Page-level header — desktop only. Matches the populated
+            tab's `.projects-tab-heading` so navigating between
+            empty/populated reads as the same surface. Mobile keeps
+            the door-graphic full-bleed treatment (no heading). */}
+        <h1 className="projects-empty-page-heading ds-type-tab-header">Projects</h1>
         {/* Copy stack wrapped so desktop CSS can position the whole
             block absolutely on the graphic (top:627, horizontally
             centered to the 963-wide image). Mobile flexes normally. */}
@@ -3935,6 +3940,10 @@ function IdeasEmptyState({
 }) {
   return (
     <div className="projects-empty">
+      {/* Same `.projects-empty-page-heading` treatment as the Projects
+          empty state — desktop-only via CSS. Mobile keeps the
+          full-bleed door layout without a top heading. */}
+      <h1 className="projects-empty-page-heading ds-type-tab-header">Ideas</h1>
       {/* Same copy-stack wrapper as Projects empty — desktop CSS
           positions the wrapper on the 963×642 graphic; mobile
           flexes normally. */}

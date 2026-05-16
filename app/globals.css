@@ -372,6 +372,11 @@ html[data-theme="dark"] .topbar {
    a single primary CTA that kicks off the create-project flow. Only
    rendered when `projects.length === 0`; the moment a project exists we
    revert to the standard list-with-header layout. */
+/* Page-level "Projects" / "Ideas" heading on the empty states is
+   desktop-only — mobile keeps the full-bleed door layout without
+   a top heading. Default-hidden here; the desktop @media block
+   further down flips it back to `display: block`. */
+.projects-empty-page-heading { display: none; }
 .projects-empty {
   display: flex;
   flex-direction: column;
@@ -12337,6 +12342,19 @@ html[data-design="v2"] .menu-panel-utility svg {
     position: relative;
     text-align: initial;
     min-height: 100vh;
+  }
+  /* Page-level header ("Projects" / "Ideas") on the empty states.
+     Desktop: pinned to the top-left of the .projects-empty
+     container, aligned visually with the graphic's left edge
+     (105px). Mobile keeps the full-bleed door layout so the
+     heading is `display: none` by default and only shown here. */
+  html[data-design="v2"] .projects-empty .projects-empty-page-heading {
+    display: block;
+    position: absolute;
+    top: 80px;
+    left: 105px;
+    margin: 0;
+    color: var(--ds-color-black);
   }
   html[data-design="v2"] .projects-empty .projects-empty-copy {
     /* Pinned to graphic.center_x (105 + 963/2 = 586.5) with
