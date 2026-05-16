@@ -5898,6 +5898,19 @@ html[data-theme="dark"] .partner-preview-empty-notice {
     width: 14px; height: 14px;
     stroke: var(--ink); stroke-width: 1.6; fill: none;
   }
+  /* Google profile image — fills the avatar circle. `overflow:
+     hidden` on the parent circle is implicit via `border-radius:
+     50%` clipping the corners; the <img> at 100%/100% with
+     object-fit: cover sits flush inside that mask. */
+  .desktop-sidebar-avatar {
+    overflow: hidden;
+  }
+  .desktop-sidebar-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
   .desktop-sidebar-label {
     flex: 1;
     overflow: hidden;

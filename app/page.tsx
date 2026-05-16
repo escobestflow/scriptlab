@@ -148,6 +148,7 @@ function DesktopSidebar({
   onIdeas,
   onMenu,
   userInitial,
+  userAvatarUrl,
 }: {
   activeMain: MainTab | null;
   inStudio: boolean;
@@ -155,6 +156,11 @@ function DesktopSidebar({
   onIdeas: () => void;
   onMenu: () => void;
   userInitial: string | null;
+  /** Google profile image URL pulled from `user.user_metadata.avatar_url`
+   *  / `.picture`. When present we render it inside the avatar circle
+   *  instead of the first-letter fallback. `null` = no OAuth picture
+   *  (email/password signup, or Google hadn't shared a picture). */
+  userAvatarUrl: string | null;
 }) {
   // Projects stays "active" in the sidebar when the user is inside
   // a project detail (Studio view) — Studio is conceptually a
@@ -195,8 +201,25 @@ function DesktopSidebar({
       </nav>
       <div className="desktop-sidebar-foot">
         <button className="desktop-sidebar-item" onClick={onMenu} aria-label="Open menu">
+          {/* Avatar circle: prefer the Google profile image when
+              available, fall back to the email's first letter,
+              then to a generic user glyph. The <img> sits inside
+              the same `.desktop-sidebar-avatar` circle, sized to
+              `100%` + `object-fit: cover` so it always fills the
+              chip cleanly. */}
           <span className="desktop-sidebar-avatar">
-            {userInitial ?? <IconUser />}
+            {userAvatarUrl
+              ? (
+                <img
+                  src={userAvatarUrl}
+                  alt=""
+                  className="desktop-sidebar-avatar-img"
+                  referrerPolicy="no-referrer"
+                />
+              )
+              : userInitial
+                ? userInitial
+                : <IconUser />}
           </span>
           <span className="desktop-sidebar-label">Account</span>
         </button>
@@ -1929,6 +1952,21 @@ export default function Page() {
 
   const userEmailTrimmed = (user?.email ?? "").trim();
   const userInitial = userEmailTrimmed ? userEmailTrimmed.charAt(0).toUpperCase() : null;
+  // Supabase's OAuth user object exposes the provider's profile
+  // image inside `user_metadata`. Google sets BOTH `avatar_url`
+  // (Supabase's normalized field) and `picture` (Google's raw OAuth
+  // claim) — prefer the Supabase-normalized one and fall through.
+  // Coerce to string so the Image component / <img> get a clean URL
+  // or `null` (not `undefined`, which would treat the attribute as
+  // unset and let an empty `src` attempt to load).
+  const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const rawAvatar =
+    userMetadata.avatar_url
+    ?? userMetadata.picture
+    ?? null;
+  const userAvatarUrl = typeof rawAvatar === "string" && rawAvatar.length > 0
+    ? rawAvatar
+    : null;
 
   return (
    <WriterProfileContext.Provider value={profileAPI}>
@@ -1950,6 +1988,7 @@ export default function Page() {
           }
         }}
         userInitial={userInitial}
+        userAvatarUrl={userAvatarUrl}
       />
       <div className="app-content">
       {/* `.view-transition` re-fires its CSS animation every time the
