@@ -149,6 +149,7 @@ function DesktopSidebar({
   onMenu,
   userInitial,
   userAvatarUrl,
+  userDisplayName,
 }: {
   activeMain: MainTab | null;
   inStudio: boolean;
@@ -161,6 +162,10 @@ function DesktopSidebar({
    *  instead of the first-letter fallback. `null` = no OAuth picture
    *  (email/password signup, or Google hadn't shared a picture). */
   userAvatarUrl: string | null;
+  /** Google display name (`user_metadata.full_name` / `.name`) or
+   *  the email's local part as a fallback. Used to label the
+   *  account row at the bottom of the sidebar. */
+  userDisplayName: string | null;
 }) {
   // Projects stays "active" in the sidebar when the user is inside
   // a project detail (Studio view) — Studio is conceptually a
@@ -200,7 +205,11 @@ function DesktopSidebar({
         </button>
       </nav>
       <div className="desktop-sidebar-foot">
-        <button className="desktop-sidebar-item" onClick={onMenu} aria-label="Open menu">
+        <button
+          className="desktop-sidebar-item desktop-sidebar-account"
+          onClick={onMenu}
+          aria-label="Open settings"
+        >
           {/* Avatar circle: prefer the Google profile image when
               available, fall back to the email's first letter,
               then to a generic user glyph. The <img> sits inside
@@ -221,7 +230,39 @@ function DesktopSidebar({
                 ? userInitial
                 : <IconUser />}
           </span>
-          <span className="desktop-sidebar-label">Account</span>
+          <span className="desktop-sidebar-account-name">
+            {userDisplayName ?? "Account"}
+          </span>
+          {/* Down chevron — purely decorative, indicates the row
+              can be expanded / interacted with. Matches the
+              screenshot reference. */}
+          <svg
+            className="desktop-sidebar-account-chevron"
+            width="10"
+            height="6"
+            viewBox="0 0 10 6"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M1 1l4 4 4-4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {/* Settings gear, right-aligned. 20×20 per spec; pushed
+              to the right of the row via `margin-left: auto` so it
+              floats independently of how long the name is. */}
+          <img
+            src="/icon-account.svg"
+            alt=""
+            aria-hidden="true"
+            width={20}
+            height={20}
+            className="desktop-sidebar-account-gear"
+          />
         </button>
       </div>
     </aside>
@@ -1967,6 +2008,18 @@ export default function Page() {
   const userAvatarUrl = typeof rawAvatar === "string" && rawAvatar.length > 0
     ? rawAvatar
     : null;
+  // Google's OAuth claim ships under both `full_name` (Supabase-
+  // normalized) and `name` (raw). Fall back to the email's local
+  // part (before the `@`) so the sidebar still labels the row with
+  // something meaningful when the provider didn't share a name.
+  const rawDisplayName =
+    userMetadata.full_name
+    ?? userMetadata.name
+    ?? null;
+  const userDisplayName =
+    typeof rawDisplayName === "string" && rawDisplayName.trim().length > 0
+      ? rawDisplayName.trim()
+      : (userEmailTrimmed.split("@")[0] || null);
 
   return (
    <WriterProfileContext.Provider value={profileAPI}>
@@ -1989,6 +2042,7 @@ export default function Page() {
         }}
         userInitial={userInitial}
         userAvatarUrl={userAvatarUrl}
+        userDisplayName={userDisplayName}
       />
       <div className="app-content">
       {/* `.view-transition` re-fires its CSS animation every time the
