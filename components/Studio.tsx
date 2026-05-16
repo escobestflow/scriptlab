@@ -519,6 +519,12 @@ export function Studio({
   // different views of the same beat: the popup is a lightweight
   // preview, the sheet is the prose-reading mode. null = closed.
   const [scriptViewBeatId, setScriptViewBeatId] = useState<string | null>(null);
+  // When true, the ScriptViewSheet opens with highlight mode pre-armed.
+  // The desktop Script tab's HM button on the right pane sets both this
+  // flag and `scriptViewBeatId` together — the sheet then handles the
+  // full drag-to-highlight + composer flow (the same one Read-through
+  // uses), avoiding a separate desktop-only implementation.
+  const [scriptViewInitialHighlight, setScriptViewInitialHighlight] = useState(false);
   // Character sheet — a single sheet used for BOTH creation and editing.
   // null = closed. "new-char-draft" marker or an existing character id = open.
   const [charSheetCharId, setCharSheetCharId] = useState<string | null>(null);
@@ -2776,6 +2782,15 @@ export function Studio({
                 setScenePopupBeatId(id);
               }}
               openScriptViewSheet={(id: string) => setScriptViewBeatId(id)}
+              /* Desktop HM button on the right pane fires this opener
+                 to enter the ScriptViewSheet's drag-highlight flow
+                 directly. Sets initialHighlightOn first so the sheet
+                 mounts with highlight mode already on — the same path
+                 the Read-through sheet uses for its highlight entry. */
+              openScriptViewSheetHighlight={(id: string) => {
+                setScriptViewInitialHighlight(true);
+                setScriptViewBeatId(id);
+              }}
               bgScriptJob={bgScriptJob}
               onStartBackgroundScriptLoop={onStartBackgroundScriptLoop}
             />
@@ -3045,8 +3060,14 @@ export function Studio({
         open={scriptViewBeatId !== null}
         story={story}
         setStory={setStory}
-        onClose={() => setScriptViewBeatId(null)}
+        onClose={() => {
+          setScriptViewBeatId(null);
+          // Reset the initial-highlight seed so a subsequent open
+          // (e.g. via a card tap on mobile) starts in read mode.
+          setScriptViewInitialHighlight(false);
+        }}
         initialBeatId={scriptViewBeatId}
+        initialHighlightOn={scriptViewInitialHighlight}
       />
 
       {/* Scene sheet — single sheet for both creation and editing,
@@ -5591,6 +5612,7 @@ function ScriptViewSheet({
   setStory,
   onClose,
   initialBeatId,
+  initialHighlightOn,
 }: {
   open: boolean;
   story: Story;
@@ -5598,6 +5620,11 @@ function ScriptViewSheet({
   onClose: () => void;
   /** Optional beat to land on when the sheet opens. */
   initialBeatId?: string | null;
+  /** When true, the sheet opens with the drag-to-highlight mode
+   *  pre-armed (matches the ReadThroughSheet's same prop). Fired
+   *  by the desktop Script tab's HM button on the right pane so
+   *  the user enters the highlight flow with one click. */
+  initialHighlightOn?: boolean;
 }) {
   const charactersDraft = getActiveCharactersDraft(story);
   const conceptDraft = getActiveConceptDraft(story);
@@ -5626,6 +5653,21 @@ function ScriptViewSheet({
     ReadThroughHighlight["rects"] | null
   >(null);
   const bodyRef = useRef<HTMLDivElement | null>(null);
+
+  // When the sheet is opened with `initialHighlightOn`, seed the
+  // local toggle. Fires once per open transition: when `open` flips
+  // false → true, copy the seed into local state. Closing the sheet
+  // clears highlight mode so the next non-highlight open is clean.
+  useEffect(() => {
+    if (open) {
+      if (initialHighlightOn) setHighlightMode(true);
+    } else {
+      setHighlightMode(false);
+      setActiveHighlight(null);
+      setDragRects(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Composer state.
   const [composerOpen, setComposerOpen] = useState(false);
@@ -9700,6 +9742,7 @@ function ScriptTab({
   onGoToStory,
   openScenePopup,
   openScriptViewSheet,
+  openScriptViewSheetHighlight,
   runGenerateAll,
   bgScriptJob,
   onStartBackgroundScriptLoop,
@@ -9758,6 +9801,11 @@ function ScriptTab({
    *  with prev/next nav, scrollable screenplay text). Fired by
    *  written scene rows / chips. */
   openScriptViewSheet?: (beatId: string) => void;
+  /** v2 desktop only — open the ScriptViewSheet with highlight mode
+   *  pre-armed. Fired by the HM button on the right pane so the user
+   *  immediately enters the drag-to-highlight + composer flow (same
+   *  one Read-through uses). */
+  openScriptViewSheetHighlight?: (beatId: string) => void;
   /** Wrap a Create-all action with the Studio-level scrim + sheet-close
    *  choreography. See `runGenerateAll` in Studio. */
   runGenerateAll: (fn: () => Promise<void>) => Promise<void>;
@@ -10229,7 +10277,22 @@ function ScriptTab({
                   <button
                     type="button"
                     className="v2-script-pane-mode-btn"
-                    onClick={() => setHighlightModeOn(v => !v)}
+                    onClick={() => {
+                      // Local visual toggle (button pressed state)
+                      setHighlightModeOn(true);
+                      // Open the ScriptViewSheet for THIS scene with
+                      // highlight mode pre-armed. The sheet owns the
+                      // drag-to-highlight + composer flow — same one
+                      // Read-through uses — so the desktop pane just
+                      // delegates rather than re-implementing it.
+                      openScriptViewSheetHighlight?.(beat.id);
+                      // Reset our local pressed state shortly after
+                      // — by the time the sheet renders the button
+                      // visually settling back to off is fine; the
+                      // sheet's HM toggle is the source of truth
+                      // once it's open.
+                      window.setTimeout(() => setHighlightModeOn(false), 250);
+                    }}
                     aria-pressed={highlightModeOn}
                     aria-label="Highlight mode"
                     title="Highlight mode"
