@@ -11894,5 +11894,178 @@ html[data-design="v2"] .menu-panel-utility svg {
   .project-card-initials .collab-initial + .collab-initial {
     margin-left: -8px;
   }
+
+  /* ── V2 desktop Settings screen ───────────────────────────────
+     Full-page settings surface that lives inside .app-content and
+     replaces the legacy .menu-panel dropdown on desktop. Layout:
+       - 865px-wide content column, centered.
+       - 80px gap from the top of the screen to the page header.
+       - Three stacked cards (account row, prefs toggles, nav
+         links) with a 0/2/16/0 9%-opacity drop shadow per spec.
+     All colors + typography come from `--ds-color-*` tokens and
+     `.ds-type-*` utility classes added on the JSX.  */
+  html[data-design="v2"] .v2-settings-screen {
+    width: 865px;
+    max-width: 865px;
+    margin: 0 auto;
+    padding: 80px 0 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+  html[data-design="v2"] .v2-settings-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  html[data-design="v2"] .v2-settings-title {
+    margin: 0;
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .v2-settings-subtitle {
+    margin: 0;
+    color: var(--ds-color-gray-chip-label);
+  }
+
+  /* Cards — white surface, soft shadow, internal padding. The
+     drop shadow is the spec value (0 / 2 / 16 / 0, black @ 9%);
+     no border so the shadow alone carries the elevation. */
+  html[data-design="v2"] .v2-settings-card {
+    background: var(--ds-color-white);
+    border-radius: 16px;
+    box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.09);
+    padding: 8px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  html[data-design="v2"] .v2-settings-card--account {
+    padding: 8px 20px;
+  }
+
+  /* Section header inside a card ("Account") — small bold label
+     at the top of the prefs + nav cards. */
+  html[data-design="v2"] .v2-settings-card-header {
+    color: var(--ds-color-black);
+    padding: 16px 4px 8px;
+  }
+
+  /* Row group — vertical stack inside a card. */
+  html[data-design="v2"] .v2-settings-rows {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Each row — avatar circle on the left, label + caption stacked
+     in the middle, action (toggle / chevron / link) on the right.
+     Native button reset so .v2-settings-row--nav can be a <button>
+     without extra chrome. */
+  html[data-design="v2"] .v2-settings-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 4px;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    color: var(--ds-color-black);
+    cursor: default;
+  }
+  html[data-design="v2"] .v2-settings-row--nav {
+    cursor: pointer;
+  }
+  html[data-design="v2"] .v2-settings-row--nav:hover {
+    background: var(--ds-color-gray-fill);
+    border-radius: 12px;
+  }
+  /* Internal divider between rows — appears on every row except
+     the first inside a card. The account-card has one row so this
+     never fires there. */
+  html[data-design="v2"] .v2-settings-card .v2-settings-rows .v2-settings-row + .v2-settings-row {
+    border-top: 0.7px solid var(--ds-color-gray-outline);
+  }
+
+  /* Avatar / icon circle — placeholder per design (44×44 ghost
+     circle on the left of each row). */
+  html[data-design="v2"] .v2-settings-row-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--ds-color-gray-fill);
+    flex: 0 0 auto;
+  }
+
+  /* Label + caption stack — takes the remaining row width so the
+     right-side action sits at the row's far right. */
+  html[data-design="v2"] .v2-settings-row-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  html[data-design="v2"] .v2-settings-row-label {
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .v2-settings-row-caption {
+    color: var(--ds-color-gray-chip-label);
+  }
+
+  /* Sign-out affordance — red label + arrow per design. Token
+     color falls back to a sensible red if the design system
+     doesn't expose a destructive red yet. */
+  html[data-design="v2"] .v2-settings-signout {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    margin-right: -8px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--ds-color-destructive, #D43E3E);
+  }
+
+  /* Toggle switch — matches the existing `.toggle-switch` shape
+     but uses local tokens so the settings card stays consistent
+     even if the legacy chip gets restyled elsewhere. 36×20 track
+     with a 14×14 knob inset by 3. */
+  html[data-design="v2"] .v2-settings-toggle {
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    border: 0;
+    background: var(--ds-color-gray-outline);
+    position: relative;
+    cursor: pointer;
+    padding: 0;
+    flex: 0 0 auto;
+    transition: background 160ms var(--ease, ease);
+  }
+  html[data-design="v2"] .v2-settings-toggle-knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--ds-color-white);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+    transition: transform 160ms var(--ease, ease);
+  }
+  html[data-design="v2"] .v2-settings-toggle.is-on {
+    /* Token-derived green — falls back to the screenshot's green
+       if --ds-color-success isn't defined. */
+    background: var(--ds-color-success, #34C759);
+  }
+  html[data-design="v2"] .v2-settings-toggle.is-on .v2-settings-toggle-knob {
+    transform: translateX(16px);
+  }
+
+  /* Right-chevron on nav rows — black, 10×16 glyph with mid stroke. */
+  html[data-design="v2"] .v2-settings-row-chevron {
+    color: var(--ds-color-black);
+    flex: 0 0 auto;
+  }
 }
 

@@ -85,7 +85,7 @@ function friendlyImageGenError(message: string, code: string | null): string {
   }
 }
 
-type MainTab = "projects" | "moments";
+type MainTab = "projects" | "moments" | "settings";
 
 /* ======= SVG Icons (from design assets) ======= */
 const IconSearch = () => (
@@ -202,6 +202,201 @@ function DesktopSidebar({
         </button>
       </div>
     </aside>
+  );
+}
+
+/** v2 desktop Settings screen — full-page surface that replaces
+ *  the legacy `.menu-panel` dropdown. Lives inside `.app-content`
+ *  so the sidebar stays visible. Width is constrained to 865px
+ *  per spec; everything below the page-level "Settings" header is
+ *  a stack of white cards with a 0/2/16/0 9%-opacity drop shadow.
+ *  All copy / colors / typestyles use design-system tokens. */
+function SettingsScreen({
+  email,
+  onSignOut,
+  darkMode,
+  setDarkMode,
+  useDraftPopup,
+  setDraftPickerStyle,
+  autosaveEnabled,
+  setAutosaveEnabled,
+  forceEmptyState,
+  setForceEmptyState,
+  onOpenStyleGuide,
+}: {
+  email: string;
+  onSignOut: () => void;
+  darkMode: boolean;
+  setDarkMode: (v: boolean) => void;
+  useDraftPopup: boolean;
+  setDraftPickerStyle: (s: "popup" | "sheet") => void;
+  autosaveEnabled: boolean;
+  setAutosaveEnabled: (v: boolean) => void;
+  forceEmptyState: boolean;
+  setForceEmptyState: (v: boolean) => void;
+  onOpenStyleGuide: () => void;
+}) {
+  // Preferences toggles — array-driven so the markup stays uniform
+  // across the four rows; copy is centralized here for easy edits.
+  const prefRows: Array<{
+    label: string;
+    caption: string;
+    value: boolean;
+    onChange: (v: boolean) => void;
+  }> = [
+    {
+      label: "Dark Mode",
+      caption: "Switch the interface to darkmode",
+      value: darkMode,
+      onChange: v => setDarkMode(v),
+    },
+    {
+      label: "Draft Popups",
+      caption: "Show a popup when starting a new draft",
+      value: useDraftPopup,
+      onChange: v => setDraftPickerStyle(v ? "popup" : "sheet"),
+    },
+    {
+      label: "Auto-Save Edits",
+      caption: "Automatically save your work in real-time",
+      value: autosaveEnabled,
+      onChange: v => setAutosaveEnabled(v),
+    },
+    {
+      label: "Empty State Preview",
+      caption: "Show preview graphics for empty states",
+      value: forceEmptyState,
+      onChange: v => setForceEmptyState(v),
+    },
+  ];
+
+  return (
+    <div className="v2-settings-screen">
+      <header className="v2-settings-header">
+        <h1 className="v2-settings-title ds-type-empty-header">Settings</h1>
+        <p className="v2-settings-subtitle ds-type-body">
+          Manage your account, preferences, and app settings
+        </p>
+      </header>
+
+      {/* Account row — email + Sign Out */}
+      <section className="v2-settings-card v2-settings-card--account">
+        <div className="v2-settings-row v2-settings-row--account">
+          <div className="v2-settings-row-avatar" aria-hidden="true" />
+          <div className="v2-settings-row-text">
+            <div className="v2-settings-row-label ds-type-body-bold">Account</div>
+            <div className="v2-settings-row-caption ds-type-body">
+              {email || "—"}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="v2-settings-signout ds-type-button-label"
+            onClick={onSignOut}
+          >
+            <span>Sign Out</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      {/* Preferences card */}
+      <section className="v2-settings-card v2-settings-card--prefs">
+        <div className="v2-settings-card-header ds-type-body-bold">Account</div>
+        <div className="v2-settings-rows">
+          {prefRows.map(row => (
+            <div className="v2-settings-row" key={row.label}>
+              <div className="v2-settings-row-avatar" aria-hidden="true" />
+              <div className="v2-settings-row-text">
+                <div className="v2-settings-row-label ds-type-body-bold">{row.label}</div>
+                <div className="v2-settings-row-caption ds-type-body">{row.caption}</div>
+              </div>
+              <button
+                type="button"
+                className={`v2-settings-toggle ${row.value ? "is-on" : ""}`}
+                role="switch"
+                aria-checked={row.value}
+                aria-label={`Toggle ${row.label}`}
+                onClick={() => row.onChange(!row.value)}
+              >
+                <span className="v2-settings-toggle-knob" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Navigation card — AI Connections + Style Guide */}
+      <section className="v2-settings-card v2-settings-card--nav">
+        <div className="v2-settings-card-header ds-type-body-bold">Account</div>
+        <div className="v2-settings-rows">
+          <button
+            type="button"
+            className="v2-settings-row v2-settings-row--nav"
+          >
+            <div className="v2-settings-row-avatar" aria-hidden="true" />
+            <div className="v2-settings-row-text">
+              <div className="v2-settings-row-label ds-type-body-bold">AI Connections</div>
+              <div className="v2-settings-row-caption ds-type-body">AI Connections</div>
+            </div>
+            <svg
+              className="v2-settings-row-chevron"
+              width="10"
+              height="16"
+              viewBox="0 0 10 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="2 2 8 8 2 14" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="v2-settings-row v2-settings-row--nav"
+            onClick={onOpenStyleGuide}
+          >
+            <div className="v2-settings-row-avatar" aria-hidden="true" />
+            <div className="v2-settings-row-text">
+              <div className="v2-settings-row-label ds-type-body-bold">Styleguide</div>
+              <div className="v2-settings-row-caption ds-type-body">
+                Customize the look and feel of your experience
+              </div>
+            </div>
+            <svg
+              className="v2-settings-row-chevron"
+              width="10"
+              height="16"
+              viewBox="0 0 10 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="2 2 8 8 2 14" />
+            </svg>
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1700,6 +1895,32 @@ export default function Page() {
                 onStartRecording={startRecording}
               />
             )}
+            {/* v2 desktop Settings screen — full-page surface that
+                replaces the legacy `.menu-panel` dropdown. Account
+                row at top, prefs section (Dark Mode / Draft Popups
+                / Auto-Save / Empty-State Preview) in the middle,
+                navigation section (AI Connections / Style Guide)
+                at the bottom. The sidebar gear button routes here
+                on v2 desktop. */}
+            {mainTab === "settings" && (
+              <SettingsScreen
+                email={userEmailTrimmed}
+                onSignOut={signOut}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
+                useDraftPopup={useDraftPopup}
+                setDraftPickerStyle={setDraftPickerStyle}
+                autosaveEnabled={autosaveEnabled}
+                setAutosaveEnabled={setAutosaveEnabled}
+                forceEmptyState={forceEmptyState}
+                setForceEmptyState={setForceEmptyState}
+                onOpenStyleGuide={() => {
+                  if (typeof window !== "undefined") {
+                    window.location.href = "/style-guide";
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
       </>
@@ -1717,7 +1938,17 @@ export default function Page() {
         inStudio={view.kind === "studio"}
         onProjects={() => { setView({ kind: "main" }); setMainTab("projects"); }}
         onIdeas={() => { setView({ kind: "main" }); setMainTab("moments"); }}
-        onMenu={() => setMenuOpen(true)}
+        /* On v2 desktop, the sidebar Account button routes to the
+           full Settings screen rather than the legacy dropdown
+           menu. Mobile / v1 keeps the dropdown panel. */
+        onMenu={() => {
+          if (isV2) {
+            setView({ kind: "main" });
+            setMainTab("settings");
+          } else {
+            setMenuOpen(true);
+          }
+        }}
         userInitial={userInitial}
       />
       <div className="app-content">
