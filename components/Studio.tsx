@@ -9404,12 +9404,16 @@ function StoryTab({
               }
               addLabel={isV2 ? "Add a Scene" : "Add scene"}
               onAdd={() => openNewScene(0)}
-              /* On v2, route the Create With AI button through the
-                 direction-prompt popup so the user can write
-                 optional guidance first. v1 keeps the legacy
-                 immediate-generate flow. */
+              /* On v2 DESKTOP, route the Create With AI button through
+                 the direction-prompt popup so the user can write
+                 optional guidance first. v1 + v2 mobile keep the
+                 legacy immediate-generate flow (the popup is a
+                 desktop-only surface; on a phone-sized screen the
+                 modal would crowd the empty state and the user
+                 already has a different way to set direction via
+                 the "Have direction in mind?" card below). */
               onGenerate={
-                isV2
+                isV2 && isDesktop
                   ? () => setDirectionPromptOpen(true)
                   : generateAllBeats
               }

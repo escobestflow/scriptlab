@@ -377,6 +377,18 @@ html[data-theme="dark"] .topbar {
    a top heading. Default-hidden here; the desktop @media block
    further down flips it back to `display: block`. */
 .projects-empty-page-heading { display: none; }
+/* Base styling for the copy wrapper added by the desktop empty-state
+   redesign. On mobile it has no positioning of its own — desktop's
+   @media block layers absolute positioning on top. Either way it
+   needs to be a centered flex column so its children (title /
+   caption / button) stack and center the same way they did before
+   the wrapper was introduced (when they were direct children of
+   `.projects-empty`, which is itself a centered flex column). */
+.projects-empty-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 .projects-empty {
   display: flex;
   flex-direction: column;
