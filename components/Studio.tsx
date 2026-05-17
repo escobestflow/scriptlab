@@ -2691,14 +2691,6 @@ export function Studio({
           return (
             <>
               <div
-                /* `key={section}` forces React to unmount/remount the
-                    wrapper on section change. That re-triggers the
-                    `.tab-content-wrap` CSS animation (defined in
-                    globals.css) every time the user switches tabs,
-                    giving Concept → Characters → Story → Script a
-                    short, snappy fade-up transition instead of a
-                    hard cut. */
-                key={section}
                 style={{ padding: "8px 22px 40px" }}
                 className={`tab-content-wrap tab-content-wrap-${section}${previewActive ? " partner-preview-locked" : ""}`}
                 aria-hidden={previewActive ? true : undefined}

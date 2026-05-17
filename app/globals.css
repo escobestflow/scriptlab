@@ -305,63 +305,16 @@ html[data-theme="dark"] .topbar {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Top-level view transition wrapper. Re-fires whenever the user
-   moves between Projects, Ideas, Settings, or into / out of a
-   Studio project.
-
-   IMPORTANT — sizing: `.app-content` is `display: flex; flex-
-   direction: column; flex: 1; min-height: 0`. This wrapper is
-   inserted as a flex child of `.app-content`, so it needs
-   `flex: 1; min-height: 0` (+ `display: flex; flex-direction:
-   column`) to fill the parent's height; otherwise the wrapper
-   collapses to its content's intrinsic height and Studio (which
-   uses `position: absolute; inset: 0` for `.studio-scroll`)
-   renders into a 0×0 box.
-
-   IMPORTANT — NO `transform`, `will-change: transform`, or
-   `position: relative` here. Any of those would make `.view-
-   transition` a containing block for fixed-position descendants
-   like `.studio-empty-overlay` (mobile: `position: fixed; top:
-   378px`), pulling them off the viewport and into this wrapper's
-   coordinate space — which sits ~44px below the screen top
-   because the topbar is a sibling above it. The opacity-only
-   fade below avoids that trap entirely. */
-.view-transition {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  animation: viewTransitionIn 280ms ease both;
-}
-@keyframes viewTransitionIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* Tab content transition inside a Studio project. Shorter +
-   lighter than the view-level transition so Concept → Characters
-   → Story → Script feels snappy. Tied to the `key={section}` on
-   `.tab-content-wrap` in Studio.tsx — every section change
-   remounts the wrapper, replaying the fade. Opacity-only for
-   the same reason as `.view-transition` above (no containing-
-   block side-effects on `position: fixed` descendants). */
-.tab-content-wrap {
-  animation: tabContentIn 180ms ease both;
-}
-@keyframes tabContentIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* Honor users who've requested reduced motion — skip both
-   transitions outright so the UI cuts cleanly instead of
-   animating. */
-@media (prefers-reduced-motion: reduce) {
-  .view-transition,
-  .tab-content-wrap {
-    animation: none;
-  }
-}
+/* View / tab transitions removed — they were creating mobile
+   layout regressions (the `.view-transition` wrapper, via either
+   a `transform` animation or `position: relative`, was scoping
+   `.studio-scroll`'s absolute positioning and `.studio-empty-
+   overlay`'s fixed positioning to the wrapper instead of the
+   viewport, pushing the empty-state graphic off-screen on
+   mobile). Reverting to the pre-transition behavior — instant
+   cuts on view + tab change. Re-introduce later only if scoped
+   to desktop and proven not to create containing blocks for
+   fixed/absolute descendants. */
 
 /* ======= PROJECT CARDS ======= */
 /* Compact elevated list row — square cover on the left, content on the

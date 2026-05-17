@@ -2045,17 +2045,7 @@ export default function Page() {
         userDisplayName={userDisplayName}
       />
       <div className="app-content">
-      {/* `.view-transition` re-fires its CSS animation every time the
-          view kind / project changes — gives Projects → Studio (and
-          Studio → Studio across projects) a short fade-up transition
-          instead of an instant cut. The key is derived from the active
-          view so React remounts the wrapper on each transition. */}
-      <div
-        className="view-transition"
-        key={view.kind === "studio" ? `s-${view.projectId}` : `m-${mainTab}`}
-      >
       {renderContent()}
-      </div>
 
       {/* Tab bar — hidden when inside a project */}
       <nav className={`tabbar ${view.kind === "studio" ? "tabbar-hidden" : ""}`}>
