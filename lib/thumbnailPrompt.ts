@@ -65,10 +65,25 @@ function extractFilledPrompt(raw: string): string {
   return raw.slice(idx).trim();
 }
 
+export type BuildImagePromptResult = {
+  prompt: string;
+  /** Anthropic token usage from the stage-1 call. Exposed so the
+   *  caller can include it in the usage_log row. Shape matches the
+   *  Anthropic SDK's `Usage` (`input_tokens`, `output_tokens`, plus
+   *  cache token counts when present). */
+  usage: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
+  model: string;
+};
+
 export async function buildImagePrompt(
   inputs: ImagePromptInputs,
   apiKey: string,
-): Promise<string> {
+): Promise<BuildImagePromptResult> {
   const { title, logline, genres, extra } = inputs;
   const genreStr = genres?.length ? genres.join(", ") : "drama";
   const extraTrim = (extra || "").trim();
@@ -94,8 +109,9 @@ export async function buildImagePrompt(
   ].join("\n");
 
   const client = new Anthropic({ apiKey });
+  const model = "claude-haiku-4-5";
   const res = await client.messages.create({
-    model: "claude-haiku-4-5",
+    model,
     max_tokens: 800,
     system: SYSTEM_BRIEF,
     messages: [{ role: "user", content: userMessage }],
@@ -103,5 +119,9 @@ export async function buildImagePrompt(
 
   const textBlocks = res.content.filter(b => b.type === "text");
   const raw = textBlocks.map(b => (b as { text: string }).text).join("\n");
-  return extractFilledPrompt(raw);
+  return {
+    prompt: extractFilledPrompt(raw),
+    usage: res.usage ?? {},
+    model,
+  };
 }

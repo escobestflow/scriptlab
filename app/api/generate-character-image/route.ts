@@ -13,6 +13,7 @@ import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
+import { logUsage } from "@/lib/usageLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,7 +73,8 @@ ${description}`;
 }
 
 export async function POST(req: Request) {
-  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+  const userEmail = req.headers.get("x-user-email");
+  if (!isBetaAllowed(userEmail)) {
     return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
       status: BETA_FORBIDDEN_RESPONSE.status,
     });
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { description, genre, tone } = await req.json();
+    const { description, genre, tone, projectId } = await req.json();
     if (!description || typeof description !== "string" || !description.trim()) {
       return new Response(JSON.stringify({ error: "description required" }), {
         status: 400,
@@ -99,20 +101,31 @@ export async function POST(req: Request) {
       typeof genre === "string" ? genre : undefined,
       typeof tone === "string" ? tone : undefined,
     );
-    const isV2 = isV2User(req.headers.get("x-user-email"));
+    const isV2 = isV2User(userEmail);
 
     // Image gen — vertical 4:5 portrait with automatic fallback.
     // gpt-image-2 first for v2 users; dall-e-3 fallback if it fails.
     // dall-e-3's nearest portrait is 1024x1792 (9:16, slightly taller
     // than 4:5 but acceptable; sharp will center-crop).
+    const sizes = { gptImage2: "1024x1280" as const, dallE3: "1024x1792" as const };
     const attempt = await generateImageWithFallback({
       apiKey,
       prompt,
-      sizes: { gptImage2: "1024x1280", dallE3: "1024x1792" },
+      sizes,
       context: "generate-character-image",
       preferV2: isV2,
     });
     if (!attempt.ok) {
+      void logUsage({
+        userEmail,
+        projectId: projectId ?? null,
+        provider: "openai",
+        kind: "image",
+        model: isV2 ? "gpt-image-2" : "dall-e-3",
+        action: "generate_character_image",
+        image: { count: 1, size: isV2 ? sizes.gptImage2 : sizes.dallE3 },
+        error: `${attempt.code ?? "error"}: ${attempt.error}`,
+      });
       return new Response(JSON.stringify({
         error: attempt.error,
         code: attempt.code,
@@ -121,6 +134,18 @@ export async function POST(req: Request) {
         headers: { "Content-Type": "application/json" },
       });
     }
+    void logUsage({
+      userEmail,
+      projectId: projectId ?? null,
+      provider: "openai",
+      kind: "image",
+      model: attempt.model,
+      action: "generate_character_image",
+      image: {
+        count: 1,
+        size: attempt.model === "gpt-image-2" ? sizes.gptImage2 : sizes.dallE3,
+      },
+    });
     const b64 = attempt.b64;
 
     // Compress: source PNG → 500x600 (5:6) JPEG (~30–60KB). Card

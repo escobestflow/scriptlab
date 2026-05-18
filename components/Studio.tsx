@@ -1241,7 +1241,7 @@ export function Studio({
       const res = await fetch("/api/generate-scene-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -1433,7 +1433,7 @@ export function Studio({
       const res = await fetch("/api/generate-character-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -8619,7 +8619,7 @@ function CharacterEditForm({
       const res = await fetch("/api/generate-character-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id }),
       });
       const data = await res.json();
       if (data.thumbnail) {
@@ -11226,7 +11226,7 @@ function SceneEditForm({
       const res = await fetch("/api/generate-scene-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone }),
+        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id }),
       });
       const data = await res.json();
       if (data.thumbnail) {

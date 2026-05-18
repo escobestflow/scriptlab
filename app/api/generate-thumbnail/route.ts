@@ -22,13 +22,15 @@ import { buildImagePrompt } from "@/lib/thumbnailPrompt";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
+import { logUsage } from "@/lib/usageLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   // Beta gate — see app/api/generate/route.ts for the rationale.
-  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+  const userEmail = req.headers.get("x-user-email");
+  if (!isBetaAllowed(userEmail)) {
     return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
       status: BETA_FORBIDDEN_RESPONSE.status,
     });
@@ -49,29 +51,49 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { title, logline, genres, extra } = await req.json();
+    const { title, logline, genres, extra, projectId } = await req.json();
 
     // Stage 1: Claude composes the locked-style image brief.
-    const prompt = await buildImagePrompt(
+    const stage1 = await buildImagePrompt(
       { title, logline, genres, extra },
       anthropicKey,
     );
+    void logUsage({
+      userEmail,
+      projectId: projectId ?? null,
+      provider: "anthropic",
+      kind: "text",
+      model: stage1.model,
+      action: "thumbnail_prompt_build",
+      textUsage: stage1.usage,
+    });
 
     // Stage 2: route by design tier with automatic fallback. V2 users
     // try gpt-image-2 first (better quality, ~5x cost); if that fails
     // for any reason (model unavailable, content moderation, quota,
     // transient 5xx) the helper retries on dall-e-3. V1 users go
     // straight to dall-e-3. See lib/imageGenWithFallback.ts.
-    const isV2 = isV2User(req.headers.get("x-user-email"));
+    const isV2 = isV2User(userEmail);
+    const sizes = { gptImage2: "1536x768" as const, dallE3: "1792x1024" as const };
     const attempt = await generateImageWithFallback({
       apiKey,
-      prompt,
-      sizes: { gptImage2: "1536x768", dallE3: "1792x1024" },
+      prompt: stage1.prompt,
+      sizes,
       context: `generate-thumbnail project="${title || "Untitled"}"`,
       preferV2: isV2,
     });
 
     if (!attempt.ok) {
+      void logUsage({
+        userEmail,
+        projectId: projectId ?? null,
+        provider: "openai",
+        kind: "image",
+        model: isV2 ? "gpt-image-2" : "dall-e-3",
+        action: "generate_thumbnail",
+        image: { count: 1, size: isV2 ? sizes.gptImage2 : sizes.dallE3 },
+        error: `${attempt.code ?? "error"}: ${attempt.error}`,
+      });
       return new Response(JSON.stringify({
         error: attempt.error,
         code: attempt.code,
@@ -80,6 +102,19 @@ export async function POST(req: Request) {
         headers: { "Content-Type": "application/json" },
       });
     }
+
+    void logUsage({
+      userEmail,
+      projectId: projectId ?? null,
+      provider: "openai",
+      kind: "image",
+      model: attempt.model,
+      action: "generate_thumbnail",
+      image: {
+        count: 1,
+        size: attempt.model === "gpt-image-2" ? sizes.gptImage2 : sizes.dallE3,
+      },
+    });
 
     const b64 = attempt.b64;
 

@@ -1298,7 +1298,7 @@ export default function Page() {
       const res = await fetch("/api/generate-thumbnail", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, logline, genres, extra }),
+        body: JSON.stringify({ title, logline, genres, extra, projectId }),
       });
       if (!res.ok) {
         // Extract error message + machine-readable code from the JSON

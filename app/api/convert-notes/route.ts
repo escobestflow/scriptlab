@@ -10,6 +10,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
+import { logUsage } from "@/lib/usageLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,11 +33,13 @@ Output rules:
 
 export async function POST(req: Request) {
   // Beta gate — see app/api/generate/route.ts for the rationale.
-  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+  const userEmail = req.headers.get("x-user-email");
+  if (!isBetaAllowed(userEmail)) {
     return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
       status: BETA_FORBIDDEN_RESPONSE.status,
     });
   }
+  const model = "claude-haiku-4-5";
   try {
     const { notes } = (await req.json()) as { notes: string[] };
     if (!Array.isArray(notes) || notes.length === 0) {
@@ -48,7 +51,7 @@ export async function POST(req: Request) {
       .join("\n\n");
 
     const res = await client.messages.create({
-      model: "claude-haiku-4-5",
+      model,
       max_tokens: 4096,
       system: SYSTEM,
       messages: [
@@ -66,12 +69,29 @@ export async function POST(req: Request) {
       .map((b: any) => b.text)
       .join("\n");
 
+    void logUsage({
+      userEmail,
+      provider: "anthropic",
+      kind: "text",
+      model,
+      action: "convert_notes",
+      textUsage: res.usage ?? {},
+    });
+
     return new Response(text, {
       status: 200,
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e);
+    void logUsage({
+      userEmail,
+      provider: "anthropic",
+      kind: "text",
+      model,
+      action: "convert_notes",
+      error: msg,
+    });
     return new Response(`convert-notes error: ${msg}`, { status: 500 });
   }
 }

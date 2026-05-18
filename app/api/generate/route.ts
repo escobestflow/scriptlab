@@ -10,6 +10,7 @@ import { ActionRequest, modelForAction, costFromUsage } from "@/lib/prompt";
 import { buildPrompt } from "@/lib/contextBuilder";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import type { WriterProfile } from "@/lib/writerProfile";
+import { logUsage } from "@/lib/usageLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,8 @@ export async function POST(req: Request) {
   // — empty string when signed out. Block calls from anyone not on
   // NEXT_PUBLIC_ALLOWED_EMAILS so backend AI costs are gated even if
   // the client-side gate is bypassed.
-  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+  const userEmail = req.headers.get("x-user-email");
+  if (!isBetaAllowed(userEmail)) {
     return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
       status: BETA_FORBIDDEN_RESPONSE.status,
     });
@@ -147,6 +149,19 @@ export async function POST(req: Request) {
             JSON.stringify({ type: "report", value: report }) + "\n"
           ));
         }
+
+        // Persist to usage_log — fire-and-forget; never throws.
+        // Done in parallel with controller.close() so streaming
+        // latency to the client is unaffected.
+        void logUsage({
+          userEmail,
+          projectId: story?.id ?? null,
+          provider: "anthropic",
+          kind: "text",
+          model,
+          action: action.type,
+          textUsage: finalUsage ?? {},
+        });
 
         controller.close();
       },

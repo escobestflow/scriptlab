@@ -4,6 +4,7 @@
 // by (text, voice, instructions) so re-plays are free.
 
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
+import { logUsage } from "@/lib/usageLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,11 +15,13 @@ const MAX_CHARS = 4000;
 
 export async function POST(req: Request) {
   // Beta gate — see app/api/generate/route.ts for the rationale.
-  if (!isBetaAllowed(req.headers.get("x-user-email"))) {
+  const userEmail = req.headers.get("x-user-email");
+  if (!isBetaAllowed(userEmail)) {
     return Response.json(BETA_FORBIDDEN_RESPONSE.body, {
       status: BETA_FORBIDDEN_RESPONSE.status,
     });
   }
+  const ttsModel = "gpt-4o-mini-tts";
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "OPENAI_API_KEY not set" }), {
@@ -54,7 +57,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini-tts",
+        model: ttsModel,
         input: text,
         voice,
         ...(instructions ? { instructions } : {}),
@@ -64,6 +67,15 @@ export async function POST(req: Request) {
 
     if (!res.ok) {
       const err = await res.text();
+      void logUsage({
+        userEmail,
+        provider: "openai",
+        kind: "audio",
+        model: ttsModel,
+        action: "tts",
+        audio: { chars: text.length },
+        error: `TTS error: ${err.slice(0, 200)}`,
+      });
       return new Response(JSON.stringify({ error: `TTS error: ${err}` }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -71,6 +83,14 @@ export async function POST(req: Request) {
     }
 
     const buf = await res.arrayBuffer();
+    void logUsage({
+      userEmail,
+      provider: "openai",
+      kind: "audio",
+      model: ttsModel,
+      action: "tts",
+      audio: { chars: text.length },
+    });
     return new Response(buf, {
       status: 200,
       headers: {
@@ -79,6 +99,14 @@ export async function POST(req: Request) {
       },
     });
   } catch (err: any) {
+    void logUsage({
+      userEmail,
+      provider: "openai",
+      kind: "audio",
+      model: ttsModel,
+      action: "tts",
+      error: err?.message ?? "unknown",
+    });
     return new Response(JSON.stringify({ error: err?.message ?? "unknown" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
