@@ -76,7 +76,15 @@ export default function AdminUsagePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/admin/usage");
+        // Pass the email header explicitly. The AuthProvider's fetch
+        // wrapper normally injects this for /api/* calls, but its
+        // useEffect installs the wrapper on a re-render and the
+        // page's own useEffect can fire first (React runs child
+        // effects before parent effects). Setting it here removes
+        // that race entirely.
+        const res = await fetch("/api/admin/usage", {
+          headers: { "x-user-email": user?.email ?? "" },
+        });
         if (!res.ok) {
           const body = await res.text();
           if (!cancelled) setFetchErr(`HTTP ${res.status}: ${body.slice(0, 200)}`);
