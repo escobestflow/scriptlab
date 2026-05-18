@@ -26,6 +26,7 @@ import {
   type ProjectMembers,
 } from "@/lib/invites";
 import { useAuth } from "@/lib/auth";
+import { isAdmin } from "@/lib/adminEmails";
 import { useIsV2 } from "@/lib/v2Access";
 import { Studio } from "@/components/Studio";
 import SplashLoader from "@/components/SplashLoader";
@@ -458,6 +459,40 @@ function SettingsScreen({
               <polyline points="2 2 8 8 2 14" />
             </svg>
           </button>
+          {/* Admin-only nav row — renders only when the signed-in email
+              matches the hardcoded admin allowlist in lib/adminEmails.ts.
+              Hidden for every other user; the underlying /admin/usage
+              page enforces the same gate, so guessing the URL doesn't
+              expose anything. */}
+          {isAdmin(email) && (
+            <a
+              href="/admin/usage"
+              className="v2-settings-row v2-settings-row--nav"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <div className="v2-settings-row-avatar" aria-hidden="true" />
+              <div className="v2-settings-row-text">
+                <div className="v2-settings-row-label ds-type-body-bold">Usage Dashboard</div>
+                <div className="v2-settings-row-caption ds-type-body">
+                  See who&apos;s generating what, by user and feature
+                </div>
+              </div>
+              <svg
+                className="v2-settings-row-chevron"
+                width="10"
+                height="16"
+                viewBox="0 0 10 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="2 2 8 8 2 14" />
+              </svg>
+            </a>
+          )}
         </div>
       </section>
     </div>
