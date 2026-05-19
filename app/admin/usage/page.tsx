@@ -26,6 +26,11 @@ type Row = {
   user_id: string | null;
   user_email: string;
   project_id: string | null;
+  project_name: string | null;
+  target_id: string | null;
+  target_name: string | null;
+  draft_id: string | null;
+  draft_label: string | null;
   provider: "anthropic" | "openai";
   kind: "text" | "image" | "audio";
   model: string;
@@ -133,6 +138,7 @@ export default function AdminUsagePage() {
       </div>
 
       <Kpis rows={rows} />
+      <SuspectedDuplicates rows={rows} />
       <ByUser rows={rows} filterEmail={filterEmail} setFilterEmail={setFilterEmail} />
       <ByAction rows={rows} filterAction={filterAction} setFilterAction={setFilterAction} />
       <DailyTimeline rows={rows} />
@@ -198,6 +204,103 @@ function Kpi({
       <div style={kpiValue}>{value}</div>
       {hint && <div style={kpiHint}>{hint}</div>}
     </div>
+  );
+}
+
+// ── Suspected duplicates ────────────────────────────────────────
+// Groups image gens by (project_id, target_id, draft_id). When the
+// same (target, draft) shows >1 generation, surfaces it as a likely
+// bug — image gens cost ~$0.19 each so accidental dupes are the
+// #1 thing the user wants to catch. Same target across DIFFERENT
+// drafts is fine (drafts are intentional copies) and not flagged.
+function SuspectedDuplicates({ rows }: { rows: Row[] }) {
+  const dupes = useMemo(() => {
+    const groups = new Map<string, Row[]>();
+    for (const r of rows) {
+      if (r.kind !== "image") continue;
+      if (!r.target_id) continue; // Only character/beat images, not project thumbnails
+      const key = `${r.project_id ?? "?"}|${r.target_id}|${r.draft_id ?? "?"}`;
+      const list = groups.get(key) ?? [];
+      list.push(r);
+      groups.set(key, list);
+    }
+    const out: Array<{
+      key: string;
+      projectName: string;
+      targetName: string;
+      draftLabel: string;
+      action: string;
+      count: number;
+      totalCost: number;
+      rows: Row[];
+    }> = [];
+    for (const [key, list] of groups.entries()) {
+      if (list.length < 2) continue;
+      const first = list[0];
+      out.push({
+        key,
+        projectName: first.project_name ?? "(unknown project)",
+        targetName: first.target_name ?? "(unknown target)",
+        draftLabel: first.draft_label ?? "(no draft label)",
+        action: first.action,
+        count: list.length,
+        totalCost: list.reduce((s, r) => s + (r.est_cost_usd ?? 0), 0),
+        rows: list,
+      });
+    }
+    return out.sort((a, b) => b.count - a.count);
+  }, [rows]);
+
+  if (dupes.length === 0) {
+    return (
+      <section style={section}>
+        <h2 style={h2}>Suspected duplicate image generations</h2>
+        <div style={{ ...dim, fontSize: 13 }}>
+          No duplicates detected. Every (project · target · draft) combination
+          has at most one image generation — that&apos;s the expected state.
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section style={{ ...section, borderColor: "#5a3a1a" }}>
+      <h2 style={h2}>
+        Suspected duplicate image generations
+        <span style={{ marginLeft: 10, color: "#f5a623", fontSize: 12, fontWeight: 400, textTransform: "none" }}>
+          {dupes.length} group{dupes.length === 1 ? "" : "s"} · same target + draft generated more than once
+        </span>
+      </h2>
+      <table style={table}>
+        <thead>
+          <tr>
+            <th style={th}>Project</th>
+            <th style={th}>Target</th>
+            <th style={th}>Draft</th>
+            <th style={th}>Action</th>
+            <th style={thNum}>Gens</th>
+            <th style={thNum}>Wasted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {dupes.map(d => (
+            <tr key={d.key}>
+              <td style={td}>{d.projectName}</td>
+              <td style={td}><strong>{d.targetName}</strong></td>
+              <td style={td}><span style={dim}>{d.draftLabel}</span></td>
+              <td style={td}><code style={code}>{d.action}</code></td>
+              <td style={{ ...tdNum, color: "#f5a623", fontWeight: 600 }}>{d.count}</td>
+              <td style={{ ...tdNum, color: "#f5a623" }}>
+                {fmtUsd(d.totalCost - (d.totalCost / d.count))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ ...dim, fontSize: 11, marginTop: 8 }}>
+        &quot;Wasted&quot; estimates the cost of redundant calls beyond the first one in each group.
+      </div>
+    </section>
   );
 }
 
@@ -439,8 +542,10 @@ function RecentTable({
           <tr>
             <th style={th}>Time</th>
             <th style={th}>User</th>
+            <th style={th}>Project</th>
+            <th style={th}>Target</th>
+            <th style={th}>Draft</th>
             <th style={th}>Action</th>
-            <th style={th}>Model</th>
             <th style={thNum}>Tokens / count</th>
             <th style={thNum}>Cost</th>
             <th style={th}>Status</th>
@@ -465,11 +570,25 @@ function RecentTable({
                 )}
               </td>
               <td style={td}>
+                {r.project_name
+                  ? <span>{r.project_name}</span>
+                  : <span style={dim}>—</span>}
+              </td>
+              <td style={td}>
+                {r.target_name
+                  ? <strong>{r.target_name}</strong>
+                  : <span style={dim}>—</span>}
+              </td>
+              <td style={td}>
+                {r.draft_label
+                  ? <span style={dim}>{r.draft_label}</span>
+                  : <span style={dim}>—</span>}
+              </td>
+              <td style={td}>
                 <button type="button" style={linkBtn} onClick={() => setFilterAction(r.action)}>
                   <code style={code}>{r.action}</code>
                 </button>
               </td>
-              <td style={td}><span style={dim}>{r.model}</span></td>
               <td style={tdNum}>
                 {r.kind === "text" && (
                   <span style={dim}>
@@ -495,7 +614,7 @@ function RecentTable({
             </tr>
           ))}
           {filtered.length === 0 && (
-            <tr><td style={td} colSpan={7}><span style={dim}>No calls match these filters.</span></td></tr>
+            <tr><td style={td} colSpan={9}><span style={dim}>No calls match these filters.</span></td></tr>
           )}
         </tbody>
       </table>

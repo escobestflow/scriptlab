@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { description, genre, tone, projectId, characterId } = await req.json();
+    const { description, genre, tone, projectId, characterId, projectName, targetName, draftId, draftLabel } = await req.json();
     if (!description || typeof description !== "string" || !description.trim()) {
       return new Response(JSON.stringify({ error: "description required" }), {
         status: 400,
@@ -132,6 +132,11 @@ export async function POST(req: Request) {
       void logUsage({
         userEmail,
         projectId: projectId ?? null,
+        projectName: projectName ?? null,
+        targetId: characterId ?? null,
+        targetName: targetName ?? null,
+        draftId: draftId ?? null,
+        draftLabel: draftLabel ?? null,
         provider: "openai",
         kind: "image",
         model: isV2 ? "gpt-image-2" : "dall-e-3",
@@ -150,6 +155,11 @@ export async function POST(req: Request) {
     void logUsage({
       userEmail,
       projectId: projectId ?? null,
+      projectName: projectName ?? null,
+      targetId: characterId ?? null,
+      targetName: targetName ?? null,
+      draftId: draftId ?? null,
+      draftLabel: draftLabel ?? null,
       provider: "openai",
       kind: "image",
       model: attempt.model,

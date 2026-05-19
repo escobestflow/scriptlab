@@ -83,3 +83,28 @@ drop policy if exists "usage_log no delete" on public.usage_log;
 -- Empty policy set + RLS enabled = default-deny for everyone except
 -- the service role. The admin page hits the service-role client
 -- server-side; it never reaches the browser auth context.
+
+-- ── Denormalized display columns (added 2026-05-18) ──────────────
+-- These are nullable, optional snapshots of the project / character /
+-- beat / draft names at the moment the AI call was made. They power
+-- the dashboard's "is this the same target?" grouping — e.g. to
+-- confirm that two image gens for "Sara" are NOT a bug because they
+-- happened in different drafts (draft_id differs).
+--
+-- Stored denormalized (rather than joined on read) for two reasons:
+--   1. The names can change over time. A character renamed "Sara →
+--      Sarah" after the fact would mis-label the historical row.
+--   2. Projects can be deleted; the log row survives for audit.
+--
+-- Safe to re-run — IF NOT EXISTS makes ALTER TABLE idempotent.
+alter table public.usage_log add column if not exists project_name text;
+alter table public.usage_log add column if not exists target_id    text;
+alter table public.usage_log add column if not exists target_name  text;
+alter table public.usage_log add column if not exists draft_id     text;
+alter table public.usage_log add column if not exists draft_label  text;
+
+-- Composite index for the dashboard's "same target?" query —
+-- groups image gens by (project, target, draft). Sorted desc on
+-- created_at so the most recent dupes surface fastest.
+create index if not exists usage_log_target_dupes_idx
+  on public.usage_log (project_id, target_id, draft_id, created_at desc);

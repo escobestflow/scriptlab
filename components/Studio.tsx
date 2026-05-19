@@ -890,32 +890,50 @@ export function Studio({
   // future path that creates beats without a thumbnail.
   // Dedup + in-flight tracking happens INSIDE autoGenerateSceneImage
   // so any caller (bulk loop, close-sheet path, form button) is safe.
+  //
+  // EXCLUSION: the beat currently being created in the scene sheet
+  // is skipped — same reasoning as the character version above
+  // (typing the name fires premature gens on partial names).
   useEffect(() => {
     const draft = getActiveStoryLayerDraft(story);
     const allBeats = isTV && activeEpisodeId
       ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
       : draft.beats;
+    const skipId = sceneSheetIsNew ? sceneSheetBeatId : null;
     for (const b of allBeats) {
+      if (b.id === skipId) continue;
       if (b.name?.trim() && !b.thumbnail) {
         autoGenerateSceneImage(b.id).catch(() => { /* swallow */ });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [story, isTV, activeEpisodeId]);
+  }, [story, isTV, activeEpisodeId, sceneSheetIsNew, sceneSheetBeatId]);
 
   // Same auto-fill, characters edition. Fires on story-state
   // change for any character with a name + no thumbnail. Picks
   // up cast produced by the bulk Add All Characters path AND
   // by easy-mode sync_concept_to_characters runs.
+  //
+  // EXCLUSION: the character currently being created in the create
+  // sheet (`charSheetIsNew && charSheetCharId`) is skipped. Otherwise
+  // every keystroke in the name field would fire a gen on the
+  // partial-name draft — e.g. typing "Sara" triggers an image of
+  // "S" before the user finishes the word. The close handler
+  // (`closeCharacterSheet`) fires the gen explicitly once the user
+  // commits, so we don't lose anything by skipping here. Existing
+  // (already-saved) characters that lost a thumbnail somehow still
+  // get caught by this effect — that's the recovery path.
   useEffect(() => {
     const draft = getActiveCharactersDraft(story);
+    const skipId = charSheetIsNew ? charSheetCharId : null;
     for (const c of draft.characters) {
+      if (c.id === skipId) continue;
       if (c.name?.trim() && !c.thumbnail) {
         autoGenerateCharacterImage(c.id).catch(() => { /* swallow */ });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [story]);
+  }, [story, charSheetIsNew, charSheetCharId]);
 
   // One-shot diagnostic on initial story load — surfaces in DevTools
   // exactly which characters had a thumbnail vs. which didn't on the
@@ -1238,10 +1256,21 @@ export function Studio({
       const concept = getActiveConceptDraft(story);
       const primaryGenre = concept.settings?.genres?.[0];
       const projectTone = concept.concept?.tone;
+      const storyDraft = getActiveStoryLayerDraft(story);
       const res = await fetch("/api/generate-scene-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id, beatId }),
+        body: JSON.stringify({
+          description,
+          genre: primaryGenre,
+          tone: projectTone,
+          projectId: story.id,
+          beatId,
+          projectName: story.title ?? null,
+          targetName: beat.name ?? null,
+          draftId: storyDraft?.id ?? null,
+          draftLabel: storyDraft ? `Story Draft ${storyDraft.number}` : null,
+        }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -1430,10 +1459,24 @@ export function Studio({
       const concept = getActiveConceptDraft(story);
       const primaryGenre = concept.settings?.genres?.[0];
       const projectTone = concept.concept?.tone;
+      // Dashboard-display metadata. Snapshots the names + draft IDs at
+      // call time so the usage_log row labels stay correct even if the
+      // character is later renamed or the project deleted.
+      const charsDraft = getActiveCharactersDraft(story);
       const res = await fetch("/api/generate-character-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id, characterId }),
+        body: JSON.stringify({
+          description,
+          genre: primaryGenre,
+          tone: projectTone,
+          projectId: story.id,
+          characterId,
+          projectName: story.title ?? null,
+          targetName: ch.name ?? null,
+          draftId: charsDraft?.id ?? null,
+          draftLabel: charsDraft ? `Characters Draft ${charsDraft.number}` : null,
+        }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -8616,10 +8659,21 @@ function CharacterEditForm({
     const projectTone = concept.concept?.tone;
     setImgBusy(true);
     try {
+      const charsDraft = getActiveCharactersDraft(story);
       const res = await fetch("/api/generate-character-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id, characterId: ch.id }),
+        body: JSON.stringify({
+          description,
+          genre: primaryGenre,
+          tone: projectTone,
+          projectId: story.id,
+          characterId: ch.id,
+          projectName: story.title ?? null,
+          targetName: ch.name ?? null,
+          draftId: charsDraft?.id ?? null,
+          draftLabel: charsDraft ? `Characters Draft ${charsDraft.number}` : null,
+        }),
       });
       const data = await res.json();
       if (data.thumbnail) {
@@ -11223,10 +11277,21 @@ function SceneEditForm({
     const projectTone = concept.concept?.tone;
     setImgBusy(true);
     try {
+      const storyDraft = getActiveStoryLayerDraft(story);
       const res = await fetch("/api/generate-scene-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, genre: primaryGenre, tone: projectTone, projectId: story.id, beatId: beat.id }),
+        body: JSON.stringify({
+          description,
+          genre: primaryGenre,
+          tone: projectTone,
+          projectId: story.id,
+          beatId: beat.id,
+          projectName: story.title ?? null,
+          targetName: beat.name ?? null,
+          draftId: storyDraft?.id ?? null,
+          draftLabel: storyDraft ? `Story Draft ${storyDraft.number}` : null,
+        }),
       });
       const data = await res.json();
       if (data.thumbnail) {

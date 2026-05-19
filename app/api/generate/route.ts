@@ -152,10 +152,13 @@ export async function POST(req: Request) {
 
         // Persist to usage_log — fire-and-forget; never throws.
         // Done in parallel with controller.close() so streaming
-        // latency to the client is unaffected.
+        // latency to the client is unaffected. projectName is
+        // captured at call time so the dashboard can group by it
+        // even if the project is later renamed or deleted.
         void logUsage({
           userEmail,
           projectId: story?.id ?? null,
+          projectName: typeof story?.title === "string" ? story.title : null,
           provider: "anthropic",
           kind: "text",
           model,

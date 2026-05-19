@@ -54,6 +54,25 @@ export type UsageEvent = {
   userId?: string | null;
   projectId?: string | null;
 
+  /** Denormalized display fields — captured at call time. Used by the
+   *  admin dashboard to surface "what project / character / beat was
+   *  this for, and which draft was active?" so dupes are easy to spot.
+   *  All optional; routes pass what they know. */
+  projectName?: string | null;
+  /** Stable id of the thing being generated for — character.id,
+   *  beat.id, or undefined for top-level project thumbnails. */
+  targetId?: string | null;
+  /** Human-readable name of the target — character.name, beat.name,
+   *  etc. Captured at call time so a later rename doesn't mis-label
+   *  the historical row. */
+  targetName?: string | null;
+  /** Active draft this generation belongs to — id + human label. Two
+   *  image gens with the same target_id but different draft_id are
+   *  EXPECTED (drafts diverge); same target_id + same draft_id is a
+   *  bug worth investigating. */
+  draftId?: string | null;
+  draftLabel?: string | null;
+
   provider: "anthropic" | "openai";
   kind: "text" | "image" | "audio";
   model: string;
@@ -144,6 +163,11 @@ export async function logUsage(event: UsageEvent): Promise<string | null> {
       user_id: userId,
       user_email: event.userEmail,
       project_id: event.projectId ?? null,
+      project_name: event.projectName ?? null,
+      target_id:   event.targetId   ?? null,
+      target_name: event.targetName ?? null,
+      draft_id:    event.draftId    ?? null,
+      draft_label: event.draftLabel ?? null,
       provider: event.provider,
       kind: event.kind,
       model: event.model,

@@ -53,6 +53,11 @@ export async function POST(req: Request) {
 
   try {
     const { title, logline, genres, extra, projectId } = await req.json();
+    // The project's title doubles as `projectName` for dashboard rows.
+    // Thumbnails don't have a more granular target (the whole project IS
+    // the target), so target_id/target_name are left null. Draft is also
+    // null — covers apply at project level, not per-draft.
+    const projectName = typeof title === "string" ? title : null;
 
     // Stage 1: Claude composes the locked-style image brief.
     const stage1 = await buildImagePrompt(
@@ -62,6 +67,7 @@ export async function POST(req: Request) {
     void logUsage({
       userEmail,
       projectId: projectId ?? null,
+      projectName,
       provider: "anthropic",
       kind: "text",
       model: stage1.model,
@@ -88,6 +94,7 @@ export async function POST(req: Request) {
       void logUsage({
         userEmail,
         projectId: projectId ?? null,
+        projectName,
         provider: "openai",
         kind: "image",
         model: isV2 ? "gpt-image-2" : "dall-e-3",
@@ -107,6 +114,7 @@ export async function POST(req: Request) {
     void logUsage({
       userEmail,
       projectId: projectId ?? null,
+      projectName,
       provider: "openai",
       kind: "image",
       model: attempt.model,
