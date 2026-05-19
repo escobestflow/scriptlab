@@ -12550,7 +12550,12 @@ html[data-design="v2"] .menu-panel-utility svg {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    background: var(--ds-color-black);
+    /* `!important` overrides the inline `style={{ background: "#fff" }}`
+       on the Button in app/page.tsx. That inline white is required for
+       v1 mobile (the button is desktop-hidden in v2 mobile via the rule
+       further up, so the inline white only ever affects v1). Without
+       !important the button renders white-on-white here. */
+    background: var(--ds-color-black) !important;
     color: var(--ds-color-white);
     border: none;
     box-shadow: none;
@@ -12568,7 +12573,7 @@ html[data-design="v2"] .menu-panel-utility svg {
     text-transform: uppercase;
     /* Mobile rule applied transform: translateY(-7px) — clear it
        since the desktop header alignment doesn't need the nudge. */
-    transform: none;
+    transform: none !important;
   }
   html[data-design="v2"] .projects-tab-heading + .ds-btn:hover,
   html[data-design="v2"] .ideas-tab-heading + .ds-btn:hover {
