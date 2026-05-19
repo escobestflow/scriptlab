@@ -3884,6 +3884,7 @@ function MomentsTab({
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<string>("All");
   const isV2 = useIsV2();
+  const isDesktop = useIsDesktop();
 
   // Dev-only: "Convert all notes to AI prompt". When the Note filter is
   // active, a button above the list posts every filtered note to
@@ -4025,7 +4026,7 @@ function MomentsTab({
         </div>
       )}
 
-      {filtered.length > 0 && (
+      {filtered.length > 0 && !isDesktop && (
         <Tip id="ideas-swipe-delete">
           Swipe left on any idea to delete it.
         </Tip>
