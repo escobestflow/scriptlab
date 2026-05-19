@@ -11911,6 +11911,23 @@ html[data-design="v2"] .empty-layer-actions .ds-btn-secondary .ds-btn-icon {
 html[data-design="v2"] .empty-layer-actions .ds-btn-primary .ds-btn-icon img {
   filter: invert(1);
 }
+
+/* MOBILE-ONLY: shrink the back-caret glyph inside the empty Script
+   tab's "Go to Story" CTA circle to 4×8 per spec. Source SVG
+   (/v2/icons/icon-back.svg) ships at 8×14 — we render it at half
+   scale on mobile while keeping the same 1:1.75 aspect ratio.
+   Scoped to `[data-section="script"]` so the other primary CTAs
+   (Add a Character on Characters tab, Create With AI on Story
+   tab) are unaffected. Wrapped in `max-width: 1439px` so the
+   desktop @media block's `width:100%; height:100%` rule (which
+   fills the 16×16 desktop badge) still wins on wide viewports. */
+@media (max-width: 1439px) {
+  html[data-design="v2"] .studio-empty-overlay[data-section="script"]
+    .empty-layer-actions .ds-btn-primary .ds-btn-icon img {
+    width: 4px;
+    height: 8px;
+  }
+}
 html[data-design="v2"] .empty-layer-actions .ds-btn-primary,
 html[data-design="v2"] .empty-layer-actions .ds-btn-secondary {
   background: transparent;
