@@ -88,8 +88,10 @@ export async function POST(req: Request) {
     // Mark imageGenAttempted=true on the beat in Supabase BEFORE the
     // OpenAI call. Same credit-bleed fix as the character route — see
     // generate-character-image/route.ts for the full rationale.
+    // AWAIT on Vercel serverless so the write completes before the
+    // response shuts the function down.
     if (projectId && beatId) {
-      void markBeatAttempted(projectId, beatId);
+      await markBeatAttempted(projectId, beatId);
     }
 
     const prompt = buildScenePrompt(
@@ -170,9 +172,11 @@ export async function POST(req: Request) {
     const { thumbnail } = await uploadJpegToStorage("scene-images", jpegBuffer);
 
     // Server-side durability: write the URL into the beat's row so
-    // the thumbnail survives client navigation during the gen.
+    // the thumbnail survives client navigation during the gen. AWAIT
+    // — Vercel kills pending async work the moment the response
+    // returns, so fire-and-forget here would orphan the URL.
     if (projectId && beatId && thumbnail) {
-      void setBeatThumbnail(projectId, beatId, thumbnail);
+      await setBeatThumbnail(projectId, beatId, thumbnail);
     }
 
     return new Response(JSON.stringify({ thumbnail }), {

@@ -142,8 +142,10 @@ export async function POST(req: Request) {
     // Server-side durability: write the URL into projects.thumbnail
     // so the cover survives client navigation during the gen. The
     // column accepts any opaque string (data URLs or Storage URLs).
+    // AWAIT — Vercel kills pending async work the moment the response
+    // returns, so fire-and-forget here would orphan the URL.
     if (projectId) {
-      void setProjectThumbnail(projectId, dataUrl);
+      await setProjectThumbnail(projectId, dataUrl);
     }
 
     return new Response(JSON.stringify({ thumbnail: dataUrl, model: attempt.model }), {

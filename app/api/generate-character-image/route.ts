@@ -104,9 +104,13 @@ export async function POST(req: Request) {
     // effect bails. Both fields (projectId + characterId) must be present
     // — otherwise we skip the persist and the route behaves as it did
     // before (URL returned to client, client autosaves).
+    //
+    // AWAIT not void: on Vercel serverless, the function shuts down as
+    // soon as the response is sent, killing any pending async work.
+    // Awaiting adds ~50ms but guarantees the write happens before we
+    // proceed to the slow OpenAI call.
     if (projectId && characterId) {
-      // Fire-and-forget — never block the gen if the mark fails.
-      void markCharacterAttempted(projectId, characterId);
+      await markCharacterAttempted(projectId, characterId);
     }
 
     const prompt = buildCharacterPrompt(
@@ -190,10 +194,11 @@ export async function POST(req: Request) {
     // Persist the URL into the project row server-side. This is the
     // durability fix: even if the user navigated away during the gen,
     // their next page load will see the thumbnail already on the
-    // character. Best-effort; failures console.warn and don't break
-    // the response.
+    // character. AWAIT — on Vercel serverless, the function shuts down
+    // as soon as the response is sent; `void` here would let the write
+    // get killed mid-flight and orphan the URL.
     if (projectId && characterId && thumbnail) {
-      void setCharacterThumbnail(projectId, characterId, thumbnail);
+      await setCharacterThumbnail(projectId, characterId, thumbnail);
     }
 
     return new Response(JSON.stringify({ thumbnail }), {
