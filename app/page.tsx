@@ -4031,6 +4031,12 @@ function MomentsTab({
         </Tip>
       )}
 
+      {/* `.v2-ideas-grid` is the container hook for the desktop 2-
+          column masonry layout. On mobile it's an unstyled passthrough
+          (no flex/grid props) so cards keep their full-width stacked
+          treatment. CSS columns at desktop give natural variable-
+          height stacking without needing JS layout math. */}
+      <div className="v2-ideas-grid">
       {filtered.map(m => (
         <SwipeToDelete key={m.id} onDelete={() => onDelete(m.id)}>
           <div
@@ -4049,6 +4055,7 @@ function MomentsTab({
           </div>
         </SwipeToDelete>
       ))}
+      </div>
 
       {/* Convert-notes output sheet — only mounted while open, so nothing
           lingers in the DOM at the bottom of the list when closed.

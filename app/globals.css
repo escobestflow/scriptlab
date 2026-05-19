@@ -12535,5 +12535,143 @@ html[data-design="v2"] .menu-panel-utility svg {
     color: var(--ds-color-black);
     flex: 0 0 auto;
   }
+
+  /* ── New Project / New Idea buttons (Projects + Ideas headers) ──
+     Mobile hides the in-content Button (the add affordance lives
+     on the topbar). Desktop has no topbar, so we un-hide here and
+     restyle the Button to match the design spec: black filled pill,
+     white text, "+" glyph, sits flush-top-right of the page heading
+     row.
+
+     The base Button uses variant="secondary" (white pill) — the
+     overrides below win because the selector is more specific. */
+  html[data-design="v2"] .projects-tab-heading + .ds-btn,
+  html[data-design="v2"] .ideas-tab-heading + .ds-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--ds-color-black);
+    color: var(--ds-color-white);
+    border: none;
+    box-shadow: none;
+    /* Pill geometry per design: ~190×64 with comfortable side padding
+       so the label has air around it. text-transform + letter-spacing
+       turns "New Project" / "New Idea" into "NEW PROJECT" / "NEW IDEA"
+       without touching the JSX strings. */
+    padding: 0 28px;
+    min-height: 64px;
+    border-radius: 999px;
+    font-family: var(--ds-font-body);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    /* Mobile rule applied transform: translateY(-7px) — clear it
+       since the desktop header alignment doesn't need the nudge. */
+    transform: none;
+  }
+  html[data-design="v2"] .projects-tab-heading + .ds-btn:hover,
+  html[data-design="v2"] .ideas-tab-heading + .ds-btn:hover {
+    /* Subtle lighten on hover — same treatment used for the empty-
+       state primary CTA elsewhere. */
+    background: #1a1a1a;
+  }
+  /* Source SVG (/add-icon.svg) is a black "+" — invert to white so
+     it reads on the black button. Bump from the inline 9×9 mobile
+     size up to a comfortable 14×14. */
+  html[data-design="v2"] .projects-tab-heading + .ds-btn img,
+  html[data-design="v2"] .ideas-tab-heading + .ds-btn img {
+    filter: invert(1);
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ── Ideas list: 2-column masonry on desktop ────────────────────
+     CSS columns gives natural variable-height stacking without
+     needing JS layout math. `break-inside: avoid` keeps each
+     SwipeToDelete + card from splitting across columns.
+     Per spec: card width 510px, gutter ~20px → total content
+     width ≈ 1040px centered in the available space. */
+  html[data-design="v2"] .v2-ideas-grid {
+    column-count: 2;
+    column-gap: 20px;
+    column-fill: balance;
+    max-width: 1040px;
+    margin: 0 auto;
+  }
+  html[data-design="v2"] .v2-ideas-grid > * {
+    break-inside: avoid;
+    /* Prevent flex/grid shrinkage of SwipeToDelete inside the
+       column. width: 100% so each card claims its column's full
+       510px. */
+    width: 100%;
+    margin-bottom: 20px;
+    display: block;
+  }
+
+  /* Idea card desktop layout — 510px wide with a 100px gray bar
+     down the left edge per spec. The bar is implemented as a
+     positioned ::before so we don't touch the JSX shape (same
+     markup as mobile). Content padding shifts right to clear the
+     bar. */
+  html[data-design="v2"] .v2-ideas-grid .card.moment-item {
+    width: 510px;
+    position: relative;
+    padding-left: 120px;    /* 100px bar + 20px content gutter */
+    padding-right: 24px;
+    padding-top: 22px;
+    padding-bottom: 22px;
+    border-radius: 14px;
+    background: var(--ds-color-white);
+    /* Subtle elevation to match the screenshot — same shadow style
+       used on other v2 desktop cards (settings, project covers). */
+    box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
+    margin: 0 0 20px;
+  }
+  html[data-design="v2"] .v2-ideas-grid .card.moment-item::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 100px;
+    background: var(--ds-color-gray-lightest);
+    border-radius: 14px 0 0 14px;
+  }
+  /* Type + timestamp share the top row. Mobile pins timestamp via
+     absolute positioning from the right edge of the card; we keep
+     that pattern but adjust the inset to account for desktop's
+     bigger padding. */
+  html[data-design="v2"] .v2-ideas-grid .card.moment-item .moment-type {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 11px;
+  }
+  html[data-design="v2"] .v2-ideas-grid .card.moment-item .moment-time {
+    top: 22px;
+    right: 24px;
+    font-size: 12px;
+  }
+
+  /* ── Search bar — 640px wide on desktop, centered ───────────────
+     Mobile uses full-width inside the 20px screen padding. Desktop
+     spec is fixed 640px with the bar centered above the filter
+     pills. */
+  html[data-design="v2"] .v2-ideas-sticky-header .search-bar {
+    width: 640px;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* Center the filter-row pills too so the cluster aligns under
+     the search bar — looks better than left-aligned against the
+     2-column grid that sits below. */
+  html[data-design="v2"] .v2-ideas-sticky-header .filter-row {
+    max-width: 1040px;
+    margin-left: auto;
+    margin-right: auto;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
 }
 
