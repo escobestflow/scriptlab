@@ -12649,6 +12649,14 @@ html[data-design="v2"] .menu-panel-utility svg {
        v2 already neutralizes — restated here belt-and-suspenders so
        no red ever flashes during a column-reflow / page-load paint. */
     background: transparent;
+    /* CRITICAL: override the base `.swipe-card { overflow: hidden }`
+       (mobile swipe-to-delete clipping behavior). On desktop the
+       inner `.card.moment-item` carries `box-shadow: var(--ds-shadow-
+       card)`, and hidden overflow on this ancestor clips the shadow
+       at the wrapper's edge — making the elevation invisible. With
+       swipe-card-delete hidden via `display: none` above, there's
+       nothing to clip anymore. */
+    overflow: visible;
   }
 
   /* Idea card desktop layout — 510px wide with a 100px gray bar
