@@ -14,6 +14,7 @@ import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
 import { logUsage } from "@/lib/usageLog";
+import { markCharacterAttempted, setCharacterThumbnail } from "@/lib/projectImagePersist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,12 +89,24 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { description, genre, tone, projectId } = await req.json();
+    const { description, genre, tone, projectId, characterId } = await req.json();
     if (!description || typeof description !== "string" || !description.trim()) {
       return new Response(JSON.stringify({ error: "description required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    // Mark the character as "image-gen attempted" in Supabase BEFORE the
+    // OpenAI call goes out. This is the credit-bleed fix: if the user
+    // refreshes the page during the 30–60s generation window, the next
+    // load sees imageGenAttempted=true on the row and the auto-fire
+    // effect bails. Both fields (projectId + characterId) must be present
+    // — otherwise we skip the persist and the route behaves as it did
+    // before (URL returned to client, client autosaves).
+    if (projectId && characterId) {
+      // Fire-and-forget — never block the gen if the mark fails.
+      void markCharacterAttempted(projectId, characterId);
     }
 
     const prompt = buildCharacterPrompt(
@@ -163,6 +176,15 @@ export async function POST(req: Request) {
     // so the API contract stays the same: caller treats `thumbnail`
     // as an opaque string and `<img src>` renders either form.
     const { thumbnail } = await uploadJpegToStorage("character-images", jpegBuffer);
+
+    // Persist the URL into the project row server-side. This is the
+    // durability fix: even if the user navigated away during the gen,
+    // their next page load will see the thumbnail already on the
+    // character. Best-effort; failures console.warn and don't break
+    // the response.
+    if (projectId && characterId && thumbnail) {
+      void setCharacterThumbnail(projectId, characterId, thumbnail);
+    }
 
     return new Response(JSON.stringify({ thumbnail }), {
       headers: { "Content-Type": "application/json" },

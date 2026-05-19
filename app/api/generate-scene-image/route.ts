@@ -14,6 +14,7 @@ import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
 import { logUsage } from "@/lib/usageLog";
+import { markBeatAttempted, setBeatThumbnail } from "@/lib/projectImagePersist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,12 +77,19 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { description, genre, tone, projectId } = await req.json();
+    const { description, genre, tone, projectId, beatId } = await req.json();
     if (!description || typeof description !== "string" || !description.trim()) {
       return new Response(JSON.stringify({ error: "description required" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
       });
+    }
+
+    // Mark imageGenAttempted=true on the beat in Supabase BEFORE the
+    // OpenAI call. Same credit-bleed fix as the character route — see
+    // generate-character-image/route.ts for the full rationale.
+    if (projectId && beatId) {
+      void markBeatAttempted(projectId, beatId);
     }
 
     const prompt = buildScenePrompt(
@@ -150,6 +158,12 @@ export async function POST(req: Request) {
     // SUPABASE_SERVICE_ROLE_KEY isn't configured — same contract as
     // /api/generate-character-image.
     const { thumbnail } = await uploadJpegToStorage("scene-images", jpegBuffer);
+
+    // Server-side durability: write the URL into the beat's row so
+    // the thumbnail survives client navigation during the gen.
+    if (projectId && beatId && thumbnail) {
+      void setBeatThumbnail(projectId, beatId, thumbnail);
+    }
 
     return new Response(JSON.stringify({ thumbnail }), {
       headers: { "Content-Type": "application/json" },

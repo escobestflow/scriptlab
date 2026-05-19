@@ -23,6 +23,7 @@ import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
 import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 import { logUsage } from "@/lib/usageLog";
+import { setProjectThumbnail } from "@/lib/projectImagePersist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,6 +130,13 @@ export async function POST(req: Request) {
       .toBuffer();
 
     const dataUrl = `data:image/jpeg;base64,${jpegBuffer.toString("base64")}`;
+
+    // Server-side durability: write the URL into projects.thumbnail
+    // so the cover survives client navigation during the gen. The
+    // column accepts any opaque string (data URLs or Storage URLs).
+    if (projectId) {
+      void setProjectThumbnail(projectId, dataUrl);
+    }
 
     return new Response(JSON.stringify({ thumbnail: dataUrl, model: attempt.model }), {
       // Same response shape as before plus a `model` field telling the
