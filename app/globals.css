@@ -6221,6 +6221,14 @@ html[data-design="v2"] {
   --ds-font-display-condensed: "Poynter Oldstyle Display Condensed", "Poynter Oldstyle Display", Georgia, serif;
   --ds-font-display-narrow:    "Poynter Oldstyle Display Narrow", "Poynter Oldstyle Display", Georgia, serif;
   --ds-font-body:              "Lato", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* ── Shadows ──────────────────────────────────────────────────────
+     `--ds-shadow-card` is the canonical card-elevation shadow.
+     Spec: X=0, Y=2, Blur=16, Spread=0, color=black @ 9% opacity.
+     Applied to v2 desktop idea cards today; reuse on any other
+     elevated surface (settings cards, project covers in the future)
+     so the visual depth stays consistent across the app. */
+  --ds-shadow-card: 0 2px 16px 0 rgba(0, 0, 0, 0.09);
 }
 
 /* ── V2 Design System tokens — type ──────────────────────────────
@@ -12549,6 +12557,7 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .ideas-tab-heading + .ds-btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 10px;
     /* `!important` overrides the inline `style={{ background: "#fff" }}`
        on the Button in app/page.tsx. That inline white is required for
@@ -12559,16 +12568,26 @@ html[data-design="v2"] .menu-panel-utility svg {
     color: var(--ds-color-white);
     border: none;
     box-shadow: none;
-    /* Pill geometry per design: ~190×64 with comfortable side padding
-       so the label has air around it. text-transform + letter-spacing
-       turns "New Project" / "New Idea" into "NEW PROJECT" / "NEW IDEA"
-       without touching the JSX strings. */
-    padding: 0 28px;
-    min-height: 64px;
+    /* Fixed geometry per spec: 192×50. Padding zeroed so width/height
+       drive the box exactly; justify-content centers the icon+label
+       cluster inside that box. Min-height cleared since we set an
+       explicit `height`. */
+    width: 192px;
+    min-width: 192px;
+    height: 50px;
+    min-height: 0;
+    padding: 0;
     border-radius: 999px;
+    /* Typography per spec: `ds-type-cta` (Lato Medium / 11px desktop /
+       0.08em / uppercase). Spelled out inline rather than via a class
+       on the JSX because the Button component currently doesn't pass
+       `className` through, so a CSS-level override is the simpler
+       wedge. text-transform uppercases "New Project" → "NEW PROJECT"
+       without touching the JSX string. */
     font-family: var(--ds-font-body);
-    font-weight: 600;
-    font-size: 13px;
+    font-weight: 500;
+    font-size: 11px;
+    line-height: normal;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     /* Mobile rule applied transform: translateY(-7px) — clear it
@@ -12632,19 +12651,26 @@ html[data-design="v2"] .menu-panel-utility svg {
      down the left edge per spec. The bar is implemented as a
      positioned ::before so we don't touch the JSX shape (same
      markup as mobile). Content padding shifts right to clear the
-     bar. */
+     bar.
+
+     Vertical rhythm: 27px above the header → header text → 27px
+     below header → 1px gray divider → 27px above body → body text
+     → 27px below body. We split this between card padding (27 top
+     + 27 bottom) and per-element margins so the divider sits in
+     the right place without nested wrappers. */
   html[data-design="v2"] .v2-ideas-grid .card.moment-item {
     width: 510px;
     position: relative;
     padding-left: 120px;    /* 100px bar + 20px content gutter */
     padding-right: 24px;
-    padding-top: 22px;
-    padding-bottom: 22px;
+    padding-top: 27px;       /* 27px above header per spec */
+    padding-bottom: 27px;    /* 27px below body per spec */
     border-radius: 14px;
     background: var(--ds-color-white);
-    /* Subtle elevation to match the screenshot — same shadow style
-       used on other v2 desktop cards (settings, project covers). */
-    box-shadow: 0 2px 16px 0 rgba(0, 0, 0, 0.06);
+    /* Canonical card elevation, sourced from `--ds-shadow-card`
+       (declared in the v2 token block). Reuse this var on other
+       elevated surfaces to keep visual depth consistent. */
+    box-shadow: var(--ds-shadow-card);
     margin: 0 0 20px;
   }
   html[data-design="v2"] .v2-ideas-grid .card.moment-item::before {
@@ -12657,40 +12683,72 @@ html[data-design="v2"] .menu-panel-utility svg {
     background: var(--ds-color-gray-lightest);
     border-radius: 14px 0 0 14px;
   }
-  /* Type + timestamp share the top row. Mobile pins timestamp via
-     absolute positioning from the right edge of the card; we keep
-     that pattern but adjust the inset to account for desktop's
-     bigger padding. */
+  /* Type + timestamp share the top row. The type's bottom edge
+     carries the gray divider that separates header from body, with
+     27px breathing room above (padding-bottom on the type) and
+     27px below the divider (margin-top on .moment-text). */
   html[data-design="v2"] .v2-ideas-grid .card.moment-item .moment-type {
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-size: 11px;
+    /* No top padding — card's padding-top: 27 supplies the gap.
+       Bottom padding + border together form the "27px below header
+       text + divider" segment. */
+    padding-bottom: 27px;
+    border-bottom: 1px solid var(--ds-color-gray-outline);
+    /* `padding-right: 80` from the base mobile rule reserves room
+       for the absolutely-pinned timestamp. Keep that here so the
+       label can't run under the timestamp. */
   }
   html[data-design="v2"] .v2-ideas-grid .card.moment-item .moment-time {
-    top: 22px;
+    /* Timestamp is absolutely positioned; align vertically with the
+       type label which now sits 27px below the card's top edge. */
+    top: 27px;
     right: 24px;
     font-size: 12px;
   }
+  html[data-design="v2"] .v2-ideas-grid .card.moment-item .moment-text {
+    /* 27px above the body text per spec — clears the divider that
+       sits at the bottom of .moment-type above. */
+    margin-top: 27px;
+    margin-bottom: 0;       /* card's padding-bottom: 27 supplies the rest */
+  }
 
-  /* ── Search bar — 640px wide on desktop, centered ───────────────
-     Mobile uses full-width inside the 20px screen padding. Desktop
-     spec is fixed 640px with the bar centered above the filter
-     pills. */
+  /* ── Sticky header (search bar + filters) ───────────────────────
+     Mobile: a gray sticky header that pins under the page heading;
+     this matches the v2 mobile spec. Desktop: ditch the sticky
+     background fill (the page background already supplies the
+     surface). Also remove the centering on the search + filter
+     so they left-align with the rest of the content column. */
+  html[data-design="v2"] .v2-ideas-sticky-header {
+    background: transparent;
+    position: static;
+  }
   html[data-design="v2"] .v2-ideas-sticky-header .search-bar {
+    /* 640px wide per spec. `margin: 0` removes the default mobile
+       auto-centering so the bar's left edge lines up with the page
+       heading + the cards below (the natural content edge). */
     width: 640px;
     max-width: 640px;
-    margin-left: auto;
-    margin-right: auto;
+    margin: 0 0 18px;
   }
-  /* Center the filter-row pills too so the cluster aligns under
-     the search bar — looks better than left-aligned against the
-     2-column grid that sits below. */
   html[data-design="v2"] .v2-ideas-sticky-header .filter-row {
-    max-width: 1040px;
-    margin-left: auto;
-    margin-right: auto;
-    justify-content: center;
+    /* Left-aligned to match the search bar above. flex-wrap stays
+       on so the pill cluster reflows on narrow viewports. */
+    margin: 0;
+    justify-content: flex-start;
     flex-wrap: wrap;
+    background: transparent;
+  }
+
+  /* ── Top-mask gray bar above Ideas header ───────────────────────
+     The `.v2-ideas-top-mask` element paints a 80px-tall cream/gray
+     strip at the top of the content area on mobile (it covers the
+     content as it scrolls under the sticky header). Desktop doesn't
+     have the sticky-header pattern, so the mask is purely visual
+     noise — hide it. */
+  html[data-design="v2"] .v2-ideas-top-mask {
+    display: none;
   }
 }
 
