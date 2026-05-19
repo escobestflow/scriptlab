@@ -12604,14 +12604,20 @@ html[data-design="v2"] .menu-panel-utility svg {
        state primary CTA elsewhere. */
     background: #1a1a1a;
   }
-  /* Source SVG (/add-icon.svg) is a black "+" — invert to white so
-     it reads on the black button. Bump from the inline 9×9 mobile
-     size up to a comfortable 14×14. */
+  /* Desktop-only icon swap on the NEW PROJECT / NEW IDEA buttons.
+     The mobile/v1 source SVG (/add-icon.svg) is replaced with the
+     dedicated desktop glyph (/icon-desktop-button-add.svg) which
+     ships pre-styled (white fill, 11×11). `content: url()` on the
+     <img> element works across modern browsers and dodges the need
+     to thread `isDesktop` through the ProjectsTab / IdeasTab
+     components. !important overrides the inline `style={{ width:
+     9, height: 9 }}` on the JSX so the icon renders at its native
+     11×11. No filter:invert needed — the new SVG is already white. */
   html[data-design="v2"] .projects-tab-heading + .ds-btn img,
   html[data-design="v2"] .ideas-tab-heading + .ds-btn img {
-    filter: invert(1);
-    width: 14px;
-    height: 14px;
+    content: url("/icon-desktop-button-add.svg");
+    width: 11px !important;
+    height: 11px !important;
   }
 
   /* ── Ideas list: 2-column masonry on desktop ────────────────────
@@ -12749,8 +12755,10 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
   html[data-design="v2"] .v2-ideas-sticky-header .filter-row {
     /* Left-aligned to match the search bar above. flex-wrap stays
-       on so the pill cluster reflows on narrow viewports. */
-    margin: 0;
+       on so the pill cluster reflows on narrow viewports.
+       margin-bottom: 50px supplies the spec'd gap between the
+       filter pills and the idea-card grid below. */
+    margin: 0 0 50px;
     justify-content: flex-start;
     flex-wrap: wrap;
     background: transparent;
