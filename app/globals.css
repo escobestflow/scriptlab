@@ -12577,7 +12577,8 @@ html[data-design="v2"] .menu-panel-utility svg {
     height: 50px;
     min-height: 0;
     padding: 0;
-    border-radius: 999px;
+    /* 15px corner radius per spec — rounded rectangle, not pill. */
+    border-radius: 15px;
     /* Typography per spec: `ds-type-cta` (Lato Medium / 11px desktop /
        0.08em / uppercase). Spelled out inline rather than via a class
        on the JSX because the Button component currently doesn't pass
