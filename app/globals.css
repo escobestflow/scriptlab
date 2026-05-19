@@ -7946,9 +7946,12 @@ html[data-design="v2"] .record-label {
     margin-bottom: 3px;
   }
   /* Description / summary — capped at 310px so the meta column has
-     room to sit on the right. (300 → 310 per latest spec, +10.) */
+     room to sit on the right. (300 → 310 per latest spec, +10.)
+     Line-clamp restored to 3 on desktop; mobile uses 2 per the
+     mobile rule further down in this file. */
   html[data-design="v2"] .tab-content-wrap-story .v2-beat-card .beat-summary-preview {
     max-width: 310px;
+    -webkit-line-clamp: 3;
   }
   /* Drag-dots icon — desktop spec bumps from 6×14 (mobile/base) to
      7.47×19. Width is a fractional value because the SVG ships at
@@ -10965,10 +10968,12 @@ html[data-design="v2"] .v2-beat-card .beat-name {
 html[data-design="v2"] .v2-beat-card .beat-summary-preview {
   margin: 0;
   color: var(--ds-color-black);
-  /* 3-line clamp matches the reference — most beat summaries fit
-     cleanly without ellipsizing, and the card height grows just
-     enough to hold them next to the 72px thumb. */
-  -webkit-line-clamp: 3;
+  /* MOBILE: clamp at 2 lines per spec. Long summaries truncate
+     with an ellipsis (`-webkit-line-clamp` handles the ellipsis
+     automatically — no `text-overflow: ellipsis` needed). Desktop
+     keeps 3 lines via the override inside the `@media (min-width:
+     1440px)` block above. */
+  -webkit-line-clamp: 2;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   overflow: hidden;
