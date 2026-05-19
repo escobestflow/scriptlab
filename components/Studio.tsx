@@ -2978,13 +2978,16 @@ export function Studio({
           >
             <div className="scene-popup-card" onClick={e => e.stopPropagation()}>
               <div className="scene-popup-image">
-                {/* In-flight FIRST — regenerate visibly replaces the
-                    existing image with shimmer. */}
-                {scenesInFlight.has(beat.id)
-                  ? <div className="scene-popup-image-placeholder ds-image-shimmer is-dark" aria-label="Generating scene image" />
-                  : beat.thumbnail
-                    ? <img src={beat.thumbnail} alt="" />
-                    : <div className="scene-popup-image-placeholder" aria-hidden="true" />}
+                {/* Shimmer when no thumbnail OR a regen is live — same
+                    canonical "no image yet" surface used everywhere
+                    in the app. */}
+                {beat.thumbnail && !scenesInFlight.has(beat.id)
+                  ? <img src={beat.thumbnail} alt="" />
+                  : <div
+                      className="scene-popup-image-placeholder ds-image-shimmer is-dark"
+                      aria-label={scenesInFlight.has(beat.id) ? "Generating scene image" : undefined}
+                      aria-hidden={scenesInFlight.has(beat.id) ? undefined : true}
+                    />}
                 <button
                   type="button"
                   className="scene-popup-close"
@@ -3011,13 +3014,14 @@ export function Studio({
                 {beatChars.length > 0 && (
                   <div className="scene-popup-characters" aria-label="Characters in this scene">
                     {beatChars.map(c => (
-                      charsInFlight.has(c.id)
-                        ? <div key={c.id} className="scene-popup-avatar ds-image-shimmer is-dark" aria-label="Generating character portrait" />
-                        : c.thumbnail
-                          ? <img key={c.id} src={c.thumbnail} alt="" className="scene-popup-avatar" />
-                          : <div key={c.id} className="scene-popup-avatar scene-popup-avatar-placeholder">
-                              {c.name ? c.name[0].toUpperCase() : "?"}
-                            </div>
+                      c.thumbnail && !charsInFlight.has(c.id)
+                        ? <img key={c.id} src={c.thumbnail} alt="" className="scene-popup-avatar" />
+                        : <div
+                            key={c.id}
+                            className="scene-popup-avatar ds-image-shimmer is-dark"
+                            aria-label={charsInFlight.has(c.id) ? "Generating character portrait" : undefined}
+                            aria-hidden={charsInFlight.has(c.id) ? undefined : true}
+                          />
                     ))}
                   </div>
                 )}
@@ -8325,14 +8329,21 @@ function CharactersTab({
             onClick={() => openCharacter(ch.id)}
           >
             {isV2 ? (
-              charsInFlight.has(ch.id) ? (
-                <div className="v2-character-portrait ds-image-shimmer is-dark" aria-label="Generating character portrait" />
-              ) : ch.thumbnail ? (
+              // Shimmer when there's no thumbnail OR a regen is live.
+              // Letter-initial placeholder retired per user ask: shimmer
+              // is now the canonical "no image yet" surface across all
+              // surfaces in the app. The gen-protection guards inside
+              // autoGenerateCharacterImage (imageGenAttempted, in-flight
+              // set, failed set) prevent the shimmer-visible state from
+              // turning into a re-fire — the visual is purely cosmetic.
+              ch.thumbnail && !charsInFlight.has(ch.id) ? (
                 <img src={ch.thumbnail} alt="" className="v2-character-portrait" />
               ) : (
-                <div className="v2-character-portrait v2-character-portrait-placeholder">
-                  {ch.name ? ch.name[0].toUpperCase() : "?"}
-                </div>
+                <div
+                  className="v2-character-portrait ds-image-shimmer is-dark"
+                  aria-label={charsInFlight.has(ch.id) ? "Generating character portrait" : undefined}
+                  aria-hidden={charsInFlight.has(ch.id) ? undefined : true}
+                />
               )
             ) : (
               <div className="character-avatar">
@@ -8720,19 +8731,17 @@ function CharacterEditForm({
     <div>
       {isV2Form && !isNew && (
         <div className="v2-character-form-portrait">
-          {/* In-flight FIRST — covers both the local manual Regenerate
-              click (imgBusy) and bulk auto-gen (autoGenInFlight). */}
-          {(imgBusy || autoGenInFlight) ? (
-            <div
-              className="v2-character-form-portrait-img ds-image-shimmer is-dark"
-              aria-label="Generating character portrait"
-            />
-          ) : ch.thumbnail ? (
+          {/* Shimmer when no thumbnail OR a regen is live (imgBusy =
+              local Regenerate click; autoGenInFlight = bulk auto-gen).
+              Letter-initial placeholder retired per user ask. */}
+          {ch.thumbnail && !(imgBusy || autoGenInFlight) ? (
             <img src={ch.thumbnail} alt="" className="v2-character-form-portrait-img" />
           ) : (
-            <div className="v2-character-form-portrait-img v2-character-form-portrait-placeholder">
-              {ch.name ? ch.name[0].toUpperCase() : "?"}
-            </div>
+            <div
+              className="v2-character-form-portrait-img ds-image-shimmer is-dark"
+              aria-label={(imgBusy || autoGenInFlight) ? "Generating character portrait" : undefined}
+              aria-hidden={(imgBusy || autoGenInFlight) ? undefined : true}
+            />
           )}
           <div className="v2-character-form-portrait-actions">
             <Button
@@ -9630,14 +9639,20 @@ function StoryTab({
                     }}
                   >
                   {isV2 && (
-                    /* In-flight check FIRST — regenerate visibly replaces
-                       the old thumb with shimmer instead of sitting
-                       invisibly behind it. */
-                    scenesInFlight.has(beat.id)
-                      ? <div className="v2-beat-thumb ds-image-shimmer is-dark" aria-label="Generating scene image" />
-                      : beat.thumbnail
-                        ? <img src={beat.thumbnail} alt="" className="v2-beat-thumb" />
-                        : <div className="v2-beat-thumb v2-beat-thumb-placeholder">{(beat.name || "?").charAt(0).toUpperCase()}</div>
+                    /* Shimmer when there's no thumbnail OR a regen is
+                       live. Letter-initial placeholder retired per
+                       user ask — shimmer is the canonical "no image
+                       yet" surface app-wide. The autoGenerateScene-
+                       Image protections (imageGenAttempted, in-flight
+                       set) guarantee that showing shimmer doesn't
+                       trigger redundant gens. */
+                    beat.thumbnail && !scenesInFlight.has(beat.id)
+                      ? <img src={beat.thumbnail} alt="" className="v2-beat-thumb" />
+                      : <div
+                          className="v2-beat-thumb ds-image-shimmer is-dark"
+                          aria-label={scenesInFlight.has(beat.id) ? "Generating scene image" : undefined}
+                          aria-hidden={scenesInFlight.has(beat.id) ? undefined : true}
+                        />
                   )}
                   <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>
                     {i + 1}
@@ -10551,11 +10566,13 @@ function ScriptTab({
             ) : (
               <div className="v2-script-pane-detail-row">
                 <div className="v2-script-pane-image">
-                  {scenesInFlight.has(beat.id)
-                    ? <div className="v2-script-pane-image-placeholder ds-image-shimmer is-dark" aria-label="Generating scene image" />
-                    : beat.thumbnail
-                      ? <img src={beat.thumbnail} alt="" />
-                      : <div className="v2-script-pane-image-placeholder" aria-hidden="true" />}
+                  {beat.thumbnail && !scenesInFlight.has(beat.id)
+                    ? <img src={beat.thumbnail} alt="" />
+                    : <div
+                        className="v2-script-pane-image-placeholder ds-image-shimmer is-dark"
+                        aria-label={scenesInFlight.has(beat.id) ? "Generating scene image" : undefined}
+                        aria-hidden={scenesInFlight.has(beat.id) ? undefined : true}
+                      />}
                   {/* Duration pill — bottom-LEFT of the image per spec.
                       Reuses the project hero's "Updated 2d ago" clock
                       SVG so the same glyph reads across the app. */}
@@ -10587,13 +10604,14 @@ function ScriptTab({
                   {beatChars.length > 0 && (
                     <div className="v2-script-pane-characters" aria-label="Characters in this scene">
                       {beatChars.map(c => (
-                        charsInFlight.has(c.id)
-                          ? <div key={c.id} className="v2-script-pane-avatar ds-image-shimmer is-dark" aria-label="Generating character portrait" />
-                          : c.thumbnail
-                            ? <img key={c.id} src={c.thumbnail} alt="" className="v2-script-pane-avatar" />
-                            : <div key={c.id} className="v2-script-pane-avatar v2-script-pane-avatar-placeholder">
-                                {c.name ? c.name[0].toUpperCase() : "?"}
-                              </div>
+                        c.thumbnail && !charsInFlight.has(c.id)
+                          ? <img key={c.id} src={c.thumbnail} alt="" className="v2-script-pane-avatar" />
+                          : <div
+                              key={c.id}
+                              className="v2-script-pane-avatar ds-image-shimmer is-dark"
+                              aria-label={charsInFlight.has(c.id) ? "Generating character portrait" : undefined}
+                              aria-hidden={charsInFlight.has(c.id) ? undefined : true}
+                            />
                       ))}
                     </div>
                   )}
@@ -11451,13 +11469,16 @@ function SceneEditForm({
           on its own once a name lands and the sheet closes. */}
       {isV2Form && !isNew && (
         <div className="v2-scene-form-image">
-          {/* In-flight FIRST — manual Regenerate (imgBusy) and bulk
-              auto-gen (autoGenInFlight) both show shimmer. */}
-          {(imgBusy || autoGenInFlight)
-            ? <div className="v2-scene-form-image-img ds-image-shimmer is-dark" aria-label="Generating scene image" />
-            : beat.thumbnail
-              ? <img src={beat.thumbnail} alt="" className="v2-scene-form-image-img" />
-              : <div className="v2-scene-form-image-img v2-scene-form-image-placeholder" aria-hidden="true" />}
+          {/* Shimmer when no thumbnail OR a regen is live (imgBusy or
+              autoGenInFlight). Empty placeholder retired per user
+              ask — shimmer is the canonical "no image yet" surface. */}
+          {beat.thumbnail && !(imgBusy || autoGenInFlight)
+            ? <img src={beat.thumbnail} alt="" className="v2-scene-form-image-img" />
+            : <div
+                className="v2-scene-form-image-img ds-image-shimmer is-dark"
+                aria-label={(imgBusy || autoGenInFlight) ? "Generating scene image" : undefined}
+                aria-hidden={(imgBusy || autoGenInFlight) ? undefined : true}
+              />}
           <Button
             variant="secondary"
             size="sm"
@@ -11848,21 +11869,11 @@ function SettingsTab({
             block of the same dimensions. If the API fails, the next
             render flips back to the original thumbnail because we
             never clear story.thumbnail. */}
-        {isThumbnailInFlight ? (
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
-            <div
-              className="ds-image-shimmer is-dark"
-              aria-label="Generating project image"
-              style={{
-                width: "100%",
-                maxWidth: 320,
-                aspectRatio: "16 / 9",
-                borderRadius: 13,
-                display: "block",
-              }}
-            />
-          </div>
-        ) : story.thumbnail && (
+        {/* Shimmer when there's no project cover OR a regen is live.
+            Previously the no-cover state rendered nothing — now it
+            shows shimmer to match the rest of the app's "no image
+            yet" surfaces. */}
+        {story.thumbnail && !isThumbnailInFlight ? (
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
             <img
               src={story.thumbnail}
@@ -11873,6 +11884,21 @@ function SettingsTab({
                 aspectRatio: "16 / 9",
                 borderRadius: 13,
                 objectFit: "cover",
+                display: "block",
+              }}
+            />
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+            <div
+              className="ds-image-shimmer is-dark"
+              aria-label={isThumbnailInFlight ? "Generating project image" : undefined}
+              aria-hidden={isThumbnailInFlight ? undefined : true}
+              style={{
+                width: "100%",
+                maxWidth: 320,
+                aspectRatio: "16 / 9",
+                borderRadius: 13,
                 display: "block",
               }}
             />

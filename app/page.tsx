@@ -28,6 +28,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/adminEmails";
 import { useIsV2 } from "@/lib/v2Access";
+import { DesktopSidebar, deriveSidebarUserFields, type MainTab } from "@/components/DesktopSidebar";
 import { Studio } from "@/components/Studio";
 import SplashLoader from "@/components/SplashLoader";
 import PostLoginTransition from "@/components/PostLoginTransition";
@@ -86,7 +87,10 @@ function friendlyImageGenError(message: string, code: string | null): string {
   }
 }
 
-type MainTab = "projects" | "moments" | "settings";
+// `MainTab` is imported from /components/DesktopSidebar so both the
+// sidebar and the page share a single source of truth for the set
+// of "main tabs". Re-declaring locally would create a structurally-
+// identical but distinct type that wouldn't be assignable.
 
 /* ======= SVG Icons (from design assets) ======= */
 const IconSearch = () => (
@@ -138,137 +142,9 @@ function useIsDesktop(): boolean {
   return isDesktop;
 }
 
-// Sidebar is rendered always; CSS hides it below 1440px. Buttons mirror
-// the mobile tabbar primary destinations (Projects / Ideas) plus the
-// hamburger menu surface that lives in the top-left on mobile. No Record
-// here — the mobile FAB is intentionally desktop-suppressed.
-function DesktopSidebar({
-  activeMain,
-  inStudio,
-  onProjects,
-  onIdeas,
-  onMenu,
-  userInitial,
-  userAvatarUrl,
-  userDisplayName,
-}: {
-  activeMain: MainTab | null;
-  inStudio: boolean;
-  onProjects: () => void;
-  onIdeas: () => void;
-  onMenu: () => void;
-  userInitial: string | null;
-  /** Google profile image URL pulled from `user.user_metadata.avatar_url`
-   *  / `.picture`. When present we render it inside the avatar circle
-   *  instead of the first-letter fallback. `null` = no OAuth picture
-   *  (email/password signup, or Google hadn't shared a picture). */
-  userAvatarUrl: string | null;
-  /** Google display name (`user_metadata.full_name` / `.name`) or
-   *  the email's local part as a fallback. Used to label the
-   *  account row at the bottom of the sidebar. */
-  userDisplayName: string | null;
-}) {
-  // Projects stays "active" in the sidebar when the user is inside
-  // a project detail (Studio view) — Studio is conceptually a
-  // child of the Projects section, so the nav-rail visual reflects
-  // that. Ideas is only active when the user is on the Ideas tab.
-  const projectsActive = inStudio || activeMain === "projects";
-  const ideasActive = !inStudio && activeMain === "moments";
-  return (
-    <aside className="desktop-sidebar" aria-label="Primary">
-      <div className="desktop-sidebar-brand">
-        <img src="/logo.svg" alt="Unfold" className="desktop-sidebar-logo" />
-      </div>
-      <nav className="desktop-sidebar-nav">
-        <button
-          className={`desktop-sidebar-item ${projectsActive ? "active" : ""}`}
-          onClick={onProjects}
-        >
-          <span className="desktop-sidebar-icon">
-            <img
-              src={projectsActive ? "/project-icon-active.svg" : "/project-icon-inactive.svg"}
-              alt=""
-            />
-          </span>
-          <span className="desktop-sidebar-label">Projects</span>
-        </button>
-        <button
-          className={`desktop-sidebar-item ${ideasActive ? "active" : ""}`}
-          onClick={onIdeas}
-        >
-          <span className="desktop-sidebar-icon">
-            <img
-              src={ideasActive ? "/ideas-icon-active.svg" : "/ideas-icon-inactive.svg"}
-              alt=""
-            />
-          </span>
-          <span className="desktop-sidebar-label">Ideas</span>
-        </button>
-      </nav>
-      <div className="desktop-sidebar-foot">
-        <button
-          className="desktop-sidebar-item desktop-sidebar-account"
-          onClick={onMenu}
-          aria-label="Open settings"
-        >
-          {/* Avatar circle: prefer the Google profile image when
-              available, fall back to the email's first letter,
-              then to a generic user glyph. The <img> sits inside
-              the same `.desktop-sidebar-avatar` circle, sized to
-              `100%` + `object-fit: cover` so it always fills the
-              chip cleanly. */}
-          <span className="desktop-sidebar-avatar">
-            {userAvatarUrl
-              ? (
-                <img
-                  src={userAvatarUrl}
-                  alt=""
-                  className="desktop-sidebar-avatar-img"
-                  referrerPolicy="no-referrer"
-                />
-              )
-              : userInitial
-                ? userInitial
-                : <IconUser />}
-          </span>
-          <span className="desktop-sidebar-account-name">
-            {userDisplayName ?? "Account"}
-          </span>
-          {/* Down chevron — purely decorative, indicates the row
-              can be expanded / interacted with. Matches the
-              screenshot reference. */}
-          <svg
-            className="desktop-sidebar-account-chevron"
-            width="10"
-            height="6"
-            viewBox="0 0 10 6"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M1 1l4 4 4-4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          {/* Settings gear, right-aligned. 20×20 per spec; pushed
-              to the right of the row via `margin-left: auto` so it
-              floats independently of how long the name is. */}
-          <img
-            src="/icon-account.svg"
-            alt=""
-            aria-hidden="true"
-            width={20}
-            height={20}
-            className="desktop-sidebar-account-gear"
-          />
-        </button>
-      </div>
-    </aside>
-  );
-}
+// DesktopSidebar lives in /components/DesktopSidebar.tsx so /admin/usage
+// and any future side-routes can reuse the same nav chrome. Imported at
+// the top of this file.
 
 /** v2 desktop Settings screen — full-page surface that replaces
  *  the legacy `.menu-panel` dropdown. Lives inside `.app-content`
@@ -3465,12 +3341,17 @@ function ProjectsTab({
               }}
             >
               <div className="project-cover">
+                {/* Pending-invite card: shimmer when no cover, matching
+                    the canonical "no image yet" treatment. Pending
+                    invites don't have a regen path so no in-flight
+                    branch is needed. */}
                 {inv.projectThumbnail ? (
                   <img src={inv.projectThumbnail} alt="" className="project-cover-img" />
                 ) : (
-                  <span className="project-cover-initial">
-                    {inv.projectTitle ? inv.projectTitle.charAt(0).toUpperCase() : "?"}
-                  </span>
+                  <div
+                    className="project-cover-fill ds-image-shimmer is-dark"
+                    aria-hidden="true"
+                  />
                 )}
               </div>
               <div className="project-body">
@@ -3617,21 +3498,21 @@ function ProjectsTab({
             onClick={() => onOpen(p.id)}
           >
             <div className="project-cover">
-              {/* In-flight check FIRST: regenerate should visibly replace
-                  the existing image with shimmer, not sit invisibly
-                  behind it. If the API fails, the next render flips
-                  back to the existing thumbnail (it was never cleared). */}
-              {thumbsInFlight.has(p.id) ? (
-                <div
-                  className="project-cover-fill ds-image-shimmer is-dark"
-                  aria-label="Generating project image"
-                />
-              ) : p.thumbnail ? (
+              {/* Shimmer when no cover OR a regen is live. The
+                  letter-initial placeholder is retired per user ask
+                  — shimmer is the canonical "no image yet" surface
+                  app-wide. The auto-gen protections in generateThumb-
+                  nail (thumbsInFlight set, accountLimitHit circuit
+                  breaker) prevent the shimmer-visible state from
+                  silently re-firing gens. */}
+              {p.thumbnail && !thumbsInFlight.has(p.id) ? (
                 <img src={p.thumbnail} alt="" className="project-cover-img" />
               ) : (
-                <span className="project-cover-initial">
-                  {p.title ? p.title.charAt(0).toUpperCase() : "?"}
-                </span>
+                <div
+                  className="project-cover-fill ds-image-shimmer is-dark"
+                  aria-label={thumbsInFlight.has(p.id) ? "Generating project image" : undefined}
+                  aria-hidden={thumbsInFlight.has(p.id) ? undefined : true}
+                />
               )}
             </div>
             <div className="project-body">

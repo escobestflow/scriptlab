@@ -19,6 +19,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { isAdmin, isTrusted } from "@/lib/adminEmails";
+import { DesktopSidebar, deriveSidebarUserFields } from "@/components/DesktopSidebar";
 
 type Row = {
   id: string;
@@ -107,31 +108,66 @@ export default function AdminUsagePage() {
     return () => { cancelled = true; };
   }, [authLoading, user?.email]);
 
+  // Shared sidebar fields — derived from the same auth helper the
+  // main app uses so the avatar / display name / initial fall back
+  // identically here.
+  const { userInitial, userAvatarUrl, userDisplayName } = deriveSidebarUserFields(user);
+
+  // App shell wrapper. Mirrors the layout in app/page.tsx so the
+  // sidebar persists on every desktop surface. The admin dashboard
+  // is a side-route from the user's perspective (`activeMain={null}`
+  // means no main-tab pill is highlighted), so the sidebar clicks
+  // route the user BACK to / and the appropriate main tab.
+  //
+  // Layout: .app (flex row on desktop) → .desktop-sidebar (220px)
+  // | .app-content (flex-1, scrollable). The dark dashboard fills
+  // .app-content; an inner container caps the content width at
+  // 1100px so it doesn't sprawl on ultra-wide displays.
+  const Shell = ({ children }: { children: React.ReactNode }) => (
+    <div className="app">
+      <DesktopSidebar
+        activeMain={null}
+        inStudio={false}
+        onProjects={() => router.push("/")}
+        onIdeas={() => router.push("/")}
+        onMenu={() => router.push("/")}
+        userInitial={userInitial}
+        userAvatarUrl={userAvatarUrl}
+        userDisplayName={userDisplayName}
+      />
+      <div className="app-content">
+        <div style={pageWrap}>
+          <div style={pageInner}>{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+
   // Auth still resolving, or non-admin caught mid-redirect.
   if (authLoading || !isAdmin(user?.email)) {
-    return <div style={pageWrap} />;
+    return <Shell><></></Shell>;
   }
 
   if (fetchErr) {
     return (
-      <div style={pageWrap}>
+      <Shell>
         <h1 style={h1}>Usage Dashboard</h1>
         <div style={errBox}>Failed to load: {fetchErr}</div>
-      </div>
+      </Shell>
     );
   }
 
   if (!rows) {
     return (
-      <div style={pageWrap}>
+      <Shell>
         <h1 style={h1}>Usage Dashboard</h1>
         <div style={dim}>Loading…</div>
-      </div>
+      </Shell>
     );
   }
 
   return (
-    <div style={pageWrap}>
+    <Shell>
       <h1 style={h1}>Usage Dashboard</h1>
       <div style={subtle}>
         Last 30 days · {rows.length.toLocaleString()} calls · auto-refresh disabled (reload page for fresh data)
@@ -149,7 +185,7 @@ export default function AdminUsagePage() {
         setFilterEmail={setFilterEmail}
         setFilterAction={setFilterAction}
       />
-    </div>
+    </Shell>
   );
 }
 
@@ -632,12 +668,26 @@ function RecentTable({
 // page and doesn't need to share visual language with the rest of the
 // app. Dark surface, simple typography, dense tables.
 
+// Outer wrap fills the .app-content area with the dark dashboard
+// surface (so the sidebar's light theme doesn't bleed into the
+// dashboard area). Scrolls vertically when the page is tall.
 const pageWrap: React.CSSProperties = {
+  background: "#0a0a0b",
+  minHeight: "100%",
+  width: "100%",
+  overflowY: "auto",
+  fontFamily: "-apple-system, system-ui, sans-serif",
+  color: "#e8e8e8",
+  boxSizing: "border-box",
+};
+// Inner wrap caps content width on wide displays and adds breathing
+// padding. Separated from pageWrap so the dark surface fills edge-
+// to-edge while the actual content stays readable at a comfortable
+// width.
+const pageInner: React.CSSProperties = {
   maxWidth: 1100,
   margin: "0 auto",
   padding: "32px 24px 80px",
-  fontFamily: "-apple-system, system-ui, sans-serif",
-  color: "#e8e8e8",
 };
 const h1: React.CSSProperties = { margin: 0, fontSize: 24, fontWeight: 600 };
 const h2: React.CSSProperties = { margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: "#bdbdbd", textTransform: "uppercase", letterSpacing: 0.5 };
