@@ -6248,7 +6248,10 @@ html[data-design="v2"] .ds-type-tab-header {
   font-weight: 400;
   font-size: 39px;
   line-height: normal;
-  letter-spacing: 0.03em;
+  /* -3% per spec — tighter optical kerning on the large Poynter
+     display face. Negative letter-spacing reads as "compressed"
+     and works well at 39px+ where the natural counters are wide. */
+  letter-spacing: -0.03em;
 }
 html[data-design="v2"] .ds-type-project-page-title {
   font-family: var(--ds-font-display);
