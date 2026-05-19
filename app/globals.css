@@ -12614,6 +12614,20 @@ html[data-design="v2"] .menu-panel-utility svg {
     display: block;
   }
 
+  /* SwipeToDelete wrapper on desktop: kill the red bleed entirely.
+     `.swipe-card`'s base rule paints #d63333 as a "mask" behind the
+     drag content; v2 already neutralizes that on the wrapper itself
+     but the absolutely-positioned `.swipe-card-delete` button still
+     sits behind the card and bleeds at the seam between rows on the
+     column-based layout. Swipe gestures don't apply on desktop
+     anyway (no touch), so hide the delete button + clip overflow. */
+  html[data-design="v2"] .v2-ideas-grid .swipe-card {
+    overflow: hidden;
+  }
+  html[data-design="v2"] .v2-ideas-grid .swipe-card-delete {
+    display: none;
+  }
+
   /* Idea card desktop layout — 510px wide with a 100px gray bar
      down the left edge per spec. The bar is implemented as a
      positioned ::before so we don't touch the JSX shape (same
