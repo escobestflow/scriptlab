@@ -2124,6 +2124,23 @@ export function Studio({
             on viewports ≥1440. CSS hides the mobile equivalents on
             desktop so they don't duplicate or fight for position. */}
         {isV2 && isDesktop && (
+          <>
+          {/* Top-right floating Settings button — desktop only. Position
+              fixed so it stays anchored to the viewport's top-right
+              regardless of scroll. Visually matches the mobile circular
+              settings button (40×40 / gray-lightest fill / soft shadow /
+              17×17 pencil icon). Vertical alignment matches the Draft N
+              pill in the hero's meta column (top: 37px lines up with
+              the draft pill's top edge); horizontal is 60px from the
+              viewport's right edge per spec. */}
+          <button
+            type="button"
+            className="v2-desktop-settings-fab"
+            onClick={() => setShowSetup(true)}
+            aria-label="Open project settings"
+          >
+            <img src="/v2/icons/icon-project-edit.svg" alt="" />
+          </button>
           <div className="v2-desktop-hero">
             <button
               type="button"
@@ -2169,6 +2186,7 @@ export function Studio({
               </div>
             </div>
           </div>
+          </>
         )}
 
         <button
