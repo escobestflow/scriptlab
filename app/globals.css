@@ -12660,25 +12660,41 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
 
   /* ── Ideas list: 2-column masonry on desktop ────────────────────
-     CSS columns gives natural variable-height stacking without
-     needing JS layout math. `break-inside: avoid` keeps each
-     SwipeToDelete + card from splitting across columns.
-     Per spec: card width 510px, gutter ~20px → total content
-     width ≈ 1040px centered in the available space. */
+     Replaced CSS multi-column (column-count: 2 + column-fill: balance)
+     with two explicit `.v2-ideas-col` flex children. The browser's
+     column-balance algorithm was producing a phantom "first" item
+     in column 2 on some viewports — visually invisible but still
+     clickable, since the balance recalc generated a fragment that
+     hit-tests against the page even though it has no rendered
+     content. Explicit columns sidestep the multi-column layout
+     engine entirely.
+
+     Layout: flex row → two 510px columns → 20px gap. Each column
+     is itself a flex-column container so cards stack vertically
+     with the spec'd 20px between-card gap. Both columns start at
+     the same Y by default (flex row default align-items: stretch).
+     Left edge sits at the natural content edge — same as the
+     search bar and filters above. */
   html[data-design="v2"] .v2-ideas-grid {
-    column-count: 2;
-    column-gap: 20px;
-    column-fill: balance;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 20px;
     max-width: 1040px;
-    margin: 0 auto;
+    margin: 0;
   }
-  html[data-design="v2"] .v2-ideas-grid > * {
-    break-inside: avoid;
-    /* Prevent flex/grid shrinkage of SwipeToDelete inside the
-       column. width: 100% so each card claims its column's full
-       510px. */
+  html[data-design="v2"] .v2-ideas-col {
+    flex: 0 0 510px;
+    width: 510px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  /* Per-card SwipeToDelete wrapper sits inside a column. Width
+     claims the column's full 510px; margin handled by the column's
+     flex gap. */
+  html[data-design="v2"] .v2-ideas-col > * {
     width: 100%;
-    margin-bottom: 20px;
     display: block;
   }
 

@@ -4032,30 +4032,85 @@ function MomentsTab({
         </Tip>
       )}
 
-      {/* `.v2-ideas-grid` is the container hook for the desktop 2-
-          column masonry layout. On mobile it's an unstyled passthrough
-          (no flex/grid props) so cards keep their full-width stacked
-          treatment. CSS columns at desktop give natural variable-
-          height stacking without needing JS layout math. */}
+      {/* `.v2-ideas-grid` is the desktop 2-column masonry container.
+          On mobile (and v1) it's a passthrough with all cards in a
+          single DOM list. On desktop v2, we split the filtered list
+          into two explicit `.v2-ideas-col` children — even-indexed
+          ideas go LEFT, odd-indexed go RIGHT — and each column
+          stacks its own cards in normal block flow.
+
+          Why two explicit columns: CSS multi-column (column-count: 2 +
+          column-fill: balance) gave the right column an invisible-
+          but-clickable "phantom" first card on some viewports — the
+          browser's balance algorithm appears to render a fragment of
+          a column-spanning element that has no visible content. Two
+          explicit DOM columns sidestep the multi-column layout engine
+          entirely; both columns start at the same Y, each card renders
+          in its own normal block flow with no balance recalc artifacts. */}
       <div className="v2-ideas-grid">
-      {filtered.map(m => (
-        <SwipeToDelete key={m.id} onDelete={() => onDelete(m.id)}>
-          <div
-            className="card moment-item"
-            onClick={() => onEdit(m)}
-            style={{ cursor: "pointer" }}
-          >
-            <div className="moment-type ds-type-body">{m.type}</div>
-            <div className="moment-text ds-type-body">{m.text}</div>
-            {m.tags.length > 0 && (
-              <div className="moment-tags">
-                {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
-              </div>
-            )}
-            <div className="moment-time ds-type-body">{formatTime(m.createdAt)}</div>
+      {isDesktop && isV2 ? (
+        <>
+          <div className="v2-ideas-col">
+            {filtered.filter((_, i) => i % 2 === 0).map(m => (
+              <SwipeToDelete key={m.id} onDelete={() => onDelete(m.id)}>
+                <div
+                  className="card moment-item"
+                  onClick={() => onEdit(m)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="moment-type ds-type-body">{m.type}</div>
+                  <div className="moment-text ds-type-body">{m.text}</div>
+                  {m.tags.length > 0 && (
+                    <div className="moment-tags">
+                      {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
+                    </div>
+                  )}
+                  <div className="moment-time ds-type-body">{formatTime(m.createdAt)}</div>
+                </div>
+              </SwipeToDelete>
+            ))}
           </div>
-        </SwipeToDelete>
-      ))}
+          <div className="v2-ideas-col">
+            {filtered.filter((_, i) => i % 2 === 1).map(m => (
+              <SwipeToDelete key={m.id} onDelete={() => onDelete(m.id)}>
+                <div
+                  className="card moment-item"
+                  onClick={() => onEdit(m)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <div className="moment-type ds-type-body">{m.type}</div>
+                  <div className="moment-text ds-type-body">{m.text}</div>
+                  {m.tags.length > 0 && (
+                    <div className="moment-tags">
+                      {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
+                    </div>
+                  )}
+                  <div className="moment-time ds-type-body">{formatTime(m.createdAt)}</div>
+                </div>
+              </SwipeToDelete>
+            ))}
+          </div>
+        </>
+      ) : (
+        filtered.map(m => (
+          <SwipeToDelete key={m.id} onDelete={() => onDelete(m.id)}>
+            <div
+              className="card moment-item"
+              onClick={() => onEdit(m)}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="moment-type ds-type-body">{m.type}</div>
+              <div className="moment-text ds-type-body">{m.text}</div>
+              {m.tags.length > 0 && (
+                <div className="moment-tags">
+                  {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
+                </div>
+              )}
+              <div className="moment-time ds-type-body">{formatTime(m.createdAt)}</div>
+            </div>
+          </SwipeToDelete>
+        ))
+      )}
       </div>
 
       {/* Convert-notes output sheet — only mounted while open, so nothing
