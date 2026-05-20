@@ -7390,9 +7390,13 @@ html[data-design="v2"] .record-label {
      Combined: clean image in the center, fully white at the corners. */
   html[data-design="v2"] .v2-desktop-hero-image {
     position: relative;
-    flex: 0 0 537px;
-    width: 537px;
-    height: 313px;
+    /* Box dimensions per latest spec: 513×303 (was 537×313 — width
+       trimmed by 24, height by 10). Margin-left stays at -60 so the
+       image still bleeds into the sidebar gutter; only the right
+       edge moves leftward. */
+    flex: 0 0 513px;
+    width: 513px;
+    height: 303px;
     background: var(--ds-color-gray-dark-fill);
     border: 0;
     border-radius: 0;
@@ -7407,20 +7411,12 @@ html[data-design="v2"] .record-label {
        image bleeds left into the sidebar gutter. */
     margin-left: -60px;
   }
+  /* White-fade gradient overlay (`v2/desktop-gradient.png`) retired
+     per user spec — image now renders unmodified inside the 513×303
+     box. Pseudo kept declared but hidden so a future re-enable just
+     needs to flip display back to block. */
   html[data-design="v2"] .v2-desktop-hero-image::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    /* Hero gradient overlay is a hand-authored PNG (1074×626 @ 2x
-       for the 537×313 image button). Background-size: cover keeps
-       it filling the button at any DPR. The CSS-gradient stack +
-       configurator that lived here was retired in favor of this
-       single asset — easier to art-direct, no live-blur tuning. */
-    background-image: url("/v2/desktop-gradient.png");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+    display: none;
   }
   html[data-design="v2"] .v2-desktop-hero-image img {
     width: 100%;
@@ -7589,8 +7585,10 @@ html[data-design="v2"] .record-label {
      borders — just a top + bottom hairline stroke. */
   html[data-design="v2"] .studio-tabs-row {
     /* Unwind the mobile fixed-pill positioning. The tabs-row now
-       flows inline with the page content at full content width. */
-    position: static;
+       flows inline with the page content at full content width.
+       `position: relative` is required so the ::before below
+       (which paints the full-bleed top divider) anchors here. */
+    position: relative;
     top: auto;
     left: auto;
     right: auto;
@@ -7605,6 +7603,25 @@ html[data-design="v2"] .record-label {
        flex-start so the bar's left edge aligns flush with the
        column cards' left edge. */
     justify-content: flex-start;
+  }
+  /* Full-bleed top divider that sits at the top edge of the tabs
+     row (directly below the project image / hero meta block). Per
+     spec the line is flush against the sidebar's right edge on
+     the LEFT and the viewport's right edge on the RIGHT — so
+     `left: -60px` cancels the parent .studio-scroll's padding-
+     left:60, and `right: 0` reaches the right edge of .studio-
+     scroll (which has padding-right:0 on desktop, i.e. the
+     viewport edge). Replaces the bounded border-top that used to
+     live on .studio-tab-bar. */
+  html[data-design="v2"] .studio-tabs-row::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -60px;
+    right: 0;
+    height: 1px;
+    background: rgba(219, 218, 217, 0.3);
+    pointer-events: none;
   }
   html[data-design="v2"] .studio-tab-bar {
     /* Flat band: 66px tall, top hairline + bottom 2px strokes
@@ -7627,12 +7644,11 @@ html[data-design="v2"] .record-label {
     margin-left: 25px;
     border-left: none;
     border-right: none;
-    /* Top hairline at 30% opacity per spec — softer than the
-       bottom rule so the tab bar reads as a "ceiling lifting
-       toward the page" rather than a hard frame. Hardcoded rgba
-       since CSS hex tokens don't carry alpha. The token's value
-       is #DBDAD9 = rgb(219, 218, 217). */
-    border-top: 1px solid rgba(219, 218, 217, 0.3);
+    /* Top hairline retired here in favor of a full-bleed divider
+       drawn via `.studio-tabs-row::before` below (which extends
+       from the sidebar's right edge to the viewport's right edge,
+       per spec — flush instead of bounded to the 1054px bar). */
+    border-top: none;
     border-bottom: 2px solid var(--ds-color-gray-divider);
     /* Override v1's space-between distribution: content-sized
        tabs, left-anchored, 90px between adjacent tabs. */
