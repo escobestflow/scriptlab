@@ -6828,10 +6828,19 @@ html[data-design="v2"] .topbar .topbar-center .brand-logo-img {
 /* Page-title headings (Projects / Ideas) fade on the same scroll
    range as the wordmark. The headings scroll with content but the
    opacity is tied to the same 0..30 px window so they fade at the
-   same pace. */
+   same pace. MOBILE ONLY — desktop pins the opacity to 1 via the
+   override inside the @media (min-width: 1440px) block below. The
+   desktop persistent sidebar makes the scroll-fade chrome treatment
+   unnecessary; the heading should stay solid as the user scrolls. */
 html[data-design="v2"] .projects-tab-heading,
 html[data-design="v2"] .ideas-tab-heading {
   opacity: var(--v2-scroll-fade, 1);
+}
+@media (min-width: 1440px) {
+  html[data-design="v2"] .projects-tab-heading,
+  html[data-design="v2"] .ideas-tab-heading {
+    opacity: 1 !important;
+  }
 }
 
 /* New "+" add button in the topbar — only rendered in v2 (see
