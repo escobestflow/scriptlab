@@ -4,11 +4,12 @@ import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo, cre
 import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings, Reference,
-  ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, ProjectDraft,
+  ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, EpisodesLayerDraft, ProjectDraft,
   LayerKey, LayerSyncState,
   getActiveProjectDraft,
-  getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft,
-  updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft,
+  getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, getActiveEpisodesDraft,
+  updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft, updateEpisodesDraft,
+  addEpisodeToActiveDraft, upsertEpisodeInActiveDraft,
   createNewLayerDraft, createEmptyLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, duplicateActiveProjectDraft, createEmptyProjectDraft, switchProjectDraft, deleteProjectDraft,
   saveLayerDraft, isLayerDraftDirty,
@@ -57,7 +58,12 @@ import {
 } from "@/lib/invites";
 import { loadMyProfile, saveMyDisplayName } from "@/lib/profiles";
 
-type Section = "concept" | "characters" | "story" | "script";
+// "episodes" is TV-only (only renders when projectType === "tv-show").
+// On TV projects the top-level tab list becomes [concept, episodes,
+// characters]; clicking an episode card drills down into a per-episode
+// view where the tabs shift to [story, script]. Feature projects never
+// see the "episodes" value.
+type Section = "concept" | "characters" | "episodes" | "story" | "script";
 
 // ── Partner Story / Identity Context ────────────────────────────────
 // Phase 2 collaboration. When this project is shared, the parent
@@ -883,6 +889,12 @@ export function Studio({
   const sceneImagesFailed = useRef<Set<string>>(new Set());
   const [scenesInFlight, setScenesInFlight] = useState<Set<string>>(new Set());
   const [charsInFlight, setCharsInFlight] = useState<Set<string>>(new Set());
+  // TV-only — drives the shimmer on the per-episode card thumbnail
+  // while a generation is in flight. Phase 1 keeps this empty (no
+  // episode-image generation yet); the state hook is here so the
+  // EpisodesTab can subscribe to it consistently when Phase 3 wires
+  // an auto-fill pipeline analogous to autoGenerateSceneImage.
+  const [episodesInFlight] = useState<Set<string>>(new Set());
 
   // Auto-fill missing scene thumbnails. Fires whenever the story
   // state changes — picks up beats produced by the bulk Add All
@@ -1893,64 +1905,21 @@ export function Studio({
   // Back handler
   function handleBack() {
     if (showSetup) { setShowSetup(false); return; }
-    if (isTV && activeEpisodeId) { setActiveEpisodeId(null); return; }
+    // TV inside-episode → go back to the project-level Episodes tab.
+    // Clear `activeEpisodeId` AND reset section to "episodes" so the
+    // user lands on the Episodes screen (not Concept).
+    if (isTV && activeEpisodeId) {
+      setActiveEpisodeId(null);
+      setSection("episodes");
+      return;
+    }
     onBack();
   }
 
-  // TV Show episode view (for Story tab only)
-  if (isTV && !activeEpisodeId && section === "story" && !showSetup) {
-    return (
-      <>
-        <ProjectHeader
-          story={story}
-          onBack={onBack}
-          onSetup={() => setShowSetup(true)}
-          subtitle={`${activeStoryLayer.episodes?.length ?? 0} episodes`}
-        />
-        <SectionTabs section={section} setSection={setSection} story={story} autosaveEnabled={autosaveEnabled} />
-        <div className="screen-scroll">
-          <div className="page-enter">
-            {(activeStoryLayer.episodes ?? []).map(ep => (
-              <button
-                key={ep.id}
-                className="project-card"
-                onClick={() => setActiveEpisodeId(ep.id)}
-                style={{ width: "100%", textAlign: "left" }}
-              >
-                <div className="project-thumb" style={{ width: 42, height: 42, borderRadius: 12, fontSize: 14 }}>
-                  {ep.number}
-                </div>
-                <div className="project-info">
-                  <div className="project-title">{ep.title}</div>
-                  <div className="caption">{ep.beats.length} scenes</div>
-                </div>
-                <div className="project-arrow">›</div>
-              </button>
-            ))}
-            <Button variant="secondary" size="lg" style={{ width: "100%", marginTop: 12 }}
-              onClick={() => {
-                setStory(s => {
-                  const ad = getActiveStoryLayerDraft(s);
-                  return updateStoryLayerDraft(s, {
-                    episodes: [
-                      ...(ad.episodes ?? []),
-                      {
-                        id: "ep_" + Math.random().toString(36).slice(2),
-                        title: `Episode ${(ad.episodes?.length ?? 0) + 1}`,
-                        number: (ad.episodes?.length ?? 0) + 1,
-                        beats: [],
-                      },
-                    ],
-                  });
-                });
-              }}>
-              + Add episode
-            </Button>
-          </div>
-        </div>
-      </>
-    );
-  }
+  // The legacy TV "episodes list shown when Story tab is active" view
+  // has been retired. The new "episodes" Section + EpisodesTab in the
+  // main render handles this for both mobile and desktop. Falls
+  // through to the main render below.
 
   // Setup view
   const confirmDeleteDialog = confirmDeleteProject ? (
@@ -2155,6 +2124,32 @@ export function Studio({
                   {story.title ? story.title.charAt(0).toUpperCase() : "?"}
                 </div>
               )}
+              {/* TV-only — back-to-episodes chip overlaid on the hero
+                  image's top-left when the user is drilled into an
+                  episode. Click → returns to the project-level
+                  Episodes tab via handleBack(). stopPropagation so
+                  the click doesn't bubble up and open Settings (the
+                  hero image's primary handler). */}
+              {isTV && activeEpisodeId && (
+                <span
+                  className="v2-desktop-hero-back-chip ds-type-cta"
+                  role="button"
+                  tabIndex={0}
+                  onClick={e => { e.stopPropagation(); handleBack(); }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleBack();
+                    }
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  <span>BACK TO EPISODES</span>
+                </span>
+              )}
             </button>
             <div className="v2-desktop-hero-meta">
               <button
@@ -2196,6 +2191,30 @@ export function Studio({
           onClick={() => setShowSetup(true)}
           aria-label="Open project settings"
         >
+          {/* TV-only back-to-episodes chip on the mobile hero thumbnail.
+              Same affordance as the desktop overlay (top-left of the
+              project image, returns to the Episodes tab). Only renders
+              when the user is drilled into an episode. */}
+          {isTV && activeEpisodeId && (
+            <span
+              className="v2-mobile-hero-back-chip ds-type-cta"
+              role="button"
+              tabIndex={0}
+              onClick={e => { e.stopPropagation(); handleBack(); }}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleBack();
+                }
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+              <span>BACK TO EPISODES</span>
+            </span>
+          )}
           {story.thumbnail ? (
             <img src={story.thumbnail} alt="" className="project-header-thumb" />
           ) : (
@@ -2305,7 +2324,14 @@ export function Studio({
           )}
 
           <div className="studio-tabs-row">
-            <SectionTabs section={section} setSection={setSection} story={story} autosaveEnabled={autosaveEnabled} />
+            <SectionTabs
+              section={section}
+              setSection={setSection}
+              story={story}
+              autosaveEnabled={autosaveEnabled}
+              isTV={isTV}
+              activeEpisodeId={activeEpisodeId}
+            />
           </div>
 
         </div>
@@ -2778,6 +2804,23 @@ export function Studio({
               runGenerateAll={runGenerateAll}
               activeEpisodeId={activeEpisodeId}
               charsInFlight={charsInFlight}
+            />
+          )}
+          {section === "episodes" && (
+            <EpisodesTab
+              story={tabStory}
+              setStory={tabSetStory}
+              autosaveEnabled={autosaveEnabled}
+              onOpenUpdateTray={setUpdateTraySource}
+              onOpenEpisode={(epId) => {
+                // Drill into the episode: set the active episode id
+                // and flip the tab list to the in-episode view
+                // [story, script]. The user's first stop inside an
+                // episode is Story.
+                setActiveEpisodeId(epId);
+                setSection("story");
+              }}
+              episodesInFlight={episodesInFlight}
             />
           )}
           {section === "story" && (
@@ -3409,18 +3452,46 @@ function SectionTabs({
   setSection,
   story,
   autosaveEnabled = true,
+  isTV,
+  activeEpisodeId,
 }: {
   section: Section;
   setSection: (s: Section) => void;
   story: Story;
   autosaveEnabled?: boolean;
+  /** TV-only flag. When true, the tab list shape depends on
+   *  activeEpisodeId — project-level vs drilled-into-an-episode. */
+  isTV: boolean;
+  /** Non-null = the user has drilled into an episode. Tab list
+   *  shifts to [Story, Script]. Null/undefined = project level. */
+  activeEpisodeId: string | null | undefined;
 }) {
-  const tabs: { key: Section; label: string; layer: LayerKey }[] = [
-    { key: "concept",    label: "CONCEPT",    layer: "concept" },
-    { key: "characters", label: "CHARACTERS", layer: "characters" },
-    { key: "story",      label: "STORY",      layer: "story" },
-    { key: "script",     label: "SCRIPT",     layer: "script" },
-  ];
+  // Tab list depends on (projectType, isInsideEpisode):
+  //   • Feature project: [Concept, Characters, Story, Script] (unchanged)
+  //   • TV at project level (activeEpisodeId == null):
+  //       [Concept, Episodes, Characters] — Story / Script are per-
+  //       episode for TV so they only appear inside the drill-down.
+  //   • TV inside an episode (activeEpisodeId set):
+  //       [Story, Script] — Concept / Episodes / Characters live at the
+  //       project level; the user uses the BACK chip on the hero image
+  //       to return there.
+  const tabs: { key: Section; label: string; layer: LayerKey }[] = isTV
+    ? (activeEpisodeId
+        ? [
+            { key: "story",      label: "STORY",      layer: "story" },
+            { key: "script",     label: "SCRIPT",     layer: "script" },
+          ]
+        : [
+            { key: "concept",    label: "CONCEPT",    layer: "concept" },
+            { key: "episodes",   label: "EPISODES",   layer: "episodes" },
+            { key: "characters", label: "CHARACTERS", layer: "characters" },
+          ])
+    : [
+        { key: "concept",    label: "CONCEPT",    layer: "concept" },
+        { key: "characters", label: "CHARACTERS", layer: "characters" },
+        { key: "story",      label: "STORY",      layer: "story" },
+        { key: "script",     label: "SCRIPT",     layer: "script" },
+      ];
 
   // Sliding underline (desktop). useLayoutEffect measures the active
   // tab's position inside the bar after each render and writes
@@ -4363,13 +4434,15 @@ type AnyLayerDraft =
   | ConceptLayerDraft
   | CharactersLayerDraft
   | StoryLayerDraft
-  | ScriptLayerDraft;
+  | ScriptLayerDraft
+  | EpisodesLayerDraft;
 
 function getLayerPool(s: Story, layer: LayerKey): AnyLayerDraft[] {
   return (
     layer === "concept"    ? s.conceptDrafts :
     layer === "characters" ? s.charactersDrafts :
     layer === "story"      ? s.storyDrafts :
+    layer === "episodes"   ? (s.episodesDrafts ?? []) :
                              s.scriptDrafts
   );
 }
@@ -4784,10 +4857,11 @@ function ReadIcon() {
 // target in canonical order so the user lands on the most-upstream
 // result.
 
-const ORDER_KEYS: LayerKey[] = ["concept", "characters", "story", "script"];
+const ORDER_KEYS: LayerKey[] = ["concept", "characters", "episodes", "story", "script"];
 const LAYER_LABEL: Record<LayerKey, string> = {
   concept: "Concept",
   characters: "Characters",
+  episodes: "Episodes",
   story: "Story",
   script: "Script",
 };
@@ -9104,6 +9178,197 @@ function CharacterEditForm({
         </div>
       )}
     </div>
+  );
+}
+
+/* ============================================ */
+/* ============ EPISODES TAB ================== */
+/* ============================================ */
+//
+// TV-only. Renders the project-level Episodes screen: a 4-column
+// card grid of episodes inside the active EpisodesLayerDraft, plus
+// two Add-an-Episode buttons (manual + AI) and the standard layer-
+// draft picker. Clicking an episode card drills into the per-
+// episode Story/Script view (the parent Studio sets activeEpisodeId
+// and flips section to "story").
+//
+// Empty state: no episodes in the active draft → render the same
+// EmptyLayerState shell other tabs use, with the placeholder Story
+// silhouette graphic for now (user will provide a dedicated asset
+// later).
+
+function EpisodesTab({
+  story,
+  setStory,
+  autosaveEnabled,
+  onOpenEpisode,
+  onOpenUpdateTray,
+  episodesInFlight,
+}: {
+  story: Story;
+  setStory: (u: (s: Story) => Story) => void;
+  autosaveEnabled: boolean;
+  /** Drill-down callback. Parent sets activeEpisodeId + section="story". */
+  onOpenEpisode: (episodeId: string) => void;
+  /** Passed through to LayerBar so the "Update Other Layers" tray
+   *  knows which layer initiated the sync (same pattern as the
+   *  other tabs). */
+  onOpenUpdateTray: (source: LayerKey) => void;
+  /** Ids of episodes currently having their cover image generated
+   *  (mirrors charsInFlight / scenesInFlight). Drives the per-card
+   *  shimmer; auto-fill protections live inside the parent. */
+  episodesInFlight: Set<string>;
+}) {
+  const isV2 = useIsV2();
+  const isDesktop = useIsDesktopStudio();
+  const activeDraft = getActiveEpisodesDraft(story);
+  const episodes = activeDraft?.episodes ?? [];
+  const hasEpisodes = episodes.length > 0;
+
+  // Manual add — appends a blank episode to the active draft and
+  // immediately drills in so the user can name it / write beats.
+  function handleAddEpisode() {
+    setStory(s => {
+      const before = (getActiveEpisodesDraft(s)?.episodes ?? []).length;
+      const next = addEpisodeToActiveDraft(s, { title: "" });
+      const after = getActiveEpisodesDraft(next)?.episodes ?? [];
+      const newId = after[before]?.id;
+      // Drill in on the next render once setStory has flushed. Use
+      // a microtask so onOpenEpisode runs AFTER React commits the
+      // new episode to state (otherwise activeEpisodeId points at a
+      // not-yet-existing id during the same commit).
+      if (newId) queueMicrotask(() => onOpenEpisode(newId));
+      return next;
+    });
+  }
+
+  // AI add — Phase 1 wires this to the same handler as manual.
+  // Phase 3 will hook it up to a real prompt that produces a title +
+  // logline (and optionally seeded beats) from the project's
+  // concept context.
+  function handleAddEpisodeAI() {
+    handleAddEpisode();
+  }
+
+  return (
+    <>
+      <LayerBar
+        layer="episodes"
+        label="Episodes"
+        story={story}
+        setStory={setStory}
+        autosaveEnabled={autosaveEnabled}
+        onOpenUpdateTray={onOpenUpdateTray}
+        rightSlot={hasEpisodes ? (
+          <div className="v2-episodes-add-row">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleAddEpisode}
+              icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
+              className="ds-type-cta"
+            >
+              Add an Episode
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleAddEpisodeAI}
+              icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
+              className="empty-state-ai-btn ds-type-cta"
+            >
+              Add an Episode
+            </Button>
+          </div>
+        ) : undefined}
+      />
+
+      {!hasEpisodes && (
+        <EmptyLayerState
+          section="story"   /* Reuses Story's silhouette graphic per user request. */
+          layer="episodes"
+          draftPickerLabel="Episodes"
+          story={story}
+          setStory={setStory}
+          autosaveEnabled={autosaveEnabled}
+          icon={
+            isV2
+              ? <img src="/v2/empty-state-story.png" alt="" className="empty-layer-icon-v2" />
+              : <img src="/script-icon.svg" width={41} height={44} alt="" />
+          }
+          title={isV2 ? "Define Your Episodes" : "No episodes yet"}
+          caption={
+            isV2
+              ? "Build out the episodes that make up your TV series. Each episode gets its own Story and Script."
+              : "Add your first episode to start outlining the series."
+          }
+          addLabel={isV2 ? "Add an Episode" : "Add episode"}
+          onAdd={handleAddEpisode}
+          onGenerate={handleAddEpisodeAI}
+          generating={false}
+          generateLabel={isV2 ? "Create With AI" : "Create with AI"}
+          generatingLabel="Creating…"
+        />
+      )}
+
+      {hasEpisodes && (
+        <div className="v2-episodes-grid">
+          {episodes.map(ep => (
+            <button
+              key={ep.id}
+              type="button"
+              className="v2-episode-card"
+              onClick={() => onOpenEpisode(ep.id)}
+            >
+              <div className="v2-episode-card-image">
+                {/* Shimmer when no thumbnail OR a regen is live —
+                    matches the canonical "no image yet" pattern
+                    used app-wide. */}
+                {ep.thumbnail && !episodesInFlight.has(ep.id) ? (
+                  <img src={ep.thumbnail} alt="" />
+                ) : (
+                  <div
+                    className="v2-episode-card-image-fallback ds-image-shimmer is-dark"
+                    aria-label={episodesInFlight.has(ep.id) ? "Generating episode image" : undefined}
+                    aria-hidden={episodesInFlight.has(ep.id) ? undefined : true}
+                  />
+                )}
+                <div className="v2-episode-card-badge ds-type-cta">
+                  EPISODE {ep.number}
+                </div>
+                <button
+                  type="button"
+                  className="v2-episode-card-menu"
+                  aria-label="Episode menu"
+                  onClick={e => { e.stopPropagation(); /* TODO Phase 2 menu */ }}
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                    <circle cx="6" cy="12" r="1.7" />
+                    <circle cx="12" cy="12" r="1.7" />
+                    <circle cx="18" cy="12" r="1.7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="v2-episode-card-body">
+                <div className="v2-episode-card-title ds-type-project-card-title">
+                  {ep.title || `Episode ${ep.number}`}
+                </div>
+                <div className="v2-episode-card-description ds-type-body">
+                  {ep.logline || ""}
+                </div>
+                <div className="v2-episode-card-updated ds-type-body-sm">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <polyline points="12 7 12 12 15 14" />
+                  </svg>
+                  <span>Updated {formatUpdatedAgo(ep.updatedAt ?? story.updatedAt)}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

@@ -1,7 +1,9 @@
 import {
   Story, ProjectDraft, Beat, Character, Concept, Script, StorySettings,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft,
+  EpisodesLayerDraft, Episode,
   emptyConceptDraft, emptyCharactersDraft, emptyStoryLayerDraft, emptyScriptDraft,
+  emptyEpisodesDraft,
 } from "./story";
 import { Moment } from "./sampleData";
 import { supabase } from "./supabase";
@@ -208,6 +210,32 @@ function normalizeStoryLayerDraft(d: any, number = 1, ts?: string): StoryLayerDr
   };
 }
 
+function normalizeEpisode(e: any, index: number): Episode {
+  return {
+    id: e?.id || "ep_" + Math.random().toString(36).slice(2),
+    title: typeof e?.title === "string" ? e.title : "",
+    number: typeof e?.number === "number" ? e.number : index + 1,
+    beats: Array.isArray(e?.beats) ? e.beats.map((b: any, i: number) => normalizeBeat(b, i)) : [],
+    logline: typeof e?.logline === "string" ? e.logline : undefined,
+    thumbnail: typeof e?.thumbnail === "string" ? e.thumbnail : undefined,
+    imageGenAttempted: e?.imageGenAttempted === true ? true : undefined,
+    updatedAt: typeof e?.updatedAt === "string" ? e.updatedAt : undefined,
+  };
+}
+
+function normalizeEpisodesDraft(d: any, number = 1, ts?: string): EpisodesLayerDraft {
+  const now = ts || d?.updatedAt || new Date().toISOString();
+  const updated = d?.updatedAt || now;
+  return {
+    id: d?.id || "epd_" + Math.random().toString(36).slice(2),
+    number: d?.number ?? number,
+    createdAt: d?.createdAt || now,
+    updatedAt: updated,
+    savedAt: d?.savedAt || updated,
+    episodes: Array.isArray(d?.episodes) ? d.episodes.map((e: any, i: number) => normalizeEpisode(e, i)) : [],
+  };
+}
+
 function normalizeScriptDraft(d: any, number = 1, ts?: string): ScriptLayerDraft {
   const now = ts || d?.updatedAt || new Date().toISOString();
   const updated = d?.updatedAt || now;
@@ -242,12 +270,66 @@ function normalizeStory(s: any): Story {
     const charactersDrafts = (s.charactersDrafts ?? []).map((d: any, i: number) => normalizeCharactersDraft(d, i + 1));
     const storyDrafts      = (s.storyDrafts ?? []).map((d: any, i: number) => normalizeStoryLayerDraft(d, i + 1));
     const scriptDrafts     = (s.scriptDrafts ?? []).map((d: any, i: number) => normalizeScriptDraft(d, i + 1));
+
+    // EPISODES LAYER — TV-only. Three cases:
+    //   (a) Already migrated: `s.episodesDrafts` is present → normalize each.
+    //   (b) Legacy TV project: episodes nested inside each storyDraft.episodes
+    //       → lift them out, one episodesDraft parallel to each storyDraft
+    //       that carried episodes. Match by index/number to preserve which
+    //       storyDraft maps to which episodes draft.
+    //   (c) New TV project: no episodes anywhere → seed a single empty
+    //       episodes draft (storyDrafts[0] still exists in the layered shape).
+    // For non-TV projects the field stays undefined.
+    const isTV = s.projectType === "tv-show";
+    let episodesDrafts: EpisodesLayerDraft[] | undefined;
+    let storyToEpisodes: Map<string, string> = new Map();
+    if (isTV) {
+      if (Array.isArray(s.episodesDrafts) && s.episodesDrafts.length > 0) {
+        // (a) Already-migrated payload.
+        episodesDrafts = s.episodesDrafts.map((d: any, i: number) => normalizeEpisodesDraft(d, i + 1));
+      } else {
+        // (b) and (c): build from legacy storyDrafts. Each storyDraft that
+        // carries an `episodes` array gets a parallel episodesDraft with
+        // the same number. storyDrafts without episodes get an empty one.
+        episodesDrafts = storyDrafts.map((sd: StoryLayerDraft, i: number) => {
+          const draftId = genId("epd");
+          storyToEpisodes.set(sd.id, draftId);
+          return {
+            id: draftId,
+            number: sd.number ?? i + 1,
+            createdAt: sd.createdAt,
+            updatedAt: sd.updatedAt,
+            savedAt: sd.savedAt,
+            episodes: Array.isArray(sd.episodes)
+              ? sd.episodes.map((e: any, j: number) => normalizeEpisode(e, j))
+              : [],
+          };
+        });
+        // Ensure at least one episodes-draft exists even if storyDrafts is empty.
+        // The local-var narrowing inside the closure isn't picked up by
+        // TS — we just assigned the variable a non-undefined value
+        // above, but the inference forgets that here, so we re-assert
+        // with a non-null check.
+        if (!episodesDrafts || episodesDrafts.length === 0) {
+          episodesDrafts = [emptyEpisodesDraft(genId("epd"), 1, now)];
+        }
+      }
+    }
+
     const projectDrafts: ProjectDraft[] = (s.projectDrafts ?? []).map((pd: any, i: number) => {
       const upd = pd.updatedAt || now;
       const conceptId    = pd.conceptDraftId    || conceptDrafts[0]?.id;
       const charactersId = pd.charactersDraftId || charactersDrafts[0]?.id;
       const storyId      = pd.storyDraftId      || storyDrafts[0]?.id;
       const scriptId     = pd.scriptDraftId     || scriptDrafts[0]?.id;
+      // TV-only — wire each projectDraft to an episodesDraft. Prefer
+      // any pre-existing pd.episodesDraftId (case a); otherwise look
+      // up the lifted-from-story mapping (case b); fall back to the
+      // first available episodes draft (case c / safety net).
+      const episodesId = !isTV ? undefined
+        : (pd.episodesDraftId && (episodesDrafts ?? []).some(e => e.id === pd.episodesDraftId))
+          ? pd.episodesDraftId
+          : storyToEpisodes.get(storyId) ?? episodesDrafts?.[0]?.id;
       return {
         id: pd.id || genId("pd"),
         number: pd.number ?? i + 1,
@@ -258,13 +340,16 @@ function normalizeStory(s: any): Story {
         charactersDraftId: charactersId,
         storyDraftId: storyId,
         scriptDraftId: scriptId,
+        episodesDraftId: episodesId,
         savedConceptDraftId:    pd.savedConceptDraftId    || conceptId,
         savedCharactersDraftId: pd.savedCharactersDraftId || charactersId,
         savedStoryDraftId:      pd.savedStoryDraftId      || storyId,
         savedScriptDraftId:     pd.savedScriptDraftId     || scriptId,
+        savedEpisodesDraftId:   pd.savedEpisodesDraftId   || episodesId,
         conceptSyncedAt:    pd.conceptSyncedAt,
         charactersSyncedAt: pd.charactersSyncedAt,
         storySyncedAt:      pd.storySyncedAt,
+        episodesSyncedAt:   pd.episodesSyncedAt,
       };
     });
     return {
@@ -276,6 +361,7 @@ function normalizeStory(s: any): Story {
       charactersDrafts,
       storyDrafts,
       scriptDrafts,
+      episodesDrafts,
       projectDrafts,
       activeProjectDraftId: projectDrafts.some((pd: ProjectDraft) => pd.id === s.activeProjectDraftId)
         ? s.activeProjectDraftId
@@ -286,6 +372,7 @@ function normalizeStory(s: any): Story {
         story: s.counters?.story ?? storyDrafts.length,
         script: s.counters?.script ?? scriptDrafts.length,
         project: s.counters?.project ?? projectDrafts.length,
+        episodes: isTV ? (s.counters?.episodes ?? (episodesDrafts?.length ?? 0)) : undefined,
       },
       updatedAt: now,
     };
@@ -298,7 +385,9 @@ function normalizeStory(s: any): Story {
     const charactersDrafts: CharactersLayerDraft[] = [];
     const storyDrafts: StoryLayerDraft[] = [];
     const scriptDrafts: ScriptLayerDraft[] = [];
+    const episodesDrafts: EpisodesLayerDraft[] = [];
     const projectDrafts: ProjectDraft[] = [];
+    const shape2IsTV = s.projectType === "tv-show";
 
     oldDrafts.forEach((od, i) => {
       const ts = od.updatedAt || now;
@@ -309,10 +398,17 @@ function normalizeStory(s: any): Story {
         id: genId("sd"),
       }, i + 1, ts);
       const scd: ScriptLayerDraft    = normalizeScriptDraft({ script: od.script, id: genId("scd") }, i + 1, ts);
+      // TV-only: lift old monolithic-draft `od.episodes` into a parallel
+      // EpisodesLayerDraft. New-project case ends up with [] episodes; the
+      // user adds the first one from the Episodes tab.
+      const epd: EpisodesLayerDraft | null = shape2IsTV
+        ? normalizeEpisodesDraft({ id: genId("epd"), episodes: od.episodes ?? [] }, i + 1, ts)
+        : null;
       conceptDrafts.push(cd);
       charactersDrafts.push(chd);
       storyDrafts.push(sd);
       scriptDrafts.push(scd);
+      if (epd) episodesDrafts.push(epd);
       projectDrafts.push({
         id: od.id || genId("pd"),
         number: od.number ?? i + 1,
@@ -323,10 +419,12 @@ function normalizeStory(s: any): Story {
         charactersDraftId: chd.id,
         storyDraftId: sd.id,
         scriptDraftId: scd.id,
+        episodesDraftId: epd?.id,
         savedConceptDraftId: cd.id,
         savedCharactersDraftId: chd.id,
         savedStoryDraftId: sd.id,
         savedScriptDraftId: scd.id,
+        savedEpisodesDraftId: epd?.id,
         conceptSyncedAt: ts,
         charactersSyncedAt: ts,
         storySyncedAt: ts,
@@ -342,6 +440,7 @@ function normalizeStory(s: any): Story {
       charactersDrafts,
       storyDrafts,
       scriptDrafts,
+      episodesDrafts: shape2IsTV ? episodesDrafts : undefined,
       projectDrafts,
       activeProjectDraftId: projectDrafts.find(pd => pd.id === s.activeDraftId)?.id ?? projectDrafts[0].id,
       counters: {
@@ -350,6 +449,7 @@ function normalizeStory(s: any): Story {
         story: storyDrafts.length,
         script: scriptDrafts.length,
         project: projectDrafts.length,
+        episodes: shape2IsTV ? episodesDrafts.length : undefined,
       },
       updatedAt: now,
     };
@@ -360,6 +460,12 @@ function normalizeStory(s: any): Story {
   const chd = normalizeCharactersDraft(s, 1, now);
   const sd = normalizeStoryLayerDraft(s, 1, now);
   const scd = normalizeScriptDraft(s, 1, now);
+  const shape3IsTV = s.projectType === "tv-show";
+  // TV-only: build a single episodes layer draft, lifting any
+  // top-level `s.episodes` if present (legacy pre-drafts shape).
+  const epd: EpisodesLayerDraft | null = shape3IsTV
+    ? normalizeEpisodesDraft({ id: genId("epd"), episodes: s.episodes ?? [] }, 1, now)
+    : null;
   const pd: ProjectDraft = {
     id: genId("pd"),
     number: 1,
@@ -370,10 +476,12 @@ function normalizeStory(s: any): Story {
     charactersDraftId: chd.id,
     storyDraftId: sd.id,
     scriptDraftId: scd.id,
+    episodesDraftId: epd?.id,
     savedConceptDraftId: cd.id,
     savedCharactersDraftId: chd.id,
     savedStoryDraftId: sd.id,
     savedScriptDraftId: scd.id,
+    savedEpisodesDraftId: epd?.id,
     conceptSyncedAt: now,
     charactersSyncedAt: now,
     storySyncedAt: now,
@@ -387,9 +495,10 @@ function normalizeStory(s: any): Story {
     charactersDrafts: [chd],
     storyDrafts: [sd],
     scriptDrafts: [scd],
+    episodesDrafts: epd ? [epd] : undefined,
     projectDrafts: [pd],
     activeProjectDraftId: pd.id,
-    counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 },
+    counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1, episodes: epd ? 1 : undefined },
     updatedAt: now,
   };
 }

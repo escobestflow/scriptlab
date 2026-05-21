@@ -283,6 +283,15 @@ function payloadToContent(
       const list = Array.isArray(raw?.scenes) ? raw.scenes : [];
       return { kind: "script", scenes: list.map(normalizeScene) };
     }
+    case "episodes": {
+      // TV-only sync target. Maps the model's `episodes` array onto
+      // the EpisodesLayerDraft shape. Phase 1 doesn't define new
+      // sync prompts that target this layer — kept here so the
+      // exhaustive-switch return-type check passes and so Phase 3
+      // can hook this up without revisiting syncLayer.ts.
+      const list = Array.isArray(raw?.episodes) ? raw.episodes : [];
+      return { kind: "episodes", episodes: list.map((e: any, i: number) => normalizeEpisode(e, i)) };
+    }
   }
 }
 

@@ -2172,6 +2172,10 @@ html[data-theme="dark"] .layer-draft-picker {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: transform 160ms var(--ease);
+  /* Becomes the positioning context for the TV back-to-episodes chip
+     anchored at top:14 / left:14 of the mobile hero thumbnail
+     (rendered inside this button when activeEpisodeId is set). */
+  position: relative;
 }
 .studio-thumb-button:active {
   transform: scale(0.98);
@@ -12856,5 +12860,311 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .v2-ideas-top-mask {
     display: none;
   }
+
+  /* ── Episodes tab — DESKTOP (4-column card grid + buttons) ──────
+     Project-level Episodes screen for TV projects. Spec: 4 cards
+     across with 20px gaps, each card has a dark image area with
+     an "EPISODE N" badge + 3-dot menu, then a white body with the
+     episode title (Poynter display) / description / "Updated …"
+     timestamp. Click anywhere on the card → drill into the per-
+     episode Story tab (parent handles activeEpisodeId).
+
+     Cards aim for ~290px wide at 1462px viewport (4 × 290 + 3 ×
+     20 = 1220, fits inside the standard 1054-wide tab content
+     area). `minmax(280px, 1fr)` keeps the grid responsive on
+     narrower desktops without breaking the 4-up cadence on the
+     reference viewport. */
+  html[data-design="v2"] .v2-episodes-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 0 0 40px;
+    padding: 0;
+  }
+  html[data-design="v2"] .v2-episodes-add-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+  }
+  /* Override the empty-state button geometry inherited from
+     `.empty-layer-actions .ds-btn`: the right-slot here is a tight
+     header cluster, not a vertical CTA stack. Pill width is
+     content-driven, no extra padding-block. */
+  html[data-design="v2"] .v2-episodes-add-row .ds-btn {
+    width: auto;
+    min-width: 0;
+    height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+  }
+
+  html[data-design="v2"] .v2-episode-card {
+    /* Full-card click target. Reset native <button> chrome so the
+       card reads as a clean tile. */
+    appearance: none;
+    background: var(--ds-color-white);
+    border: 0;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 14px;
+    box-shadow: var(--ds-shadow-card);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    color: inherit;
+  }
+  /* Image area — dark surface with the EPISODE badge bottom-left
+     spec'd as "top-left" but the reference design clearly anchors
+     it bottom-left of the image (clearance from the menu glyph).
+     Shimmer fallback fills the same box when no thumbnail. */
+  html[data-design="v2"] .v2-episode-card-image {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: var(--ds-color-gray-dark-fill);
+    overflow: hidden;
+  }
+  html[data-design="v2"] .v2-episode-card-image > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  html[data-design="v2"] .v2-episode-card-image-fallback {
+    position: absolute;
+    inset: 0;
+  }
+  /* Badge: "EPISODE N" in small uppercase white text, top-left of
+     the image. No fill behind — sits directly on the dark image,
+     which is the readable surface per spec. */
+  html[data-design="v2"] .v2-episode-card-badge {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    color: var(--ds-color-white);
+    /* font tokens come from .ds-type-cta on the JSX; this rule
+       just positions. */
+    z-index: 2;
+    pointer-events: none;
+    letter-spacing: 0.08em;
+  }
+  /* 3-dot menu glyph — top-right of the image. Transparent button,
+     white glyph; subtle hover darkens the background a bit. */
+  html[data-design="v2"] .v2-episode-card-menu {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: var(--ds-color-white);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+  }
+  html[data-design="v2"] .v2-episode-card-menu:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  html[data-design="v2"] .v2-episode-card-body {
+    padding: 18px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--ds-color-white);
+  }
+  html[data-design="v2"] .v2-episode-card-title {
+    color: var(--ds-color-black);
+    line-height: 1.1;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  html[data-design="v2"] .v2-episode-card-description {
+    color: var(--ds-color-black);
+    line-height: 1.45;
+    /* Clamp the description at 2 lines so card heights stay
+       consistent across long/short loglines. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.9em;       /* reserve 2 lines even when empty */
+  }
+  html[data-design="v2"] .v2-episode-card-updated {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--ds-color-unfold-gold);
+    margin-top: 4px;
+  }
+  html[data-design="v2"] .v2-episode-card-updated svg {
+    flex: 0 0 auto;
+  }
+
+  /* ── Back-to-episodes chip on the desktop hero image ────────────
+     Pill positioned at top-left of `.v2-desktop-hero-image`. Light
+     fill (matches the settings-fab treatment) so it reads cleanly
+     on any cover art. Visible only when the parent JSX renders it
+     (gated on isTV && activeEpisodeId in Studio.tsx). */
+  html[data-design="v2"] .v2-desktop-hero-back-chip {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    height: 32px;
+    border-radius: 999px;
+    background: var(--ds-color-white);
+    color: var(--ds-color-black);
+    box-shadow: var(--ds-shadow-card);
+    /* font tokens from .ds-type-cta on the JSX */
+    cursor: pointer;
+    user-select: none;
+  }
+  html[data-design="v2"] .v2-desktop-hero-back-chip:hover {
+    background: var(--ds-color-gray-lightest);
+  }
+}
+
+/* ── Episodes tab — MOBILE (single-column stack) ────────────────
+   Base (mobile-first) rules. Cards stack vertically full-width
+   with the standard 20px gap; desktop overrides to a 4-up grid
+   inside the @media block above. The add-row also collapses to
+   vertical stacking on mobile so the two CTAs each get full width
+   in the layer-bar's rightSlot. */
+html[data-design="v2"] .v2-episodes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0 40px;
+}
+html[data-design="v2"] .v2-episodes-add-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+html[data-design="v2"] .v2-episode-card {
+  appearance: none;
+  background: var(--ds-color-white);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 14px;
+  box-shadow: var(--ds-shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+}
+html[data-design="v2"] .v2-episode-card-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--ds-color-gray-dark-fill);
+  overflow: hidden;
+}
+html[data-design="v2"] .v2-episode-card-image > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+html[data-design="v2"] .v2-episode-card-image-fallback {
+  position: absolute;
+  inset: 0;
+}
+html[data-design="v2"] .v2-episode-card-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  color: var(--ds-color-white);
+  z-index: 2;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+html[data-design="v2"] .v2-episode-card-menu {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--ds-color-white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+}
+html[data-design="v2"] .v2-episode-card-body {
+  padding: 16px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--ds-color-white);
+}
+html[data-design="v2"] .v2-episode-card-title {
+  color: var(--ds-color-black);
+  line-height: 1.1;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+html[data-design="v2"] .v2-episode-card-description {
+  color: var(--ds-color-black);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html[data-design="v2"] .v2-episode-card-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ds-color-unfold-gold);
+  margin-top: 4px;
+}
+
+/* ── Back-to-episodes chip on the MOBILE hero thumbnail ─────────
+   Mounted inside `.studio-thumb-button` (the mobile hero is a
+   full-bleed image at the top of the project page). Same pill
+   look as the desktop chip but positioned within the mobile
+   thumbnail's bounds. */
+html[data-design="v2"] .v2-mobile-hero-back-chip {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--ds-color-white);
+  color: var(--ds-color-black);
+  box-shadow: var(--ds-shadow-card);
+  cursor: pointer;
+  user-select: none;
 }
 

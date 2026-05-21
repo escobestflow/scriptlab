@@ -237,6 +237,21 @@ export interface Episode {
   title: string;
   number: number;
   beats: Beat[];
+  /** Optional per-episode logline / 1-line synopsis. Displayed on
+   *  the episode card in the Episodes tab. Independent of the
+   *  project-level Concept logline. */
+  logline?: string;
+  /** Optional per-episode cover thumbnail (URL or data URL). Falls
+   *  back to a placeholder when missing. */
+  thumbnail?: string;
+  /** Mirrors Character/Beat — set true the first time an image
+   *  generation attempt has been made (even if it failed). Prevents
+   *  the auto-fill effect from re-firing across reloads. */
+  imageGenAttempted?: boolean;
+  /** Last-modified marker — used in the "Updated 2d ago" label on
+   *  the episode card. Bumps whenever any field on the episode (or
+   *  any beat inside it) changes. */
+  updatedAt?: string;
 }
 
 export interface Scene {
@@ -301,6 +316,31 @@ export interface CharactersLayerDraft {
   characters: Character[];
 }
 
+/**
+ * Episodes layer draft — top-level for TV projects. Mirrors
+ * StoryLayerDraft's shape (id/number/timestamps + a content list).
+ * The content list is `episodes`; each Episode carries its own
+ * beats. Drill-down: clicking an episode in the Episodes tab opens
+ * the per-episode Story tab, which scopes its work to that
+ * episode's beats inside the active episodes draft.
+ *
+ * MIGRATION: TV projects created before this layer existed stored
+ * episodes inside `StoryLayerDraft.episodes`. `normalizeStory` in
+ * lib/storage.ts detects that shape and lifts the episodes to an
+ * `EpisodesLayerDraft[]` on load (one episodes-draft per legacy
+ * story-draft that carried episodes). The legacy `episodes` field
+ * on StoryLayerDraft is preserved for back-compat reads but new
+ * code should always use `Story.episodesDrafts`.
+ */
+export interface EpisodesLayerDraft {
+  id: string;
+  number: number;
+  createdAt: string;
+  updatedAt: string;
+  savedAt: string;
+  episodes: Episode[];
+}
+
 export interface StoryLayerDraft {
   id: string;
   number: number;
@@ -308,6 +348,9 @@ export interface StoryLayerDraft {
   updatedAt: string;
   savedAt: string;
   beats: Beat[];
+  /** @deprecated TV projects now keep episodes on Story.episodesDrafts.
+   *  Field kept for back-compat reads of legacy data; the normalizer
+   *  lifts it during load. New writes should not touch this. */
   episodes?: Episode[];
   ingredients: Ingredient[];
   snippets: Snippet[];
@@ -342,18 +385,25 @@ export interface ProjectDraft {
   charactersDraftId: string;
   storyDraftId: string;
   scriptDraftId: string;
+  /** TV-only. References the active EpisodesLayerDraft for this
+   *  project draft. Optional on the type so existing feature
+   *  projects don't need migration; the normalizer fills it in
+   *  for TV projects on load. */
+  episodesDraftId?: string;
   // Saved layer IDs at time of last save — used to detect per-tab
   // "has this layer changed since save" indicators.
   savedConceptDraftId?: string;
   savedCharactersDraftId?: string;
   savedStoryDraftId?: string;
   savedScriptDraftId?: string;
+  savedEpisodesDraftId?: string;
   // Sync markers: ISO timestamps of when each upstream layer was "synced"
   // into this project draft. If upstream.updatedAt > this marker, the
   // downstream is considered out-of-sync.
   conceptSyncedAt?: string;
   charactersSyncedAt?: string;
   storySyncedAt?: string;
+  episodesSyncedAt?: string;
 }
 
 // ── Story (project) ──
@@ -368,6 +418,10 @@ export interface Story {
   charactersDrafts: CharactersLayerDraft[];
   storyDrafts: StoryLayerDraft[];
   scriptDrafts: ScriptLayerDraft[];
+  /** TV-only layer. Populated by the normalizer for `projectType ===
+   *  "tv-show"`; absent on feature projects (which have no episodes
+   *  concept). */
+  episodesDrafts?: EpisodesLayerDraft[];
   projectDrafts: ProjectDraft[];
   activeProjectDraftId: string;
   counters: {
@@ -376,6 +430,10 @@ export interface Story {
     story: number;
     script: number;
     project: number;
+    /** TV-only — used by `createNewLayerDraft` when forking an
+     *  episodes draft. Optional so feature projects don't carry
+     *  a meaningless field. */
+    episodes?: number;
   };
   updatedAt: string;
   /**
@@ -389,7 +447,7 @@ export interface Story {
   collaboratorUserId?: string;
 }
 
-export type LayerKey = "concept" | "characters" | "story" | "script";
+export type LayerKey = "concept" | "characters" | "story" | "script" | "episodes";
 
 // ── Default factories ──
 
@@ -429,6 +487,14 @@ export function emptyStoryLayerDraft(id: string, number: number, ts: string): St
   };
 }
 
+/** TV-only — empty Episodes layer draft. Mirrors the shape of
+ *  emptyStoryLayerDraft. New TV projects start with one such draft
+ *  containing no episodes; the user adds the first episode from the
+ *  Episodes tab. */
+export function emptyEpisodesDraft(id: string, number: number, ts: string): EpisodesLayerDraft {
+  return { id, number, createdAt: ts, updatedAt: ts, savedAt: ts, episodes: [] };
+}
+
 export function emptyScriptDraft(id: string, number: number, ts: string): ScriptLayerDraft {
   return {
     id, number, createdAt: ts, updatedAt: ts, savedAt: ts,
@@ -460,6 +526,17 @@ export function getActiveStoryLayerDraft(story: Story): StoryLayerDraft {
 export function getActiveScriptDraft(story: Story): ScriptLayerDraft {
   const pd = getActiveProjectDraft(story);
   return story.scriptDrafts.find(d => d.id === pd.scriptDraftId) ?? story.scriptDrafts[0];
+}
+
+/** TV-only. Returns the active EpisodesLayerDraft (the one
+ *  referenced by the active project draft's `episodesDraftId`).
+ *  Returns null for feature projects (no episodes concept) and for
+ *  legacy TV projects that haven't been normalized yet — callers
+ *  should handle the null case gracefully. */
+export function getActiveEpisodesDraft(story: Story): EpisodesLayerDraft | null {
+  if (!story.episodesDrafts || story.episodesDrafts.length === 0) return null;
+  const pd = getActiveProjectDraft(story);
+  return story.episodesDrafts.find(d => d.id === pd.episodesDraftId) ?? story.episodesDrafts[0];
 }
 
 // ── Helpers: layer updates ──
@@ -503,6 +580,61 @@ export function updateStoryLayerDraft(story: Story, patch: Partial<StoryLayerDra
     ),
     updatedAt: now,
   };
+}
+
+/** TV-only — patch the active EpisodesLayerDraft. Mirrors
+ *  updateStoryLayerDraft. No-ops cleanly when `episodesDrafts` is
+ *  empty (returns the story unchanged) so feature projects that
+ *  accidentally end up here don't crash. */
+export function updateEpisodesDraft(story: Story, patch: Partial<EpisodesLayerDraft>): Story {
+  if (!story.episodesDrafts || story.episodesDrafts.length === 0) return story;
+  const now = new Date().toISOString();
+  const pd = getActiveProjectDraft(story);
+  const targetId = pd.episodesDraftId ?? story.episodesDrafts[0].id;
+  return {
+    ...story,
+    episodesDrafts: story.episodesDrafts.map(d =>
+      d.id === targetId ? { ...d, ...patch, updatedAt: now } : d
+    ),
+    updatedAt: now,
+  };
+}
+
+/** Replace one episode within the active episodes draft. Bumps
+ *  episode.updatedAt so the "Updated 2d ago" label on the card
+ *  reflects the latest change. */
+export function upsertEpisodeInActiveDraft(story: Story, episode: Episode): Story {
+  const active = getActiveEpisodesDraft(story);
+  if (!active) return story;
+  const now = new Date().toISOString();
+  const nextEpisode: Episode = { ...episode, updatedAt: now };
+  const exists = active.episodes.some(e => e.id === episode.id);
+  const nextEpisodes = exists
+    ? active.episodes.map(e => (e.id === episode.id ? nextEpisode : e))
+    : [...active.episodes, nextEpisode];
+  return updateEpisodesDraft(story, { episodes: nextEpisodes });
+}
+
+/** Add a new episode to the active episodes draft. Auto-numbers
+ *  based on the current count; caller supplies title + (optional)
+ *  logline. Returns the updated story; the new episode's id is on
+ *  the last entry of the active draft. */
+export function addEpisodeToActiveDraft(
+  story: Story,
+  init: { title?: string; logline?: string } = {},
+): Story {
+  const active = getActiveEpisodesDraft(story);
+  if (!active) return story;
+  const now = new Date().toISOString();
+  const ep: Episode = {
+    id: genId("ep"),
+    title: init.title ?? "",
+    number: active.episodes.length + 1,
+    beats: [],
+    logline: init.logline,
+    updatedAt: now,
+  };
+  return updateEpisodesDraft(story, { episodes: [...active.episodes, ep] });
 }
 
 export function updateScriptDraft(story: Story, patch: Partial<ScriptLayerDraft>): Story {
@@ -750,6 +882,32 @@ export function createEmptyLayerDraft(story: Story, layer: LayerKey): Story {
         updatedAt: now,
       };
     }
+    case "episodes": {
+      // TV-only. Forks a new empty Episodes layer draft. No-ops
+      // gracefully for non-TV projects that have no episodesDrafts
+      // array — returns the story unchanged.
+      const existing = story.episodesDrafts ?? [];
+      if (!story.episodesDrafts) return story;
+      const draft = emptyEpisodesDraft(
+        genId("epd"),
+        nextDraftNumber(existing),
+        now,
+      );
+      return {
+        ...story,
+        episodesDrafts: [...existing, draft],
+        counters: {
+          ...story.counters,
+          episodes: Math.max(story.counters.episodes ?? 0, draft.number),
+        },
+        projectDrafts: story.projectDrafts.map(pd =>
+          pd.id === story.activeProjectDraftId
+            ? { ...pd, episodesDraftId: draft.id, episodesSyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
   }
 }
 
@@ -759,7 +917,47 @@ export function createNewLayerDraft(story: Story, layer: LayerKey): Story {
     case "characters": return createNewCharactersDraft(story);
     case "story":      return createNewStoryLayerDraft(story);
     case "script":     return createNewScriptDraft(story);
+    case "episodes":   return createNewEpisodesDraft(story);
   }
+}
+
+/** TV-only — duplicate the active Episodes layer draft. Mirrors
+ *  createNewStoryLayerDraft: deep-clones via spread (Episode arrays
+ *  are shallow-copied), assigns a fresh id, bumps the layer number,
+ *  and points the active project draft at the new draft. Returns
+ *  story unchanged when there's no episodes layer (feature project
+ *  or legacy unmigrated TV row). */
+export function createNewEpisodesDraft(story: Story): Story {
+  if (!story.episodesDrafts || story.episodesDrafts.length === 0) return story;
+  const now = new Date().toISOString();
+  const active = getActiveEpisodesDraft(story);
+  if (!active) return story;
+  const nextNumber = nextDraftNumber(story.episodesDrafts);
+  const newDraft: EpisodesLayerDraft = {
+    ...active,
+    id: genId("epd"),
+    number: nextNumber,
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    // Deep-copy episodes + their beats so future edits don't share
+    // references with the previous draft.
+    episodes: active.episodes.map(e => ({
+      ...e,
+      beats: e.beats.map(b => ({ ...b })),
+    })),
+  };
+  return {
+    ...story,
+    episodesDrafts: [...story.episodesDrafts, newDraft],
+    counters: { ...story.counters, episodes: nextNumber },
+    projectDrafts: story.projectDrafts.map(pd =>
+      pd.id === story.activeProjectDraftId
+        ? { ...pd, episodesDraftId: newDraft.id, episodesSyncedAt: now, updatedAt: now }
+        : pd
+    ),
+    updatedAt: now,
+  };
 }
 
 // ── Copy partner's layer draft to mine ──
@@ -778,7 +976,7 @@ export function createNewLayerDraft(story: Story, layer: LayerKey): Story {
 
 export function copyPartnerLayerDraft(
   myStory: Story,
-  partnerDraft: ConceptLayerDraft | CharactersLayerDraft | StoryLayerDraft | ScriptLayerDraft,
+  partnerDraft: ConceptLayerDraft | CharactersLayerDraft | StoryLayerDraft | ScriptLayerDraft | EpisodesLayerDraft,
   layer: LayerKey,
 ): Story {
   const now = new Date().toISOString();
@@ -875,6 +1073,39 @@ export function copyPartnerLayerDraft(
         projectDrafts: myStory.projectDrafts.map(pd =>
           pd.id === myStory.activeProjectDraftId
             ? { ...pd, scriptDraftId: draft.id, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
+    case "episodes": {
+      // TV-only. Copies the partner's episodes draft into mine as a
+      // new draft (matches the per-layer copy semantics of the other
+      // cases). Deep-clones episodes so future edits don't share
+      // references with the partner's data.
+      const src = partnerDraft as EpisodesLayerDraft;
+      const existing = myStory.episodesDrafts ?? [];
+      const draft: EpisodesLayerDraft = {
+        id: genId("epd"),
+        number: nextDraftNumber(existing),
+        createdAt: now,
+        updatedAt: now,
+        savedAt: now,
+        episodes: src.episodes.map(e => ({
+          ...e,
+          beats: e.beats.map(b => ({ ...b })),
+        })),
+      };
+      return {
+        ...myStory,
+        episodesDrafts: [...existing, draft],
+        counters: {
+          ...myStory.counters,
+          episodes: Math.max(myStory.counters.episodes ?? 0, draft.number),
+        },
+        projectDrafts: myStory.projectDrafts.map(pd =>
+          pd.id === myStory.activeProjectDraftId
+            ? { ...pd, episodesDraftId: draft.id, episodesSyncedAt: now, updatedAt: now }
             : pd
         ),
         updatedAt: now,
@@ -998,10 +1229,11 @@ export function copyConceptFieldFromPartner(
 export function saveLayerDraft(story: Story, layer: LayerKey): Story {
   const pd = getActiveProjectDraft(story);
   const now = new Date().toISOString();
-  const refKey: "conceptDraftId" | "charactersDraftId" | "storyDraftId" | "scriptDraftId" =
+  const refKey: "conceptDraftId" | "charactersDraftId" | "storyDraftId" | "scriptDraftId" | "episodesDraftId" =
     layer === "concept"    ? "conceptDraftId" :
     layer === "characters" ? "charactersDraftId" :
     layer === "story"      ? "storyDraftId" :
+    layer === "episodes"   ? "episodesDraftId" :
                              "scriptDraftId";
   const activeId = pd[refKey];
 
@@ -1034,6 +1266,13 @@ export function saveLayerDraft(story: Story, layer: LayerKey): Story {
       return { ...story, storyDrafts: mapDraft(story.storyDrafts), updatedAt: now };
     case "script":
       return { ...story, scriptDrafts: mapDraft(story.scriptDrafts), updatedAt: now };
+    case "episodes": {
+      // No-op for feature projects (no episodesDrafts array). For TV
+      // projects, bump the active episodes draft's savedAt so the dirty
+      // dot clears and the autosave/save semantics match the other layers.
+      if (!story.episodesDrafts) return story;
+      return { ...story, episodesDrafts: mapDraft(story.episodesDrafts), updatedAt: now };
+    }
   }
 }
 
@@ -1082,8 +1321,9 @@ export function isLayerChangedForTabDot(story: Story, layer: LayerKey): boolean 
     layer === "concept"    ? getActiveConceptDraft(story) :
     layer === "characters" ? getActiveCharactersDraft(story) :
     layer === "story"      ? getActiveStoryLayerDraft(story) :
+    layer === "episodes"   ? getActiveEpisodesDraft(story) :
                              getActiveScriptDraft(story);
-  return isLayerDraftDirty(draft);
+  return isLayerDraftDirty(draft ?? undefined);
 }
 
 // ── Per-field change detection for Concept tab ──
@@ -1492,11 +1732,16 @@ export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
       return !c || c.characters.length === 0;
     }
     case "story": {
+      // For TV the "story" layer is per-episode; data lives on
+      // Story.episodesDrafts[*].episodes[*].beats now. Treat the
+      // layer as empty when no beat inside any episode has been
+      // started. Feature projects keep the old single-array check.
+      if (story.projectType === "tv-show") {
+        const epd = getActiveEpisodesDraft(story);
+        return !epd || epd.episodes.every(ep => ep.beats.length === 0);
+      }
       const s = getActiveStoryLayerDraft(story);
       if (!s) return true;
-      if (story.projectType === "tv-show") {
-        return (s.episodes ?? []).every(ep => ep.beats.length === 0);
-      }
       return s.beats.length === 0;
     }
     case "script": {
@@ -1508,15 +1753,20 @@ export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
       const sc = getActiveScriptDraft(story);
       const hasScenes = !!sc && sc.script.scenes.length > 0;
       if (hasScenes) return false;
-      const sl = getActiveStoryLayerDraft(story);
-      if (!sl) return true;
       const allBeats = story.projectType === "tv-show"
-        ? (sl.episodes ?? []).flatMap(ep => ep.beats)
-        : sl.beats;
+        ? (getActiveEpisodesDraft(story)?.episodes ?? []).flatMap(ep => ep.beats)
+        : (getActiveStoryLayerDraft(story)?.beats ?? []);
       const hasSceneProse = allBeats.some(
         b => (b.sceneContent ?? "").trim() !== ""
       );
       return !hasSceneProse;
+    }
+    case "episodes": {
+      // TV-only layer. Empty if there are zero episodes in the
+      // active draft. Feature projects return true (no episodes
+      // concept) — but callers should generally only hit this on TV.
+      const epd = getActiveEpisodesDraft(story);
+      return !epd || epd.episodes.length === 0;
     }
   }
 }
@@ -1600,7 +1850,10 @@ export type LayerContent =
   | { kind: "concept";    patch: ConceptContentPatch }
   | { kind: "characters"; characters: Character[] }
   | { kind: "story";      beats: Beat[]; episodes?: Episode[] }
-  | { kind: "script";     scenes: Scene[] };
+  | { kind: "script";     scenes: Scene[] }
+  /** TV-only — used when a sync targets the Episodes layer
+   *  directly (e.g. generate-episode-from-concept). */
+  | { kind: "episodes";   episodes: Episode[] };
 
 export function createAndActivateLayerDraftWith(story: Story, content: LayerContent): Story {
   // Step 1: create a new draft (branches from active, becomes active).
@@ -1608,6 +1861,7 @@ export function createAndActivateLayerDraftWith(story: Story, content: LayerCont
     content.kind === "concept"    ? createNewConceptDraft(story) :
     content.kind === "characters" ? createNewCharactersDraft(story) :
     content.kind === "story"      ? createNewStoryLayerDraft(story) :
+    content.kind === "episodes"   ? createNewEpisodesDraft(story) :
                                     createNewScriptDraft(story);
   // Step 2: apply the content to the now-active new draft.
   switch (content.kind) {
@@ -1615,6 +1869,7 @@ export function createAndActivateLayerDraftWith(story: Story, content: LayerCont
     case "characters": return replaceActiveCharactersContent(branched, content.characters);
     case "story":      return replaceActiveStoryContent(branched, content.beats, content.episodes);
     case "script":     return replaceActiveScriptContent(branched, content.scenes);
+    case "episodes":   return updateEpisodesDraft(branched, { episodes: content.episodes });
   }
 }
 
@@ -1641,6 +1896,7 @@ export function applySyncResult(
       case "characters": return replaceActiveCharactersContent(story, content.characters);
       case "story":      return replaceActiveStoryContent(story, content.beats, content.episodes);
       case "script":     return replaceActiveScriptContent(story, content.scenes);
+      case "episodes":   return updateEpisodesDraft(story, { episodes: content.episodes });
     }
   }
   return createAndActivateLayerDraftWith(story, content);
