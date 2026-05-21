@@ -13039,23 +13039,33 @@ html[data-design="v2"] .menu-panel-utility svg {
 }
 
 /* ── Episodes tab — MOBILE (single-column stack) ────────────────
-   Base (mobile-first) rules. Cards stack vertically full-width
-   with the standard 20px gap; desktop overrides to a 4-up grid
-   inside the @media block above. The add-row also collapses to
-   vertical stacking on mobile so the two CTAs each get full width
-   in the layer-bar's rightSlot. */
-html[data-design="v2"] .v2-episodes-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 16px 0 40px;
+   Mobile-only rules. WRAPPED in `@media (max-width: 1439px)` so the
+   desktop @media block earlier in this file (which sets `display:
+   grid` on .v2-episodes-grid for the 4-up layout) still wins on
+   wide viewports. Without this wrapper, the rules below cascade
+   later than the desktop block and clobber the grid. */
+@media (max-width: 1439px) {
+  html[data-design="v2"] .v2-episodes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 16px 0 40px;
+  }
+  html[data-design="v2"] .v2-episodes-add-row {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: center;
+  }
+  html[data-design="v2"] .v2-episode-card-image {
+    aspect-ratio: 16 / 9;
+  }
 }
-html[data-design="v2"] .v2-episodes-add-row {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  align-items: center;
-}
+/* Shared (mobile + desktop) base properties — desktop has its own
+   geometry inside the @media (min-width: 1440px) block above, but
+   the visual chrome (background, border-radius, shadow, layout flow)
+   is identical. Declared at base specificity so both viewports get
+   them without duplication. */
 html[data-design="v2"] .v2-episode-card {
   appearance: none;
   background: var(--ds-color-white);
@@ -13074,7 +13084,6 @@ html[data-design="v2"] .v2-episode-card {
 html[data-design="v2"] .v2-episode-card-image {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
   background: var(--ds-color-gray-dark-fill);
   overflow: hidden;
 }
@@ -13115,7 +13124,7 @@ html[data-design="v2"] .v2-episode-card-menu {
   z-index: 3;
 }
 html[data-design="v2"] .v2-episode-card-body {
-  padding: 16px 16px 16px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
