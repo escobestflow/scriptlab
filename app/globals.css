@@ -13179,26 +13179,8 @@ html[data-design="v2"] .v2-mobile-header-episode-title {
   font-size: 14px;
 }
 
-/* ── Back-to-episodes chip on the MOBILE hero thumbnail ─────────
-   Mounted inside `.studio-thumb-button` (the mobile hero is a
-   full-bleed image at the top of the project page). Same pill
-   look as the desktop chip but positioned within the mobile
-   thumbnail's bounds. */
-html[data-design="v2"] .v2-mobile-hero-back-chip {
-  position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 4;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--ds-color-white);
-  color: var(--ds-color-black);
-  box-shadow: var(--ds-shadow-card);
-  cursor: pointer;
-  user-select: none;
-}
+/* (Mobile back-to-episodes chip retired — the top-left back arrow
+   in `.studio-nav-fixed` already serves as the back path on mobile.
+   Desktop keeps its overlay chip because the desktop layout hides
+   `.studio-nav-fixed` entirely.) */
 

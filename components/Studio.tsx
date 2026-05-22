@@ -2207,30 +2207,11 @@ export function Studio({
           onClick={() => setShowSetup(true)}
           aria-label="Open project settings"
         >
-          {/* TV-only back-to-episodes chip on the mobile hero thumbnail.
-              Same affordance as the desktop overlay (top-left of the
-              project image, returns to the Episodes tab). Only renders
-              when the user is drilled into an episode. */}
-          {isTV && activeEpisodeId && (
-            <span
-              className="v2-mobile-hero-back-chip ds-type-cta"
-              role="button"
-              tabIndex={0}
-              onClick={e => { e.stopPropagation(); handleBack(); }}
-              onKeyDown={e => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleBack();
-                }
-              }}
-            >
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-              <span>BACK TO EPISODES</span>
-            </span>
-          )}
+          {/* No mobile back chip: the existing top-left back arrow in
+              `.studio-nav-fixed` already routes through `handleBack()`,
+              which for TV inside an episode resets activeEpisodeId and
+              flips section back to "episodes". The desktop chip stays
+              because desktop hides `.studio-nav-fixed`. */}
           {story.thumbnail ? (
             <img src={story.thumbnail} alt="" className="project-header-thumb" />
           ) : (
