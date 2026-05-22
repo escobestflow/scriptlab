@@ -1317,11 +1317,16 @@ export function isProjectDraftDirty(story: Story): boolean {
 // A tab shows a dot only when the active layer draft has unsaved option
 // edits. Creating or switching drafts alone does NOT trigger the dot.
 export function isLayerChangedForTabDot(story: Story, layer: LayerKey): boolean {
+  // Episodes layer suppresses the dirty-dot in Phase 1 — adding an
+  // episode bumps the draft's updatedAt immediately (no manual save
+  // step in the new flow), so the dot would surface constantly and
+  // never read as meaningful signal. Revisit when the Episodes
+  // layer gets explicit save semantics in Phase 2.
+  if (layer === "episodes") return false;
   const draft =
     layer === "concept"    ? getActiveConceptDraft(story) :
     layer === "characters" ? getActiveCharactersDraft(story) :
     layer === "story"      ? getActiveStoryLayerDraft(story) :
-    layer === "episodes"   ? getActiveEpisodesDraft(story) :
                              getActiveScriptDraft(story);
   return isLayerDraftDirty(draft ?? undefined);
 }
