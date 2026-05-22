@@ -1916,12 +1916,45 @@ export function Studio({
     onBack();
   }
 
+  // TV episode settings — when the user opens settings from inside an
+  // episode (gear / pencil in the top nav), the panel scopes to that
+  // specific episode (header reads "Episode Settings"; the delete card
+  // is "Delete Episode" and removes just this episode, not the
+  // project). After deletion the user lands back on the project-level
+  // Episodes tab.
+  const isEpisodeSettings = !!(isTV && activeEpisodeId && showSetup);
+  const [confirmDeleteEpisode, setConfirmDeleteEpisode] = useState(false);
+  function handleDeleteEpisode() {
+    if (!activeEpisodeId) return;
+    const targetId = activeEpisodeId;
+    setStory(s => {
+      const epd = getActiveEpisodesDraft(s);
+      if (!epd) return s;
+      return updateEpisodesDraft(s, {
+        episodes: epd.episodes.filter(e => e.id !== targetId),
+      });
+    });
+    setActiveEpisodeId(null);
+    setSection("episodes");
+    setShowSetup(false);
+    setConfirmDeleteEpisode(false);
+  }
+
   // The legacy TV "episodes list shown when Story tab is active" view
   // has been retired. The new "episodes" Section + EpisodesTab in the
   // main render handles this for both mobile and desktop. Falls
   // through to the main render below.
 
   // Setup view
+  // Resolve the active episode (for the episode-settings header /
+  // confirm-delete copy). null when not in episode-settings mode.
+  const activeEpisodeForSettings = isEpisodeSettings
+    ? (getActiveEpisodesDraft(story)?.episodes.find(e => e.id === activeEpisodeId) ?? null)
+    : null;
+  const episodeLabel = activeEpisodeForSettings
+    ? (activeEpisodeForSettings.title?.trim() || `Episode ${activeEpisodeForSettings.number}`)
+    : "this episode";
+
   const confirmDeleteDialog = confirmDeleteProject ? (
     <>
       <div className="confirm-backdrop" onClick={() => setConfirmDeleteProject(false)} />
@@ -1948,13 +1981,40 @@ export function Studio({
     </>
   ) : null;
 
+  // Parallel dialog for episode delete — same shell as the project
+  // version but the copy targets the specific episode and the
+  // confirm action calls handleDeleteEpisode.
+  const confirmDeleteEpisodeDialog = confirmDeleteEpisode ? (
+    <>
+      <div className="confirm-backdrop" onClick={() => setConfirmDeleteEpisode(false)} />
+      <div className="confirm-dialog">
+        <div className="confirm-title">Are you sure?</div>
+        <div className="confirm-body">
+          This will permanently delete &quot;{episodeLabel}&quot; from {story.title || "this project"}.
+          The rest of the show — concept, characters, other episodes — stays intact.
+          This action cannot be undone.
+        </div>
+        <div className="confirm-actions">
+          <Button variant="secondary" size="sm"
+            onClick={() => setConfirmDeleteEpisode(false)}>
+            Cancel
+          </Button>
+          <button className="btn-delete-project"
+            onClick={handleDeleteEpisode}>
+            Delete Episode
+          </button>
+        </div>
+      </div>
+    </>
+  ) : null;
+
   if (showSetup) {
     return (
       <>
         <ProjectHeader
           story={story}
           onBack={() => setShowSetup(false)}
-          subtitle="Settings"
+          subtitle={isEpisodeSettings ? "Episode Settings" : "Settings"}
         />
         <div className="screen-scroll">
           <div className="page-enter">
@@ -1966,6 +2026,8 @@ export function Studio({
               onCreateProjectFromDraft={handleCreateProjectFromDraft}
               onDeleteLayerDraft={handleDeleteLayerDraft}
               onRequestDeleteProject={() => setConfirmDeleteProject(true)}
+              isEpisodeMode={isEpisodeSettings}
+              onRequestDeleteEpisode={() => setConfirmDeleteEpisode(true)}
               onEmailProject={onEmailProject}
               emailProjectBusy={emailProjectBusy}
               onRegenerateThumbnail={onRegenerateThumbnail}
@@ -1974,6 +2036,7 @@ export function Studio({
           </div>
         </div>
         {confirmDeleteDialog}
+        {confirmDeleteEpisodeDialog}
       </>
     );
   }
@@ -9331,6 +9394,22 @@ function EpisodesTab({
         />
       )}
 
+      {/* Mobile-only bottom sticky "Add Episode" CTA. Desktop already
+          shows the two Add chips inline with the LayerBar above, so
+          the bottom bar would be redundant on a wide viewport. Mirrors
+          the same `LayerStickyBar` pattern Characters / Story / Script
+          use on mobile. */}
+      {hasEpisodes && !isDesktop && (
+        <>
+          <div className="layer-sticky-bar-spacer" aria-hidden="true" />
+          <LayerStickyBar
+            label="Add Episode"
+            onClick={openAddEpisodePrompt}
+            icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
+          />
+        </>
+      )}
+
       {hasEpisodes && (
         <div className="v2-episodes-grid">
           {episodes.map(ep => (
@@ -12155,6 +12234,8 @@ function SettingsTab({
   onLoadProjectDraft, onDeleteProjectDraft, onCreateProjectFromDraft,
   onDeleteLayerDraft,
   onRequestDeleteProject,
+  isEpisodeMode = false,
+  onRequestDeleteEpisode,
   onEmailProject,
   emailProjectBusy,
   onRegenerateThumbnail,
@@ -12167,6 +12248,16 @@ function SettingsTab({
   onCreateProjectFromDraft: (id: string) => void;
   onDeleteLayerDraft: (layer: LayerKey, draftId: string) => void;
   onRequestDeleteProject: () => void;
+  /** TV-only. When true the destructive action targets the episode
+   *  the user is currently inside (handler comes via
+   *  `onRequestDeleteEpisode`). The rest of the settings panel keeps
+   *  its existing project-level behavior — per user spec, the
+   *  episode settings are "almost exactly like project settings,
+   *  only the destructive action differs." */
+  isEpisodeMode?: boolean;
+  /** Required when `isEpisodeMode` is true. Opens the parent's
+   *  delete-episode confirm dialog. */
+  onRequestDeleteEpisode?: () => void;
   /** Opens the email picker sheet (owned by app/page.tsx). Optional
    *  — renders the Email card only when provided. */
   onEmailProject?: () => void;
@@ -12492,17 +12583,24 @@ function SettingsTab({
           to join. A project can have at most one collaborator. */}
       <CollaboratorsCard story={story} />
 
-      {/* Danger zone: delete project */}
+      {/* Danger zone: delete project (or episode, in TV episode-
+          settings mode). The two flows are identical visually; only
+          the copy + handler differ. */}
       <div className="card" style={{ marginTop: 20 }}>
         <span className="eyebrow">Danger Zone</span>
         <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
-          Permanently delete this project and all its drafts. This cannot be undone.
+          {isEpisodeMode
+            ? "Permanently delete this episode. The rest of the show stays intact. This cannot be undone."
+            : "Permanently delete this project and all its drafts. This cannot be undone."}
         </div>
         <button
           className="btn-delete-project"
-          onClick={() => onRequestDeleteProject()}
+          onClick={() => {
+            if (isEpisodeMode) onRequestDeleteEpisode?.();
+            else onRequestDeleteProject();
+          }}
         >
-          Delete Project
+          {isEpisodeMode ? "Delete Episode" : "Delete Project"}
         </button>
       </div>
     </>
