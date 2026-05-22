@@ -9343,26 +9343,41 @@ function EpisodesTab({
         autosaveEnabled={autosaveEnabled}
         onOpenUpdateTray={onOpenUpdateTray}
         rightSlot={hasEpisodes ? (
-          <div className="v2-episodes-add-row">
-            <Button
-              variant="primary"
-              size="sm"
+          // Desktop: BOTH add chips beside the LayerBar — manual (black)
+          // + AI (white) per spec. Mobile: just the single AI chip
+          // here; the manual add is the big bottom-sticky bar below
+          // (mirrors Characters / Story / Script's mobile pattern).
+          isDesktop ? (
+            <div className="v2-episodes-add-row">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={openAddEpisodePrompt}
+                icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
+                className="ds-type-cta"
+              >
+                Add an Episode
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={openAddEpisodePrompt}
+                icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
+                className="empty-state-ai-btn ds-type-cta"
+              >
+                Add an Episode
+              </Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="add-all-characters-chip"
               onClick={openAddEpisodePrompt}
-              icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
-              className="ds-type-cta"
             >
-              Add an Episode
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={openAddEpisodePrompt}
-              icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
-              className="empty-state-ai-btn ds-type-cta"
-            >
-              Add an Episode
-            </Button>
-          </div>
+              <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+              <span>Add an Episode</span>
+            </button>
+          )
         ) : undefined}
       />
 
