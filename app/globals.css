@@ -9898,11 +9898,13 @@ html[data-design="v2"] .studio-tab[data-section="story"]::before {
   mask-image: url("/v2/icons/icon-story.svg");
   -webkit-mask-image: url("/v2/icons/icon-story.svg");
 }
-/* Episodes tab reuses the story icon as a placeholder — per user
-   direction; they'll provide a dedicated Episodes glyph later. */
+/* Dedicated Episodes glyph (16×14, two stacked rounded rectangles
+   representing the episode stack). Lives at /icon-episodes.svg
+   (outside the v2/icons folder so it can be swapped without going
+   through the v2 namespace). */
 html[data-design="v2"] .studio-tab[data-section="episodes"]::before {
-  mask-image: url("/v2/icons/icon-story.svg");
-  -webkit-mask-image: url("/v2/icons/icon-story.svg");
+  mask-image: url("/icon-episodes.svg");
+  -webkit-mask-image: url("/icon-episodes.svg");
 }
 html[data-design="v2"] .studio-tab[data-section="script"]::before {
   mask-image: url("/v2/icons/icon-script.svg");
