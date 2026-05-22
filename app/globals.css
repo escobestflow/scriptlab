@@ -7459,6 +7459,16 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-desktop-hero-draft {
     margin-bottom: 18px;
   }
+  /* TV-only — episode title rendered beneath the project title
+     when the user is drilled into an episode. Smaller display
+     treatment than the project title so the hierarchy reads
+     "PROJECT > episode" at a glance. Comes from the JSX's
+     ds-type-project-card-title token (28px desktop). */
+  html[data-design="v2"] .v2-desktop-hero-episode-title {
+    color: var(--ds-color-black);
+    margin: 6px 0 0;
+    line-height: 1.1;
+  }
   /* Title — typography is owned by the `.ds-type-project-page-title`
      token applied alongside this class on the JSX (Poynter / 400 /
      65px on desktop). This rule only zeros out the default <h1>
@@ -9885,6 +9895,12 @@ html[data-design="v2"] .studio-tab[data-section="characters"]::before {
   -webkit-mask-image: url("/v2/icons/icon-characters.svg");
 }
 html[data-design="v2"] .studio-tab[data-section="story"]::before {
+  mask-image: url("/v2/icons/icon-story.svg");
+  -webkit-mask-image: url("/v2/icons/icon-story.svg");
+}
+/* Episodes tab reuses the story icon as a placeholder — per user
+   direction; they'll provide a dedicated Episodes glyph later. */
+html[data-design="v2"] .studio-tab[data-section="episodes"]::before {
   mask-image: url("/v2/icons/icon-story.svg");
   -webkit-mask-image: url("/v2/icons/icon-story.svg");
 }
@@ -13152,6 +13168,15 @@ html[data-design="v2"] .v2-episode-card-updated {
   gap: 6px;
   color: var(--ds-color-unfold-gold);
   margin-top: 4px;
+}
+
+/* TV-only — mobile episode subtitle below the project title in
+   `.studio-header-sticky`. Renders only when the user is drilled
+   into an episode (gated in JSX). */
+html[data-design="v2"] .v2-mobile-header-episode-title {
+  color: var(--ds-color-black);
+  margin: 2px 0 0;
+  font-size: 14px;
 }
 
 /* ── Back-to-episodes chip on the MOBILE hero thumbnail ─────────

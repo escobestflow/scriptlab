@@ -2163,6 +2163,22 @@ export function Studio({
               <h1 className="v2-desktop-hero-title ds-type-project-page-title" ref={heroTitleRef}>
                 {story.title || "Untitled"}
               </h1>
+              {/* TV-only — when drilled into an episode, render the
+                  episode title beneath the project title so the
+                  hero communicates BOTH levels of the hierarchy
+                  (project + episode). Uses the active episodes
+                  draft's matching record by id. Falls back to
+                  "Episode N" when title is empty. */}
+              {isTV && activeEpisodeId && (() => {
+                const epd = getActiveEpisodesDraft(story);
+                const ep = epd?.episodes.find(e => e.id === activeEpisodeId);
+                if (!ep) return null;
+                return (
+                  <div className="v2-desktop-hero-episode-title ds-type-project-card-title">
+                    {ep.title?.trim() || `Episode ${ep.number}`}
+                  </div>
+                );
+              })()}
               <div className="v2-desktop-hero-rule" aria-hidden="true" />
               {(() => {
                 // Description is the raw logline. CSS `-webkit-line-clamp:2`
@@ -2264,6 +2280,19 @@ export function Studio({
           >
             {story.title || "Untitled"}
           </button>
+          {/* TV-only mobile sub-title — when drilled into an episode,
+              render the episode name beneath the project title so the
+              mobile sticky header surfaces both hierarchy levels. */}
+          {isTV && activeEpisodeId && (() => {
+            const epd = getActiveEpisodesDraft(story);
+            const ep = epd?.episodes.find(e => e.id === activeEpisodeId);
+            if (!ep) return null;
+            return (
+              <div className="v2-mobile-header-episode-title ds-type-body-bold">
+                {ep.title?.trim() || `Episode ${ep.number}`}
+              </div>
+            );
+          })()}
 
           {/* Project drafts dropdown trigger. Identical on solo and
               shared projects — collaboration is signaled by the
@@ -9225,29 +9254,39 @@ function EpisodesTab({
   const episodes = activeDraft?.episodes ?? [];
   const hasEpisodes = episodes.length > 0;
 
-  // Manual add — appends a blank episode to the active draft and
-  // immediately drills in so the user can name it / write beats.
-  function handleAddEpisode() {
+  // Prompt popup state. Both Add-an-Episode CTAs (manual + AI)
+  // route through this popup so the user can describe what
+  // happens in the episode before it's created. On confirm, the
+  // description becomes the episode's logline and the user is
+  // drilled into the new episode's Story tab. Phase 3 will use
+  // the description as the AI prompt seed when the user picked
+  // the AI variant.
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptText, setPromptText] = useState("");
+
+  function openAddEpisodePrompt() {
+    setPromptText("");
+    setPromptOpen(true);
+  }
+
+  function confirmAddEpisode() {
+    const text = promptText.trim();
+    setPromptOpen(false);
+    setPromptText("");
     setStory(s => {
       const before = (getActiveEpisodesDraft(s)?.episodes ?? []).length;
-      const next = addEpisodeToActiveDraft(s, { title: "" });
+      const next = addEpisodeToActiveDraft(s, {
+        title: "",
+        logline: text || undefined,
+      });
       const after = getActiveEpisodesDraft(next)?.episodes ?? [];
       const newId = after[before]?.id;
-      // Drill in on the next render once setStory has flushed. Use
-      // a microtask so onOpenEpisode runs AFTER React commits the
-      // new episode to state (otherwise activeEpisodeId points at a
-      // not-yet-existing id during the same commit).
+      // Drill in on the next render once setStory has flushed.
+      // queueMicrotask ensures onOpenEpisode runs AFTER React
+      // commits the new episode to state.
       if (newId) queueMicrotask(() => onOpenEpisode(newId));
       return next;
     });
-  }
-
-  // AI add — Phase 1 wires this to the same handler as manual.
-  // Phase 3 will hook it up to a real prompt that produces a title +
-  // logline (and optionally seeded beats) from the project's
-  // concept context.
-  function handleAddEpisodeAI() {
-    handleAddEpisode();
   }
 
   return (
@@ -9264,7 +9303,7 @@ function EpisodesTab({
             <Button
               variant="primary"
               size="sm"
-              onClick={handleAddEpisode}
+              onClick={openAddEpisodePrompt}
               icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
               className="ds-type-cta"
             >
@@ -9273,7 +9312,7 @@ function EpisodesTab({
             <Button
               variant="secondary"
               size="sm"
-              onClick={handleAddEpisodeAI}
+              onClick={openAddEpisodePrompt}
               icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
               className="empty-state-ai-btn ds-type-cta"
             >
@@ -9303,8 +9342,8 @@ function EpisodesTab({
               : "Add your first episode to start outlining the series."
           }
           addLabel={isV2 ? "Add an Episode" : "Add episode"}
-          onAdd={handleAddEpisode}
-          onGenerate={handleAddEpisodeAI}
+          onAdd={openAddEpisodePrompt}
+          onGenerate={openAddEpisodePrompt}
           generating={false}
           generateLabel={isV2 ? "Create With AI" : "Create with AI"}
           generatingLabel="Creating…"
@@ -9366,6 +9405,72 @@ function EpisodesTab({
               </div>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Episode-prompt popup — appears whenever the user taps either
+          Add CTA (manual or AI). Mirrors the v2 direction-prompt
+          shell used by Story's "Create With AI" so the visual chrome
+          is consistent. On Confirm: the description becomes the new
+          episode's logline, the episode is appended to the active
+          episodes draft, and the user is drilled into its Story tab.
+          Empty input is allowed — the episode is created with no
+          logline; the user can fill it in later from the episode
+          page. */}
+      {promptOpen && (
+        <div
+          className="v2-direction-prompt-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="v2-episode-prompt-title"
+          onClick={() => setPromptOpen(false)}
+        >
+          <div
+            className="v2-direction-prompt-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2
+              id="v2-episode-prompt-title"
+              className="v2-direction-prompt-title ds-type-empty-header"
+            >
+              Add an Episode
+            </h2>
+            <p className="v2-direction-prompt-caption ds-type-body">
+              Describe what happens in this episode — characters, key
+              beats, where the story moves. Your project's concept and
+              characters are taken into account; this is just extra
+              guidance.
+            </p>
+            <label className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">
+                Episode description
+              </span>
+              <textarea
+                className="v2-direction-prompt-textarea"
+                value={promptText}
+                onChange={e => setPromptText(e.target.value)}
+                placeholder="e.g. The detective receives an anonymous package containing photos from a case she thought was closed. As she investigates, she realizes the prime suspect — long believed dead — may have been hiding in plain sight."
+                rows={8}
+                autoFocus
+              />
+            </label>
+            <div className="v2-direction-prompt-actions">
+              <button
+                type="button"
+                className="v2-direction-prompt-cancel"
+                onClick={() => setPromptOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="v2-direction-prompt-confirm"
+                onClick={confirmAddEpisode}
+              >
+                Add Episode
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </>
