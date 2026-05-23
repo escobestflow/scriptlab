@@ -2979,6 +2979,58 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
 }
 .create-modal.open { transform: translateY(0); }
 
+/* ── Desktop: centered popup instead of bottom sheet ────────────
+   Mobile keeps the existing slide-up-from-bottom treatment. On
+   desktop, anchor the modal to the center of the viewport, give
+   it a fixed width + full border-radius + canonical card shadow,
+   and use a subtle fade+scale entry instead of the off-screen
+   translateY. The `.sheet-handle` grabber at the top of the
+   modal is mobile-only chrome and gets hidden here. */
+@media (min-width: 1440px) {
+  html[data-design="v2"] .create-modal {
+    /* Reset the mobile bottom-pinned positioning. Centered via
+       50/50 + translate, then translated up an extra few px in
+       the .open state for the fade-up feel. */
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    width: 560px;
+    max-width: 92vw;
+    max-height: 86vh;
+    border-radius: 18px;
+    border-top: none;
+    box-shadow: var(--ds-shadow-card);
+    /* Closed state — invisible, slightly down + scaled down. The
+       .open transition runs the same 480ms easing as the mobile
+       slide so the perceived snappiness matches. */
+    transform: translate(-50%, calc(-50% + 12px)) scale(0.98);
+    opacity: 0;
+    transition: opacity 320ms var(--ease), transform 320ms var(--ease);
+    padding-bottom: 0;
+  }
+  html[data-design="v2"] .create-modal.open {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  /* Sheet handle (the mobile grabber pill at the top) — purely
+     mobile chrome. Hide on desktop so the popup reads as a
+     square-cornered card with no decorative bar. */
+  html[data-design="v2"] .create-modal .sheet-handle {
+    display: none;
+  }
+  /* Tighten padding for desktop's narrower-but-taller silhouette. */
+  html[data-design="v2"] .create-modal-header {
+    padding: 24px 28px 14px;
+  }
+  html[data-design="v2"] .create-modal-body {
+    padding: 14px 28px 20px;
+  }
+  html[data-design="v2"] .create-modal-footer {
+    padding: 16px 28px 24px;
+  }
+}
+
 .create-modal-body {
   flex: 1;
   overflow-y: auto;
