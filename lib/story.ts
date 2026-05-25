@@ -80,6 +80,13 @@ export interface Concept {
   summary: string;
   tone: string;
   themes: string[];
+  /** TV-only — high-level outline of the story arc that spans the
+   *  whole season. Surfaces in the Concept tab as a free-text field
+   *  on TV projects only. Every TV-targeted prompt injects this as
+   *  a top-level block so individual episode generations stay in
+   *  sync with the larger arc. Empty / undefined = no arc set;
+   *  prompts gracefully omit the block. */
+  seriesArc?: string;
 }
 
 export interface CharacterRelationship {
@@ -232,6 +239,20 @@ export interface Beat {
   imageGenAttempted?: boolean;
 }
 
+/** Canonical episode-archetype tags. Each leans the AI's beat
+ *  generation toward a different structural template. Empty /
+ *  undefined → no archetype hint; the model uses a generic episode
+ *  shape. New values can be added without breaking older episodes
+ *  since the field is optional. */
+export type EpisodeArchetype =
+  | "case-of-the-week"
+  | "myth-arc"
+  | "bottle"
+  | "character-study"
+  | "flashback"
+  | "season-premiere"
+  | "season-finale";
+
 export interface Episode {
   id: string;
   title: string;
@@ -241,6 +262,11 @@ export interface Episode {
    *  the episode card in the Episodes tab. Independent of the
    *  project-level Concept logline. */
   logline?: string;
+  /** Optional archetype tag — feeds the per-episode beat-generation
+   *  prompt with a structural template hint (procedural vs. myth
+   *  arc vs. bottle vs. character study, etc.). Defaults to
+   *  undefined; the model picks a generic shape in that case. */
+  archetype?: EpisodeArchetype;
   /** Optional per-episode cover thumbnail (URL or data URL). Falls
    *  back to a placeholder when missing. */
   thumbnail?: string;

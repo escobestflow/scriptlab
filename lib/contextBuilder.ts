@@ -10,7 +10,7 @@
 // This means iterative edits inside a session reuse ~90% of input tokens
 // at 10% price. Without this pattern, heavy usage is uneconomical.
 
-import { Story, Scene, Character, Snippet, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft } from "./story";
+import { Story, Scene, Character, Snippet, EpisodeArchetype, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, getActiveEpisodesDraft } from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
 import { WriterProfile, renderProfileForPrompt, isProfileMeaningful } from "./writerProfile";
 
@@ -122,6 +122,16 @@ ${story.projectType === "short" ? `
 ## Short-film parameters
 - Target duration: ${settings.duration ? `${settings.duration} min` : "unspecified (default 10–15 min)"}
 - Short structure: ${settings.shortStructure ?? "unspecified (default flexible Situation → Pressure → Shift)"}
+` : ""}${isTV && concept?.seriesArc?.trim() ? `
+## Season Arc (HIGH PRIORITY — applies to every episode generation)
+The user has authored a season-level arc. Every individual episode you
+generate or modify must serve this arc. Earlier episodes seed setups
+referenced here; later episodes pay off threads opened earlier; the
+finale lands the arc's resolution. When generating an episode in
+isolation, internalize where in the arc this episode sits and pace
+accordingly.
+
+${concept.seriesArc.trim()}
 ` : ""}
 
 ## Characters
@@ -244,6 +254,98 @@ ${dir}
 """`;
 }
 
+// Maps each EpisodeArchetype to a one-paragraph structural template
+// hint. Used by tvEpisodeContext below. Empty string when the user
+// hasn't picked one — the model uses a generic shape in that case.
+function episodeArchetypeFlavor(a: EpisodeArchetype | undefined): string {
+  switch (a) {
+    case "case-of-the-week":
+      return "ARCHETYPE: Case of the Week. Self-contained A-plot opens and resolves within this episode. Mythology can simmer in the B-plot but doesn't have to land. End on a turn that points forward, not a hard cliffhanger.";
+    case "myth-arc":
+      return "ARCHETYPE: Myth-arc / serialized. This episode advances the season's spine 1–2 meaningful steps. Leave threads OPEN. End on an escalation that demands the next episode.";
+    case "bottle":
+      return "ARCHETYPE: Bottle episode. Minimal locations (one or two interiors); minimal new characters; character-driven and emotion-forward. Conflict is interior or interpersonal, not plot-driven. Pace slowly; let scenes breathe.";
+    case "character-study":
+      return "ARCHETYPE: Character study. One character at the center; the season arc takes a back seat. Reveal interior life through specific decisions, memories, or relationships. The episode's payoff is emotional understanding, not plot advancement.";
+    case "flashback":
+      return "ARCHETYPE: Flashback / origin. Temporal split — present-day frame opens and closes; the middle is the past. The past-era scenes should adopt a slightly different voice (older characters, different setting, different stakes). The frame's job is to re-contextualize what we already know about the present.";
+    case "season-premiere":
+      return "ARCHETYPE: Season premiere. Re-establish the world after a time jump or a finale's fallout. Re-meet each major character through what's CHANGED for them, not exposition dumps. End on a question that the rest of the season will answer.";
+    case "season-finale":
+      return "ARCHETYPE: Season finale. Pay off, don't seed. The season arc resolves (in the chosen ending mode); characters land in a new emotional place; the audience should feel the season closing. Cliffhangers are optional — pick one based on whether there's a clear next-season hook.";
+    default:
+      return "";
+  }
+}
+
+/** TV-episode context block. Injected into TV beat-gen + sync prompts
+ *  when the client passes `episodeId` in the action payload.
+ *
+ *  Composition:
+ *    1. WHICH EPISODE — position (N of M), archetype hint, logline.
+ *    2. PRIOR EPISODES — compressed summary of episodes 1..N-1.
+ *       Each prior episode emits its number/title/logline plus a
+ *       2-line beat summary. Keeps the prompt under 2K tokens per
+ *       episode even at high season counts.
+ *
+ *  Returns "" when the story isn't TV, the episode id doesn't match,
+ *  or no episodes exist. Callers can append unconditionally. */
+function tvEpisodeContext(story: Story, episodeId: string | undefined): string {
+  if (story.projectType !== "tv-show" || !episodeId) return "";
+  const epd = getActiveEpisodesDraft(story);
+  if (!epd) return "";
+  const sorted = [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+  const idx = sorted.findIndex(e => e.id === episodeId);
+  if (idx < 0) return "";
+  const total = sorted.length;
+  const me = sorted[idx];
+
+  // Position phrase. Total can be 1 (just the pilot, treat as premiere)
+  // or large (mid-season nuance). Pilot = ep 1; finale = last ep when
+  // there are 2+ episodes total; middle = everything else.
+  const position =
+    total === 1                ? `This is the ONLY episode in the season. Treat it as both opener and standalone.` :
+    idx === 0                  ? `This is Episode 1 of ${total} planned — the PILOT. Front-load setup; introduce the world, the central conflict, the protagonist's stakes. End on a hook strong enough to demand Episode 2.` :
+    idx === total - 1          ? `This is Episode ${me.number} of ${total} — the FINALE. Pay off the season's arcs; don't seed new ones (unless there's a clear next-season hook). The audience should feel the arc closing.` :
+                                 `This is Episode ${me.number} of ${total} — a MIDDLE episode. Escalate from the previous episode; advance the season arc 1–2 meaningful steps; end on a turn.`;
+
+  // Archetype hint (optional, user-tagged).
+  const archetype = episodeArchetypeFlavor(me.archetype);
+
+  // Previously-on. For each prior episode, emit number/title/logline
+  // and a compressed beat list. Cap each episode's beat block at
+  // 6 beats (head + tail) so the prompt scales gracefully across a
+  // 20-episode season.
+  const compressBeats = (beats: typeof me.beats): string => {
+    if (!beats || beats.length === 0) return "(no beats written yet)";
+    const slim = beats.length <= 6
+      ? beats
+      : [...beats.slice(0, 4), ...beats.slice(-2)];
+    return slim.map(b => `  • ${b.name}${b.summary ? ` — ${b.summary}` : ""}`).join("\n");
+  };
+  const prior = sorted.slice(0, idx);
+  const previouslyOn = prior.length === 0
+    ? ""
+    : `
+
+## Previously-on (the episodes that come BEFORE the one you're writing)
+${prior.map(ep => `### Episode ${ep.number} — ${ep.title?.trim() || "(untitled)"}
+Logline: ${ep.logline?.trim() || "(none)"}
+Beats:
+${compressBeats(ep.beats)}`).join("\n\n")}
+
+Use this history. Characters know what they learned in earlier episodes. Open threads (anything set up but not resolved above) should be honored, advanced, or paid off. Do NOT contradict what's been established.`;
+
+  return `
+
+## Episode context (HIGH PRIORITY)
+${position}
+
+You are writing for: **Episode ${me.number}${me.title?.trim() ? ` — ${me.title.trim()}` : ""}**
+Logline (this episode): ${me.logline?.trim() || "(no logline yet — infer from the season arc and prior episodes)"}
+${archetype ? `\n${archetype}\n` : ""}${previouslyOn}`;
+}
+
 function buildAsk(story: Story, action: ActionRequest): string {
   const c  = getActiveConceptDraft(story);
   const sl = getActiveStoryLayerDraft(story);
@@ -260,7 +362,7 @@ Rules:
 - Use every locked ingredient meaningfully.
 - Weave in at least one snippet where it fits naturally (reference by title in the purpose field).
 - Match the darkness/pace/unpredictability levels.
-- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${shortFilmGuidance(story)}${directionBlock(story)}`;
+- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${shortFilmGuidance(story)}${tvEpisodeContext(story, action.payload?.episodeId)}${directionBlock(story)}`;
 
     case "swap_ingredient": {
       const id = action.payload.ingredientId;
@@ -856,24 +958,24 @@ function syncPrompt_toStory(story: Story, source: "concept" | "characters" | "sc
 
   if (isTV) {
     // Pick the next episode that has zero beats — that's the one the user
-    // is implicitly asking us to plan. Falls back to "the next episode" if
+    // is implicitly asking us to plan. Falls back to the last episode when
     // every existing one is already populated, so the AI still has a clear
     // target rather than dumping into an arbitrary slot.
-    const sl = getActiveStoryLayerDraft(story);
-    const allEpisodes = sl.episodes ?? [];
+    //
+    // Now sources from the canonical `episodesDrafts` location (not the
+    // deprecated `storyLayer.episodes`) and threads the same
+    // `tvEpisodeContext` block used by `generate_beats` so the prompt
+    // carries position (pilot/middle/finale), archetype, and a
+    // previously-on summary of prior episodes' beats.
+    const epd = getActiveEpisodesDraft(story);
+    const allEpisodes = epd?.episodes ?? [];
     const targetEpisode =
       allEpisodes.find(ep => ep.beats.length === 0) ??
       allEpisodes[allEpisodes.length - 1];
     const targetLabel = targetEpisode
-      ? `Episode ${targetEpisode.number} ("${targetEpisode.title}")`
+      ? `Episode ${targetEpisode.number}${targetEpisode.title?.trim() ? ` ("${targetEpisode.title.trim()}")` : ""}`
       : "the next episode";
-    const priorCount = targetEpisode
-      ? allEpisodes.filter(ep => ep.number < targetEpisode.number && ep.beats.length > 0).length
-      : 0;
-    const continuityNote = priorCount > 0
-      ? ` There ${priorCount === 1 ? "is" : "are"} ${priorCount} prior ${priorCount === 1 ? "episode" : "episodes"} of established canon in the bible above — your beats must continue that throughline, not contradict or reset it.`
-      : "";
-    return `Derive a beat sheet for ${targetLabel} of this TV series from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${continuityNote}${sourceBlock}
+    return `Derive a beat sheet for ${targetLabel} of this TV series from the ${sourceLabel(source)} above${sourceBlock ? ", ensuring cohesion with every other layer that already exists (see blocks below)" : ""}.${sourceBlock}
 
 ${source === "script"
   ? "Extract the beat structure implicit in the scene prose."
@@ -891,7 +993,7 @@ Return STRICT JSON:
 Rules:
 - 8–15 beats.
 - Each "summary" is 1–2 sentences; each "purpose" is 1 sentence naming what the beat does for the audience.
-- No prose outside the JSON.${directionBlock(story)}`;
+- No prose outside the JSON.${tvEpisodeContext(story, targetEpisode?.id)}${directionBlock(story)}`;
   }
 
   // Short-film path: ignore the feature-style framework field (for shorts
