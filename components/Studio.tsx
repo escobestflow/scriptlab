@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
-  Story, Beat, Episode, Character, CharacterRelationship, Scene, StorySettings, Reference,
+  Story, Beat, Episode, EpisodeArchetype, Character, CharacterRelationship, Scene, StorySettings, Reference,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, EpisodesLayerDraft, ProjectDraft,
   LayerKey, LayerSyncState,
   getActiveProjectDraft,
@@ -2027,6 +2027,7 @@ export function Studio({
               onDeleteLayerDraft={handleDeleteLayerDraft}
               onRequestDeleteProject={() => setConfirmDeleteProject(true)}
               isEpisodeMode={isEpisodeSettings}
+              activeEpisodeId={isEpisodeSettings ? activeEpisodeId : null}
               onRequestDeleteEpisode={() => setConfirmDeleteEpisode(true)}
               onEmailProject={onEmailProject}
               emailProjectBusy={emailProjectBusy}
@@ -7987,6 +7988,33 @@ function ConceptTab({
         />
       </AttrRow>
 
+      {/* TV-only: Season Arc — a series-wide outline of the story
+          arcs that span the season. Every TV-targeted prompt picks
+          this up via storyBible's "Season Arc (HIGH PRIORITY)" block,
+          so individual episode generations stay in sync with the
+          larger arc (pilot seeds it, finale pays it off, middles
+          escalate). */}
+      {story.projectType === "tv-show" && (
+        <AttrRow
+          label="Season Arc"
+          values={d.concept.seriesArc?.trim() ? [d.concept.seriesArc.trim().slice(0, 60) + (d.concept.seriesArc.length > 60 ? "…" : "")] : undefined}
+          placeholder="Outline the season-spanning arcs"
+          expanded={openAttr === "seriesArc"}
+          onToggle={() => toggle("seriesArc")}
+          readOnly={ro()}
+          noToggle={lockTap}
+        >
+          <Textarea
+            value={d.concept.seriesArc ?? ""}
+            onChange={e => updateDraft({ concept: { ...d.concept, seriesArc: e.target.value } })}
+            placeholder={`Outline the arc that runs across the whole season — what happens in the pilot, mid-season turn, finale. E.g. "Ep 1: discovery. Eps 2–4: the team forms, false leads. Mid-season (5–6): the antagonist's plan revealed. Eps 7–9: the cost — characters pay. Finale (10): confrontation and irreversible change."`}
+            rows={8}
+            style={{ marginBottom: 0 }}
+            readOnly={ro()}
+          />
+        </AttrRow>
+      )}
+
       {/* Story Framework — beat-skeleton framework the AI uses when generating
           beats and syncing Story from other layers. Optional: if unset,
           prompts tell the model to pick whatever fits the concept. For
@@ -12250,6 +12278,7 @@ function SettingsTab({
   onDeleteLayerDraft,
   onRequestDeleteProject,
   isEpisodeMode = false,
+  activeEpisodeId = null,
   onRequestDeleteEpisode,
   onEmailProject,
   emailProjectBusy,
@@ -12270,6 +12299,10 @@ function SettingsTab({
    *  episode settings are "almost exactly like project settings,
    *  only the destructive action differs." */
   isEpisodeMode?: boolean;
+  /** The episode id the user is currently inside, when isEpisodeMode
+   *  is true. Used to surface episode-scoped controls (e.g. the
+   *  archetype chip selector) at the top of the panel. */
+  activeEpisodeId?: string | null;
   /** Required when `isEpisodeMode` is true. Opens the parent's
    *  delete-episode confirm dialog. */
   onRequestDeleteEpisode?: () => void;
@@ -12334,9 +12367,65 @@ function SettingsTab({
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
 
+  // TV-only: when in episode mode, surface an Archetype card at the
+  // top of the panel. Lets the user tag the episode (case-of-the-week,
+  // myth-arc, bottle, etc.) which contextBuilder's tvEpisodeContext
+  // picks up to lean the beat-gen prompt toward a structural template.
+  const activeEpisodeForArchetype =
+    isEpisodeMode && activeEpisodeId
+      ? (getActiveEpisodesDraft(story)?.episodes.find(e => e.id === activeEpisodeId) ?? null)
+      : null;
+  const ARCHETYPE_OPTIONS: Array<{ value: EpisodeArchetype; label: string; blurb: string }> = [
+    { value: "case-of-the-week", label: "Case of the Week", blurb: "Self-contained A-plot; resolves this episode." },
+    { value: "myth-arc",         label: "Myth-arc",         blurb: "Advances the season's spine; leaves threads open." },
+    { value: "bottle",           label: "Bottle",           blurb: "Minimal locations; character-driven; slow pace." },
+    { value: "character-study",  label: "Character Study",  blurb: "One character at the center; emotional payoff over plot." },
+    { value: "flashback",        label: "Flashback / Origin", blurb: "Past-era core with a present-day frame." },
+    { value: "season-premiere",  label: "Season Premiere",  blurb: "Re-establish the world after a finale or time jump." },
+    { value: "season-finale",    label: "Season Finale",    blurb: "Pays off, doesn't seed. Arc resolves." },
+  ];
+  function setArchetype(next: EpisodeArchetype | null) {
+    if (!activeEpisodeId) return;
+    setStory(s => {
+      const epd = getActiveEpisodesDraft(s);
+      if (!epd) return s;
+      return updateEpisodesDraft(s, {
+        episodes: epd.episodes.map(ep =>
+          ep.id === activeEpisodeId
+            ? { ...ep, archetype: next ?? undefined }
+            : ep,
+        ),
+      });
+    });
+  }
+
   return (
     <>
       <div className="display ds-type-tab-header settings-tab-heading" style={{ marginBottom: 18 }}>Settings</div>
+
+      {activeEpisodeForArchetype && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <span className="eyebrow">Archetype</span>
+          <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
+            Tag this episode's structural template. The AI uses this to lean its beat-gen toward the right shape (procedural vs. serialized vs. character-driven, etc.). Optional — leave unset for a generic episode shape.
+          </div>
+          <div className="chip-row" style={{ gap: 8, flexWrap: "wrap" }}>
+            {ARCHETYPE_OPTIONS.map(opt => {
+              const selected = activeEpisodeForArchetype.archetype === opt.value;
+              return (
+                <Selector
+                  key={opt.value}
+                  selected={selected}
+                  onClick={() => setArchetype(selected ? null : opt.value)}
+                  title={opt.blurb}
+                >
+                  {opt.label}
+                </Selector>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <span className="eyebrow">Cover</span>
