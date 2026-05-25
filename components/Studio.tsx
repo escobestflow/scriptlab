@@ -4,11 +4,14 @@ import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo, cre
 import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, EpisodeArchetype, Character, CharacterRelationship, Scene, StorySettings, Reference,
+  Arc, ArcType, ArcsLayerDraft, ARC_TYPES, ARC_TYPE_LABELS, ARC_COLORS,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, EpisodesLayerDraft, ProjectDraft,
   LayerKey, LayerSyncState,
   getActiveProjectDraft,
   getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, getActiveEpisodesDraft,
+  getActiveArcsDraft,
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft, updateEpisodesDraft,
+  updateArcsDraft, addArcToActiveDraft,
   addEpisodeToActiveDraft, upsertEpisodeInActiveDraft,
   createNewLayerDraft, createEmptyLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, duplicateActiveProjectDraft, createEmptyProjectDraft, switchProjectDraft, deleteProjectDraft,
@@ -63,7 +66,7 @@ import { loadMyProfile, saveMyDisplayName } from "@/lib/profiles";
 // characters]; clicking an episode card drills down into a per-episode
 // view where the tabs shift to [story, script]. Feature projects never
 // see the "episodes" value.
-type Section = "concept" | "characters" | "episodes" | "story" | "script";
+type Section = "concept" | "characters" | "episodes" | "arcs" | "story" | "script";
 
 // ── Partner Story / Identity Context ────────────────────────────────
 // Phase 2 collaboration. When this project is shared, the parent
@@ -2897,6 +2900,13 @@ export function Studio({
               episodesInFlight={episodesInFlight}
             />
           )}
+          {section === "arcs" && (
+            <ArcsTab
+              story={tabStory}
+              setStory={tabSetStory}
+              autosaveEnabled={autosaveEnabled}
+            />
+          )}
           {section === "story" && (
             <StoryTab
               story={tabStory}
@@ -3549,6 +3559,11 @@ function SectionTabs({
   //       [Story, Script] — Concept / Episodes / Characters live at the
   //       project level; the user uses the BACK chip on the hero image
   //       to return there.
+  // TV at project level now has FOUR tabs in the order the mock
+  // specifies: Concept · Characters · Archs · Episodes. The "Archs"
+  // tab is the season-arcs planning surface (timeline graph + arc
+  // cards). Inside an episode the tab list is unchanged — Story /
+  // Script. Feature/short shows are unaffected.
   const tabs: { key: Section; label: string; layer: LayerKey }[] = isTV
     ? (activeEpisodeId
         ? [
@@ -3557,8 +3572,9 @@ function SectionTabs({
           ]
         : [
             { key: "concept",    label: "CONCEPT",    layer: "concept" },
-            { key: "episodes",   label: "EPISODES",   layer: "episodes" },
             { key: "characters", label: "CHARACTERS", layer: "characters" },
+            { key: "arcs",       label: "ARCHS",      layer: "arcs" },
+            { key: "episodes",   label: "EPISODES",   layer: "episodes" },
           ])
     : [
         { key: "concept",    label: "CONCEPT",    layer: "concept" },
@@ -4931,11 +4947,12 @@ function ReadIcon() {
 // target in canonical order so the user lands on the most-upstream
 // result.
 
-const ORDER_KEYS: LayerKey[] = ["concept", "characters", "episodes", "story", "script"];
+const ORDER_KEYS: LayerKey[] = ["concept", "characters", "episodes", "arcs", "story", "script"];
 const LAYER_LABEL: Record<LayerKey, string> = {
   concept: "Concept",
   characters: "Characters",
   episodes: "Episodes",
+  arcs: "Archs",
   story: "Story",
   script: "Script",
 };
@@ -9846,6 +9863,457 @@ function EpisodesTab({
                 disabled={continuityBusy}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ============================================ */
+/* ============ ARCS TAB ====================== */
+/* ============================================ */
+
+/* Catmull-Rom → cubic Bezier path generator. Takes a list of
+ * { x, y } anchor points and returns an SVG `d` string that smoothly
+ * passes through every point. Tension parameter `t` controls how
+ * tight the curve hugs the anchors; t=0 is the standard Catmull-Rom
+ * (Uniform); t=0.5 matches Centripetal which avoids loops on
+ * irregular spacing. We use t=0 since arc-score anchors are
+ * evenly spaced along the X axis (one per episode), so loops can't
+ * happen and the Uniform variant reads as the smoothest. */
+function catmullRomPath(points: Array<{ x: number; y: number }>, t: number = 0): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  if (points.length === 2) {
+    return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  }
+  const result: string[] = [`M ${points[0].x} ${points[0].y}`];
+  // Phantom endpoints — extrapolate one segment beyond each end so
+  // the first and last visible segments still get a smooth tangent.
+  const phantomStart = {
+    x: 2 * points[0].x - points[1].x,
+    y: 2 * points[0].y - points[1].y,
+  };
+  const phantomEnd = {
+    x: 2 * points[points.length - 1].x - points[points.length - 2].x,
+    y: 2 * points[points.length - 1].y - points[points.length - 2].y,
+  };
+  const all = [phantomStart, ...points, phantomEnd];
+  for (let i = 1; i < all.length - 2; i++) {
+    const p0 = all[i - 1];
+    const p1 = all[i];
+    const p2 = all[i + 1];
+    const p3 = all[i + 2];
+    const c1x = p1.x + ((p2.x - p0.x) / 6) * (1 - t);
+    const c1y = p1.y + ((p2.y - p0.y) / 6) * (1 - t);
+    const c2x = p2.x - ((p3.x - p1.x) / 6) * (1 - t);
+    const c2y = p2.y - ((p3.y - p1.y) / 6) * (1 - t);
+    result.push(`C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`);
+  }
+  return result.join(" ");
+}
+
+/* ArcGraph — SVG rendering of every arc's intensity curve across
+ * the season's episodes. X axis: episode index. Y axis: 1 (order)
+ * at the bottom, 10 (chaos) at the top. Each curve is a smooth
+ * Catmull-Rom path colored to match its arc card. Hover/selection
+ * state from the parent emphasizes one curve while fading the rest.
+ *
+ * Layout: SVG width/height fluid via parent container. We use a
+ * fixed internal viewBox so labels + guides scale uniformly. */
+function ArcGraph({
+  arcs,
+  episodeCount,
+  highlightedArcId,
+}: {
+  arcs: Arc[];
+  episodeCount: number;
+  highlightedArcId: string | null;
+}) {
+  // Display fallback: when no episodes exist yet, use a placeholder
+  // 7-episode axis so the chart isn't empty. The defaultArc shape
+  // (3 → 8) shows the curve gently rising.
+  const n = Math.max(episodeCount, 7);
+  // SVG internal coordinate space — picked to give good padding.
+  const W = 900;
+  const H = 460;
+  const padL = 60;
+  const padR = 30;
+  const padT = 36;
+  const padB = 40;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  // X for a given episode index (0..n-1); evenly spaced.
+  const x = (i: number) => padL + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  // Y for a given score (1..10). Score 1 maps to the BOTTOM (order),
+  // score 10 maps to the TOP (chaos). Linear in between.
+  const y = (s: number) => padT + plotH - ((Math.max(1, Math.min(10, s)) - 1) / 9) * plotH;
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="v2-arc-graph-svg"
+      preserveAspectRatio="xMidYMid meet"
+      role="img"
+      aria-label="Season arc timeline graph"
+    >
+      {/* Light horizontal guide lines for the 1–10 scale. */}
+      {[1, 3, 5, 7, 10].map(s => (
+        <line
+          key={`hg-${s}`}
+          x1={padL} x2={W - padR}
+          y1={y(s)} y2={y(s)}
+          className="v2-arc-graph-guide-h"
+        />
+      ))}
+      {/* Subtle vertical guide lines per episode + EP labels at top. */}
+      {Array.from({ length: n }, (_, i) => (
+        <g key={`vg-${i}`}>
+          <line
+            x1={x(i)} x2={x(i)}
+            y1={padT} y2={H - padB}
+            className="v2-arc-graph-guide-v"
+          />
+          <text
+            x={x(i)} y={padT - 12}
+            className="v2-arc-graph-ep-label"
+            textAnchor="middle"
+          >
+            EP{i + 1}
+          </text>
+        </g>
+      ))}
+      {/* CHAOS / ORDER axis labels — stacked letters on the left edge. */}
+      {"CHAOS".split("").map((ch, i) => (
+        <text
+          key={`chaos-${i}`}
+          x={padL - 30}
+          y={padT + 16 + i * 12}
+          className="v2-arc-graph-axis-label"
+          textAnchor="middle"
+        >
+          {ch}
+        </text>
+      ))}
+      {"ORDER".split("").map((ch, i) => (
+        <text
+          key={`order-${i}`}
+          x={padL - 30}
+          y={H - padB - 60 + i * 12}
+          className="v2-arc-graph-axis-label"
+          textAnchor="middle"
+        >
+          {ch}
+        </text>
+      ))}
+      {/* Per-arc curves. Render order: non-highlighted first (so
+          they sit below visually); highlighted last (on top). */}
+      {arcs.map(arc => {
+        const points = arc.scores.slice(0, n).map((s, i) => ({ x: x(i), y: y(s) }));
+        // If the arc has fewer scores than episodes, extend the last
+        // value horizontally (flat) for the remaining episodes so
+        // every curve spans the full axis.
+        while (points.length < n) {
+          const last = points[points.length - 1] ?? { x: x(0), y: y(5) };
+          points.push({ x: x(points.length), y: last.y });
+        }
+        const d = catmullRomPath(points, 0);
+        const isFaded = highlightedArcId !== null && highlightedArcId !== arc.id;
+        const isActive = highlightedArcId === arc.id;
+        return (
+          <g
+            key={arc.id}
+            className={`v2-arc-graph-curve${isFaded ? " is-faded" : ""}${isActive ? " is-active" : ""}`}
+          >
+            <path d={d} stroke={arc.color} className="v2-arc-graph-curve-path" />
+            {isActive && points.map((p, i) => (
+              <circle
+                key={i}
+                cx={p.x} cy={p.y} r={4}
+                fill={arc.color}
+                className="v2-arc-graph-curve-node"
+              />
+            ))}
+          </g>
+        );
+      })}
+      {/* Bottom-axis "PROBLEM BEGINS" / "PROBLEM RESOLVES" markers. */}
+      <text
+        x={padL} y={H - 6}
+        className="v2-arc-graph-corner-label"
+        textAnchor="start"
+      >
+        PROBLEM BEGINS
+      </text>
+      <text
+        x={W - padR} y={H - 6}
+        className="v2-arc-graph-corner-label"
+        textAnchor="end"
+      >
+        PROBLEM RESOLVES
+      </text>
+    </svg>
+  );
+}
+
+/* ArcCard — individual arc tile shown in the left column of the
+ * Archs tab. 248px wide on desktop. Left-edge color marker uses the
+ * arc's color (matches the curve in the graph). Hover/focus tells
+ * the parent which arc to highlight in the graph. */
+function ArcCard({
+  arc,
+  onHover,
+  onLeave,
+  isActive,
+}: {
+  arc: Arc;
+  onHover: () => void;
+  onLeave: () => void;
+  isActive: boolean;
+}) {
+  return (
+    <div
+      className={`v2-arc-card${isActive ? " is-active" : ""}`}
+      style={{ "--arc-color": arc.color } as React.CSSProperties}
+      onMouseEnter={onHover}
+      onMouseLeave={onLeave}
+    >
+      <div className="v2-arc-card-title">{arc.title || ARC_TYPE_LABELS[arc.type]}</div>
+      <div className="v2-arc-card-type">{ARC_TYPE_LABELS[arc.type].toUpperCase()}</div>
+      {arc.description && (
+        <div className="v2-arc-card-description">{arc.description}</div>
+      )}
+    </div>
+  );
+}
+
+function ArcsTab({
+  story, setStory, autosaveEnabled,
+}: {
+  story: Story;
+  setStory: (u: (s: Story) => Story) => void;
+  autosaveEnabled: boolean;
+}) {
+  const isV2 = useIsV2();
+  const isDesktop = useIsDesktopStudio();
+  const activeDraft = getActiveArcsDraft(story);
+  const arcs = activeDraft?.arcs ?? [];
+  const hasArcs = arcs.length > 0;
+  const episodeCount = getActiveEpisodesDraft(story)?.episodes.length ?? 0;
+
+  const [highlightedArcId, setHighlightedArcId] = useState<string | null>(null);
+
+  // Add-Arch popup state. Both add CTAs route through this. Type is
+  // forced to main-plot for the first arc; otherwise the user picks.
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptType, setPromptType] = useState<ArcType>("main-plot");
+  const [promptTitle, setPromptTitle] = useState("");
+  const [promptDescription, setPromptDescription] = useState("");
+
+  function openAddArcPrompt() {
+    // First arc: locked to Main Plot per spec. Otherwise default to
+    // Character (the next-most-common starting point).
+    const defaultType: ArcType = arcs.length === 0 ? "main-plot" : "character";
+    setPromptType(defaultType);
+    setPromptTitle("");
+    setPromptDescription("");
+    setPromptOpen(true);
+  }
+
+  function confirmAddArc() {
+    const title = promptTitle.trim();
+    const description = promptDescription.trim();
+    setPromptOpen(false);
+    setStory(s => addArcToActiveDraft(s, {
+      type: promptType,
+      title,
+      description,
+    }));
+    setPromptTitle("");
+    setPromptDescription("");
+  }
+
+  return (
+    <>
+      <LayerBar
+        layer="arcs"
+        label="Archs"
+        story={story}
+        setStory={setStory}
+        autosaveEnabled={autosaveEnabled}
+        /* No-op — arcs aren't a sync source/target in Phase 1, so
+           the "Update Other Layers" tray never opens from this tab. */
+        onOpenUpdateTray={() => {}}
+        rightSlot={hasArcs ? (
+          isDesktop ? (
+            <div className="v2-episodes-add-row">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={openAddArcPrompt}
+                icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
+                className="ds-type-cta"
+              >
+                Add an Arch
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={openAddArcPrompt}
+                icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
+                className="empty-state-ai-btn ds-type-cta"
+              >
+                Add an Arch
+              </Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="add-all-characters-chip"
+              onClick={openAddArcPrompt}
+            >
+              <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+              <span>Add an Arch</span>
+            </button>
+          )
+        ) : undefined}
+      />
+
+      {!hasArcs && (
+        <EmptyLayerState
+          section="arcs"
+          layer="arcs"
+          draftPickerLabel="Archs"
+          story={story}
+          setStory={setStory}
+          autosaveEnabled={autosaveEnabled}
+          icon={
+            isV2
+              ? <img src="/v2/empty-state-story.png" alt="" className="empty-layer-icon-v2" />
+              : <img src="/script-icon.svg" width={41} height={44} alt="" />
+          }
+          title={isV2 ? "Map Your Arcs" : "No arcs yet"}
+          caption={
+            isV2
+              ? "Lay out the story arcs that span your season. Each arc tracks an intensity curve across every episode — main plot, character arcs, mysteries, and more."
+              : "Add your first arc to start mapping the season's story shape."
+          }
+          addLabel={isV2 ? "Add an Arch" : "Add arc"}
+          onAdd={openAddArcPrompt}
+          onGenerate={openAddArcPrompt}
+          generating={false}
+          generateLabel={isV2 ? "Create With AI" : "Create with AI"}
+          generatingLabel="Creating…"
+        />
+      )}
+
+      {hasArcs && (
+        <div className="v2-arcs-tab">
+          <div className="v2-arcs-cards">
+            {arcs.map(arc => (
+              <ArcCard
+                key={arc.id}
+                arc={arc}
+                onHover={() => setHighlightedArcId(arc.id)}
+                onLeave={() => setHighlightedArcId(null)}
+                isActive={highlightedArcId === arc.id}
+              />
+            ))}
+          </div>
+          <div className="v2-arcs-graph">
+            <ArcGraph
+              arcs={arcs}
+              episodeCount={episodeCount}
+              highlightedArcId={highlightedArcId}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Add-Arch popup. Mirrors the Add-Episode popup. Forces type
+          to Main Plot on the first arc; otherwise the type dropdown
+          shows every value of ARC_TYPES. */}
+      {promptOpen && (
+        <div
+          className="v2-direction-prompt-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="v2-arc-prompt-title"
+          onClick={() => setPromptOpen(false)}
+        >
+          <div
+            className="v2-direction-prompt-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2
+              id="v2-arc-prompt-title"
+              className="v2-direction-prompt-title ds-type-empty-header"
+            >
+              {arcs.length === 0 ? "Add the Main Plot Arch" : "Add an Arch"}
+            </h2>
+            <p className="v2-direction-prompt-caption ds-type-body">
+              {arcs.length === 0
+                ? "Every season starts with the central external story — the spine that drives the plot. We'll add it as your Main Plot Arch."
+                : "Pick the type of arc, give it a title, and write a one-sentence description of its shape across the season."}
+            </p>
+            {arcs.length > 0 && (
+              <label className="v2-direction-prompt-field">
+                <span className="v2-direction-prompt-field-label">Type</span>
+                <select
+                  className="v2-direction-prompt-textarea"
+                  value={promptType}
+                  onChange={e => setPromptType(e.target.value as ArcType)}
+                  style={{ height: 44, padding: "0 12px" }}
+                >
+                  {ARC_TYPES.filter(t => t !== "main-plot").map(t => (
+                    <option key={t} value={t}>{ARC_TYPE_LABELS[t]}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">Title</span>
+              <input
+                type="text"
+                className="v2-direction-prompt-textarea"
+                value={promptTitle}
+                onChange={e => setPromptTitle(e.target.value)}
+                placeholder={
+                  arcs.length === 0
+                    ? "e.g. The Meth Business"
+                    : "e.g. Walt's Descent"
+                }
+                style={{ height: 44, padding: "0 12px" }}
+              />
+            </label>
+            <label className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">
+                One-sentence description
+              </span>
+              <textarea
+                className="v2-direction-prompt-textarea"
+                value={promptDescription}
+                onChange={e => setPromptDescription(e.target.value)}
+                placeholder="e.g. A dying, powerless teacher begins using crime to feel in control."
+                rows={3}
+              />
+            </label>
+            <div className="v2-direction-prompt-actions">
+              <button
+                type="button"
+                className="v2-direction-prompt-cancel"
+                onClick={() => setPromptOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="v2-direction-prompt-confirm"
+                onClick={confirmAddArc}
+              >
+                Add Arch
               </button>
             </div>
           </div>

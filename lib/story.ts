@@ -367,6 +367,115 @@ export interface EpisodesLayerDraft {
   episodes: Episode[];
 }
 
+/* ── Arcs layer (TV-only Phase 1 UI) ───────────────────────────────
+   The "Archs" tab on TV projects holds the season's story arcs — a
+   list of subplot cards each plotting an intensity curve across the
+   season's episodes. Arcs are independent of episodes mechanically
+   (they don't drive episode generation yet) — this is a planning
+   surface the writer fills in, mostly by hand for now.
+
+   Each arc has:
+     - type: one of the 20 canonical arc types (see ARC_TYPES)
+     - title: user-supplied display name (e.g., "Walt's Descent")
+     - description: 1-sentence summary of the arc's shape
+     - color: hex string used by both the arc card's left-edge marker
+       AND the SVG curve in the timeline graph. Picked from a curated
+       palette at create-time; the user can change it later.
+     - scores: number[] of length = active episode count. Each value
+       is the arc's intensity at that episode (1 = order, 10 = chaos).
+       New scores default to a sensible flat-ish baseline (see emptyArc). */
+
+export const ARC_TYPES = [
+  "main-plot",
+  "character",
+  "relationship",
+  "subplot",
+  "secrecy",
+  "investigation",
+  "mystery-reveal",
+  "antagonist",
+  "world",
+  "theme",
+  "power",
+  "moral-descent",
+  "redemption",
+  "rise",
+  "fall",
+  "survival",
+  "revenge",
+  "love-romance",
+  "family",
+  "identity",
+] as const;
+
+export type ArcType = typeof ARC_TYPES[number];
+
+/** Human-facing label for each arc type. Mirrors the user-spec'd
+ *  copy. Used by both the arc-card type chip and the Add Arch type
+ *  picker. "Arch" spelling intentional — matches the UI surface. */
+export const ARC_TYPE_LABELS: Record<ArcType, string> = {
+  "main-plot":      "Main Plot Arch",
+  "character":      "Character Arch",
+  "relationship":   "Relationship Arch",
+  "subplot":        "Subplot Arch",
+  "secrecy":        "Secrecy Arch",
+  "investigation":  "Investigation Arch",
+  "mystery-reveal": "Mystery / Reveal Arch",
+  "antagonist":     "Antagonist Arch",
+  "world":          "World Arch",
+  "theme":          "Theme Arch",
+  "power":          "Power Arch",
+  "moral-descent":  "Moral Descent / Corruption Arch",
+  "redemption":     "Redemption Arch",
+  "rise":           "Rise Arch",
+  "fall":           "Fall Arch",
+  "survival":       "Survival Arch",
+  "revenge":        "Revenge Arch",
+  "love-romance":   "Love / Romance Arch",
+  "family":         "Family Arch",
+  "identity":       "Identity Arch",
+};
+
+/** Curated arc palette — picked for distinguishability on the
+ *  light cream app background. New arcs are assigned colors in
+ *  order (1st arc → index 0, 2nd → index 1, etc.). When the user
+ *  has more arcs than colors we cycle. */
+export const ARC_COLORS: string[] = [
+  "#4A6FA5", // blue        — main plot default
+  "#E55757", // red
+  "#D86A9F", // pink
+  "#6FAD8F", // green
+  "#E8C551", // yellow
+  "#6BA6D9", // light blue
+  "#A87FB8", // purple
+  "#E89C5D", // orange
+  "#4F8B9B", // teal
+  "#B85C3C", // brown
+  "#8AB85C", // lime
+  "#C77BD9", // magenta
+];
+
+export interface Arc {
+  id: string;
+  type: ArcType;
+  title: string;
+  description: string;
+  color: string;
+  /** Intensity at each episode. `scores.length` should equal the
+   *  active episodes-draft's episode count; emptyArc / addArcToActive-
+   *  Draft handle the alignment. Each value is 1-10. */
+  scores: number[];
+}
+
+export interface ArcsLayerDraft {
+  id: string;
+  number: number;
+  createdAt: string;
+  updatedAt: string;
+  savedAt: string;
+  arcs: Arc[];
+}
+
 export interface StoryLayerDraft {
   id: string;
   number: number;
@@ -416,6 +525,10 @@ export interface ProjectDraft {
    *  projects don't need migration; the normalizer fills it in
    *  for TV projects on load. */
   episodesDraftId?: string;
+  /** TV-only. References the active ArcsLayerDraft. Same back-compat
+   *  treatment as `episodesDraftId` — optional, filled in by the
+   *  normalizer for TV projects on load. */
+  arcsDraftId?: string;
   // Saved layer IDs at time of last save — used to detect per-tab
   // "has this layer changed since save" indicators.
   savedConceptDraftId?: string;
@@ -423,6 +536,7 @@ export interface ProjectDraft {
   savedStoryDraftId?: string;
   savedScriptDraftId?: string;
   savedEpisodesDraftId?: string;
+  savedArcsDraftId?: string;
   // Sync markers: ISO timestamps of when each upstream layer was "synced"
   // into this project draft. If upstream.updatedAt > this marker, the
   // downstream is considered out-of-sync.
@@ -430,6 +544,7 @@ export interface ProjectDraft {
   charactersSyncedAt?: string;
   storySyncedAt?: string;
   episodesSyncedAt?: string;
+  arcsSyncedAt?: string;
 }
 
 // ── Story (project) ──
@@ -448,6 +563,11 @@ export interface Story {
    *  "tv-show"`; absent on feature projects (which have no episodes
    *  concept). */
   episodesDrafts?: EpisodesLayerDraft[];
+  /** TV-only layer. Stores the user's "Archs" tab content — a list
+   *  of season story arcs each carrying a per-episode intensity
+   *  score array. Initialized empty (one draft, zero arcs) by the
+   *  normalizer on TV projects; absent on feature/short projects. */
+  arcsDrafts?: ArcsLayerDraft[];
   projectDrafts: ProjectDraft[];
   activeProjectDraftId: string;
   counters: {
@@ -460,6 +580,9 @@ export interface Story {
      *  episodes draft. Optional so feature projects don't carry
      *  a meaningless field. */
     episodes?: number;
+    /** TV-only — same shape as `episodes`. Increments when a new
+     *  arcs draft is forked. */
+    arcs?: number;
   };
   updatedAt: string;
   /**
@@ -473,7 +596,7 @@ export interface Story {
   collaboratorUserId?: string;
 }
 
-export type LayerKey = "concept" | "characters" | "story" | "script" | "episodes";
+export type LayerKey = "concept" | "characters" | "story" | "script" | "episodes" | "arcs";
 
 // ── Default factories ──
 
@@ -519,6 +642,105 @@ export function emptyStoryLayerDraft(id: string, number: number, ts: string): St
  *  Episodes tab. */
 export function emptyEpisodesDraft(id: string, number: number, ts: string): EpisodesLayerDraft {
   return { id, number, createdAt: ts, updatedAt: ts, savedAt: ts, episodes: [] };
+}
+
+/** TV-only — empty Arcs layer draft. One per project at creation
+ *  time, zero arcs inside. The Archs tab populates it from there. */
+export function emptyArcsLayerDraft(id: string, number: number, ts: string): ArcsLayerDraft {
+  return { id, number, createdAt: ts, updatedAt: ts, savedAt: ts, arcs: [] };
+}
+
+/** Build a fresh Arc record. The first arc on a project defaults
+ *  to `main-plot` (the spine) — caller signals this by passing
+ *  `isFirst: true`. Scores are initialized to a neutral middle-of-
+ *  the-road shape so the curve is rendered immediately without
+ *  forcing the user to set every point. `episodeCount` should be
+ *  the current active episodes-draft's length; if zero (no
+ *  episodes yet) we default to a placeholder 7-point baseline. */
+export function emptyArc(opts: {
+  id: string;
+  type: ArcType;
+  title?: string;
+  description?: string;
+  color: string;
+  episodeCount: number;
+}): Arc {
+  const n = Math.max(opts.episodeCount, 7);
+  // Default shape: gentle climb from order (3) to chaos (8) across
+  // the season — reads as "things escalate." Writers will edit.
+  const scores: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    scores.push(Math.round(3 + t * 5));
+  }
+  return {
+    id: opts.id,
+    type: opts.type,
+    title: opts.title ?? "",
+    description: opts.description ?? "",
+    color: opts.color,
+    scores,
+  };
+}
+
+/** TV-only. Returns the active ArcsLayerDraft (matched by
+ *  ProjectDraft.arcsDraftId) or null when the project doesn't
+ *  have arcs yet (legacy load before the normalizer ran, or a
+ *  non-TV project). */
+export function getActiveArcsDraft(story: Story): ArcsLayerDraft | null {
+  if (!story.arcsDrafts || story.arcsDrafts.length === 0) return null;
+  const pd = getActiveProjectDraft(story);
+  if (!pd) return story.arcsDrafts[0] ?? null;
+  return (
+    story.arcsDrafts.find(d => d.id === pd.arcsDraftId) ??
+    story.arcsDrafts[0] ??
+    null
+  );
+}
+
+/** TV-only — patch the active ArcsLayerDraft. Mirrors the
+ *  episodes/story patch helpers; bumps updatedAt on the draft. */
+export function updateArcsDraft(story: Story, patch: Partial<ArcsLayerDraft>): Story {
+  if (!story.arcsDrafts || story.arcsDrafts.length === 0) return story;
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  const ts = new Date().toISOString();
+  return {
+    ...story,
+    arcsDrafts: story.arcsDrafts.map(d =>
+      d.id === active.id ? { ...d, ...patch, updatedAt: ts } : d
+    ),
+    updatedAt: ts,
+  };
+}
+
+/** Add an Arc to the active arcs draft. The first arc on the
+ *  project (active draft has zero arcs) is forced to `main-plot`
+ *  regardless of what the caller passed — per spec ("the first arc
+ *  will be defaulted as it is the main story arch"). Otherwise the
+ *  caller's `type` is honored. Color is auto-assigned from
+ *  ARC_COLORS based on the index of the new arc, cycling when we
+ *  run out. */
+export function addArcToActiveDraft(
+  story: Story,
+  input: { type: ArcType; title?: string; description?: string },
+): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  const isFirst = active.arcs.length === 0;
+  const type: ArcType = isFirst ? "main-plot" : input.type;
+  const color = ARC_COLORS[active.arcs.length % ARC_COLORS.length];
+  const episodeCount = getActiveEpisodesDraft(story)?.episodes.length ?? 0;
+  const id = `arc_${Math.random().toString(36).slice(2, 10)}`;
+  const arc = emptyArc({
+    id,
+    type,
+    title: input.title?.trim() || ARC_TYPE_LABELS[type],
+    description: input.description?.trim() || "",
+    color,
+    episodeCount,
+  });
+  return updateArcsDraft(story, { arcs: [...active.arcs, arc] });
 }
 
 export function emptyScriptDraft(id: string, number: number, ts: string): ScriptLayerDraft {
@@ -935,6 +1157,28 @@ export function createEmptyLayerDraft(story: Story, layer: LayerKey): Story {
         updatedAt: now,
       };
     }
+    case "arcs": {
+      const existing = story.arcsDrafts ?? [];
+      const draft = emptyArcsLayerDraft(
+        genId("ard"),
+        nextDraftNumber(existing),
+        now,
+      );
+      return {
+        ...story,
+        arcsDrafts: [...existing, draft],
+        counters: {
+          ...story.counters,
+          arcs: Math.max(story.counters.arcs ?? 0, draft.number),
+        },
+        projectDrafts: story.projectDrafts.map(pd =>
+          pd.id === story.activeProjectDraftId
+            ? { ...pd, arcsDraftId: draft.id, arcsSyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
   }
 }
 
@@ -945,7 +1189,46 @@ export function createNewLayerDraft(story: Story, layer: LayerKey): Story {
     case "story":      return createNewStoryLayerDraft(story);
     case "script":     return createNewScriptDraft(story);
     case "episodes":   return createNewEpisodesDraft(story);
+    case "arcs":       return createNewArcsLayerDraft(story);
   }
+}
+
+/** TV-only — duplicate the active Arcs layer draft. Mirrors
+ *  createNewEpisodesDraft. Each arc inside the draft keeps the same
+ *  id-shape (we generate fresh IDs) but copies title/type/color/
+ *  scores so the new draft starts as an editable snapshot of the
+ *  current one. */
+export function createNewArcsLayerDraft(story: Story): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  const now = new Date().toISOString();
+  const existing = story.arcsDrafts ?? [];
+  const newDraft: ArcsLayerDraft = {
+    id: genId("ard"),
+    number: nextDraftNumber(existing),
+    createdAt: now,
+    updatedAt: now,
+    savedAt: now,
+    arcs: active.arcs.map(a => ({
+      ...a,
+      id: `arc_${Math.random().toString(36).slice(2, 10)}`,
+      scores: [...a.scores],
+    })),
+  };
+  return {
+    ...story,
+    arcsDrafts: [...existing, newDraft],
+    counters: {
+      ...story.counters,
+      arcs: Math.max(story.counters.arcs ?? 0, newDraft.number),
+    },
+    projectDrafts: story.projectDrafts.map(pd =>
+      pd.id === story.activeProjectDraftId
+        ? { ...pd, arcsDraftId: newDraft.id, arcsSyncedAt: now, updatedAt: now }
+        : pd
+    ),
+    updatedAt: now,
+  };
 }
 
 /** TV-only — duplicate the active Episodes layer draft. Mirrors
@@ -1003,7 +1286,7 @@ export function createNewEpisodesDraft(story: Story): Story {
 
 export function copyPartnerLayerDraft(
   myStory: Story,
-  partnerDraft: ConceptLayerDraft | CharactersLayerDraft | StoryLayerDraft | ScriptLayerDraft | EpisodesLayerDraft,
+  partnerDraft: ConceptLayerDraft | CharactersLayerDraft | StoryLayerDraft | ScriptLayerDraft | EpisodesLayerDraft | ArcsLayerDraft,
   layer: LayerKey,
 ): Story {
   const now = new Date().toISOString();
@@ -1138,6 +1421,39 @@ export function copyPartnerLayerDraft(
         updatedAt: now,
       };
     }
+    case "arcs": {
+      // TV-only. Copies the partner's arcs draft into mine as a new
+      // draft, deep-cloning the score arrays so future edits don't
+      // share references.
+      const src = partnerDraft as ArcsLayerDraft;
+      const existing = myStory.arcsDrafts ?? [];
+      const draft: ArcsLayerDraft = {
+        id: genId("ard"),
+        number: nextDraftNumber(existing),
+        createdAt: now,
+        updatedAt: now,
+        savedAt: now,
+        arcs: src.arcs.map(a => ({
+          ...a,
+          id: `arc_${Math.random().toString(36).slice(2, 10)}`,
+          scores: [...a.scores],
+        })),
+      };
+      return {
+        ...myStory,
+        arcsDrafts: [...existing, draft],
+        counters: {
+          ...myStory.counters,
+          arcs: Math.max(myStory.counters.arcs ?? 0, draft.number),
+        },
+        projectDrafts: myStory.projectDrafts.map(pd =>
+          pd.id === myStory.activeProjectDraftId
+            ? { ...pd, arcsDraftId: draft.id, arcsSyncedAt: now, updatedAt: now }
+            : pd
+        ),
+        updatedAt: now,
+      };
+    }
   }
 }
 
@@ -1256,11 +1572,12 @@ export function copyConceptFieldFromPartner(
 export function saveLayerDraft(story: Story, layer: LayerKey): Story {
   const pd = getActiveProjectDraft(story);
   const now = new Date().toISOString();
-  const refKey: "conceptDraftId" | "charactersDraftId" | "storyDraftId" | "scriptDraftId" | "episodesDraftId" =
+  const refKey: "conceptDraftId" | "charactersDraftId" | "storyDraftId" | "scriptDraftId" | "episodesDraftId" | "arcsDraftId" =
     layer === "concept"    ? "conceptDraftId" :
     layer === "characters" ? "charactersDraftId" :
     layer === "story"      ? "storyDraftId" :
     layer === "episodes"   ? "episodesDraftId" :
+    layer === "arcs"       ? "arcsDraftId" :
                              "scriptDraftId";
   const activeId = pd[refKey];
 
@@ -1299,6 +1616,10 @@ export function saveLayerDraft(story: Story, layer: LayerKey): Story {
       // dot clears and the autosave/save semantics match the other layers.
       if (!story.episodesDrafts) return story;
       return { ...story, episodesDrafts: mapDraft(story.episodesDrafts), updatedAt: now };
+    }
+    case "arcs": {
+      if (!story.arcsDrafts) return story;
+      return { ...story, arcsDrafts: mapDraft(story.arcsDrafts), updatedAt: now };
     }
   }
 }
@@ -1344,12 +1665,11 @@ export function isProjectDraftDirty(story: Story): boolean {
 // A tab shows a dot only when the active layer draft has unsaved option
 // edits. Creating or switching drafts alone does NOT trigger the dot.
 export function isLayerChangedForTabDot(story: Story, layer: LayerKey): boolean {
-  // Episodes layer suppresses the dirty-dot in Phase 1 — adding an
-  // episode bumps the draft's updatedAt immediately (no manual save
-  // step in the new flow), so the dot would surface constantly and
-  // never read as meaningful signal. Revisit when the Episodes
-  // layer gets explicit save semantics in Phase 2.
-  if (layer === "episodes") return false;
+  // Episodes + Arcs layers suppress the dirty-dot in Phase 1 — same
+  // reasoning as episodes: adding/editing on the Archs tab bumps
+  // updatedAt continuously, so the dot would read as constant
+  // noise. Revisit when these layers get explicit save semantics.
+  if (layer === "episodes" || layer === "arcs") return false;
   const draft =
     layer === "concept"    ? getActiveConceptDraft(story) :
     layer === "characters" ? getActiveCharactersDraft(story) :
@@ -1800,6 +2120,12 @@ export function isLayerDraftEmpty(story: Story, layer: LayerKey): boolean {
       const epd = getActiveEpisodesDraft(story);
       return !epd || epd.episodes.length === 0;
     }
+    case "arcs": {
+      // TV-only. Empty when there are no arcs in the active arcs
+      // draft (project still has its seeded empty draft).
+      const ard = getActiveArcsDraft(story);
+      return !ard || ard.arcs.length === 0;
+    }
   }
 }
 
@@ -1885,7 +2211,11 @@ export type LayerContent =
   | { kind: "script";     scenes: Scene[] }
   /** TV-only — used when a sync targets the Episodes layer
    *  directly (e.g. generate-episode-from-concept). */
-  | { kind: "episodes";   episodes: Episode[] };
+  | { kind: "episodes";   episodes: Episode[] }
+  /** TV-only — placeholder for future sync flows that target the
+   *  Arcs layer. Phase 1 leaves this as a passthrough; the Arcs
+   *  tab is hand-edited only. */
+  | { kind: "arcs";       arcs: Arc[] };
 
 export function createAndActivateLayerDraftWith(story: Story, content: LayerContent): Story {
   // Step 1: create a new draft (branches from active, becomes active).
@@ -1894,6 +2224,7 @@ export function createAndActivateLayerDraftWith(story: Story, content: LayerCont
     content.kind === "characters" ? createNewCharactersDraft(story) :
     content.kind === "story"      ? createNewStoryLayerDraft(story) :
     content.kind === "episodes"   ? createNewEpisodesDraft(story) :
+    content.kind === "arcs"       ? createNewArcsLayerDraft(story) :
                                     createNewScriptDraft(story);
   // Step 2: apply the content to the now-active new draft.
   switch (content.kind) {
@@ -1902,6 +2233,7 @@ export function createAndActivateLayerDraftWith(story: Story, content: LayerCont
     case "story":      return replaceActiveStoryContent(branched, content.beats, content.episodes);
     case "script":     return replaceActiveScriptContent(branched, content.scenes);
     case "episodes":   return updateEpisodesDraft(branched, { episodes: content.episodes });
+    case "arcs":       return updateArcsDraft(branched, { arcs: content.arcs });
   }
 }
 
@@ -1929,6 +2261,7 @@ export function applySyncResult(
       case "story":      return replaceActiveStoryContent(story, content.beats, content.episodes);
       case "script":     return replaceActiveScriptContent(story, content.scenes);
       case "episodes":   return updateEpisodesDraft(story, { episodes: content.episodes });
+      case "arcs":       return updateArcsDraft(story, { arcs: content.arcs });
     }
   }
   return createAndActivateLayerDraftWith(story, content);

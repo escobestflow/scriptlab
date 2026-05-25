@@ -9979,6 +9979,12 @@ html[data-design="v2"] .studio-tab[data-section="script"]::before {
   mask-image: url("/v2/icons/icon-script.svg");
   -webkit-mask-image: url("/v2/icons/icon-script.svg");
 }
+/* Archs tab glyph — chevron-mountain shape ("^") representing the
+   curve cresting on the season arc timeline. Lives at /icon-arcs.svg. */
+html[data-design="v2"] .studio-tab[data-section="arcs"]::before {
+  mask-image: url("/icon-arcs.svg");
+  -webkit-mask-image: url("/icon-arcs.svg");
+}
 
 /* Drop v1's underline indicator and use a small dot 8px from the
    bar's bottom edge instead. Absolutely positioned so it never
@@ -13098,6 +13104,156 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
   html[data-design="v2"] .v2-episode-card-updated svg {
     flex: 0 0 auto;
+  }
+
+  /* ── Archs tab (TV-only): season arcs planning surface ───────────
+     Two-column layout: 248px column of arc cards on the LEFT, the
+     timeline graph fills the rest on the RIGHT. Mobile stacks
+     vertically (cards above graph). Both surfaces share a single
+     `.v2-arcs-tab` flex container. */
+  html[data-design="v2"] .v2-arcs-tab {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 36px;
+    max-width: 1300px;
+    margin: 0;
+    padding-top: 8px;
+  }
+  html[data-design="v2"] .v2-arcs-cards {
+    flex: 0 0 248px;
+    width: 248px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  html[data-design="v2"] .v2-arcs-graph {
+    flex: 1 1 auto;
+    min-width: 0;
+    /* Padding around the SVG so axis labels don't crowd the
+       container edge. The SVG itself uses preserveAspectRatio to
+       scale within whatever box it gets. */
+    padding: 0 8px;
+  }
+  html[data-design="v2"] .v2-arc-graph-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    /* Soft outer border so the graph reads as a contained module. */
+    background: transparent;
+  }
+
+  /* Arc card — left-edge color marker uses the per-card CSS var
+     `--arc-color` set inline in the JSX so it matches the SVG
+     curve color exactly. */
+  html[data-design="v2"] .v2-arc-card {
+    width: 248px;
+    background: var(--ds-color-white);
+    border-radius: 14px;
+    box-shadow: var(--ds-shadow-card);
+    padding: 16px 16px 16px 20px;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    transition: box-shadow 200ms var(--ease);
+  }
+  html[data-design="v2"] .v2-arc-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--arc-color, var(--ds-color-gray-outline));
+  }
+  html[data-design="v2"] .v2-arc-card.is-active {
+    box-shadow: 0 4px 22px 0 rgba(0, 0, 0, 0.14);
+  }
+  html[data-design="v2"] .v2-arc-card-title {
+    font-family: var(--ds-font-display);
+    font-weight: 400;
+    font-size: 21px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ds-color-black);
+    margin-bottom: 4px;
+  }
+  html[data-design="v2"] .v2-arc-card-type {
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ds-color-gray-chip-label);
+    margin-bottom: 8px;
+  }
+  html[data-design="v2"] .v2-arc-card-description {
+    font-family: var(--ds-font-body);
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ds-color-black);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* SVG graph internals. */
+  html[data-design="v2"] .v2-arc-graph-guide-h {
+    stroke: var(--ds-color-gray-outline);
+    stroke-width: 0.5;
+    opacity: 0.5;
+  }
+  html[data-design="v2"] .v2-arc-graph-guide-v {
+    stroke: var(--ds-color-gray-outline);
+    stroke-width: 0.5;
+    opacity: 0.4;
+  }
+  html[data-design="v2"] .v2-arc-graph-ep-label {
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    fill: var(--ds-color-gray-chip-label);
+  }
+  html[data-design="v2"] .v2-arc-graph-axis-label {
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    fill: var(--ds-color-gray-chip-label);
+  }
+  html[data-design="v2"] .v2-arc-graph-corner-label {
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    fill: var(--ds-color-gray-chip-label);
+    text-transform: uppercase;
+  }
+  /* Curve groups: default opacity 1; fade non-highlighted; emphasize
+     the active one with slightly thicker stroke. The transition
+     keeps the hover crossover from feeling jumpy. */
+  html[data-design="v2"] .v2-arc-graph-curve {
+    transition: opacity 180ms var(--ease);
+  }
+  html[data-design="v2"] .v2-arc-graph-curve-path {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke-width 180ms var(--ease);
+  }
+  html[data-design="v2"] .v2-arc-graph-curve.is-faded {
+    opacity: 0.18;
+  }
+  html[data-design="v2"] .v2-arc-graph-curve.is-active .v2-arc-graph-curve-path {
+    stroke-width: 3.2;
+  }
+  html[data-design="v2"] .v2-arc-graph-curve-node {
+    opacity: 0.95;
   }
 
   /* ── Back-to-episodes chip on the desktop hero image ────────────

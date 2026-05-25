@@ -292,6 +292,15 @@ function payloadToContent(
       const list = Array.isArray(raw?.episodes) ? raw.episodes : [];
       return { kind: "episodes", episodes: list.map((e: any, i: number) => normalizeEpisode(e, i)) };
     }
+    case "arcs": {
+      // TV-only sync target. Phase 1 doesn't define sync prompts
+      // that target the Arcs layer — kept as a passthrough so the
+      // exhaustive-switch type-check passes. When Phase 3 wires up
+      // a `sync_concept_to_arcs` action this case will lift the
+      // model's `arcs` array into the canonical Arc shape.
+      const list = Array.isArray(raw?.arcs) ? raw.arcs : [];
+      return { kind: "arcs", arcs: list };
+    }
   }
 }
 
