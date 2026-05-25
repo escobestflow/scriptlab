@@ -9383,7 +9383,7 @@ function EpisodesTab({
 
       {!hasEpisodes && (
         <EmptyLayerState
-          section="story"   /* Reuses Story's silhouette graphic per user request. */
+          section="episodes"   /* desktop bg-image swap → /v2/desktop-empty-state-episodes.png */
           layer="episodes"
           draftPickerLabel="Episodes"
           story={story}
