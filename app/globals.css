@@ -7952,6 +7952,13 @@ html[data-design="v2"] .record-label {
     min-height: 0;
     /* row-gap on the grid handles inter-card spacing now. */
     margin-bottom: 0;
+    /* Desktop card chrome: drop the 0.7px gray outline (declared in
+       the base `.card.v2-character-card` rule) and replace it with the
+       canonical card shadow. Matches the Episode + Idea card treatment
+       app-wide — `--ds-shadow-card` is the single source of truth for
+       elevated surfaces. */
+    border: 0;
+    box-shadow: var(--ds-shadow-card);
   }
   html[data-design="v2"] .tab-content-wrap-characters .v2-character-card .v2-character-portrait {
     width: 157px;
@@ -8040,6 +8047,11 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .tab-content-wrap-story .beat-card.v2-beat-card {
     height: 157px;
     position: relative;
+    /* Desktop card chrome: replace the base 0.7px gray outline with
+       the canonical shadow token. Same treatment as the Episode +
+       Idea + Character cards. */
+    border: 0;
+    box-shadow: var(--ds-shadow-card);
   }
   /* Drag-grip rail repositioned per spec:
        - 20px from the card's LEFT edge to the icon
@@ -8212,9 +8224,14 @@ html[data-design="v2"] .record-label {
   }
   /* Each script-tab scene card is a fixed 353px wide column on
      desktop. The bare `.beat-card.v2-script-card` rule above keeps
-     the surface (radius, outline, padding); this just locks width. */
+     the radius / padding; here we override the surface chrome to
+     match the rest of the desktop card language (Episode / Idea /
+     Character / Story-beat) — drop the gray outline, add the
+     canonical shadow token. */
   html[data-design="v2"] .tab-content-wrap-script .beat-card.v2-script-card {
     width: 353px;
+    border: 0;
+    box-shadow: var(--ds-shadow-card);
   }
 
   /* Script tab's LayerBar — pull the right-slot in-line with the
