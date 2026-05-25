@@ -12285,6 +12285,9 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .studio-empty-overlay[data-section="script"] {
     background-image: url("/v2/desktop-empty-state-script.png");
   }
+  html[data-design="v2"] .studio-empty-overlay[data-section="episodes"] {
+    background-image: url("/v2/desktop-empty-state-episodes.png");
+  }
   html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
     overflow: hidden;
   }
