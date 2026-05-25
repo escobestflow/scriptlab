@@ -107,7 +107,21 @@ export type ActionType =
   // Rewrites a user-highlighted passage inside a scene's prose per a
   // natural-language instruction. Returns JSON { "replacement": string }
   // that the client splices back into scene.content.
-  | "rewrite_highlighted_range";
+  | "rewrite_highlighted_range"
+  // ── TV episode generation ──
+  // `generate_episode` is the AI-variant of "Add an Episode" on the
+  // Episodes tab. Reads the project concept + characters + season arc
+  // + the position (next-episode-number of total planned) and
+  // returns: a proper episode title + a 1-paragraph logline + a seed
+  // beat list (5–8 beats). Result patches into a new episode that
+  // the client then opens directly.
+  | "generate_episode"
+  // ── Continuity check ──
+  // Walks every episode's beats + dialogue and surfaces inconsistencies
+  // (character knows something they shouldn't, dropped plot threads,
+  // under-used characters). Returns a structured notes list the UI
+  // renders as a panel. Sonnet-grade; on-demand only.
+  | "check_continuity";
 
 export interface ActionRequest {
   type: ActionType;
@@ -136,6 +150,13 @@ export function modelForAction(type: ActionType): string {
     // have to sit seamlessly inside surrounding prose. Sonnet handles
     // the tonal continuity better than Haiku.
     case "rewrite_highlighted_range":
+    // generate_episode produces title + logline + 5–8 beats grounded in
+    // the season arc and prior episodes — structural reasoning + tone
+    // continuity work, Sonnet-grade.
+    case "generate_episode":
+    // check_continuity reads the entire season and surfaces issues.
+    // Long-context + nuanced reasoning ⇒ Sonnet.
+    case "check_continuity":
       return "claude-sonnet-4-5"; // quality matters for prose
     case "generate_beats":
     case "swap_ingredient":

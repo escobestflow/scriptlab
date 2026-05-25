@@ -647,7 +647,7 @@ export function upsertEpisodeInActiveDraft(story: Story, episode: Episode): Stor
  *  the last entry of the active draft. */
 export function addEpisodeToActiveDraft(
   story: Story,
-  init: { title?: string; logline?: string } = {},
+  init: { title?: string; logline?: string; beats?: Beat[]; archetype?: EpisodeArchetype } = {},
 ): Story {
   const active = getActiveEpisodesDraft(story);
   if (!active) return story;
@@ -656,8 +656,9 @@ export function addEpisodeToActiveDraft(
     id: genId("ep"),
     title: init.title ?? "",
     number: active.episodes.length + 1,
-    beats: [],
+    beats: init.beats ?? [],
     logline: init.logline,
+    archetype: init.archetype,
     updatedAt: now,
   };
   return updateEpisodesDraft(story, { episodes: [...active.episodes, ep] });

@@ -836,6 +836,132 @@ Rules:
 - No prose outside the JSON.`;
     }
 
+    // ── TV episode generation ──
+    // The AI-variant of "Add an Episode" on the Episodes tab. The
+    // client supplies an optional `userDirection` (free-text describing
+    // what should happen in the episode) plus the implied position via
+    // the bible above. We produce: title + logline + 5–8 seed beats.
+    case "generate_episode": {
+      const payload = action.payload as { userDirection?: string; episodeNumber?: number; totalPlanned?: number };
+      const userDirection = (payload?.userDirection ?? "").trim();
+      const epd = getActiveEpisodesDraft(story);
+      const existingCount = epd?.episodes.length ?? 0;
+      const nextNumber = payload?.episodeNumber ?? (existingCount + 1);
+      const totalPlanned = payload?.totalPlanned;
+
+      // Position phrase (same logic as tvEpisodeContext but inlined here
+      // because this action runs BEFORE the new episode exists, so we
+      // can't reuse the helper). When total is unknown, fall back to
+      // "this is episode N of an as-yet-unspecified season length."
+      const positionLine =
+        nextNumber === 1
+          ? "This is the PILOT. Front-load setup; introduce the world, central conflict, and protagonist stakes. End on a hook strong enough to demand Episode 2."
+          : totalPlanned && nextNumber === totalPlanned
+            ? `This is the FINALE (Episode ${nextNumber} of ${totalPlanned}). Pay off the season's arcs; don't seed new ones unless there's a clear next-season hook. The audience should feel the arc closing.`
+            : totalPlanned
+              ? `This is a MIDDLE episode — Episode ${nextNumber} of ${totalPlanned} planned. Escalate from the prior episodes; advance the season arc 1–2 meaningful steps; end on a turn.`
+              : `This is Episode ${nextNumber} (total season length not yet specified). Treat as a middle episode unless the season arc above implies otherwise.`;
+
+      // Previously-on (reuse the same compression logic as tvEpisodeContext).
+      const prior = epd?.episodes
+        ? [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0))
+        : [];
+      const compressBeats = (beats: typeof prior[number]["beats"]): string => {
+        if (!beats || beats.length === 0) return "(no beats written yet)";
+        const slim = beats.length <= 6
+          ? beats
+          : [...beats.slice(0, 4), ...beats.slice(-2)];
+        return slim.map(b => `  • ${b.name}${b.summary ? ` — ${b.summary}` : ""}`).join("\n");
+      };
+      const previouslyOn = prior.length === 0
+        ? ""
+        : `
+
+## Previously-on
+${prior.map(ep => `### Episode ${ep.number} — ${ep.title?.trim() || "(untitled)"}
+Logline: ${ep.logline?.trim() || "(none)"}
+Beats:
+${compressBeats(ep.beats)}`).join("\n\n")}
+
+Use this history. The new episode must NOT contradict what's established here. Honor, advance, or pay off open threads as appropriate.`;
+
+      return `Compose a new TV episode for this series. Position: Episode ${nextNumber}.
+
+${positionLine}${previouslyOn}
+
+${userDirection ? `USER DIRECTION for THIS episode (high-priority guidance — follow it):
+"""
+${userDirection}
+"""
+
+` : ""}Return STRICT JSON in this exact schema:
+{
+  "title": string,                  // 1–5 words; specific, sensory, NOT a number ("The Knot" not "Episode Three")
+  "logline": string,                // 1 short paragraph (2–4 sentences). What happens this episode + the emotional stakes. Plain prose, no scene numbers.
+  "beats": [                        // 5–8 seed beats. Just enough for the user to feel the spine — they will fill in detail later.
+    { "name": string, "summary": string, "purpose": string }
+  ]
+}
+
+Rules:
+- Every output element must be grounded in the project bible (concept / characters / season arc) above.
+- The title must read as a real episode title (think "Pilot" / "The Big Bang" / "The Suitcase"), not a tagline.
+- The logline must declare what the audience experiences this episode — not what the season will eventually be about.
+- The 5–8 beats are a SEED, not a full beat sheet. Cover the spine; leave room for the user to expand.
+- No prose outside the JSON.`;
+    }
+
+    // ── Continuity check ──
+    // Reads the entire season's beats + episode loglines and surfaces
+    // structural / narrative issues. UI renders the result as a notes
+    // panel. Findings are scoped by severity so the user can triage.
+    case "check_continuity": {
+      const epd = getActiveEpisodesDraft(story);
+      const episodes = epd?.episodes ?? [];
+      if (episodes.length === 0) {
+        return `Return STRICT JSON: { "findings": [] }. This project has no episodes yet — there is nothing to check.`;
+      }
+      const sorted = [...episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+      const episodeBlocks = sorted.map(ep => {
+        const beatLines = (ep.beats ?? []).length === 0
+          ? "  (no beats yet)"
+          : ep.beats.map(b => `  • ${b.name}${b.summary ? `: ${b.summary}` : ""}`).join("\n");
+        return `### Episode ${ep.number}${ep.title?.trim() ? ` — ${ep.title.trim()}` : ""}
+Logline: ${ep.logline?.trim() || "(none)"}
+Beats:
+${beatLines}`;
+      }).join("\n\n");
+
+      return `Audit the continuity of this TV series. Read every episode below in order. Surface any of the following issues:
+
+- **Contradictions**: a character knows or says something that conflicts with what was established in an earlier episode.
+- **Dropped threads**: a plot setup that's never paid off, or is forgotten between episodes.
+- **Under-used characters**: a major character (per the bible) who has minimal presence across episodes.
+- **Pacing problems**: stretches of episodes where the season arc doesn't advance, or where the same beat repeats.
+- **Tonal whiplash**: a tonal break that isn't earned (e.g. a bottle/character episode dropped into a pure-procedural run with no setup).
+
+# Episodes in order
+${episodeBlocks}
+
+Return STRICT JSON:
+{
+  "findings": [
+    {
+      "severity": "high" | "medium" | "low",
+      "kind": "contradiction" | "dropped-thread" | "under-used-character" | "pacing" | "tonal-whiplash" | "other",
+      "episodes": [number, …],     // which episode numbers this finding spans (1–N)
+      "title": string,             // <= 60 chars, headline-style
+      "detail": string             // 1–3 sentences explaining the issue concretely
+    }
+  ]
+}
+
+Rules:
+- High-severity = a logical contradiction or dropped-thread that breaks story trust. Surface these first.
+- Don't pad. If nothing is wrong, return { "findings": [] }.
+- No prose outside the JSON.`;
+    }
+
     default:
       return `Unknown action.`;
   }

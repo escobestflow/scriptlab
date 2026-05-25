@@ -9328,23 +9328,30 @@ function EpisodesTab({
 
   // Prompt popup state. Both Add-an-Episode CTAs (manual + AI)
   // route through this popup so the user can describe what
-  // happens in the episode before it's created. On confirm, the
-  // description becomes the episode's logline and the user is
-  // drilled into the new episode's Story tab. Phase 3 will use
-  // the description as the AI prompt seed when the user picked
-  // the AI variant.
+  // happens in the episode before it's created.
+  //
+  // - Manual mode (`aiMode: false`): description becomes the
+  //   episode's logline. Title stays blank, beats stay empty.
+  // - AI mode (`aiMode: true`): description becomes the AI prompt
+  //   seed. The `generate_episode` action returns a real title +
+  //   logline + 5–8 seed beats grounded in the project's concept,
+  //   characters, and season arc — plus the position (pilot /
+  //   middle / finale) and any prior episodes' beats.
+  //
+  // On confirm in either mode the user is drilled into the new
+  // episode's Story tab.
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptText, setPromptText] = useState("");
+  const [aiMode, setAiMode] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
 
-  function openAddEpisodePrompt() {
+  function openAddEpisodePrompt(ai: boolean) {
     setPromptText("");
+    setAiMode(ai);
     setPromptOpen(true);
   }
 
-  function confirmAddEpisode() {
-    const text = promptText.trim();
-    setPromptOpen(false);
-    setPromptText("");
+  function createBlankEpisodeFromPrompt(text: string) {
     setStory(s => {
       const before = (getActiveEpisodesDraft(s)?.episodes ?? []).length;
       const next = addEpisodeToActiveDraft(s, {
@@ -9359,6 +9366,172 @@ function EpisodesTab({
       if (newId) queueMicrotask(() => onOpenEpisode(newId));
       return next;
     });
+  }
+
+  async function createAIEpisodeFromPrompt(text: string) {
+    setAiBusy(true);
+    try {
+      const epd = getActiveEpisodesDraft(story);
+      const existingCount = epd?.episodes.length ?? 0;
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story,
+          action: {
+            type: "generate_episode",
+            payload: {
+              userDirection: text || undefined,
+              episodeNumber: existingCount + 1,
+            },
+          },
+          profile: null,
+        }),
+      });
+      if (!res.body) {
+        // Fall through to manual creation so the user isn't stuck.
+        createBlankEpisodeFromPrompt(text);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.type === "text") fullText += evt.value;
+          } catch {}
+        }
+      }
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        createBlankEpisodeFromPrompt(text);
+        return;
+      }
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        title?: string;
+        logline?: string;
+        beats?: Array<{ name?: string; summary?: string; purpose?: string }>;
+      };
+      // Patch into a new episode + drill in.
+      setStory(s => {
+        const before = (getActiveEpisodesDraft(s)?.episodes ?? []).length;
+        const seedBeats: Beat[] = (parsed.beats ?? []).map((b, i) => ({
+          id: `b_${Math.random().toString(36).slice(2)}`,
+          name: String(b.name ?? "").trim(),
+          summary: String(b.summary ?? "").trim(),
+          purpose: String(b.purpose ?? "").trim(),
+          position: i,
+          momentIds: [],
+          status: "design" as const,
+        }));
+        const next = addEpisodeToActiveDraft(s, {
+          title: String(parsed.title ?? "").trim(),
+          logline: String(parsed.logline ?? "").trim() || text || undefined,
+          beats: seedBeats,
+        });
+        const after = getActiveEpisodesDraft(next)?.episodes ?? [];
+        const newId = after[before]?.id;
+        if (newId) queueMicrotask(() => onOpenEpisode(newId));
+        return next;
+      });
+    } catch (err) {
+      console.error("[generate_episode] failed:", err);
+      createBlankEpisodeFromPrompt(text);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  function confirmAddEpisode() {
+    const text = promptText.trim();
+    if (aiMode) {
+      // Keep popup open + show "Generating…" until the AI call returns.
+      // The AI handler closes the popup itself when done (success or
+      // fall-through). Don't clear promptText yet in case the user
+      // hits Cancel from the busy state and we need to restore.
+      void createAIEpisodeFromPrompt(text).finally(() => {
+        setPromptOpen(false);
+        setPromptText("");
+      });
+    } else {
+      setPromptOpen(false);
+      setPromptText("");
+      createBlankEpisodeFromPrompt(text);
+    }
+  }
+
+  // ── Continuity check ────────────────────────────────────────────
+  // Sends every episode's beats + loglines to the model in a single
+  // call. Returns a list of structured findings (contradictions,
+  // dropped threads, etc.) we surface in a results sheet. Only
+  // available when there are at least 2 episodes — checking one
+  // episode against itself isn't meaningful.
+  type ContinuityFinding = {
+    severity: "high" | "medium" | "low";
+    kind: "contradiction" | "dropped-thread" | "under-used-character" | "pacing" | "tonal-whiplash" | "other";
+    episodes: number[];
+    title: string;
+    detail: string;
+  };
+  const [continuityBusy, setContinuityBusy] = useState(false);
+  const [continuityResults, setContinuityResults] = useState<ContinuityFinding[] | null>(null);
+  const [continuityOpen, setContinuityOpen] = useState(false);
+  const [continuityError, setContinuityError] = useState<string | null>(null);
+
+  async function runContinuityCheck() {
+    if (continuityBusy) return;
+    setContinuityBusy(true);
+    setContinuityError(null);
+    setContinuityResults(null);
+    setContinuityOpen(true);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          story,
+          action: { type: "check_continuity", payload: {} },
+          profile: null,
+        }),
+      });
+      if (!res.body) throw new Error("no response stream");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const evt = JSON.parse(line);
+            if (evt.type === "text") fullText += evt.value;
+          } catch {}
+        }
+      }
+      const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("model didn't return JSON");
+      const parsed = JSON.parse(jsonMatch[0]) as { findings?: ContinuityFinding[] };
+      setContinuityResults(parsed.findings ?? []);
+    } catch (err) {
+      console.error("[check_continuity] failed:", err);
+      setContinuityError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setContinuityBusy(false);
+    }
   }
 
   return (
@@ -9377,10 +9550,23 @@ function EpisodesTab({
           // (mirrors Characters / Story / Script's mobile pattern).
           isDesktop ? (
             <div className="v2-episodes-add-row">
+              {episodes.length >= 2 && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={runContinuityCheck}
+                  disabled={continuityBusy}
+                  icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
+                  className="ds-type-cta"
+                  style={{ marginRight: 4 }}
+                >
+                  {continuityBusy ? "Checking…" : "Check Continuity"}
+                </Button>
+              )}
               <Button
                 variant="primary"
                 size="sm"
-                onClick={openAddEpisodePrompt}
+                onClick={() => openAddEpisodePrompt(false)}
                 icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
                 className="ds-type-cta"
               >
@@ -9389,7 +9575,7 @@ function EpisodesTab({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={openAddEpisodePrompt}
+                onClick={() => openAddEpisodePrompt(true)}
                 icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
                 className="empty-state-ai-btn ds-type-cta"
               >
@@ -9400,7 +9586,7 @@ function EpisodesTab({
             <button
               type="button"
               className="add-all-characters-chip"
-              onClick={openAddEpisodePrompt}
+              onClick={() => openAddEpisodePrompt(true)}
             >
               <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
               <span>Add an Episode</span>
@@ -9429,25 +9615,24 @@ function EpisodesTab({
               : "Add your first episode to start outlining the series."
           }
           addLabel={isV2 ? "Add an Episode" : "Add episode"}
-          onAdd={openAddEpisodePrompt}
-          onGenerate={openAddEpisodePrompt}
-          generating={false}
+          onAdd={() => openAddEpisodePrompt(false)}
+          onGenerate={() => openAddEpisodePrompt(true)}
+          generating={aiBusy}
           generateLabel={isV2 ? "Create With AI" : "Create with AI"}
           generatingLabel="Creating…"
         />
       )}
 
-      {/* Mobile-only bottom sticky "Add Episode" CTA. Desktop already
-          shows the two Add chips inline with the LayerBar above, so
-          the bottom bar would be redundant on a wide viewport. Mirrors
-          the same `LayerStickyBar` pattern Characters / Story / Script
-          use on mobile. */}
+      {/* Mobile-only bottom sticky "Add Episode" CTA (manual, since the
+          inline AI chip at the top of the LayerBar covers the AI path).
+          Desktop already shows the two Add chips inline with the LayerBar
+          above, so the bottom bar would be redundant on a wide viewport. */}
       {hasEpisodes && !isDesktop && (
         <>
           <div className="layer-sticky-bar-spacer" aria-hidden="true" />
           <LayerStickyBar
             label="Add Episode"
-            onClick={openAddEpisodePrompt}
+            onClick={() => openAddEpisodePrompt(false)}
             icon={<span style={{ fontSize: 14, lineHeight: 1 }}>+</span>}
           />
         </>
@@ -9536,13 +9721,12 @@ function EpisodesTab({
               id="v2-episode-prompt-title"
               className="v2-direction-prompt-title ds-type-empty-header"
             >
-              Add an Episode
+              {aiMode ? "Create an Episode with AI" : "Add an Episode"}
             </h2>
             <p className="v2-direction-prompt-caption ds-type-body">
-              Describe what happens in this episode — characters, key
-              beats, where the story moves. Your project's concept and
-              characters are taken into account; this is just extra
-              guidance.
+              {aiMode
+                ? "Describe what should happen in this episode. The AI will compose a title, logline, and a seed beat list grounded in your concept, characters, season arc, and prior episodes. Leave blank to let the AI choose."
+                : "Describe what happens in this episode — characters, key beats, where the story moves. Your project's concept and characters are taken into account; this is just extra guidance."}
             </p>
             <label className="v2-direction-prompt-field">
               <span className="v2-direction-prompt-field-label">
@@ -9555,6 +9739,7 @@ function EpisodesTab({
                 placeholder="e.g. The detective receives an anonymous package containing photos from a case she thought was closed. As she investigates, she realizes the prime suspect — long believed dead — may have been hiding in plain sight."
                 rows={8}
                 autoFocus
+                disabled={aiBusy}
               />
             </label>
             <div className="v2-direction-prompt-actions">
@@ -9562,6 +9747,7 @@ function EpisodesTab({
                 type="button"
                 className="v2-direction-prompt-cancel"
                 onClick={() => setPromptOpen(false)}
+                disabled={aiBusy}
               >
                 Cancel
               </button>
@@ -9569,8 +9755,97 @@ function EpisodesTab({
                 type="button"
                 className="v2-direction-prompt-confirm"
                 onClick={confirmAddEpisode}
+                disabled={aiBusy}
               >
-                Add Episode
+                {aiBusy ? "Generating…" : aiMode ? "Create with AI" : "Add Episode"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Continuity check results — sheet-style modal that surfaces
+          the AI's findings. Renders when continuityOpen is true; the
+          sheet closes via the explicit "Close" button or backdrop tap.
+          Three states: busy (spinner), error (message), results (list
+          of findings with severity chips). */}
+      {continuityOpen && (
+        <div
+          className="v2-direction-prompt-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="v2-continuity-title"
+          onClick={() => { if (!continuityBusy) setContinuityOpen(false); }}
+        >
+          <div
+            className="v2-direction-prompt-card"
+            style={{ maxWidth: 720, width: "92vw", maxHeight: "84vh", overflowY: "auto" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h2
+              id="v2-continuity-title"
+              className="v2-direction-prompt-title ds-type-empty-header"
+            >
+              Continuity Check
+            </h2>
+            <p className="v2-direction-prompt-caption ds-type-body">
+              {continuityBusy
+                ? "Reading every episode's beats and loglines. This usually takes 15–30 seconds…"
+                : continuityError
+                  ? `Couldn't complete the check: ${continuityError}`
+                  : continuityResults && continuityResults.length === 0
+                    ? "No issues found. Every episode's events are internally consistent with what came before."
+                    : `Surfacing ${continuityResults?.length ?? 0} potential issue${(continuityResults?.length ?? 0) === 1 ? "" : "s"} across your episodes.`}
+            </p>
+            {!continuityBusy && continuityResults && continuityResults.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 12 }}>
+                {continuityResults.map((f, i) => (
+                  <div key={i} style={{
+                    background: "var(--ds-color-gray-lightest, #FCFBFB)",
+                    border: "0.7px solid var(--ds-color-gray-outline)",
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                  }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                      <span style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        background:
+                          f.severity === "high"   ? "#FBE5E2" :
+                          f.severity === "medium" ? "#FDF1D6" :
+                                                    "#EEE",
+                        color:
+                          f.severity === "high"   ? "#A53D33" :
+                          f.severity === "medium" ? "#8A6A20" :
+                                                    "#555",
+                      }}>{f.severity}</span>
+                      <span style={{ fontSize: 11, color: "#888", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        {f.kind.replace(/-/g, " ")}
+                      </span>
+                      {f.episodes?.length > 0 && (
+                        <span style={{ fontSize: 11, color: "#888", marginLeft: "auto" }}>
+                          Ep {f.episodes.join(", Ep ")}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{f.title}</div>
+                    <div style={{ fontSize: 13, color: "#444", lineHeight: 1.5 }}>{f.detail}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="v2-direction-prompt-actions" style={{ marginTop: 18 }}>
+              <button
+                type="button"
+                className="v2-direction-prompt-confirm"
+                onClick={() => setContinuityOpen(false)}
+                disabled={continuityBusy}
+              >
+                Close
               </button>
             </div>
           </div>
