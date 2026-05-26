@@ -13258,6 +13258,66 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .v2-arc-card .v2-arc-card-body > * {
     pointer-events: none;
   }
+
+  /* "+ CHARACTER ARC" placeholder card — ghost variant of an arc
+     card that prompts the writer to add a character arc directly
+     from the Arcs tab. Width matches an actual arc card (248px) so
+     it tiles into the column flush. Height is fixed at 79px per
+     spec — distinctly shorter than a full card to read as a "slot"
+     rather than a concrete entry. The colored left edge mirrors
+     the .v2-arc-card::before pattern but uses the dedicated tan
+     #AC9175 to disambiguate this slot from any actual arc's color. */
+  html[data-design="v2"] .v2-arc-card-placeholder {
+    /* button reset */
+    border: 0;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* dimensions */
+    width: 248px;
+    height: 79px;
+    /* surface: same soft card chrome as a real arc card, but no
+       drop shadow — ghost slot, lower visual weight. */
+    background: var(--ds-color-white);
+    border-radius: 14px;
+    box-shadow: 0 0 0 0.7px var(--ds-color-gray-outline);
+    /* layout: icon + 12px gap + label */
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 28px; /* 8 (color-bar gap) + 20 inset */
+    padding-right: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow 200ms var(--ease), transform 200ms var(--ease);
+  }
+  html[data-design="v2"] .v2-arc-card-placeholder:hover {
+    box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.08), 0 0 0 0.7px var(--ds-color-gray-outline);
+  }
+  html[data-design="v2"] .v2-arc-card-placeholder::before {
+    /* Tan color bar — distinct from any of the arc colors in
+       ARC_COLORS so a placeholder is never confused with a real arc.
+       Geometry matches the real .v2-arc-card::before: 14px from top
+       and bottom, 4px wide, anchored to the left edge. */
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 4px;
+    border-radius: 2px;
+    background: #AC9175;
+  }
+  html[data-design="v2"] .v2-arc-card-placeholder-icon {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    pointer-events: none;
+  }
+  html[data-design="v2"] .v2-arc-card-placeholder-label {
+    color: #9A9A9A;
+    pointer-events: none;
+  }
   html[data-design="v2"] .v2-arc-card:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 22px 0 rgba(0, 0, 0, 0.10);

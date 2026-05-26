@@ -10289,6 +10289,15 @@ function ArcGraph({
   // cursor.
   const svgRef = useRef<SVGSVGElement>(null);
   const [drag, setDrag] = useState<{ arcId: string; index: number; score: number } | null>(null);
+  // Tracks pointer-down origin + a "moved" flag so we can tell a
+  // click on an intensity node (no movement → open Add Moment popup
+  // at that episode) from a drag (any meaningful movement → commit a
+  // new score on release).
+  const nodePressRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+  // Threshold (in client pixels) for promoting a pointer-down + up
+  // into a "drag" instead of a "click." 4px catches the typical
+  // hand-shake while a deliberate drag has to clear that band.
+  const NODE_DRAG_THRESHOLD = 4;
 
   function scoreFromClientY(clientY: number): number {
     const svg = svgRef.current;
@@ -10316,6 +10325,7 @@ function ArcGraph({
     // user drags off it — pointermove + pointerup keep firing here.
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     setDrag({ arcId, index, score: currentScore });
+    nodePressRef.current = { x: e.clientX, y: e.clientY, moved: false };
     // Lock the highlight on the dragging arc so neighbor curves don't
     // steal focus when the cursor crosses them mid-drag.
     onHoverArc(arcId);
@@ -10323,6 +10333,15 @@ function ArcGraph({
 
   function onNodePointerMove(e: React.PointerEvent<SVGCircleElement>) {
     if (!drag) return;
+    // Promote to "moved" once the pointer drifts past the click
+    // threshold. Pointer-up checks this flag to decide between
+    // committing a score (drag) or opening the moment popup (click).
+    const press = nodePressRef.current;
+    if (press && !press.moved) {
+      const dx = e.clientX - press.x;
+      const dy = e.clientY - press.y;
+      if (Math.hypot(dx, dy) > NODE_DRAG_THRESHOLD) press.moved = true;
+    }
     const next = scoreFromClientY(e.clientY);
     if (next !== drag.score) {
       setDrag({ ...drag, score: next });
@@ -10332,6 +10351,17 @@ function ArcGraph({
   function onNodePointerUp(e: React.PointerEvent<SVGCircleElement>) {
     if (!drag) return;
     try { (e.currentTarget as Element).releasePointerCapture(e.pointerId); } catch {}
+    const press = nodePressRef.current;
+    nodePressRef.current = null;
+    if (press && !press.moved) {
+      // Treat as a click on this node — open the Add Moment popup
+      // at the node's exact integer episode position. Skip the score
+      // commit since the user didn't drag.
+      const { arcId, index } = drag;
+      setDrag(null);
+      onAddMomentAt(arcId, index);
+      return;
+    }
     onScoreCommit(drag.arcId, drag.index, drag.score);
     setDrag(null);
   }
@@ -10719,6 +10749,12 @@ function ArcsTab({
   // intensities reappear if the user later grows the episode count
   // back. On save we merge: visible cells (first N) + preserved tail.
   const [promptScoresFull, setPromptScoresFull] = useState<number[]>([]);
+  // Optional character pinning — only meaningful when promptType ===
+  // "character". `null` means the user hasn't picked a character
+  // (or doesn't want to pin one); the arc still saves but with an
+  // unlinked characterId so it shows up in the Arcs tab cards but
+  // not on any specific character's page.
+  const [promptCharacterId, setPromptCharacterId] = useState<string | null>(null);
 
   // ── Add/Edit Moment popup (turning-point marker on an arc) ───────
   const [momentPopupOpen, setMomentPopupOpen] = useState(false);
@@ -10804,12 +10840,15 @@ function ArcsTab({
     return out;
   }
 
-  function openAddArcPrompt() {
-    const defaultType: ArcType = arcs.length === 0 ? "main-plot" : "character";
+  function openAddArcPrompt(opts: { initialType?: ArcType } = {}) {
+    const defaultType: ArcType =
+      opts.initialType
+      ?? (arcs.length === 0 ? "main-plot" : "character");
     setEditingArcId(null);
     setPromptType(defaultType);
     setPromptTitle("");
     setPromptDescription("");
+    setPromptCharacterId(null);
     const initial = defaultScores(episodeCount);
     setPromptScores(initial);
     setPromptScoresFull(initial);
@@ -10821,6 +10860,7 @@ function ArcsTab({
     setPromptType(arc.type);
     setPromptTitle(arc.title);
     setPromptDescription(arc.description);
+    setPromptCharacterId(arc.characterId ?? null);
     // Capture the FULL stored scores (which may be longer than
     // episodeCount if the user previously shrank Concept) so the tail
     // beyond the visible cells survives the save. The popup only
@@ -10845,6 +10885,10 @@ function ArcsTab({
       ...promptScores,
       ...promptScoresFull.slice(promptScores.length),
     ];
+    // characterId only persists for character arcs — if the user
+    // flipped the type away from "character" mid-edit, we explicitly
+    // null it out so the link doesn't dangle.
+    const linkedCharacterId = promptType === "character" ? promptCharacterId : null;
     if (editingArcId) {
       // Edit mode — patch the existing arc. Always flip `intensitySet`
       // on since the user has now explicitly saved scores via the
@@ -10856,6 +10900,9 @@ function ArcsTab({
         description,
         scores: mergedScores,
         intensitySet: true,
+        // Patch characterId with either the picked id or `undefined`
+        // to clear a previous link.
+        characterId: linkedCharacterId ?? undefined,
       }));
     } else {
       // Create mode — append a new arc with the user's scores. The
@@ -10867,11 +10914,13 @@ function ArcsTab({
         description,
         scores: mergedScores,
         intensitySet: true,
+        ...(linkedCharacterId ? { characterId: linkedCharacterId } : {}),
       }));
     }
     setEditingArcId(null);
     setPromptTitle("");
     setPromptDescription("");
+    setPromptCharacterId(null);
     setPromptScores([]);
     setPromptScoresFull([]);
   }
@@ -10915,7 +10964,7 @@ function ArcsTab({
               <button
                 type="button"
                 className="add-one-chip-primary"
-                onClick={openAddArcPrompt}
+                onClick={() => openAddArcPrompt()}
               >
                 <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
                 <span>Add an Arc</span>
@@ -10923,7 +10972,7 @@ function ArcsTab({
               <button
                 type="button"
                 className="add-one-chip"
-                onClick={openAddArcPrompt}
+                onClick={() => openAddArcPrompt()}
               >
                 <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
                 <span>Add an Arc</span>
@@ -10933,7 +10982,7 @@ function ArcsTab({
             <button
               type="button"
               className="add-all-characters-chip"
-              onClick={openAddArcPrompt}
+              onClick={() => openAddArcPrompt()}
             >
               <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
               <span>Add an Arc</span>
@@ -10962,8 +11011,8 @@ function ArcsTab({
               : "Add your first arc to start mapping the season's story shape."
           }
           addLabel={isV2 ? "Add an Arc" : "Add arc"}
-          onAdd={openAddArcPrompt}
-          onGenerate={openAddArcPrompt}
+          onAdd={() => openAddArcPrompt()}
+          onGenerate={() => openAddArcPrompt()}
           generating={false}
           generateLabel={isV2 ? "Create With AI" : "Create with AI"}
           generatingLabel="Creating…"
@@ -10985,6 +11034,25 @@ function ArcsTab({
                 isActive={highlightedArcId === arc.id}
               />
             ))}
+            {/* Always-visible "+ CHARACTER ARC" placeholder card.
+                Click pre-selects character type in the Add Arc popup
+                so the character picker is already showing — the
+                writer just picks who the arc belongs to. */}
+            <button
+              type="button"
+              className="v2-arc-card-placeholder"
+              onClick={() => openAddArcPrompt({ initialType: "character" })}
+            >
+              <img
+                src="/v2/icon-add-arc.svg"
+                alt=""
+                aria-hidden="true"
+                className="v2-arc-card-placeholder-icon"
+              />
+              <span className="v2-arc-card-placeholder-label ds-type-project-tab-nav-inactive">
+                CHARACTER ARC
+              </span>
+            </button>
           </div>
           <div className="v2-arcs-graph">
             <ArcGraph
@@ -11057,16 +11125,18 @@ function ArcsTab({
               </p>
               {/* Type — chip-row picker using the same Selector
                   primitive the Character form uses for Gender. The
-                  Main Plot Arch type is locked to the first arc;
-                  in edit mode for an existing main-plot arc the
-                  chip row is hidden entirely (you can't change a
-                  Main Plot Arch into anything else without
-                  orphaning the season's spine). */}
-              {!isFirstAndCreating && !(isEditMode && promptType === "main-plot") && (
+                  first arc still defaults to Main Plot (it's the
+                  natural starting beat for a season), but the user
+                  can pick anything from this picker — including
+                  another Main Plot. We used to filter Main Plot out
+                  to enforce "one main plot per season"; the writer
+                  pushed back on that since some seasons run two
+                  parallel core arcs (A-plot / B-plot). */}
+              {!isFirstAndCreating && (
                 <div className="v2-direction-prompt-field">
                   <span className="v2-direction-prompt-field-label">Type</span>
                   <div className="chip-row v2-arc-prompt-type-row">
-                    {ARC_TYPES.filter(t => t !== "main-plot").map(t => (
+                    {ARC_TYPES.map(t => (
                       <Selector
                         key={t}
                         selected={promptType === t}
@@ -11075,6 +11145,35 @@ function ArcsTab({
                         {ARC_TYPE_LABELS[t].replace(/ Arc$/, "")}
                       </Selector>
                     ))}
+                  </div>
+                </div>
+              )}
+              {/* Character picker — appears only when the arc type is
+                  "character" so the writer can pin the arc to a
+                  specific cast member from the Arcs-tab popup
+                  (matches what the Character popup's own arc flow
+                  does, but here surfaced as an inline chip row). */}
+              {promptType === "character" && (
+                <div className="v2-direction-prompt-field">
+                  <span className="v2-direction-prompt-field-label">Character</span>
+                  <div className="chip-row v2-arc-prompt-type-row">
+                    {(getActiveCharactersDraft(story).characters ?? []).length === 0 ? (
+                      <span className="v2-arc-moment-idea-empty" style={{ padding: 0 }}>
+                        No characters in this project yet — add one from the Characters tab first.
+                      </span>
+                    ) : (
+                      getActiveCharactersDraft(story).characters.map(c => (
+                        <Selector
+                          key={c.id}
+                          selected={promptCharacterId === c.id}
+                          onClick={() =>
+                            setPromptCharacterId(promptCharacterId === c.id ? null : c.id)
+                          }
+                        >
+                          {c.name || "Unnamed"}
+                        </Selector>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
