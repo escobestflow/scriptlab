@@ -89,7 +89,12 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { description, genre, tone, projectId, characterId, projectName, targetName, draftId, draftLabel } = await req.json();
+    const { description, genre, tone, projectId, characterId, projectName, targetName, draftId, draftLabel, model } = await req.json();
+    // Validate `model` if provided: must be one of the two known values.
+    // Anything else (or absent) leaves the choice to the V2-routing logic
+    // inside generateImageWithFallback.
+    const forceModel: "dall-e-3" | "gpt-image-2" | undefined =
+      model === "dall-e-3" || model === "gpt-image-2" ? model : undefined;
     if (!description || typeof description !== "string" || !description.trim()) {
       return new Response(JSON.stringify({ error: "description required" }), {
         status: 400,
@@ -131,6 +136,7 @@ export async function POST(req: Request) {
       sizes,
       context: "generate-character-image",
       preferV2: isV2,
+      forceModel,
     });
     if (!attempt.ok) {
       void logUsage({

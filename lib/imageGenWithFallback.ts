@@ -56,10 +56,22 @@ export async function generateImageWithFallback(opts: {
   context: string;
   /** When true (v2 users) try gpt-image-2 first, then dall-e-3 on
    *  failure. When false (v1 users) go straight to dall-e-3 — no
-   *  upgrade path to gpt-image-2. */
+   *  upgrade path to gpt-image-2. Ignored when `forceModel` is set. */
   preferV2: boolean;
+  /** Optional explicit model override. When set, bypasses preferV2
+   *  routing entirely:
+   *   - `"dall-e-3"`     → use dall-e-3 only, no fallback (user opted
+   *     into the cheap path; we don't silently upgrade them).
+   *   - `"gpt-image-2"`  → use gpt-image-2 with the same dall-e-3
+   *     fallback on transient errors that preferV2 uses (so a premium
+   *     request never returns empty if the cheap model could've
+   *     served).
+   *  Used by the per-popup "Regenerate (Premium)" button (forces
+   *  gpt-image-2) and by auto-gen client paths that forward the
+   *  user's `useImageModelPref` selection. */
+  forceModel?: "dall-e-3" | "gpt-image-2";
 }): Promise<ImageGenResult> {
-  const { apiKey, prompt, sizes, context, preferV2 } = opts;
+  const { apiKey, prompt, sizes, context, preferV2, forceModel } = opts;
 
   // Parse OpenAI's standard error envelope. Their error responses
   // look like:
@@ -144,6 +156,35 @@ export async function generateImageWithFallback(opts: {
     }
   }
 
+  // Explicit-override path. When the caller specified a model, honor
+  // it directly. Only gpt-image-2 retains the dall-e-3 fallback (a
+  // premium request should never return empty if the cheap model
+  // could've served); a forced dall-e-3 doesn't auto-upgrade to
+  // premium since the user opted into the cheap path.
+  if (forceModel === "dall-e-3") {
+    const r = await tryModel("dall-e-3");
+    if (r.ok) console.log(`[${context}] success via dall-e-3 (forced)`);
+    return r;
+  }
+  if (forceModel === "gpt-image-2") {
+    const r = await tryModel("gpt-image-2");
+    if (r.ok) {
+      console.log(`[${context}] success via gpt-image-2 (forced)`);
+      return r;
+    }
+    if (isUnrecoverable(r.code)) {
+      console.warn(`[${context}] gpt-image-2 (forced) hit unrecoverable error (${r.code}), NOT retrying dall-e-3`);
+      return r;
+    }
+    console.warn(`[${context}] gpt-image-2 (forced) failed (${r.error.slice(0, 120)}…), falling back to dall-e-3`);
+    const fallback = await tryModel("dall-e-3");
+    if (fallback.ok) console.log(`[${context}] success via dall-e-3 (fallback from forced gpt-image-2)`);
+    return fallback;
+  }
+
+  // Default (no override) path. preferV2 routes v2 users through
+  // gpt-image-2 with dall-e-3 fallback; v1 users go straight to
+  // dall-e-3 with no upgrade.
   if (preferV2) {
     const v2 = await tryModel("gpt-image-2");
     if (v2.ok) {

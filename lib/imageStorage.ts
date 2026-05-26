@@ -11,7 +11,7 @@
 import { getSupabaseAdmin } from "./supabaseAdmin";
 import crypto from "crypto";
 
-export type ImageBucket = "character-images" | "scene-images";
+export type ImageBucket = "character-images" | "scene-images" | "episode-images";
 
 interface UploadResult {
   /** The string to store on Character.thumbnail / Beat.thumbnail.

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 const AUTOSAVE_KEY = "scriptlab:autosave";
 const DARKMODE_KEY = "scriptlab:darkmode";
 const DRAFT_PICKER_STYLE_KEY = "scriptlab:draftPickerStyle";
+const IMAGE_MODEL_KEY = "scriptlab:imageModel";
 
 /** Read the autosave pref. SSR-safe — returns the default (true) on the server. */
 export function loadAutosave(): boolean {
@@ -194,6 +195,65 @@ export function useDraftPickerStylePref(): [
         new CustomEvent(DRAFT_PICKER_STYLE_EVENT, { detail: next }),
       );
     }
+  }, []);
+
+  return [value, set];
+}
+
+// ── Image generation model ──────────────────────────────────────────
+// Controls which OpenAI image model is used for AUTO-generation
+// (character portraits, scene/episode thumbnails). Users can override
+// per-image via the explicit "Regenerate (Premium)" button in each
+// edit popup; this pref governs the default that fires unattended.
+//
+// "dall-e-3"     — cheaper, faster, default. ~$0.04 per standard image.
+// "gpt-image-2"  — premium, higher quality. ~5× the cost.
+//
+// Project-cover generation always uses gpt-image-2 (covers are
+// infrequent and the quality bump is worth it) — see /api/generate-
+// thumbnail/route.ts for the V2 routing logic that's untouched by
+// this pref.
+
+export type ImageModelPref = "dall-e-3" | "gpt-image-2";
+
+/** Read the image-model pref. SSR-safe — returns "dall-e-3" default. */
+export function loadImageModelPref(): ImageModelPref {
+  if (typeof window === "undefined") return "dall-e-3";
+  try {
+    const raw = window.localStorage.getItem(IMAGE_MODEL_KEY);
+    return raw === "gpt-image-2" ? "gpt-image-2" : "dall-e-3";
+  } catch {
+    return "dall-e-3";
+  }
+}
+
+/** Persist the image-model pref. No-op on the server. */
+export function saveImageModelPref(v: ImageModelPref): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(IMAGE_MODEL_KEY, v);
+  } catch {
+    /* localStorage may be disabled — fail silently */
+  }
+}
+
+/**
+ * React hook backing the image-model pref. SSR-renders the cheap
+ * default and reconciles with localStorage after mount. Same shape
+ * as `useAutosavePref`. Consumers: the settings toggle, plus every
+ * auto-generation client path (character, scene, episode) reads
+ * this and forwards it as the `model` param in their POST body.
+ */
+export function useImageModelPref(): [ImageModelPref, (v: ImageModelPref) => void] {
+  const [value, setValue] = useState<ImageModelPref>("dall-e-3");
+
+  useEffect(() => {
+    setValue(loadImageModelPref());
+  }, []);
+
+  const set = useCallback((next: ImageModelPref) => {
+    setValue(next);
+    saveImageModelPref(next);
   }, []);
 
   return [value, set];

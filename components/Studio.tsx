@@ -51,7 +51,7 @@ import type { WriterProfile } from "@/lib/writerProfile";
 import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 import { SpeakButton } from "@/components/SpeakButton";
-import { useDraftPickerStylePref, type DraftPickerStyle } from "@/lib/prefs";
+import { useDraftPickerStylePref, type DraftPickerStyle, loadImageModelPref } from "@/lib/prefs";
 import { useAuth } from "@/lib/auth";
 import {
   createInvite,
@@ -891,14 +891,22 @@ export function Studio({
   // hasn't flushed yet within a single session.
   const characterImagesFailed = useRef<Set<string>>(new Set());
   const sceneImagesFailed = useRef<Set<string>>(new Set());
+  // Per-session circuit-breaker for episode-image gen — once an episode
+  // has failed in this session, the auto-loop never re-fires it. Manual
+  // Regenerate from the episode edit popup still works (mirror of the
+  // scene + character patterns).
+  const episodeImagesFailed = useRef<Set<string>>(new Set());
   const [scenesInFlight, setScenesInFlight] = useState<Set<string>>(new Set());
   const [charsInFlight, setCharsInFlight] = useState<Set<string>>(new Set());
   // TV-only — drives the shimmer on the per-episode card thumbnail
-  // while a generation is in flight. Phase 1 keeps this empty (no
-  // episode-image generation yet); the state hook is here so the
-  // EpisodesTab can subscribe to it consistently when Phase 3 wires
-  // an auto-fill pipeline analogous to autoGenerateSceneImage.
-  const [episodesInFlight] = useState<Set<string>>(new Set());
+  // while a generation is in flight. Wired up in Phase 3: the
+  // autoGenerateEpisodeImage flow below mirrors autoGenerateSceneImage,
+  // and the per-popup Regenerate button reuses the same in-flight set.
+  const [episodesInFlight, setEpisodesInFlight] = useState<Set<string>>(new Set());
+  // Dedup ref so the same episode never has two parallel POSTs in
+  // flight (e.g. when the useEffect re-fires before the previous
+  // response lands). Same pattern as the character / scene refs.
+  const episodeImagesInFlight = useRef<Set<string>>(new Set());
 
   // Auto-fill missing scene thumbnails. Fires whenever the story
   // state changes — picks up beats produced by the bulk Add All
@@ -1286,6 +1294,10 @@ export function Studio({
           targetName: beat.name ?? null,
           draftId: storyDraft?.id ?? null,
           draftLabel: storyDraft ? `Story Draft ${storyDraft.number}` : null,
+          // Read the pref synchronously at call time so the auto-gen
+          // path always honors the user's latest choice (no closure
+          // staleness from a hook captured at component mount).
+          model: loadImageModelPref(),
         }),
         signal: controller.signal,
       });
@@ -1325,6 +1337,126 @@ export function Studio({
       });
     }
   }
+
+  // ── TV episode image auto-fill ──────────────────────────────────
+  // Mirrors autoGenerateSceneImage exactly. Fires per-episode whenever
+  // the episode has a non-empty logline but no thumbnail yet. The
+  // imageGenAttempted sentinel + circuit-breaker keep the loop from
+  // re-firing across reloads or after a transient failure. The
+  // generated URL is patched back into the episodes draft via
+  // upsertEpisodeInActiveDraft so the card immediately picks up the
+  // new image without a refresh.
+  async function autoGenerateEpisodeImage(episodeId: string): Promise<void> {
+    if (episodeImagesInFlight.current.has(episodeId)) return;
+    if (episodeImagesFailed.current.has(episodeId)) return;
+    const epd = getActiveEpisodesDraft(story);
+    const ep = epd?.episodes.find(e => e.id === episodeId);
+    if (!ep || ep.thumbnail) return;
+    if ((ep as any).imageGenAttempted) {
+      console.log(`[autoGenerateEpisodeImage] skipped ep="${ep.title}" id=${episodeId} — imageGenAttempted=true (manual regen only)`);
+      return;
+    }
+    const logline = ep.logline?.trim();
+    if (!logline) return;
+    console.log(`[autoGenerateEpisodeImage] firing for ep="${ep.title}" id=${episodeId} — thumbnail missing`);
+    // Stamp imageGenAttempted before fetch — credit-bleed protection
+    // mirrored from character + scene paths.
+    setStory(s => {
+      const d = getActiveEpisodesDraft(s);
+      if (!d) return s;
+      const next = d.episodes.map(e =>
+        e.id === episodeId && !(e as any).imageGenAttempted
+          ? { ...e, imageGenAttempted: true } as Episode
+          : e,
+      );
+      return updateEpisodesDraft(s, { episodes: next });
+    });
+    episodeImagesInFlight.current.add(episodeId);
+    setEpisodesInFlight(prev => {
+      const n = new Set(prev);
+      n.add(episodeId);
+      return n;
+    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort("timeout-60s"), 60_000);
+    try {
+      const concept = getActiveConceptDraft(story);
+      const primaryGenre = concept.settings?.genres?.[0];
+      const projectTone = concept.concept?.tone;
+      const res = await fetch("/api/generate-episode-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: ep.title ?? "",
+          logline,
+          genre: primaryGenre,
+          tone: projectTone,
+          projectId: story.id,
+          episodeId,
+          projectName: story.title ?? null,
+          targetName: ep.title ?? null,
+          draftId: epd?.id ?? null,
+          draftLabel: epd ? `Episodes Draft ${epd.number}` : null,
+          model: loadImageModelPref(),
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        let message = `HTTP ${res.status}`;
+        try {
+          const errData = await res.json();
+          if (errData?.error) message = String(errData.error);
+        } catch { /* non-JSON body */ }
+        console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId}: ${message}`);
+        episodeImagesFailed.current.add(episodeId);
+        return;
+      }
+      const data = await res.json();
+      const thumb = typeof data?.thumbnail === "string" ? data.thumbnail : null;
+      if (!thumb) {
+        console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId}: API returned no thumbnail`);
+        episodeImagesFailed.current.add(episodeId);
+        return;
+      }
+      setStory(s => {
+        const d = getActiveEpisodesDraft(s);
+        if (!d) return s;
+        const next = d.episodes.map(e =>
+          e.id === episodeId && !e.thumbnail ? { ...e, thumbnail: thumb } : e,
+        );
+        return updateEpisodesDraft(s, { episodes: next });
+      });
+    } catch (err: any) {
+      const msg = err?.name === "AbortError" || err?.message?.includes("aborted")
+        ? "aborted after 60s (upstream hang)"
+        : (err?.message || String(err));
+      console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId} threw:`, msg);
+      episodeImagesFailed.current.add(episodeId);
+    } finally {
+      clearTimeout(timeoutId);
+      episodeImagesInFlight.current.delete(episodeId);
+      setEpisodesInFlight(prev => {
+        const n = new Set(prev);
+        n.delete(episodeId);
+        return n;
+      });
+    }
+  }
+
+  // Auto-fill loop — every story-state change, walk the episodes draft
+  // and fire a gen for any episode that has a logline but no thumbnail.
+  // Guards inside autoGenerateEpisodeImage prevent duplicates.
+  useEffect(() => {
+    if (!isTV) return;
+    const epd = getActiveEpisodesDraft(story);
+    if (!epd) return;
+    for (const e of epd.episodes) {
+      if (e.logline?.trim() && !e.thumbnail && !(e as any).imageGenAttempted) {
+        autoGenerateEpisodeImage(e.id).catch(() => { /* swallow */ });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story, isTV]);
 
   const closeCharacterSheet = () => {
     const id = charSheetCharId;
@@ -1492,6 +1624,7 @@ export function Studio({
           targetName: ch.name ?? null,
           draftId: charsDraft?.id ?? null,
           draftLabel: charsDraft ? `Characters Draft ${charsDraft.number}` : null,
+          model: loadImageModelPref(),
         }),
         signal: controller.signal,
       });
@@ -9075,7 +9208,7 @@ function CharacterEditForm({
   const isV2Form = useIsV2();
   const [imgBusy, setImgBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  async function generateImage() {
+  async function generateImage(opts: { forceModel?: "dall-e-3" | "gpt-image-2" } = {}) {
     if (imgBusy) return;
     const description = [
       ch.name && `Name: ${ch.name}`,
@@ -9092,6 +9225,12 @@ function CharacterEditForm({
       }
       return;
     }
+    // Resolve which model to use:
+    //   - opts.forceModel takes top priority (the "Regenerate (Premium)"
+    //     button passes "gpt-image-2" explicitly).
+    //   - Otherwise fall back to the user's stored preference; the cheap
+    //     dall-e-3 is the safe default.
+    const modelToUse = opts.forceModel ?? loadImageModelPref();
     const concept = getActiveConceptDraft(story);
     const primaryGenre = concept.settings?.genres?.[0];
     const projectTone = concept.concept?.tone;
@@ -9111,6 +9250,7 @@ function CharacterEditForm({
           targetName: ch.name ?? null,
           draftId: charsDraft?.id ?? null,
           draftLabel: charsDraft ? `Characters Draft ${charsDraft.number}` : null,
+          model: modelToUse,
         }),
       });
       const data = await res.json();
@@ -9174,12 +9314,28 @@ function CharacterEditForm({
             <Button
               variant="secondary"
               size="sm"
-              onClick={generateImage}
+              onClick={() => generateImage()}
               disabled={imgBusy}
               icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
             >
               {imgBusy ? "Generating…" : ch.thumbnail ? "Regenerate" : "Generate"}
             </Button>
+            {/* Premium override — always uses gpt-image-2 regardless of
+                the user's main settings toggle. Shown only when a
+                portrait already exists; pre-generation there's nothing
+                to "upgrade" to. */}
+            {ch.thumbnail && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => generateImage({ forceModel: "gpt-image-2" })}
+                disabled={imgBusy}
+                icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
+                title="Regenerate using OpenAI gpt-image-2 (higher quality, ~5× cost)"
+              >
+                Regenerate (Premium)
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -13744,7 +13900,7 @@ function SceneEditForm({
   // endpoint that the auto-fill effect uses; the returned data
   // URL replaces beat.thumbnail.
   const [imgBusy, setImgBusy] = useState(false);
-  async function generateSceneImage() {
+  async function generateSceneImage(opts: { forceModel?: "dall-e-3" | "gpt-image-2" } = {}) {
     if (imgBusy) return;
     const description = [
       beat.name && `Beat: ${beat.name}`,
@@ -13760,6 +13916,7 @@ function SceneEditForm({
     const concept = getActiveConceptDraft(story);
     const primaryGenre = concept.settings?.genres?.[0];
     const projectTone = concept.concept?.tone;
+    const modelToUse = opts.forceModel ?? loadImageModelPref();
     setImgBusy(true);
     try {
       const storyDraft = getActiveStoryLayerDraft(story);
@@ -13776,6 +13933,7 @@ function SceneEditForm({
           targetName: beat.name ?? null,
           draftId: storyDraft?.id ?? null,
           draftLabel: storyDraft ? `Story Draft ${storyDraft.number}` : null,
+          model: modelToUse,
         }),
       });
       const data = await res.json();
@@ -13949,12 +14107,27 @@ function SceneEditForm({
           <Button
             variant="secondary"
             size="sm"
-            onClick={generateSceneImage}
+            onClick={() => generateSceneImage()}
             disabled={imgBusy || !beat.name?.trim()}
             icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
           >
             {imgBusy ? "Generating…" : beat.thumbnail ? "Regenerate" : "Generate"}
           </Button>
+          {/* Premium override — uses gpt-image-2 directly. Shown only
+              when a scene image already exists; pre-gen the standard
+              "Generate" button already kicks off the user's pref. */}
+          {beat.thumbnail && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => generateSceneImage({ forceModel: "gpt-image-2" })}
+              disabled={imgBusy || !beat.name?.trim()}
+              icon={<img src="/icon-ai-button.svg" alt="" aria-hidden="true" />}
+              title="Regenerate using OpenAI gpt-image-2 (higher quality, ~5× cost)"
+            >
+              Regenerate (Premium)
+            </Button>
+          )}
         </div>
       )}
 

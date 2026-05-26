@@ -35,7 +35,7 @@ import PostLoginTransition from "@/components/PostLoginTransition";
 import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
 import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
-import { useAutosavePref, useDarkModePref, useDraftPickerStylePref } from "@/lib/prefs";
+import { useAutosavePref, useDarkModePref, useDraftPickerStylePref, useImageModelPref } from "@/lib/prefs";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 
 type View =
@@ -396,6 +396,8 @@ export default function Page() {
   const [mainTab, setMainTab] = useState<MainTab>("projects");
   const [menuOpen, setMenuOpen] = useState(false);
   const [autosaveEnabled, setAutosaveEnabled] = useAutosavePref();
+  const [imageModel, setImageModel] = useImageModelPref();
+  const premiumImages = imageModel === "gpt-image-2";
   const [darkMode, setDarkMode] = useDarkModePref();
   // Draft-picker style pref — "sheet" (default) uses the portaled
   // bottom-sheet for both project-drafts and layer-drafts dropdowns.
@@ -2179,6 +2181,44 @@ export default function Page() {
               onClick={(e) => {
                 e.stopPropagation();
                 setAutosaveEnabled(!autosaveEnabled);
+              }}
+            >
+              <span className="toggle-switch-knob" />
+            </button>
+          </div>
+
+          {/* Premium image quality. OFF (default) = cheaper DALL-E 3
+              on every AUTO-generation (character portraits, scene
+              thumbs, episode thumbs). ON = the premium gpt-image-2
+              model, ~5× cost per image. Project covers always use
+              gpt-image-2 regardless — they're infrequent enough that
+              the quality bump is worth it. Either way, the explicit
+              "Regenerate (Premium)" button in each edit popup
+              overrides this toggle on a per-image basis. */}
+          <div
+            className="menu-panel-utility"
+            style={{ ["--d" as any]: "270ms" }}
+            onClick={() => setImageModel(premiumImages ? "dall-e-3" : "gpt-image-2")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setImageModel(premiumImages ? "dall-e-3" : "gpt-image-2");
+              }
+            }}
+            aria-describedby="image-model-pref-desc"
+            title="When ON, auto-generated character portraits, scene + episode thumbnails use gpt-image-2 (higher quality, ~5× cost). When OFF, uses DALL-E 3 (cheaper)."
+          >
+            <span className="label">Premium image quality</span>
+            <button
+              type="button"
+              className={`toggle-switch toggle-switch-dark ${premiumImages ? "on" : ""}`}
+              aria-label="Toggle premium image quality"
+              aria-pressed={premiumImages}
+              onClick={(e) => {
+                e.stopPropagation();
+                setImageModel(premiumImages ? "dall-e-3" : "gpt-image-2");
               }}
             >
               <span className="toggle-switch-knob" />

@@ -110,6 +110,32 @@ export async function markBeatAttempted(
   });
 }
 
+// ── Episode thumbnail (TV-only; nested in data.episodesDrafts[].episodes[]) ─
+// Mirrors the character/beat helpers. The credit-bleed guard (mark
+// attempted BEFORE the OpenAI call) prevents a page refresh during the
+// 30-60s generation window from triggering a duplicate spend on the
+// next load — same protection the character + beat paths use.
+
+export async function setEpisodeThumbnail(
+  projectId: string,
+  episodeId: string,
+  url: string,
+): Promise<boolean> {
+  return mutateEpisode(projectId, episodeId, (e) => {
+    e.thumbnail = url;
+    e.imageGenAttempted = true;
+  });
+}
+
+export async function markEpisodeAttempted(
+  projectId: string,
+  episodeId: string,
+): Promise<boolean> {
+  return mutateEpisode(projectId, episodeId, (e) => {
+    e.imageGenAttempted = true;
+  });
+}
+
 // ── Internals ────────────────────────────────────────────────────
 
 type AnyRecord = Record<string, unknown>;
@@ -226,6 +252,60 @@ async function mutateBeat(
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.warn(`[projectImagePersist] mutateBeat threw: ${msg}`);
+    return false;
+  }
+}
+
+/**
+ * Same shape as mutateCharacter / mutateBeat, but for the TV episode
+ * layer. Episodes live at `episodesDrafts[].episodes[]`. No feature
+ * fallback here — episodes are TV-only.
+ */
+async function mutateEpisode(
+  projectId: string,
+  episodeId: string,
+  mut: (ep: AnyRecord) => void,
+): Promise<boolean> {
+  const admin = getSupabaseAdmin();
+  if (!admin) return false;
+  try {
+    const { data: row, error: readErr } = await admin
+      .from("projects")
+      .select("data")
+      .eq("id", projectId)
+      .single();
+    if (readErr || !row?.data) {
+      console.warn(`[projectImagePersist] mutateEpisode read(${projectId}): ${readErr?.message ?? "no row"}`);
+      return false;
+    }
+    const data = row.data as AnyRecord;
+    const drafts = (data.episodesDrafts as AnyRecord[] | undefined) ?? [];
+    let touched = 0;
+    for (const draft of drafts) {
+      const episodes = (draft.episodes as AnyRecord[] | undefined) ?? [];
+      for (const ep of episodes) {
+        if (ep.id === episodeId) {
+          mut(ep);
+          touched++;
+        }
+      }
+    }
+    if (touched === 0) {
+      console.warn(`[projectImagePersist] mutateEpisode: episode ${episodeId} not found in project ${projectId}`);
+      return false;
+    }
+    const { error: writeErr } = await admin
+      .from("projects")
+      .update({ data, updated_at: new Date().toISOString() })
+      .eq("id", projectId);
+    if (writeErr) {
+      console.warn(`[projectImagePersist] mutateEpisode write(${projectId}): ${writeErr.message}`);
+      return false;
+    }
+    return true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(`[projectImagePersist] mutateEpisode threw: ${msg}`);
     return false;
   }
 }
