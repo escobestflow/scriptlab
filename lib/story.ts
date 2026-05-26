@@ -592,6 +592,22 @@ export interface Story {
   };
   updatedAt: string;
   /**
+   * Last time the USER made a direct content edit to this story.
+   * Distinct from `updatedAt` (which bumps on EVERY DB write — including
+   * background paths like thumbnail regen, partner-sync incoming, and
+   * autosave of normalize-only changes). Used as the sort key for the
+   * Projects grid so cards don't shuffle every time the auth listener
+   * re-fires on tab focus and triggers a normalize-only save.
+   *
+   * Bumped exclusively inside the layer-draft update helpers
+   * (`updateConceptDraft` / `updateCharactersDraft` / `updateStoryLayerDraft`
+   * / `updateScriptDraft` / `updateEpisodesDraft` / `updateArcsDraft`),
+   * which is the choke point every typed/clicked content change flows
+   * through. Optional + fallback-to-`updatedAt` on the sort makes legacy
+   * rows behave identically until the user touches them once.
+   */
+  lastUserEditAt?: string;
+  /**
    * When set, this project is shared with another user and the value
    * is their auth.users.id. The partner's own row (a separate DB
    * row sharing this project id) carries the reverse pointer back
@@ -717,6 +733,8 @@ export function updateArcsDraft(story: Story, patch: Partial<ArcsLayerDraft>): S
       d.id === active.id ? { ...d, ...patch, updatedAt: ts } : d
     ),
     updatedAt: ts,
+    // User content edit — bump the sort key for the Projects grid.
+    lastUserEditAt: ts,
   };
 }
 
@@ -895,6 +913,7 @@ export function updateConceptDraft(story: Story, patch: Partial<ConceptLayerDraf
       d.id === pd.conceptDraftId ? { ...d, ...patch, updatedAt: now } : d
     ),
     updatedAt: now,
+    lastUserEditAt: now,
   };
 }
 
@@ -907,6 +926,7 @@ export function updateCharactersDraft(story: Story, patch: Partial<CharactersLay
       d.id === pd.charactersDraftId ? { ...d, ...patch, updatedAt: now } : d
     ),
     updatedAt: now,
+    lastUserEditAt: now,
   };
 }
 
@@ -919,6 +939,7 @@ export function updateStoryLayerDraft(story: Story, patch: Partial<StoryLayerDra
       d.id === pd.storyDraftId ? { ...d, ...patch, updatedAt: now } : d
     ),
     updatedAt: now,
+    lastUserEditAt: now,
   };
 }
 
@@ -937,6 +958,7 @@ export function updateEpisodesDraft(story: Story, patch: Partial<EpisodesLayerDr
       d.id === targetId ? { ...d, ...patch, updatedAt: now } : d
     ),
     updatedAt: now,
+    lastUserEditAt: now,
   };
 }
 
@@ -987,6 +1009,7 @@ export function updateScriptDraft(story: Story, patch: Partial<ScriptLayerDraft>
       d.id === pd.scriptDraftId ? { ...d, ...patch, updatedAt: now } : d
     ),
     updatedAt: now,
+    lastUserEditAt: now,
   };
 }
 

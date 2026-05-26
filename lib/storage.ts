@@ -416,6 +416,13 @@ function normalizeStory(s: any): Story {
         arcs: isTV ? (s.counters?.arcs ?? (arcsDrafts?.length ?? 0)) : undefined,
       },
       updatedAt: now,
+      // Preserve the user-edit sort key across loads. Legacy rows that
+      // never had this field fall back to `s.updatedAt` so they sort by
+      // their existing recency on first load, then settle into the new
+      // stable behavior on the next user content edit.
+      lastUserEditAt: typeof s.lastUserEditAt === "string"
+        ? s.lastUserEditAt
+        : (typeof s.updatedAt === "string" ? s.updatedAt : now),
     };
   }
 
@@ -508,6 +515,9 @@ function normalizeStory(s: any): Story {
         arcs: shape2IsTV ? shape2ArcsDrafts!.length : undefined,
       },
       updatedAt: now,
+      lastUserEditAt: typeof s.lastUserEditAt === "string"
+        ? s.lastUserEditAt
+        : (typeof s.updatedAt === "string" ? s.updatedAt : now),
     };
   }
 
@@ -562,6 +572,9 @@ function normalizeStory(s: any): Story {
     activeProjectDraftId: pd.id,
     counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1, episodes: epd ? 1 : undefined, arcs: ard ? 1 : undefined },
     updatedAt: now,
+    lastUserEditAt: typeof s.lastUserEditAt === "string"
+      ? s.lastUserEditAt
+      : (typeof s.updatedAt === "string" ? s.updatedAt : now),
   };
 }
 
@@ -724,6 +737,10 @@ export function newBlankProject(): Story {
     activeProjectDraftId: pd.id,
     counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 },
     updatedAt: now,
+    // Initialize the user-edit sort key so brand-new projects sort
+    // correctly (most-recently-created on top) until the user makes
+    // their first content edit.
+    lastUserEditAt: now,
   };
 }
 
@@ -766,5 +783,8 @@ export function createProjectFromDraft(sourceStory: Story, projectDraftId: strin
     activeProjectDraftId: pd.id,
     counters: { concept: 1, characters: 1, story: 1, script: 1, project: 1 },
     updatedAt: now,
+    // Treat duplicating an existing project as a brand-new user
+    // action so the copy lands at the top of the Projects grid.
+    lastUserEditAt: now,
   };
 }

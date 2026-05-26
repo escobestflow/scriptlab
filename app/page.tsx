@@ -750,7 +750,20 @@ export default function Page() {
         loadProjectsFromDB(user.id),
         loadMomentsFromDB(user.id),
       ]);
-      setProjects(p);
+      // Sort by `lastUserEditAt` so the order reflects the user's
+      // last DIRECT content edit, not every DB write. The DB query
+      // already orders by `updated_at` DESC, but that bumps on every
+      // background path (thumbnail regen, partner-sync, normalize-only
+      // autosave) — which is why cards used to reshuffle every time
+      // the Supabase auth listener re-fired on tab focus and the
+      // useEffect re-hydrated. Falls back to `updatedAt` for legacy
+      // rows that haven't been touched since the field was added.
+      const sorted = [...p].sort((a, b) => {
+        const ak = a.lastUserEditAt ?? a.updatedAt ?? "";
+        const bk = b.lastUserEditAt ?? b.updatedAt ?? "";
+        return bk.localeCompare(ak); // DESC
+      });
+      setProjects(sorted);
       setMoments(m);
       setHydrated(true);
     })();
@@ -862,7 +875,15 @@ export default function Page() {
     // Reload both the project list (so the shared project appears)
     // and the pending-invites list (so the card goes away).
     const fresh = await loadProjectsFromDB(user.id);
-    setProjects(fresh);
+    // Re-apply the lastUserEditAt sort, same logic as the initial
+    // hydration path — DB returns updated_at DESC which bumps on
+    // every background write.
+    const sorted = [...fresh].sort((a, b) => {
+      const ak = a.lastUserEditAt ?? a.updatedAt ?? "";
+      const bk = b.lastUserEditAt ?? b.updatedAt ?? "";
+      return bk.localeCompare(ak);
+    });
+    setProjects(sorted);
     await reloadPendingInvites();
   }, [
     user,
