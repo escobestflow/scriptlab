@@ -13457,6 +13457,67 @@ html[data-design="v2"] .menu-panel-utility svg {
     background: #fdf3f3;
   }
 
+  /* ── Character popup: Character Arcs section ─────────────────────
+     List of arc rows + an Add button. The Add button reuses
+     .add-one-chip-primary so it matches the populated Characters /
+     Arcs tab "Add" CTA visually. Each arc row is a soft tile with
+     the arc's color as a left-edge marker, mirroring the .v2-arc-
+     card pattern from the Arcs tab. */
+  html[data-design="v2"] .v2-character-arcs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  html[data-design="v2"] .v2-character-arc-row {
+    /* button reset */
+    border: 0;
+    background: var(--ds-color-gray-lightest);
+    color: var(--ds-color-black);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* layout */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px 10px 18px;
+    border-radius: 8px;
+    position: relative;
+    transition: background-color 160ms var(--ease, ease);
+  }
+  html[data-design="v2"] .v2-character-arc-row:hover {
+    background: #f1eeec;
+  }
+  html[data-design="v2"] .v2-character-arc-row::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 12px;
+    bottom: 12px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--arc-color, var(--ds-color-gray-outline));
+  }
+  html[data-design="v2"] .v2-character-arc-row-title {
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 13px;
+  }
+  html[data-design="v2"] .v2-character-arc-row-meta {
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--ds-color-gray-chip-label);
+    text-transform: uppercase;
+  }
+  html[data-design="v2"] .v2-character-arcs-add {
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+
   /* ── Back-to-episodes chip on the desktop hero image ────────────
      Pill positioned at top-left of `.v2-desktop-hero-image`. Light
      fill (matches the settings-fab treatment) so it reads cleanly

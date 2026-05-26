@@ -417,29 +417,29 @@ export const ARC_TYPES = [
 export type ArcType = typeof ARC_TYPES[number];
 
 /** Human-facing label for each arc type. Mirrors the user-spec'd
- *  copy. Used by both the arc-card type chip and the Add Arch type
- *  picker. "Arch" spelling intentional — matches the UI surface. */
+ *  copy. Used by both the arc-card type chip and the Add Arc type
+ *  picker. */
 export const ARC_TYPE_LABELS: Record<ArcType, string> = {
-  "main-plot":      "Main Plot Arch",
-  "character":      "Character Arch",
-  "relationship":   "Relationship Arch",
-  "subplot":        "Subplot Arch",
-  "secrecy":        "Secrecy Arch",
-  "investigation":  "Investigation Arch",
-  "mystery-reveal": "Mystery / Reveal Arch",
-  "antagonist":     "Antagonist Arch",
-  "world":          "World Arch",
-  "theme":          "Theme Arch",
-  "power":          "Power Arch",
-  "moral-descent":  "Moral Descent / Corruption Arch",
-  "redemption":     "Redemption Arch",
-  "rise":           "Rise Arch",
-  "fall":           "Fall Arch",
-  "survival":       "Survival Arch",
-  "revenge":        "Revenge Arch",
-  "love-romance":   "Love / Romance Arch",
-  "family":         "Family Arch",
-  "identity":       "Identity Arch",
+  "main-plot":      "Main Plot Arc",
+  "character":      "Character Arc",
+  "relationship":   "Relationship Arc",
+  "subplot":        "Subplot Arc",
+  "secrecy":        "Secrecy Arc",
+  "investigation":  "Investigation Arc",
+  "mystery-reveal": "Mystery / Reveal Arc",
+  "antagonist":     "Antagonist Arc",
+  "world":          "World Arc",
+  "theme":          "Theme Arc",
+  "power":          "Power Arc",
+  "moral-descent":  "Moral Descent / Corruption Arc",
+  "redemption":     "Redemption Arc",
+  "rise":           "Rise Arc",
+  "fall":           "Fall Arc",
+  "survival":       "Survival Arc",
+  "revenge":        "Revenge Arc",
+  "love-romance":   "Love / Romance Arc",
+  "family":         "Family Arc",
+  "identity":       "Identity Arc",
 };
 
 /** Curated arc palette — picked for distinguishability on the
@@ -471,6 +471,22 @@ export interface Arc {
    *  active episodes-draft's episode count; emptyArc / addArcToActive-
    *  Draft handle the alignment. Each value is 1-10. */
   scores: number[];
+  /** When set, this arc belongs to a specific character — managed
+   *  from the character popup's "Character Arcs" section AS WELL AS
+   *  from the Arcs tab popup. Only meaningful when `type === "character"`.
+   *  References a Character.id in the active characters draft. The
+   *  Arcs tab is the canonical store; the character popup is an
+   *  alternate editor for the same Arc entries. */
+  characterId?: string;
+  /** Whether the user has explicitly set per-episode intensity values
+   *  for this arc. Character arcs default to `false` so they don't
+   *  pollute the timeline graph before the writer has decided how the
+   *  arc plays out across the season — the ArcGraph only renders a
+   *  curve for character arcs once this flips true. Non-character
+   *  arcs (main-plot, mystery, etc.) are always considered set since
+   *  the Arcs-tab popup forces the scores row to be filled in at
+   *  creation time. */
+  intensitySet?: boolean;
 }
 
 export interface ArcsLayerDraft {
@@ -765,12 +781,31 @@ export function getEpisodeCountForArcs(story: Story): number {
  *  score inputs). */
 export function addArcToActiveDraft(
   story: Story,
-  input: { type: ArcType; title?: string; description?: string; scores?: number[] },
+  input: {
+    type: ArcType;
+    title?: string;
+    description?: string;
+    scores?: number[];
+    /** Optional — set when adding from the character popup so the new
+     *  arc is owned by that character. Type is forced to "character"
+     *  if a characterId is provided (regardless of `input.type`) since
+     *  character ownership and the "character" category are 1:1. */
+    characterId?: string;
+    /** When true, mark this arc as having user-set intensity (its
+     *  curve will render in the timeline graph). Arcs-tab adds pass
+     *  `true` here so the new curve is visible immediately. Character-
+     *  popup adds pass the flag based on whether the user filled in
+     *  the optional intensity row. */
+    intensitySet?: boolean;
+  },
 ): Story {
   const active = getActiveArcsDraft(story);
   if (!active) return story;
   const isFirst = active.arcs.length === 0;
-  const type: ArcType = isFirst ? "main-plot" : input.type;
+  // A characterId forces the arc into the "character" category, regardless
+  // of what was passed — the two concepts are 1:1 by design.
+  const requestedType: ArcType = input.characterId ? "character" : input.type;
+  const type: ArcType = isFirst ? "main-plot" : requestedType;
   const color = ARC_COLORS[active.arcs.length % ARC_COLORS.length];
   const episodeCount = getEpisodeCountForArcs(story);
   const id = `arc_${Math.random().toString(36).slice(2, 10)}`;
@@ -788,6 +823,12 @@ export function addArcToActiveDraft(
       .map(s => Math.max(1, Math.min(10, Math.round(s))));
     while (arc.scores.length < episodeCount) arc.scores.push(5);
   }
+  if (input.characterId) arc.characterId = input.characterId;
+  // Default `intensitySet`: character arcs default to FALSE (gated
+  // out of the graph until the user fills in the intensity row);
+  // every other arc type defaults to TRUE since the Arcs-tab popup
+  // always asks for scores at creation time.
+  arc.intensitySet = input.intensitySet ?? type !== "character";
   return updateArcsDraft(story, { arcs: [...active.arcs, arc] });
 }
 
@@ -798,7 +839,7 @@ export function addArcToActiveDraft(
 export function updateArcInActiveDraft(
   story: Story,
   arcId: string,
-  patch: Partial<Pick<Arc, "type" | "title" | "description" | "color" | "scores">>,
+  patch: Partial<Pick<Arc, "type" | "title" | "description" | "color" | "scores" | "characterId" | "intensitySet">>,
 ): Story {
   const active = getActiveArcsDraft(story);
   if (!active) return story;

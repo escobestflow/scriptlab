@@ -3360,6 +3360,7 @@ export function Studio({
                     <CharacterEditForm
                       character={activeChar}
                       story={story}
+                      setStory={setStory}
                       isNew={charSheetIsNew || isCharLocked}
                       autoGenInFlight={charsInFlight.has(activeChar.id)}
                       onUpdate={(patch) => {
@@ -4952,7 +4953,7 @@ const LAYER_LABEL: Record<LayerKey, string> = {
   concept: "Concept",
   characters: "Characters",
   episodes: "Episodes",
-  arcs: "Archs",
+  arcs: "Arcs",
   story: "Story",
   script: "Script",
 };
@@ -8709,6 +8710,7 @@ function CharactersTab({
 function CharacterEditForm({
   character: ch,
   story,
+  setStory,
   onUpdate,
   onRemove,
   isNew = false,
@@ -8716,6 +8718,11 @@ function CharacterEditForm({
 }: {
   character: Character;
   story: Story;
+  /** Direct setter for the Story — used by the Character Arcs
+   *  section to write into the canonical arcsDrafts pool. The
+   *  existing onUpdate callback is narrow (Character patch only),
+   *  so we accept the full setStory here too. */
+  setStory: (u: (s: Story) => Story) => void;
   onUpdate: (patch: Partial<Character>) => void;
   onRemove: () => void;
   /** True when the sheet was opened via "New character" — hides the
@@ -8772,6 +8779,126 @@ function CharacterEditForm({
     arc: arcHist,
     notes: notesHist,
   };
+
+  /* ── Character Arcs section (TV-only) ───────────────────────────
+   * Lists every arc in the canonical arcsDrafts pool that's owned by
+   * this character (arc.characterId === ch.id). Opening an arc OR
+   * adding a new one routes through the same inline popup, which
+   * mirrors the Arcs-tab popup's shape: title + description + an
+   * optional per-episode intensity row.
+   *
+   * The Arcs tab is canonical — the arcs live there, we just edit a
+   * slice here. Episode intensity is optional at create time; the
+   * arc only renders as a curve in the timeline graph once
+   * `intensitySet` flips true. Until then it's still listed in the
+   * Arcs-tab cards column and inside this section. */
+  const isCharProjectTV = story.projectType === "tv-show";
+  const allArcs = getActiveArcsDraft(story)?.arcs ?? [];
+  const charArcs = allArcs.filter(a => a.characterId === ch.id);
+  const charEpisodeCount = getEpisodeCountForArcs(story);
+
+  const [arcPopupOpen, setArcPopupOpen] = useState(false);
+  const [arcEditingId, setArcEditingId] = useState<string | null>(null);
+  const [arcTitle, setArcTitle] = useState("");
+  const [arcDescription, setArcDescription] = useState("");
+  // Visible cells (0..episodeCount-1) and the full preserved array
+  // (may be longer than visible if Concept's episodeCount was shrunk
+  // after the arc was created). Same merge-on-save pattern as the
+  // Arcs-tab popup.
+  const [arcScoresVisible, setArcScoresVisible] = useState<number[]>([]);
+  const [arcScoresFull, setArcScoresFull] = useState<number[]>([]);
+  // Whether the user wants this arc to render in the timeline graph.
+  // Off by default for character arcs so a writer can scaffold the
+  // arc concept (title/description only) before deciding the season
+  // curve. Flipping it on reveals the per-episode score row.
+  const [arcSetIntensity, setArcSetIntensity] = useState(false);
+
+  function defaultArcScores(n: number): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      out.push(Math.round(3 + t * 5));
+    }
+    return out;
+  }
+
+  function openAddCharacterArc() {
+    setArcEditingId(null);
+    setArcTitle("");
+    setArcDescription("");
+    const seed = defaultArcScores(charEpisodeCount);
+    setArcScoresVisible(seed);
+    setArcScoresFull(seed);
+    setArcSetIntensity(false);
+    setArcPopupOpen(true);
+  }
+
+  function openEditCharacterArc(arc: Arc) {
+    setArcEditingId(arc.id);
+    setArcTitle(arc.title);
+    setArcDescription(arc.description);
+    const full = [...arc.scores];
+    while (full.length < charEpisodeCount) full.push(full[full.length - 1] ?? 5);
+    setArcScoresFull(full);
+    setArcScoresVisible(full.slice(0, charEpisodeCount));
+    setArcSetIntensity(arc.intensitySet === true);
+    setArcPopupOpen(true);
+  }
+
+  function setArcScoreAt(index: number, value: number) {
+    const clamped = Math.max(1, Math.min(10, Math.round(value)));
+    setArcScoresVisible(prev => {
+      const next = [...prev];
+      while (next.length <= index) next.push(5);
+      next[index] = clamped;
+      return next;
+    });
+  }
+
+  function confirmCharacterArc() {
+    const title = arcTitle.trim();
+    const description = arcDescription.trim();
+    setArcPopupOpen(false);
+    const mergedScores = [
+      ...arcScoresVisible,
+      ...arcScoresFull.slice(arcScoresVisible.length),
+    ];
+    if (arcEditingId) {
+      const id = arcEditingId;
+      setStory(s => updateArcInActiveDraft(s, id, {
+        title,
+        description,
+        // Always write scores so re-toggling intensity preserves
+        // whatever values are in the inputs. The graph filter uses
+        // intensitySet, not scores presence, to decide visibility.
+        scores: mergedScores,
+        intensitySet: arcSetIntensity,
+      }));
+    } else {
+      setStory(s => addArcToActiveDraft(s, {
+        type: "character",
+        characterId: ch.id,
+        title,
+        description,
+        scores: mergedScores,
+        intensitySet: arcSetIntensity,
+      }));
+    }
+    setArcEditingId(null);
+    setArcTitle("");
+    setArcDescription("");
+    setArcScoresVisible([]);
+    setArcScoresFull([]);
+    setArcSetIntensity(false);
+  }
+
+  function deleteCharacterArc() {
+    if (!arcEditingId) return;
+    const id = arcEditingId;
+    setArcPopupOpen(false);
+    setArcEditingId(null);
+    setStory(s => deleteArcFromActiveDraft(s, id));
+  }
 
   async function generateCharacterField(field: CharAIField) {
     if (aiBusy) return;
@@ -9271,16 +9398,61 @@ function CharacterEditForm({
         pager={pagerFor("voice")}
       />
 
-      <TextAttrRow
-        label="Character arc"
-        value={ch.arc}
-        placeholder="How they change over the story"
-        onChange={v => onUpdate({ arc: v })}
-        multiline
-        ai={() => generateCharacterField("arc")}
-        aiLoading={aiBusy === "arc"}
-        pager={pagerFor("arc")}
-      />
+      {/* Character Arcs — TV-only structured editor. For feature /
+          short projects we keep the legacy free-text field (below)
+          since arcs without episodes don't have a timeline to track
+          against. */}
+      {isCharProjectTV ? (
+        <AttrRow
+          label="Character Arcs"
+          values={charArcs.length > 0
+            ? charArcs.map(a => a.title || ARC_TYPE_LABELS["character"])
+            : undefined}
+          placeholder="Track this character's season arcs"
+          expanded={openAttr === "characterArcs"}
+          onToggle={() => toggleAttr("characterArcs")}
+        >
+          <div className="v2-character-arcs-list">
+            {charArcs.map(arc => (
+              <button
+                key={arc.id}
+                type="button"
+                className="v2-character-arc-row"
+                onClick={() => openEditCharacterArc(arc)}
+                style={{ "--arc-color": arc.color } as React.CSSProperties}
+              >
+                <span className="v2-character-arc-row-title">
+                  {arc.title || "Untitled Arc"}
+                </span>
+                <span className="v2-character-arc-row-meta">
+                  {arc.intensitySet
+                    ? "Intensity set"
+                    : "No intensity yet"}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="add-one-chip-primary v2-character-arcs-add"
+              onClick={openAddCharacterArc}
+            >
+              <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
+              <span>Add Character Arc</span>
+            </button>
+          </div>
+        </AttrRow>
+      ) : (
+        <TextAttrRow
+          label="Character arc"
+          value={ch.arc}
+          placeholder="How they change over the story"
+          onChange={v => onUpdate({ arc: v })}
+          multiline
+          ai={() => generateCharacterField("arc")}
+          aiLoading={aiBusy === "arc"}
+          pager={pagerFor("arc")}
+        />
+      )}
 
       <TextAttrRow
         label="Additional notes"
@@ -9308,6 +9480,127 @@ function CharacterEditForm({
           >
             Delete character
           </Button>
+        </div>
+      )}
+
+      {/* Character-arc add/edit popup. Mirrors the Arcs-tab popup
+          shape (.v2-direction-prompt-* classes for visual parity)
+          but is scoped to one character — the new entry always
+          gets type=character, characterId=ch.id. The "Set episode
+          intensity" toggle hides the per-episode score row when
+          off; with it off the arc still exists but stays out of
+          the timeline graph until the writer fills it in. */}
+      {arcPopupOpen && (
+        <div
+          className="v2-direction-prompt-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="v2-char-arc-prompt-title"
+          onClick={() => setArcPopupOpen(false)}
+        >
+          <div
+            className="v2-direction-prompt-card v2-arc-prompt-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2
+              id="v2-char-arc-prompt-title"
+              className="v2-direction-prompt-title ds-type-empty-header"
+            >
+              {arcEditingId ? "Edit Character Arc" : "Add Character Arc"}
+            </h2>
+            <p className="v2-direction-prompt-caption ds-type-body">
+              Give the arc a one-line title and (optionally) a description.
+              Toggle on Episode intensity if you're ready to plot the
+              shape of this arc across the season.
+            </p>
+            <div className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">Title</span>
+              <Input
+                type="text"
+                value={arcTitle}
+                onChange={e => setArcTitle(e.target.value)}
+                placeholder="e.g. From cop to criminal"
+              />
+            </div>
+            <label className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">
+                One-sentence description
+              </span>
+              <textarea
+                className="v2-direction-prompt-textarea"
+                value={arcDescription}
+                onChange={e => setArcDescription(e.target.value)}
+                placeholder="e.g. He starts as the moral center and ends as the threat."
+                rows={3}
+              />
+            </label>
+            <div className="v2-direction-prompt-field">
+              <label
+                className="v2-character-arc-intensity-toggle"
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={arcSetIntensity}
+                  onChange={e => setArcSetIntensity(e.target.checked)}
+                />
+                <span className="v2-direction-prompt-field-label" style={{ margin: 0 }}>
+                  Set episode intensity (show in Arcs timeline)
+                </span>
+              </label>
+            </div>
+            {arcSetIntensity && (
+              <div className="v2-direction-prompt-field">
+                <span className="v2-direction-prompt-field-label">
+                  Episode intensity (1 = order, 10 = chaos)
+                </span>
+                <div className="v2-arc-prompt-scores">
+                  {Array.from({ length: charEpisodeCount }, (_, i) => (
+                    <div key={i} className="v2-arc-prompt-score-cell">
+                      <label className="v2-arc-prompt-score-label">EP{i + 1}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={arcScoresVisible[i] ?? 5}
+                        onChange={e => {
+                          const v = parseInt(e.target.value, 10);
+                          if (Number.isFinite(v)) setArcScoreAt(i, v);
+                        }}
+                        className="v2-arc-prompt-score-input"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="v2-direction-prompt-actions">
+              {arcEditingId && (
+                <button
+                  type="button"
+                  className="v2-arc-prompt-delete"
+                  onClick={deleteCharacterArc}
+                  style={{ marginRight: "auto" }}
+                >
+                  Delete Arc
+                </button>
+              )}
+              <button
+                type="button"
+                className="v2-direction-prompt-cancel"
+                onClick={() => setArcPopupOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="v2-direction-prompt-confirm"
+                onClick={confirmCharacterArc}
+              >
+                {arcEditingId ? "Save" : "Add Arc"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -10030,8 +10323,13 @@ function ArcGraph({
         </text>
       ))}
       {/* Per-arc curves. Render order: non-highlighted first (so
-          they sit below visually); highlighted last (on top). */}
-      {arcs.map(arc => {
+          they sit below visually); highlighted last (on top).
+          Character arcs without `intensitySet` are skipped entirely —
+          the writer hasn't told us how that character's curve plays
+          across the season yet, so we don't draw a noisy default
+          line. They still appear in the cards column and inside the
+          character popup's arcs section, just not on the graph. */}
+      {arcs.filter(a => a.type !== "character" || a.intensitySet === true).map(arc => {
         const points = arc.scores.slice(0, n).map((s, i) => ({ x: x(i), y: y(s) }));
         // If the arc has fewer scores than episodes, extend the last
         // value horizontally (flat) for the remaining episodes so
@@ -10219,21 +10517,27 @@ function ArcsTab({
       ...promptScoresFull.slice(promptScores.length),
     ];
     if (editingArcId) {
-      // Edit mode — patch the existing arc.
+      // Edit mode — patch the existing arc. Always flip `intensitySet`
+      // on since the user has now explicitly saved scores via the
+      // Arcs-tab popup (which forces a value into every cell).
       const id = editingArcId;
       setStory(s => updateArcInActiveDraft(s, id, {
         type: promptType,
         title,
         description,
         scores: mergedScores,
+        intensitySet: true,
       }));
     } else {
-      // Create mode — append a new arc with the user's scores.
+      // Create mode — append a new arc with the user's scores. The
+      // Arcs-tab popup is the "intensity-set at creation time" path,
+      // so the curve renders immediately.
       setStory(s => addArcToActiveDraft(s, {
         type: promptType,
         title,
         description,
         scores: mergedScores,
+        intensitySet: true,
       }));
     }
     setEditingArcId(null);
@@ -10265,7 +10569,7 @@ function ArcsTab({
     <>
       <LayerBar
         layer="arcs"
-        label="Archs"
+        label="Arcs"
         story={story}
         setStory={setStory}
         autosaveEnabled={autosaveEnabled}
@@ -10285,7 +10589,7 @@ function ArcsTab({
                 onClick={openAddArcPrompt}
               >
                 <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
-                <span>Add an Arch</span>
+                <span>Add an Arc</span>
               </button>
               <button
                 type="button"
@@ -10293,7 +10597,7 @@ function ArcsTab({
                 onClick={openAddArcPrompt}
               >
                 <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
-                <span>Add an Arch</span>
+                <span>Add an Arc</span>
               </button>
             </div>
           ) : (
@@ -10303,7 +10607,7 @@ function ArcsTab({
               onClick={openAddArcPrompt}
             >
               <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
-              <span>Add an Arch</span>
+              <span>Add an Arc</span>
             </button>
           )
         ) : undefined}
@@ -10328,7 +10632,7 @@ function ArcsTab({
               ? "Lay out the story arcs that span your season. Each arc tracks an intensity curve across every episode — main plot, character arcs, mysteries, and more."
               : "Add your first arc to start mapping the season's story shape."
           }
-          addLabel={isV2 ? "Add an Arch" : "Add arc"}
+          addLabel={isV2 ? "Add an Arc" : "Add arc"}
           onAdd={openAddArcPrompt}
           onGenerate={openAddArcPrompt}
           generating={false}
@@ -10388,8 +10692,8 @@ function ArcsTab({
                 className="v2-direction-prompt-title ds-type-empty-header"
               >
                 {isEditMode
-                  ? "Edit Arch"
-                  : isFirstAndCreating ? "Add the Main Plot Arch" : "Add an Arch"}
+                  ? "Edit Arc"
+                  : isFirstAndCreating ? "Add the Main Plot Arc" : "Add an Arc"}
               </h2>
               <p className="v2-direction-prompt-caption ds-type-body">
                 {isFirstAndCreating
@@ -10413,7 +10717,7 @@ function ArcsTab({
                         selected={promptType === t}
                         onClick={() => setPromptType(t)}
                       >
-                        {ARC_TYPE_LABELS[t].replace(/ Arch$/, "")}
+                        {ARC_TYPE_LABELS[t].replace(/ Arc$/, "")}
                       </Selector>
                     ))}
                   </div>
@@ -10486,7 +10790,7 @@ function ArcsTab({
                     onClick={handleDeleteArc}
                     style={{ marginRight: "auto" }}
                   >
-                    Delete Arch
+                    Delete Arc
                   </button>
                 )}
                 <button
