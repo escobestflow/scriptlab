@@ -13154,8 +13154,20 @@ html[data-design="v2"] .menu-panel-utility svg {
     padding: 16px 16px 16px 20px;
     position: relative;
     overflow: hidden;
-    cursor: default;
-    transition: box-shadow 200ms var(--ease);
+    /* Clickable — opens the arc-edit popup. Reset native <button>
+       chrome so the card reads as a clean tile, but keep cursor:
+       pointer + text-align: left so the surface is obviously
+       interactive. */
+    cursor: pointer;
+    text-align: left;
+    border: 0;
+    font: inherit;
+    color: inherit;
+    transition: box-shadow 200ms var(--ease), transform 200ms var(--ease);
+  }
+  html[data-design="v2"] .v2-arc-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 22px 0 rgba(0, 0, 0, 0.10);
   }
   html[data-design="v2"] .v2-arc-card::before {
     content: "";
@@ -13254,6 +13266,81 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
   html[data-design="v2"] .v2-arc-graph-curve-node {
     opacity: 0.95;
+  }
+
+  /* Arc-prompt score row — one number input per episode. Flex
+     wraps when the season is long (10+). The popup card widens
+     slightly on desktop so the row reads comfortably. */
+  html[data-design="v2"] .v2-arc-prompt-card {
+    max-width: 720px;
+  }
+  html[data-design="v2"] .v2-arc-prompt-scores {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    margin-top: 8px;
+  }
+  html[data-design="v2"] .v2-arc-prompt-score-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  html[data-design="v2"] .v2-arc-prompt-score-label {
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--ds-color-gray-chip-label);
+    text-transform: uppercase;
+  }
+  html[data-design="v2"] .v2-arc-prompt-score-input {
+    width: 44px;
+    height: 38px;
+    border-radius: 8px;
+    border: 0.7px solid var(--ds-color-gray-outline);
+    background: var(--ds-color-white);
+    text-align: center;
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--ds-color-black);
+    /* Hide the native number spinner so the field reads as a
+       single tappable cell. Users can still type a value or use
+       arrow keys when focused. */
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  html[data-design="v2"] .v2-arc-prompt-score-input::-webkit-outer-spin-button,
+  html[data-design="v2"] .v2-arc-prompt-score-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  html[data-design="v2"] .v2-arc-prompt-score-input:focus {
+    outline: none;
+    border-color: var(--ds-color-black);
+  }
+
+  /* Delete-Arch button in edit mode — same shape as the cancel
+     button but with the destructive red color for emphasis. Pushed
+     to the left of the action row via `margin-right: auto` on the
+     JSX so it sits opposite Cancel/Save. */
+  html[data-design="v2"] .v2-arc-prompt-delete {
+    height: 40px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 0.7px solid var(--ds-color-gray-outline);
+    background: var(--ds-color-white);
+    color: #c14b4b;
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  html[data-design="v2"] .v2-arc-prompt-delete:hover {
+    background: #fdf3f3;
   }
 
   /* ── Back-to-episodes chip on the desktop hero image ────────────

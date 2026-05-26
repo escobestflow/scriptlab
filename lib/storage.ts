@@ -155,6 +155,14 @@ function normalizeSettings(s: any): StorySettings {
     // defaults (12 min / generic 3-stage skeleton).
     duration: typeof s?.duration === "number" && s.duration > 0 && s.duration <= 60
       ? s.duration : undefined,
+    // TV-only — clamp episodeCount to a sane integer in [1, 30].
+    // Anything outside that range normalizes to undefined and the
+    // Arcs tab falls back to a 7-episode placeholder.
+    episodeCount: typeof s?.episodeCount === "number"
+      && Number.isFinite(s.episodeCount)
+      && s.episodeCount >= 1
+      && s.episodeCount <= 30
+      ? Math.round(s.episodeCount) : undefined,
     shortStructure: ALLOWED_SHORT_STRUCTURES.has(s?.shortStructure)
       ? (s.shortStructure as StorySettings["shortStructure"]) : null,
     toneNote: typeof s?.toneNote === "string" ? s.toneNote : "",

@@ -9,9 +9,9 @@ import {
   LayerKey, LayerSyncState,
   getActiveProjectDraft,
   getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, getActiveEpisodesDraft,
-  getActiveArcsDraft,
+  getActiveArcsDraft, getEpisodeCountForArcs,
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft, updateEpisodesDraft,
-  updateArcsDraft, addArcToActiveDraft,
+  updateArcsDraft, addArcToActiveDraft, updateArcInActiveDraft, deleteArcFromActiveDraft, normalizeArcScoresToCount,
   addEpisodeToActiveDraft, upsertEpisodeInActiveDraft,
   createNewLayerDraft, createEmptyLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, duplicateActiveProjectDraft, createEmptyProjectDraft, switchProjectDraft, deleteProjectDraft,
@@ -7536,6 +7536,44 @@ function ConceptTab({
         </AttrRow>
       )}
 
+      {/* Episode Count — TV-only. Drives the X-axis length of the
+          Arcs timeline graph (one score per episode on every arc).
+          When the user changes this value, every arc's `scores` array
+          in the active arcs draft is padded or trimmed to match —
+          keeps the curves continuous across the new axis. */}
+      {isTV && (
+        <AttrRow
+          label="Episode Count"
+          values={d.settings.episodeCount ? [`${d.settings.episodeCount} EP${d.settings.episodeCount === 1 ? "" : "S"}`] : undefined}
+          placeholder="e.g. 10"
+          expanded={openAttr === "episodeCount"}
+          onToggle={() => toggle("episodeCount")}
+          readOnly={ro()}
+          noToggle={lockTap}
+        >
+          <Input
+            type="number"
+            min={1}
+            max={30}
+            placeholder="e.g. 10"
+            value={d.settings.episodeCount ?? ""}
+            onChange={e => {
+              const n = parseInt(e.target.value, 10);
+              const next = Number.isFinite(n) && n >= 1 ? Math.min(30, n) : undefined;
+              setStory(s => {
+                // Patch concept first, then normalize arc score arrays
+                // to the new length so the graph stays continuous.
+                const conceptDraft = getActiveConceptDraft(s);
+                const patched = updateConceptDraft(s, {
+                  settings: { ...conceptDraft.settings, episodeCount: next },
+                });
+                return next !== undefined ? normalizeArcScoresToCount(patched, next) : patched;
+              });
+            }}
+          />
+        </AttrRow>
+      )}
+
       {/* Title — sits directly below Format per spec so the two
           project-identity fields (format + title) cluster at the top
           of Concept, before the genre/tone/theme triage begins. */}
@@ -10061,31 +10099,36 @@ function ArcGraph({
 /* ArcCard — individual arc tile shown in the left column of the
  * Archs tab. 248px wide on desktop. Left-edge color marker uses the
  * arc's color (matches the curve in the graph). Hover/focus tells
- * the parent which arc to highlight in the graph. */
+ * the parent which arc to highlight in the graph. Click opens the
+ * arc-edit popup (same shell as the add-arc popup). */
 function ArcCard({
   arc,
   onHover,
   onLeave,
+  onClick,
   isActive,
 }: {
   arc: Arc;
   onHover: () => void;
   onLeave: () => void;
+  onClick: () => void;
   isActive: boolean;
 }) {
   return (
-    <div
+    <button
+      type="button"
       className={`v2-arc-card${isActive ? " is-active" : ""}`}
       style={{ "--arc-color": arc.color } as React.CSSProperties}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
+      onClick={onClick}
     >
       <div className="v2-arc-card-title">{arc.title || ARC_TYPE_LABELS[arc.type]}</div>
       <div className="v2-arc-card-type">{ARC_TYPE_LABELS[arc.type].toUpperCase()}</div>
       {arc.description && (
         <div className="v2-arc-card-description">{arc.description}</div>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -10101,38 +10144,103 @@ function ArcsTab({
   const activeDraft = getActiveArcsDraft(story);
   const arcs = activeDraft?.arcs ?? [];
   const hasArcs = arcs.length > 0;
-  const episodeCount = getActiveEpisodesDraft(story)?.episodes.length ?? 0;
+  // Episode count for the graph X-axis + popup score row. Reads
+  // concept.settings.episodeCount first, falls back to actual
+  // episodes count, then a 7-episode placeholder.
+  const episodeCount = getEpisodeCountForArcs(story);
 
   const [highlightedArcId, setHighlightedArcId] = useState<string | null>(null);
 
-  // Add-Arch popup state. Both add CTAs route through this. Type is
-  // forced to main-plot for the first arc; otherwise the user picks.
+  // Popup state. Drives both "add new" and "edit existing." When
+  // `editingArcId` is set, the popup is in edit mode and Save
+  // patches that arc; when null, Add Arch creates a new one.
   const [promptOpen, setPromptOpen] = useState(false);
+  const [editingArcId, setEditingArcId] = useState<string | null>(null);
   const [promptType, setPromptType] = useState<ArcType>("main-plot");
   const [promptTitle, setPromptTitle] = useState("");
   const [promptDescription, setPromptDescription] = useState("");
+  // One score per episode, 1-10. Defaults to a gentle 3→8 climb on
+  // first open; restored to the existing arc's scores in edit mode.
+  const [promptScores, setPromptScores] = useState<number[]>([]);
+
+  function defaultScores(n: number): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      out.push(Math.round(3 + t * 5));
+    }
+    return out;
+  }
 
   function openAddArcPrompt() {
-    // First arc: locked to Main Plot per spec. Otherwise default to
-    // Character (the next-most-common starting point).
     const defaultType: ArcType = arcs.length === 0 ? "main-plot" : "character";
+    setEditingArcId(null);
     setPromptType(defaultType);
     setPromptTitle("");
     setPromptDescription("");
+    setPromptScores(defaultScores(episodeCount));
     setPromptOpen(true);
   }
 
-  function confirmAddArc() {
+  function openEditArcPrompt(arc: Arc) {
+    setEditingArcId(arc.id);
+    setPromptType(arc.type);
+    setPromptTitle(arc.title);
+    setPromptDescription(arc.description);
+    // Pad/trim the arc's stored scores to match the current
+    // episode count so the popup always shows one input per slot.
+    const scores = [...arc.scores];
+    while (scores.length < episodeCount) {
+      scores.push(scores[scores.length - 1] ?? 5);
+    }
+    setPromptScores(scores.slice(0, episodeCount));
+    setPromptOpen(true);
+  }
+
+  function confirmPrompt() {
     const title = promptTitle.trim();
     const description = promptDescription.trim();
     setPromptOpen(false);
-    setStory(s => addArcToActiveDraft(s, {
-      type: promptType,
-      title,
-      description,
-    }));
+    if (editingArcId) {
+      // Edit mode — patch the existing arc.
+      const id = editingArcId;
+      setStory(s => updateArcInActiveDraft(s, id, {
+        type: promptType,
+        title,
+        description,
+        scores: promptScores,
+      }));
+    } else {
+      // Create mode — append a new arc with the user's scores.
+      setStory(s => addArcToActiveDraft(s, {
+        type: promptType,
+        title,
+        description,
+        scores: promptScores,
+      }));
+    }
+    setEditingArcId(null);
     setPromptTitle("");
     setPromptDescription("");
+    setPromptScores([]);
+  }
+
+  function handleDeleteArc() {
+    if (!editingArcId) return;
+    const id = editingArcId;
+    setPromptOpen(false);
+    setEditingArcId(null);
+    setStory(s => deleteArcFromActiveDraft(s, id));
+  }
+
+  function setScoreAt(index: number, value: number) {
+    const clamped = Math.max(1, Math.min(10, Math.round(value)));
+    setPromptScores(prev => {
+      const next = [...prev];
+      while (next.length <= index) next.push(5);
+      next[index] = clamped;
+      return next;
+    });
   }
 
   return (
@@ -10218,6 +10326,7 @@ function ArcsTab({
                 arc={arc}
                 onHover={() => setHighlightedArcId(arc.id)}
                 onLeave={() => setHighlightedArcId(null)}
+                onClick={() => openEditArcPrompt(arc)}
                 isActive={highlightedArcId === arc.id}
               />
             ))}
@@ -10232,93 +10341,141 @@ function ArcsTab({
         </div>
       )}
 
-      {/* Add-Arch popup. Mirrors the Add-Episode popup. Forces type
-          to Main Plot on the first arc; otherwise the type dropdown
-          shows every value of ARC_TYPES. */}
-      {promptOpen && (
-        <div
-          className="v2-direction-prompt-scrim"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="v2-arc-prompt-title"
-          onClick={() => setPromptOpen(false)}
-        >
+      {/* Arc popup — drives BOTH the Add Arch and Edit Arch flows.
+          editingArcId !== null → edit mode (Save / Delete); else
+          create mode (Add Arch). Forces type=main-plot for the
+          first arc (per spec) regardless of mode. Includes a
+          per-episode score row so the user defines the curve's
+          intensity at each episode at create time. */}
+      {promptOpen && (() => {
+        const isEditMode = editingArcId !== null;
+        const isFirstAndCreating = !isEditMode && arcs.length === 0;
+        return (
           <div
-            className="v2-direction-prompt-card"
-            onClick={e => e.stopPropagation()}
+            className="v2-direction-prompt-scrim"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="v2-arc-prompt-title"
+            onClick={() => setPromptOpen(false)}
           >
-            <h2
-              id="v2-arc-prompt-title"
-              className="v2-direction-prompt-title ds-type-empty-header"
+            <div
+              className="v2-direction-prompt-card v2-arc-prompt-card"
+              onClick={e => e.stopPropagation()}
             >
-              {arcs.length === 0 ? "Add the Main Plot Arch" : "Add an Arch"}
-            </h2>
-            <p className="v2-direction-prompt-caption ds-type-body">
-              {arcs.length === 0
-                ? "Every season starts with the central external story — the spine that drives the plot. We'll add it as your Main Plot Arch."
-                : "Pick the type of arc, give it a title, and write a one-sentence description of its shape across the season."}
-            </p>
-            {arcs.length > 0 && (
+              <h2
+                id="v2-arc-prompt-title"
+                className="v2-direction-prompt-title ds-type-empty-header"
+              >
+                {isEditMode
+                  ? "Edit Arch"
+                  : isFirstAndCreating ? "Add the Main Plot Arch" : "Add an Arch"}
+              </h2>
+              <p className="v2-direction-prompt-caption ds-type-body">
+                {isFirstAndCreating
+                  ? "Every season starts with the central external story — the spine that drives the plot. We'll add it as your Main Plot Arch."
+                  : "Pick the type, write a one-sentence description, then score the arc's intensity at each episode (1 = order, 10 = chaos)."}
+              </p>
+              {!isFirstAndCreating && (
+                <label className="v2-direction-prompt-field">
+                  <span className="v2-direction-prompt-field-label">Type</span>
+                  <select
+                    className="v2-direction-prompt-textarea"
+                    value={promptType}
+                    onChange={e => setPromptType(e.target.value as ArcType)}
+                    style={{ height: 44, padding: "0 12px" }}
+                    disabled={isEditMode && promptType === "main-plot"}
+                  >
+                    {(isEditMode && promptType === "main-plot"
+                      ? ARC_TYPES
+                      : ARC_TYPES.filter(t => t !== "main-plot")
+                    ).map(t => (
+                      <option key={t} value={t}>{ARC_TYPE_LABELS[t]}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label className="v2-direction-prompt-field">
-                <span className="v2-direction-prompt-field-label">Type</span>
-                <select
+                <span className="v2-direction-prompt-field-label">Title</span>
+                <input
+                  type="text"
                   className="v2-direction-prompt-textarea"
-                  value={promptType}
-                  onChange={e => setPromptType(e.target.value as ArcType)}
+                  value={promptTitle}
+                  onChange={e => setPromptTitle(e.target.value)}
+                  placeholder={
+                    isFirstAndCreating
+                      ? "e.g. The Meth Business"
+                      : "e.g. Walt's Descent"
+                  }
                   style={{ height: 44, padding: "0 12px" }}
-                >
-                  {ARC_TYPES.filter(t => t !== "main-plot").map(t => (
-                    <option key={t} value={t}>{ARC_TYPE_LABELS[t]}</option>
-                  ))}
-                </select>
+                />
               </label>
-            )}
-            <label className="v2-direction-prompt-field">
-              <span className="v2-direction-prompt-field-label">Title</span>
-              <input
-                type="text"
-                className="v2-direction-prompt-textarea"
-                value={promptTitle}
-                onChange={e => setPromptTitle(e.target.value)}
-                placeholder={
-                  arcs.length === 0
-                    ? "e.g. The Meth Business"
-                    : "e.g. Walt's Descent"
-                }
-                style={{ height: 44, padding: "0 12px" }}
-              />
-            </label>
-            <label className="v2-direction-prompt-field">
-              <span className="v2-direction-prompt-field-label">
-                One-sentence description
-              </span>
-              <textarea
-                className="v2-direction-prompt-textarea"
-                value={promptDescription}
-                onChange={e => setPromptDescription(e.target.value)}
-                placeholder="e.g. A dying, powerless teacher begins using crime to feel in control."
-                rows={3}
-              />
-            </label>
-            <div className="v2-direction-prompt-actions">
-              <button
-                type="button"
-                className="v2-direction-prompt-cancel"
-                onClick={() => setPromptOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="v2-direction-prompt-confirm"
-                onClick={confirmAddArc}
-              >
-                Add Arch
-              </button>
+              <label className="v2-direction-prompt-field">
+                <span className="v2-direction-prompt-field-label">
+                  One-sentence description
+                </span>
+                <textarea
+                  className="v2-direction-prompt-textarea"
+                  value={promptDescription}
+                  onChange={e => setPromptDescription(e.target.value)}
+                  placeholder="e.g. A dying, powerless teacher begins using crime to feel in control."
+                  rows={3}
+                />
+              </label>
+              {/* Score row — one number input per episode. 1=order,
+                  10=chaos. Wraps when there are many episodes. */}
+              <div className="v2-direction-prompt-field">
+                <span className="v2-direction-prompt-field-label">
+                  Episode intensity (1 = order, 10 = chaos)
+                </span>
+                <div className="v2-arc-prompt-scores">
+                  {Array.from({ length: episodeCount }, (_, i) => (
+                    <div key={i} className="v2-arc-prompt-score-cell">
+                      <label className="v2-arc-prompt-score-label">EP{i + 1}</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={10}
+                        value={promptScores[i] ?? 5}
+                        onChange={e => {
+                          const v = parseInt(e.target.value, 10);
+                          if (Number.isFinite(v)) setScoreAt(i, v);
+                        }}
+                        className="v2-arc-prompt-score-input"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="v2-direction-prompt-actions">
+                {isEditMode && promptType !== "main-plot" && (
+                  <button
+                    type="button"
+                    className="v2-arc-prompt-delete"
+                    onClick={handleDeleteArc}
+                    style={{ marginRight: "auto" }}
+                  >
+                    Delete Arch
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="v2-direction-prompt-cancel"
+                  onClick={() => setPromptOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="v2-direction-prompt-confirm"
+                  onClick={confirmPrompt}
+                >
+                  {isEditMode ? "Save" : "Add Arch"}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 }

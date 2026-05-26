@@ -51,6 +51,12 @@ export interface StorySettings {
    *  a 12-minute / ~9-scene path. UI hides this row for non-short
    *  formats; stored values survive a temporary format swap. */
   duration?: number;
+  /** For projectType === "tv-show" only. Number of episodes planned
+   *  for the season. Drives the X-axis length of the Arcs timeline
+   *  graph (one score per episode on every arc) AND, eventually, the
+   *  AI's season-planning prompts. Clamped 1–30 by the normalizer;
+   *  `undefined` = unset → arcs fall back to 7-episode defaults. */
+  episodeCount?: number;
   /** For projectType === "short" only. Which kind of short the user
    *  is making — drives the beat-skeleton flavor the model produces.
    *  `null` = unset → prompts fall back to a generic Situation →
@@ -714,23 +720,41 @@ export function updateArcsDraft(story: Story, patch: Partial<ArcsLayerDraft>): S
   };
 }
 
+/** Returns the canonical episode count for the Arcs tab — the
+ *  number of slots on the X-axis of the timeline graph and the
+ *  length of every arc's `scores` array. Priority order:
+ *    1. concept.settings.episodeCount (user-specified)
+ *    2. getActiveEpisodesDraft length (actual episodes created)
+ *    3. 7 (default placeholder so the graph isn't empty)
+ *  TV-only — callers should generally only invoke this when
+ *  projectType === "tv-show". */
+export function getEpisodeCountForArcs(story: Story): number {
+  const fromConcept = getActiveConceptDraft(story)?.settings?.episodeCount;
+  if (typeof fromConcept === "number" && fromConcept >= 1) return fromConcept;
+  const fromEpisodes = getActiveEpisodesDraft(story)?.episodes.length ?? 0;
+  if (fromEpisodes >= 1) return fromEpisodes;
+  return 7;
+}
+
 /** Add an Arc to the active arcs draft. The first arc on the
  *  project (active draft has zero arcs) is forced to `main-plot`
  *  regardless of what the caller passed — per spec ("the first arc
  *  will be defaulted as it is the main story arch"). Otherwise the
  *  caller's `type` is honored. Color is auto-assigned from
  *  ARC_COLORS based on the index of the new arc, cycling when we
- *  run out. */
+ *  run out. Optional `scores` override — when present, replaces
+ *  the default 3→8 gentle climb (used by the popup's per-episode
+ *  score inputs). */
 export function addArcToActiveDraft(
   story: Story,
-  input: { type: ArcType; title?: string; description?: string },
+  input: { type: ArcType; title?: string; description?: string; scores?: number[] },
 ): Story {
   const active = getActiveArcsDraft(story);
   if (!active) return story;
   const isFirst = active.arcs.length === 0;
   const type: ArcType = isFirst ? "main-plot" : input.type;
   const color = ARC_COLORS[active.arcs.length % ARC_COLORS.length];
-  const episodeCount = getActiveEpisodesDraft(story)?.episodes.length ?? 0;
+  const episodeCount = getEpisodeCountForArcs(story);
   const id = `arc_${Math.random().toString(36).slice(2, 10)}`;
   const arc = emptyArc({
     id,
@@ -740,7 +764,67 @@ export function addArcToActiveDraft(
     color,
     episodeCount,
   });
+  if (input.scores && input.scores.length > 0) {
+    arc.scores = input.scores
+      .slice(0, episodeCount)
+      .map(s => Math.max(1, Math.min(10, Math.round(s))));
+    while (arc.scores.length < episodeCount) arc.scores.push(5);
+  }
   return updateArcsDraft(story, { arcs: [...active.arcs, arc] });
+}
+
+/** Patch a specific arc inside the active arcs draft. Used by
+ *  the Arc edit popup. Caller passes `arcId` + a partial Arc;
+ *  matched-by-id arcs are merged with the patch, scores are
+ *  clamped 1–10 if present. */
+export function updateArcInActiveDraft(
+  story: Story,
+  arcId: string,
+  patch: Partial<Pick<Arc, "type" | "title" | "description" | "color" | "scores">>,
+): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  return updateArcsDraft(story, {
+    arcs: active.arcs.map(a => {
+      if (a.id !== arcId) return a;
+      const next: Arc = { ...a, ...patch };
+      if (patch.scores) {
+        next.scores = patch.scores.map(s => Math.max(1, Math.min(10, Math.round(s))));
+      }
+      return next;
+    }),
+  });
+}
+
+/** Remove a specific arc from the active arcs draft. */
+export function deleteArcFromActiveDraft(story: Story, arcId: string): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  return updateArcsDraft(story, {
+    arcs: active.arcs.filter(a => a.id !== arcId),
+  });
+}
+
+/** Pad or trim every arc's `scores` array in the active draft to
+ *  the given length. Called when the user changes episodeCount on
+ *  the Concept tab — keeps each arc's curve continuous across the
+ *  new axis (last-value padding when extending; trim from the end
+ *  when shortening). */
+export function normalizeArcScoresToCount(story: Story, n: number): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active || active.arcs.length === 0) return story;
+  return updateArcsDraft(story, {
+    arcs: active.arcs.map(a => {
+      const scores = [...a.scores];
+      if (scores.length === n) return a;
+      if (scores.length > n) return { ...a, scores: scores.slice(0, n) };
+      // Pad with the last value (or 5 if empty) so the curve extends
+      // flat into the new episodes rather than collapsing to 1.
+      const padValue = scores[scores.length - 1] ?? 5;
+      while (scores.length < n) scores.push(padValue);
+      return { ...a, scores };
+    }),
+  });
 }
 
 export function emptyScriptDraft(id: string, number: number, ts: string): ScriptLayerDraft {
