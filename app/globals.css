@@ -13369,6 +13369,23 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
   html[data-design="v2"] .v2-arc-graph-curve-node {
     opacity: 0.95;
+    /* Draggable — pull the dot up/down to reshape the curve. */
+    cursor: ns-resize;
+    /* Subtle hover grow so the affordance reads. The radius itself
+       is set in JSX (r=6) so the SVG layout is stable; here we
+       only animate scale via stroke for the visual pop. */
+    transition: r 120ms var(--ease, ease), opacity 120ms var(--ease, ease);
+  }
+  html[data-design="v2"] .v2-arc-graph-curve-node:hover {
+    opacity: 1;
+  }
+  /* Touch & precision: enlarge the hit area without enlarging the
+     painted disc by giving the circle a transparent outline that
+     still receives pointer events (SVG circles hit on the entire
+     fill+stroke region). */
+  html[data-design="v2"] .v2-arc-graph-curve-node {
+    stroke: transparent;
+    stroke-width: 10;
   }
 
   /* Arc-prompt type row — chip wraps for the 19 non-main-plot

@@ -10237,6 +10237,7 @@ function ArcGraph({
   episodeCount,
   highlightedArcId,
   onHoverArc,
+  onScoreCommit,
 }: {
   arcs: Arc[];
   episodeCount: number;
@@ -10246,6 +10247,9 @@ function ArcGraph({
    *  the cards already wire into setHighlightedArcId. `null` =
    *  pointer left the curve. */
   onHoverArc: (id: string | null) => void;
+  /** Fired on pointer-up at the end of a node drag. Parent commits
+   *  the new score (1–10) to the active arcs draft. */
+  onScoreCommit: (arcId: string, index: number, score: number) => void;
 }) {
   // Display fallback: when no episodes exist yet, use a placeholder
   // 7-episode axis so the chart isn't empty. The defaultArc shape
@@ -10265,8 +10269,80 @@ function ArcGraph({
   // Y for a given score (1..10). Score 1 maps to the BOTTOM (order),
   // score 10 maps to the TOP (chaos). Linear in between.
   const y = (s: number) => padT + plotH - ((Math.max(1, Math.min(10, s)) - 1) / 9) * plotH;
+
+  // ── Drag-to-edit: pull intensity nodes up / down to reshape ──────
+  // Drag state is local — only the parent learns about the new score
+  // on pointer-up (via `onScoreCommit`), so the store doesn't churn
+  // for every pixel of movement. While dragging we render an override
+  // for the dragging arc + index so the curve re-flows live with the
+  // cursor.
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [drag, setDrag] = useState<{ arcId: string; index: number; score: number } | null>(null);
+
+  function scoreFromClientY(clientY: number): number {
+    const svg = svgRef.current;
+    if (!svg) return 5;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return 5;
+    const pt = svg.createSVGPoint();
+    pt.x = 0;
+    pt.y = clientY;
+    const local = pt.matrixTransform(ctm.inverse());
+    // Invert y(s): solve s from `y = padT + plotH - ((s-1)/9) * plotH`.
+    const raw = 1 + ((padT + plotH - local.y) / plotH) * 9;
+    return Math.max(1, Math.min(10, Math.round(raw)));
+  }
+
+  function onNodePointerDown(
+    e: React.PointerEvent<SVGCircleElement>,
+    arcId: string,
+    index: number,
+    currentScore: number,
+  ) {
+    e.preventDefault();
+    e.stopPropagation();
+    // Capture so the cursor stays "owned" by this node even when the
+    // user drags off it — pointermove + pointerup keep firing here.
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    setDrag({ arcId, index, score: currentScore });
+    // Lock the highlight on the dragging arc so neighbor curves don't
+    // steal focus when the cursor crosses them mid-drag.
+    onHoverArc(arcId);
+  }
+
+  function onNodePointerMove(e: React.PointerEvent<SVGCircleElement>) {
+    if (!drag) return;
+    const next = scoreFromClientY(e.clientY);
+    if (next !== drag.score) {
+      setDrag({ ...drag, score: next });
+    }
+  }
+
+  function onNodePointerUp(e: React.PointerEvent<SVGCircleElement>) {
+    if (!drag) return;
+    try { (e.currentTarget as Element).releasePointerCapture(e.pointerId); } catch {}
+    onScoreCommit(drag.arcId, drag.index, drag.score);
+    setDrag(null);
+  }
+
+  // Apply drag override when computing points / curve for the
+  // currently-dragging arc so the curve animates with the cursor.
+  const effectiveScores = (arc: Arc): number[] => {
+    if (!drag || drag.arcId !== arc.id) return arc.scores;
+    const copy = [...arc.scores];
+    while (copy.length <= drag.index) copy.push(5);
+    copy[drag.index] = drag.score;
+    return copy;
+  };
+
+  // While dragging, force the dragging arc to be "active" and freeze
+  // all hover toggles so an accidental cursor wander to a sibling
+  // curve doesn't yank the highlight away.
+  const effectiveHighlight = drag ? drag.arcId : highlightedArcId;
+
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
       className="v2-arc-graph-svg"
       preserveAspectRatio="xMidYMid meet"
@@ -10330,7 +10406,8 @@ function ArcGraph({
           line. They still appear in the cards column and inside the
           character popup's arcs section, just not on the graph. */}
       {arcs.filter(a => a.type !== "character" || a.intensitySet === true).map(arc => {
-        const points = arc.scores.slice(0, n).map((s, i) => ({ x: x(i), y: y(s) }));
+        const scoresForRender = effectiveScores(arc);
+        const points = scoresForRender.slice(0, n).map((s, i) => ({ x: x(i), y: y(s) }));
         // If the arc has fewer scores than episodes, extend the last
         // value horizontally (flat) for the remaining episodes so
         // every curve spans the full axis.
@@ -10339,14 +10416,18 @@ function ArcGraph({
           points.push({ x: x(points.length), y: last.y });
         }
         const d = catmullRomPath(points, 0);
-        const isFaded = highlightedArcId !== null && highlightedArcId !== arc.id;
-        const isActive = highlightedArcId === arc.id;
+        const isFaded = effectiveHighlight !== null && effectiveHighlight !== arc.id;
+        const isActive = effectiveHighlight === arc.id;
         return (
           <g
             key={arc.id}
             className={`v2-arc-graph-curve${isFaded ? " is-faded" : ""}${isActive ? " is-active" : ""}`}
-            onMouseEnter={() => onHoverArc(arc.id)}
-            onMouseLeave={() => onHoverArc(null)}
+            // Freeze hover toggles while a drag is in flight so the
+            // cursor straying onto a neighbor curve (or off this
+            // curve to where the node has been dragged) doesn't yank
+            // the highlight away.
+            onMouseEnter={() => { if (!drag) onHoverArc(arc.id); }}
+            onMouseLeave={() => { if (!drag) onHoverArc(null); }}
           >
             {/* Invisible thick hit path — the visible 2-3px curve
                 is too thin to hover precisely, so a 16px transparent
@@ -10366,9 +10447,13 @@ function ArcGraph({
             {isActive && points.map((p, i) => (
               <circle
                 key={i}
-                cx={p.x} cy={p.y} r={4}
+                cx={p.x} cy={p.y} r={6}
                 fill={arc.color}
                 className="v2-arc-graph-curve-node"
+                onPointerDown={e => onNodePointerDown(e, arc.id, i, scoresForRender[i] ?? 5)}
+                onPointerMove={onNodePointerMove}
+                onPointerUp={onNodePointerUp}
+                onPointerCancel={onNodePointerUp}
               />
             ))}
           </g>
@@ -10661,6 +10746,28 @@ function ArcsTab({
               episodeCount={episodeCount}
               highlightedArcId={highlightedArcId}
               onHoverArc={setHighlightedArcId}
+              onScoreCommit={(arcId, index, score) => {
+                setStory(s => {
+                  const active = getActiveArcsDraft(s);
+                  if (!active) return s;
+                  const arc = active.arcs.find(a => a.id === arcId);
+                  if (!arc) return s;
+                  // Patch the one slot the user dragged. We rebuild
+                  // the full scores array to preserve every other
+                  // value (and any preserved tail beyond episodeCount
+                  // from the non-destructive shrink behavior).
+                  const nextScores = [...arc.scores];
+                  while (nextScores.length <= index) nextScores.push(5);
+                  nextScores[index] = score;
+                  // Drag implies the user is committing to a curve —
+                  // if this is a character arc that hadn't yet been
+                  // flagged for the graph, keep it visible after release.
+                  return updateArcInActiveDraft(s, arcId, {
+                    scores: nextScores,
+                    intensitySet: true,
+                  });
+                });
+              }}
             />
           </div>
         </div>
