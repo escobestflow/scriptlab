@@ -10410,6 +10410,11 @@ function ArcGraph({
 
   function onCurvePointerMove(e: React.PointerEvent, arcId: string) {
     if (drag) return; // mid-node-drag: hide the "add moment" affordance
+    // Desktop-only affordance — touch input doesn't have a stable hover
+    // state, and on phones/tablets the tooltip would flash during taps
+    // and drags. The Arcs-tab graph still accepts taps on the curve to
+    // add a moment; this just gates the visual hint.
+    if (e.pointerType !== "mouse") return;
     const wrap = wrapRef.current;
     if (!wrap) return;
     const r = wrap.getBoundingClientRect();
@@ -10580,7 +10585,25 @@ function ArcGraph({
                 fill={arc.color}
                 className="v2-arc-graph-curve-node"
                 onPointerDown={e => onNodePointerDown(e, arc.id, i, scoresForRender[i] ?? 5)}
-                onPointerMove={onNodePointerMove}
+                onPointerMove={e => {
+                  // Drag tracking — only meaningful when a drag is in flight.
+                  onNodePointerMove(e);
+                  // Tooltip cursor — the node sits on top of the curve hit
+                  // path in z-order and consumes pointer events that would
+                  // otherwise reach the hit path. Forward the move to the
+                  // same tooltip handler so "+ Add moment" stays glued to
+                  // the cursor while hovering directly over an intensity
+                  // dot. (No-op when mid-drag — the handler returns early.)
+                  onCurvePointerMove(e, arc.id);
+                }}
+                onPointerLeave={() => {
+                  // Mirror: clearing tooltip when the cursor leaves the
+                  // dot. If the cursor crosses straight back onto the
+                  // hit path, the path's own move handler re-arms it
+                  // within the next frame, so the user sees continuous
+                  // tooltip rather than a flicker.
+                  if (!drag) onCurvePointerLeave();
+                }}
                 onPointerUp={onNodePointerUp}
                 onPointerCancel={onNodePointerUp}
               />
