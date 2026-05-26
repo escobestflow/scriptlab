@@ -416,6 +416,36 @@ export const ARC_TYPES = [
 
 export type ArcType = typeof ARC_TYPES[number];
 
+/** Per-type prompt modifier used by `digestArcsForEpisode`. Each
+ *  arc type maps to a single imperative the AI receives when that arc
+ *  is "active" (intensity ≥ 4) in a given episode. The phrasing is
+ *  deliberately direct — these are instructions, not vibes — so the
+ *  model can act on them in the generated beats / scenes. Character-
+ *  arc modifiers leave a `{character}` token the digest fills in with
+ *  the linked character's name. */
+export const ARC_TYPE_MODIFIERS: Record<ArcType, string> = {
+  "main-plot":      "Drive the central season plot forward this episode.",
+  "character":      "Give {character} significant screen time and a transformation beat consistent with this arc's description.",
+  "relationship":   "A scene between the named characters should measurably shift their dynamic.",
+  "subplot":        "Include a B-story beat that doesn't crowd the main plot.",
+  "secrecy":        "A character is hiding something — show concealment, near-misses, or strain (not exposition).",
+  "investigation":  "A character actively digs into the open question — show methodology, not just exposition.",
+  "mystery-reveal": "A clue or reveal must occur — the audience should learn something new.",
+  "antagonist":     "The antagonist's plan visibly advances this episode.",
+  "world":          "Reveal new texture about the setting — institution, rule, place, history.",
+  "theme":          "The thematic question shows up in at least one scene's dialogue, action, or visual contrast.",
+  "power":          "Power between parties shifts — show who decides and who waits.",
+  "moral-descent":  "A character makes a choice they wouldn't have made earlier in the season.",
+  "redemption":     "A character earns back a sliver of trust or self-respect.",
+  "rise":           "A character's status (resources, reputation, control) measurably rises.",
+  "fall":           "A character's status (resources, reputation, control) measurably falls.",
+  "survival":       "Stakes are physical and immediate — the character's continued existence is in play.",
+  "revenge":        "The avenging character pursues their target — show a step forward or a step back.",
+  "love-romance":   "A scene foregrounds romantic tension or resolution between the named characters.",
+  "family":         "Family dynamics (loyalty, obligation, grievance) drive at least one beat.",
+  "identity":       "A character confronts a piece of who they are — revelation, denial, or reframing.",
+};
+
 /** Human-facing label for each arc type. Mirrors the user-spec'd
  *  copy. Used by both the arc-card type chip and the Add Arc type
  *  picker. */
@@ -954,6 +984,146 @@ export function deleteMomentFromArc(
         : a,
     ),
   });
+}
+
+// ── Per-episode arc digest (the prompt-builder bridge) ──────────────
+//
+// Compresses the season-wide arcs pool into "what matters for THIS one
+// episode" so AI prompts get a tight, actionable instruction set
+// instead of the raw 20-arc-by-N-episode score matrix. Used by
+// contextBuilder.ts → storyBible / tvEpisodeContext / generate_episode.
+//
+// Filtering rules (mitigations from the planning doc):
+//   - Risk 1 (prompt bloat): drop arcs with intensity < 4, cap at 8.
+//   - Issue 11 (position rounding): a moment lives in EP N if
+//     `Math.floor(position) === N - 1` (0-indexed). 2.5 → EP3.
+//   - Issue 12 (character arc w/o characterId): the per-type modifier
+//     falls back to a generic phrasing instead of "{character}".
+//
+// Pure function — no setStory, no side effects, safe to call inside
+// any prompt builder.
+
+/** A single arc surfaced for an episode, with its intensity tier
+ *  and the imperative the prompt should include. */
+export interface EpisodeArcEntry {
+  arc: Arc;
+  intensity: number;
+  tier: "dominant" | "active";
+  /** Resolved character name for character-type arcs. `null` when the
+   *  arc is character-type but `characterId` doesn't resolve in the
+   *  active characters draft. */
+  characterName: string | null;
+  /** Per-type modifier with `{character}` already substituted. */
+  modifier: string;
+}
+
+/** Hard moments (turning-point markers) that anchor to this episode. */
+export interface EpisodeArcHardMoment {
+  arc: Arc;
+  moment: ArcMoment;
+  /** Final display text — `moment.text` if inline, otherwise the
+   *  linked Moment's text, with an empty-fallback for safety. */
+  text: string;
+}
+
+export interface EpisodeArcDigest {
+  /** Active arcs at this episode (intensity ≥ 4), capped at 8, sorted
+   *  by intensity DESC so the dominant ones land first in the prompt. */
+  activeArcs: EpisodeArcEntry[];
+  /** Arc moments that floor to this episode index. */
+  hardMoments: EpisodeArcHardMoment[];
+  /** Flag for Risk 2 — too many concurrent peaks. True when more than
+   *  8 arcs have intensity ≥ 6 at this episode (caller can decide
+   *  whether to warn the user). */
+  overloaded: boolean;
+}
+
+/** Compute the per-episode arc digest. `userMoments` is the user-wide
+ *  Moments pool (from `loadMomentsFromDB`) — used to resolve a hard
+ *  moment that was linked to a saved Idea instead of inline text.
+ *  Pass `[]` when the caller doesn't have the pool handy; inline-text
+ *  moments still work fine. */
+export function digestArcsForEpisode(
+  story: Story,
+  userMoments: Array<{ id: string; text: string }>,
+  episodeIndex: number,
+): EpisodeArcDigest {
+  const active = getActiveArcsDraft(story);
+  if (!active || active.arcs.length === 0) {
+    return { activeArcs: [], hardMoments: [], overloaded: false };
+  }
+  const chars = getActiveCharactersDraft(story).characters;
+  const momentById = new Map(userMoments.map(m => [m.id, m]));
+
+  const candidates: EpisodeArcEntry[] = [];
+  for (const arc of active.arcs) {
+    // Score lookup — empty / short scores arrays default to 0 so the
+    // arc gets filtered out (no noise from un-edited arcs).
+    const raw = arc.scores[episodeIndex];
+    const intensity = typeof raw === "number" ? raw : 0;
+    // Character arcs need `intensitySet` true to even enter the pool —
+    // matches the graph filter so we don't talk about a curve that
+    // isn't visible.
+    if (arc.type === "character" && arc.intensitySet !== true) continue;
+    if (intensity < 4) continue;
+    const tier: EpisodeArcEntry["tier"] = intensity >= 8 ? "dominant" : "active";
+    const linked = arc.characterId
+      ? chars.find(c => c.id === arc.characterId)
+      : undefined;
+    const characterName = linked?.name?.trim() || null;
+    const rawModifier = ARC_TYPE_MODIFIERS[arc.type];
+    const modifier = characterName
+      ? rawModifier.replace("{character}", characterName)
+      : rawModifier.replace("{character}", "the relevant character");
+    candidates.push({ arc, intensity, tier, characterName, modifier });
+  }
+  // Sort by intensity DESC then by arc.type for deterministic output
+  // (so the same digest produces the same prompt across calls).
+  candidates.sort((a, b) => (b.intensity - a.intensity) || a.arc.type.localeCompare(b.arc.type));
+
+  // Risk 2: flag overload BEFORE truncating so the count reflects the
+  // writer's actual plan, not the prompt's view.
+  const overloaded = candidates.filter(c => c.intensity >= 6).length > 8;
+  const activeArcs = candidates.slice(0, 8);
+
+  // Hard moments — anchor to floor(position) === episodeIndex.
+  const hardMoments: EpisodeArcHardMoment[] = [];
+  for (const arc of active.arcs) {
+    for (const moment of arc.moments ?? []) {
+      if (Math.floor(moment.position) !== episodeIndex) continue;
+      const inline = moment.text.trim();
+      const linkedText = moment.momentId ? momentById.get(moment.momentId)?.text?.trim() : "";
+      const text = inline || linkedText || "(empty moment)";
+      hardMoments.push({ arc, moment, text });
+    }
+  }
+  return { activeArcs, hardMoments, overloaded };
+}
+
+/** Format an `EpisodeArcDigest` into the markdown block embedded in
+ *  episode-scoped prompts. Returns "" when the digest is empty so
+ *  callers can append unconditionally. */
+export function formatArcDigest(d: EpisodeArcDigest): string {
+  if (d.activeArcs.length === 0 && d.hardMoments.length === 0) return "";
+  const lines: string[] = ["\n## Active arcs this episode (HIGH PRIORITY)"];
+  if (d.activeArcs.length === 0) {
+    lines.push("(none above the threshold for this episode)");
+  } else {
+    for (const a of d.activeArcs) {
+      const tier = a.tier === "dominant" ? "DOMINANT" : "active";
+      const title = a.arc.title?.trim() || ARC_TYPE_LABELS[a.arc.type];
+      const desc = a.arc.description?.trim();
+      lines.push(`- [${tier}, intensity ${a.intensity}/10] **${title}** — ${a.modifier}${desc ? ` (Arc note: "${desc}")` : ""}`);
+    }
+  }
+  if (d.hardMoments.length > 0) {
+    lines.push("\n## Hard moments anchored to this episode (MUST land in the beats/scenes you write)");
+    for (const m of d.hardMoments) {
+      const arcTitle = m.arc.title?.trim() || ARC_TYPE_LABELS[m.arc.type];
+      lines.push(`- [${arcTitle}] ${m.text}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 /** Pad or trim every arc's `scores` array in the active draft to

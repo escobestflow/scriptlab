@@ -10,7 +10,15 @@
 // This means iterative edits inside a session reuse ~90% of input tokens
 // at 10% price. Without this pattern, heavy usage is uneconomical.
 
-import { Story, Scene, Character, Snippet, EpisodeArchetype, getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, getActiveEpisodesDraft } from "./story";
+import {
+  Story, Scene, Character, Snippet, EpisodeArchetype,
+  getActiveConceptDraft, getActiveCharactersDraft, getActiveStoryLayerDraft, getActiveScriptDraft, getActiveEpisodesDraft,
+  // Arc wiring (Phase 2): season arcs flow into the bible + per-episode
+  // prompts as instructions, not just storage. The digest collapses the
+  // 20-arc-by-N-episode score matrix into "what matters for THIS ep."
+  getActiveArcsDraft, getEpisodeCountForArcs, digestArcsForEpisode, formatArcDigest,
+  ARC_TYPE_LABELS,
+} from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
 import { WriterProfile, renderProfileForPrompt, isProfileMeaningful } from "./writerProfile";
 
@@ -85,6 +93,67 @@ function renderBeatLines(
     .join("\n");
 }
 
+/** Render the TV "Season arcs" block embedded in the bible. Lists
+ *  every arc (any tier) with its type, title, description, and
+ *  per-episode intensity strip so the model has the full season-
+ *  shaped plan, not just the current episode's slice. Per-episode
+ *  digesting happens in `tvEpisodeContext`; this is the structural
+ *  catalog the digest references.
+ *
+ *  Returns "" for non-TV or projects with no arcs draft yet — caller
+ *  appends unconditionally. */
+function renderSeasonArcs(story: Story): string {
+  if (story.projectType !== "tv-show") return "";
+  const active = getActiveArcsDraft(story);
+  if (!active || active.arcs.length === 0) return "";
+  const characters = getActiveCharactersDraft(story).characters;
+  const episodeCount = getEpisodeCountForArcs(story);
+  // Character arcs that haven't had intensity set yet are intentionally
+  // OMITTED from the bible — they're still scaffolds in the writer's
+  // head, not commitments. Matches the ArcGraph filter so the bible's
+  // view of the season agrees with what the user sees on the canvas.
+  const arcs = active.arcs.filter(a => a.type !== "character" || a.intensitySet === true);
+  if (arcs.length === 0) return "";
+  const lines: string[] = [
+    "",
+    "## Season arcs (HIGH PRIORITY — these are the writer's structural plan for the season)",
+    "Each arc carries: a TYPE (which determines the kind of beat it pushes for), a per-episode intensity 1–10 (how prominent this arc should be in that episode), and any hard moments anchored to specific episodes. When generating episode content, weight beats / scenes by the active arcs and their intensity at that episode. Hard moments are NOT optional — they must land in the episode they're anchored to.",
+    "",
+  ];
+  for (const arc of arcs) {
+    const typeLabel = ARC_TYPE_LABELS[arc.type];
+    const title = arc.title?.trim() || typeLabel;
+    const linkedChar = arc.characterId
+      ? characters.find(c => c.id === arc.characterId)
+      : undefined;
+    const charLine = linkedChar ? ` · linked character: ${linkedChar.name || "Unnamed"}` : "";
+    lines.push(`### ${title} [${typeLabel}]${charLine}`);
+    if (arc.description?.trim()) {
+      lines.push(arc.description.trim());
+    }
+    // Intensity strip — capped at the actual episode count so a project
+    // with 9 episodes and a 12-slot scores array (legacy non-destructive
+    // shrink) doesn't dump phantom episodes into the prompt.
+    const strip = arc.scores
+      .slice(0, episodeCount)
+      .map((s, i) => `EP${i + 1}:${s}`)
+      .join("  ");
+    lines.push(`Intensity by episode: ${strip}`);
+    // Moments — chronological, with display text resolved if linked.
+    const moments = [...(arc.moments ?? [])].sort((a, b) => a.position - b.position);
+    if (moments.length > 0) {
+      lines.push("Hard moments:");
+      for (const m of moments) {
+        const epLabel = `EP${Math.floor(m.position) + 1}`;
+        const txt = m.text.trim() || "(linked idea — see Ideas pool)";
+        lines.push(`  • ${epLabel}: ${txt}`);
+      }
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
 function storyBible(story: Story): string {
   const c  = getActiveConceptDraft(story);
   const ch = getActiveCharactersDraft(story);
@@ -132,7 +201,7 @@ isolation, internalize where in the arc this episode sits and pace
 accordingly.
 
 ${concept.seriesArc.trim()}
-` : ""}
+` : ""}${isTV ? renderSeasonArcs(story) : ""}
 
 ## Characters
 ${characters.map(c => {
@@ -336,6 +405,15 @@ ${compressBeats(ep.beats)}`).join("\n\n")}
 
 Use this history. Characters know what they learned in earlier episodes. Open threads (anything set up but not resolved above) should be honored, advanced, or paid off. Do NOT contradict what's been established.`;
 
+  // Per-episode arc digest — collapses the season-wide arc pool into
+  // "what matters for THIS episode" so the model gets concrete
+  // imperatives (per-type modifiers + hard moments anchored here)
+  // rather than wading through the full season catalog in the bible.
+  // The `idx` from sorted episode list is also the 0-based episode
+  // index the digest expects.
+  const arcDigest = digestArcsForEpisode(story, [], idx);
+  const arcBlock = formatArcDigest(arcDigest);
+
   return `
 
 ## Episode context (HIGH PRIORITY)
@@ -343,7 +421,7 @@ ${position}
 
 You are writing for: **Episode ${me.number}${me.title?.trim() ? ` — ${me.title.trim()}` : ""}**
 Logline (this episode): ${me.logline?.trim() || "(no logline yet — infer from the season arc and prior episodes)"}
-${archetype ? `\n${archetype}\n` : ""}${previouslyOn}`;
+${archetype ? `\n${archetype}\n` : ""}${arcBlock}${previouslyOn}`;
 }
 
 function buildAsk(story: Story, action: ActionRequest): string {
@@ -352,7 +430,22 @@ function buildAsk(story: Story, action: ActionRequest): string {
   // Compatibility shim so existing switch cases compile with minimal change:
   const d = { ...c, ...sl };
   switch (action.type) {
-    case "generate_beats":
+    case "generate_beats": {
+      const isTV = story.projectType === "tv-show";
+      const tvCtx = tvEpisodeContext(story, action.payload?.episodeId);
+      // Episode-ending rule. Universal version lives in SYSTEM_BRAIN;
+      // we reinforce here for TV-scoped beat generation because the
+      // final-beat property is the single most important quality
+      // gate for an episodic beat sheet.
+      const endingRule = isTV && tvCtx
+        ? `\n- The FINAL beat must end on narrative momentum into the next episode (see TV-specific principle in system instructions). Do not let the episode "stop" — it must hand off energy to the next one.`
+        : "";
+      // Arc-active rule. Every arc surfaced in the per-episode digest
+      // (inside tvCtx) above intensity threshold must touch at least
+      // one beat. Hard moments are non-negotiable.
+      const arcRule = isTV && tvCtx
+        ? `\n- Every active arc in the episode's "Active arcs this episode" block above must touch at least one beat — DOMINANT arcs anchor 1–2 beats, "active" arcs at least 1. Any "Hard moments" listed must land in a beat (not just be referenced).`
+        : "";
       return `Generate a complete beat sheet for this project${d.settings.framework ? ` using the ${d.settings.framework} framework` : `, choosing whichever structural framework best fits the concept, genre, and tone`}.
 
 Return STRICT JSON in this exact schema:
@@ -362,7 +455,8 @@ Rules:
 - Use every locked ingredient meaningfully.
 - Weave in at least one snippet where it fits naturally (reference by title in the purpose field).
 - Match the darkness/pace/unpredictability levels.
-- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${shortFilmGuidance(story)}${tvEpisodeContext(story, action.payload?.episodeId)}${directionBlock(story)}`;
+- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${arcRule}${endingRule}${shortFilmGuidance(story)}${tvCtx}${directionBlock(story)}`;
+    }
 
     case "swap_ingredient": {
       const id = action.payload.ingredientId;
@@ -438,9 +532,21 @@ Return STRICT JSON: { "beat": { "name": string, "summary": string, "purpose": st
           }).join("\n")}`
         : "";
 
+      // TV final-scene momentum rule. When the user generates the
+      // scene for the LAST beat of an episode, this scene IS the
+      // episode finale — and per the universal TV-momentum principle
+      // (see SYSTEM_BRAIN) it must hand off energy to the next
+      // episode. Reinforced inline so the model doesn't only see the
+      // rule at system level; the inline reminder fires exactly where
+      // it matters most.
+      const isFinalBeat = idx === d.beats.length - 1;
+      const finalSceneNote = (story.projectType === "tv-show" && isFinalBeat)
+        ? `\n\nFINAL SCENE OF THIS EPISODE — momentum rule applies. This scene closes the episode. It must NOT simply stop the story. The closing image, line, or action must carry unresolved energy: an escalation of an active season arc, a reveal that reframes what came before, a deepened character conflict, or an emotionally/dramatically charged question left open. The audience should turn off the episode wanting the next one. A quiet ending is permitted only if the quietness itself contains the charge.`
+        : "";
+
       return `Write the full scene for beat #${idx + 1}: "${beat.name}".
 
-Beat summary: ${beat.summary}${beat.purpose ? `\nBeat purpose (what this scene does for the audience): ${beat.purpose}` : ""}${dialsBlock}${castBlock}${linkedBlock}
+Beat summary: ${beat.summary}${beat.purpose ? `\nBeat purpose (what this scene does for the audience): ${beat.purpose}` : ""}${dialsBlock}${castBlock}${linkedBlock}${finalSceneNote}
 
 Honor the project bible above — vibe "${d.settings.vibe}", genres "${d.settings.genres?.join(", ") || "drama"}", tone, themes, framework, writer voices, and reference titles all apply. The cast block above is who is on screen; characters not listed there should not appear unless the beat clearly requires it.
 
@@ -885,9 +991,30 @@ ${compressBeats(ep.beats)}`).join("\n\n")}
 
 Use this history. The new episode must NOT contradict what's established here. Honor, advance, or pay off open threads as appropriate.`;
 
+      // Per-episode arc digest at the SLOT this new episode will land
+      // in. `nextNumber` is 1-indexed; digest is 0-indexed. The digest
+      // gives the model the active arcs + hard moments for this slot
+      // even before the episode object exists.
+      const newEpisodeIdx = Math.max(0, nextNumber - 1);
+      const arcDigest = digestArcsForEpisode(story, [], newEpisodeIdx);
+      const arcBlock = formatArcDigest(arcDigest);
+
+      // Final-beat "leave us hanging" rule. Reinforced here even though
+      // SYSTEM_BRAIN carries the universal version — the writer told us
+      // it's the single most important property of a TV episode and
+      // wanted it loud at every relevant prompt boundary.
+      const endingMomentum = `
+- The FINAL beat of the episode must create narrative momentum into the next episode. Do not simply stop the story. Land on one of:
+  · a change in the audience's understanding (a piece of context reframes what we just watched),
+  · an escalation of a key arc (the active arcs above level up — stakes, scope, or trajectory),
+  · a reveal of new information (audience learns something the protagonist may or may not know yet),
+  · a deepened character conflict (an existing tension cracks open or a new one ignites),
+  · an emotionally or dramatically charged question left unresolved (a cliffhanger of meaning, not just plot).
+  Even on a finale this rule applies — the final-finale beat should leave the audience with a question that lingers past the credits.`;
+
       return `Compose a new TV episode for this series. Position: Episode ${nextNumber}.
 
-${positionLine}${previouslyOn}
+${positionLine}${arcBlock}${previouslyOn}
 
 ${userDirection ? `USER DIRECTION for THIS episode (high-priority guidance — follow it):
 """
@@ -904,10 +1031,12 @@ ${userDirection}
 }
 
 Rules:
-- Every output element must be grounded in the project bible (concept / characters / season arc) above.
+- Every output element must be grounded in the project bible (concept / characters / season arc / season arcs catalog) above.
 - The title must read as a real episode title (think "Pilot" / "The Big Bang" / "The Suitcase"), not a tagline.
 - The logline must declare what the audience experiences this episode — not what the season will eventually be about.
 - The 5–8 beats are a SEED, not a full beat sheet. Cover the spine; leave room for the user to expand.
+- Active arcs in the digest above must each touch at least one beat in your output (proportional to their tier — DOMINANT arcs anchor 1–2 beats, "active" arcs at least 1).
+- Hard moments anchored to this episode are NOT optional — at least one beat must contain that moment.${endingMomentum}
 - No prose outside the JSON.`;
     }
 
@@ -939,6 +1068,10 @@ ${beatLines}`;
 - **Under-used characters**: a major character (per the bible) who has minimal presence across episodes.
 - **Pacing problems**: stretches of episodes where the season arc doesn't advance, or where the same beat repeats.
 - **Tonal whiplash**: a tonal break that isn't earned (e.g. a bottle/character episode dropped into a pure-procedural run with no setup).
+- **Arc execution mismatch**: an arc from the "Season arcs" block in the bible has a high intensity at episode N, but episode N's beats don't reflect that arc's emphasis. (Warning-level finding, not error — the writer plans the arc, the beats execute it; mismatches are worth flagging, not failing on.)
+- **Arc pacing**: an arc's intensity jumps more than 3 levels between adjacent episodes with no precipitating event in the intervening beats. (Sudden jumps are valid for shocks; flag them so the writer confirms the jolt is intentional.)
+- **Missed hard moment**: an arc has a hard moment anchored to episode N (per the "Hard moments" lines in the bible), but episode N's beats don't contain that moment.
+- **Episode-ending stall**: an episode's final beat reads as a stopping point (everything resolved, no charged question, no escalation, no reveal). Per the TV-momentum principle, every episode should hand off energy to the next.
 
 # Episodes in order
 ${episodeBlocks}
@@ -948,7 +1081,7 @@ Return STRICT JSON:
   "findings": [
     {
       "severity": "high" | "medium" | "low",
-      "kind": "contradiction" | "dropped-thread" | "under-used-character" | "pacing" | "tonal-whiplash" | "other",
+      "kind": "contradiction" | "dropped-thread" | "under-used-character" | "pacing" | "tonal-whiplash" | "arc-execution" | "arc-pacing" | "missed-hard-moment" | "ending-stall" | "other",
       "episodes": [number, …],     // which episode numbers this finding spans (1–N)
       "title": string,             // <= 60 chars, headline-style
       "detail": string             // 1–3 sentences explaining the issue concretely
@@ -957,7 +1090,9 @@ Return STRICT JSON:
 }
 
 Rules:
-- High-severity = a logical contradiction or dropped-thread that breaks story trust. Surface these first.
+- High-severity = a logical contradiction, dropped-thread, missed hard moment, or ending stall that breaks story trust. Surface these first.
+- Medium = arc-execution / arc-pacing / under-used-character — worth flagging so the writer can confirm intent.
+- Low = pacing / tonal-whiplash that might be deliberate.
 - Don't pad. If nothing is wrong, return { "findings": [] }.
 - No prose outside the JSON.`;
     }
