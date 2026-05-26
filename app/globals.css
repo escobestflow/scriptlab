@@ -2976,8 +2976,18 @@ html[data-theme="dark"] .attr-row-body .choice.selected {
   border-top: 1px solid var(--border);
   display: flex; flex-direction: column;
   padding-bottom: env(safe-area-inset-bottom);
+  /* When closed, the modal is parked off-screen on mobile and at
+     opacity:0 on desktop — but it's still a fixed-position 549×196
+     element that captures clicks unless we explicitly disable them.
+     Without this rule, the desktop closed state silently sat over
+     the middle of every page (~(450,363)) absorbing taps on whatever
+     was below. Backdrop already uses the same auto/none pattern. */
+  pointer-events: none;
 }
-.create-modal.open { transform: translateY(0); }
+.create-modal.open {
+  transform: translateY(0);
+  pointer-events: auto;
+}
 
 /* ── Desktop: centered popup instead of bottom sheet ────────────
    Mobile keeps the existing slide-up-from-bottom treatment. On
