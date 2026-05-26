@@ -3576,7 +3576,7 @@ function SectionTabs({
         : [
             { key: "concept",    label: "CONCEPT",    layer: "concept" },
             { key: "characters", label: "CHARACTERS", layer: "characters" },
-            { key: "arcs",       label: "ARCHS",      layer: "arcs" },
+            { key: "arcs",       label: "ARCS",       layer: "arcs" },
             { key: "episodes",   label: "EPISODES",   layer: "episodes" },
           ])
     : [
