@@ -13309,6 +13309,19 @@ html[data-design="v2"] .menu-panel-utility svg {
     stroke-linecap: round;
     stroke-linejoin: round;
     transition: stroke-width 180ms var(--ease);
+    /* Visible curve does NOT receive mouse events — the invisible
+       hit path beneath it (rendered first, painted under) handles
+       all the hover. Avoids the curve "competing" with the hit
+       path or capturing only on a 2-3px sliver. */
+    pointer-events: none;
+  }
+  /* Invisible thick hit path under each curve — gives the user a
+     generous (~16px) hover band along the curve. `pointer-events:
+     stroke` restricts hits to the stroked line so we don't catch
+     pointer events on the entire bounding box of the path. */
+  html[data-design="v2"] .v2-arc-graph-curve-hit {
+    pointer-events: stroke;
+    cursor: pointer;
   }
   html[data-design="v2"] .v2-arc-graph-curve.is-faded {
     opacity: 0.18;

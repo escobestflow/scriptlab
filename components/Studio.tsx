@@ -9943,10 +9943,16 @@ function ArcGraph({
   arcs,
   episodeCount,
   highlightedArcId,
+  onHoverArc,
 }: {
   arcs: Arc[];
   episodeCount: number;
   highlightedArcId: string | null;
+  /** Notify the parent when the mouse enters/leaves a curve so the
+   *  corresponding card can show as active. Mirrors the hover loop
+   *  the cards already wire into setHighlightedArcId. `null` =
+   *  pointer left the curve. */
+  onHoverArc: (id: string | null) => void;
 }) {
   // Display fallback: when no episodes exist yet, use a placeholder
   // 7-episode axis so the chart isn't empty. The defaultArc shape
@@ -10041,7 +10047,23 @@ function ArcGraph({
           <g
             key={arc.id}
             className={`v2-arc-graph-curve${isFaded ? " is-faded" : ""}${isActive ? " is-active" : ""}`}
+            onMouseEnter={() => onHoverArc(arc.id)}
+            onMouseLeave={() => onHoverArc(null)}
           >
+            {/* Invisible thick hit path — the visible 2-3px curve
+                is too thin to hover precisely, so a 16px transparent
+                stroke widens the hover hit area. `pointer-events:
+                stroke` (CSS) restricts the hit to the stroked line
+                so the whole bounding box of the path doesn't catch
+                clicks. Rendered before the visible path so the
+                visible curve paints on top. */}
+            <path
+              d={d}
+              stroke="transparent"
+              strokeWidth={16}
+              fill="none"
+              className="v2-arc-graph-curve-hit"
+            />
             <path d={d} stroke={arc.color} className="v2-arc-graph-curve-path" />
             {isActive && points.map((p, i) => (
               <circle
@@ -10297,7 +10319,7 @@ function ArcsTab({
           autosaveEnabled={autosaveEnabled}
           icon={
             isV2
-              ? <img src="/v2/empty-state-story.png" alt="" className="empty-layer-icon-v2" />
+              ? <img src="/v2/desktop-empty-state-arch.png" alt="" className="empty-layer-icon-v2" />
               : <img src="/script-icon.svg" width={41} height={44} alt="" />
           }
           title={isV2 ? "Map Your Arcs" : "No arcs yet"}
@@ -10334,6 +10356,7 @@ function ArcsTab({
               arcs={arcs}
               episodeCount={episodeCount}
               highlightedArcId={highlightedArcId}
+              onHoverArc={setHighlightedArcId}
             />
           </div>
         </div>
@@ -10450,7 +10473,13 @@ function ArcsTab({
                 </div>
               </div>
               <div className="v2-direction-prompt-actions">
-                {isEditMode && promptType !== "main-plot" && (
+                {/* Delete is available for every arc, including the
+                    main-plot arc. Users may want to start a fresh
+                    season-arc plan from a blank canvas; the next
+                    arc the user adds will automatically take the
+                    "main-plot" type slot via openAddArcPrompt's
+                    `arcs.length === 0` check. */}
+                {isEditMode && (
                   <button
                     type="button"
                     className="v2-arc-prompt-delete"
