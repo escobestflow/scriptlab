@@ -11991,6 +11991,14 @@ html[data-design="v2"] .studio-empty-overlay[data-section="story"] {
 html[data-design="v2"] .studio-empty-overlay[data-section="script"] {
   background-image: url("/v2/empty-state-script.png");
 }
+/* Arcs uses the same desktop-sized asset on mobile for now since
+   there's no narrower mobile crop yet. Desktop override in the
+   @media (min-width: 1440px) block below points at the same file,
+   so behavior is consistent across breakpoints until a tighter
+   mobile version is added. */
+html[data-design="v2"] .studio-empty-overlay[data-section="arcs"] {
+  background-image: url("/v2/desktop-empty-state-arch.png");
+}
 
 /* Draft picker CTA — anchored 59px from the overlay top (65 - 6
    per latest spec; lifts the entire foreground stack — draft, title,
@@ -12347,6 +12355,9 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
   html[data-design="v2"] .studio-empty-overlay[data-section="episodes"] {
     background-image: url("/v2/desktop-empty-state-episodes.png");
+  }
+  html[data-design="v2"] .studio-empty-overlay[data-section="arcs"] {
+    background-image: url("/v2/desktop-empty-state-arch.png");
   }
   html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
     overflow: hidden;
