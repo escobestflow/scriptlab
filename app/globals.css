@@ -13115,7 +13115,10 @@ html[data-design="v2"] .menu-panel-utility svg {
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 36px;
+    /* 36 → 16 per spec (decreased by 20). Brings the timeline graph
+       visually closer to the arc cards so they read as a single
+       module rather than two columns floating apart. */
+    gap: 16px;
     max-width: 1300px;
     margin: 0;
     padding-top: 8px;
@@ -13266,6 +13269,17 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
   html[data-design="v2"] .v2-arc-graph-curve-node {
     opacity: 0.95;
+  }
+
+  /* Arc-prompt type row — chip wraps for the 19 non-main-plot
+     types. Matches the Character form's gender selector layout
+     (Selector chips inside a flex chip-row). flex-wrap + gap let
+     the chips reflow naturally. */
+  html[data-design="v2"] .v2-arc-prompt-type-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
   }
 
   /* Arc-prompt score row — one number input per episode. Flex

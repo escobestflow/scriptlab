@@ -7405,37 +7405,66 @@ function ConceptTab({
           Format / Duration / Short Structure / Episode Title / Genre
           / Sub-Genre stacked with thin divider lines between them. */}
       <div className="v2-concept-col-left">
-      {/* Format */}
+      {/* Format — display-only. Format is captured at project creation
+          (the wizard) and locked from then on. Changing format mid-
+          project would invalidate dozens of downstream prompts +
+          ripple through the layer drafts in ways that aren't safe
+          to undo, so the row reads as a static chip. `noToggle`
+          keeps the row collapsed; `expanded={false}` prevents any
+          interaction even if a future edit re-introduces the open
+          path. */}
       <AttrRow
         label="Format"
         values={[formatLabel.toUpperCase()]}
-        expanded={openAttr === "format"}
-        onToggle={() => toggle("format")}
-        dot={!autosaveEnabled && isConceptFieldDirty(story, "projectType")}
+        expanded={false}
+        onToggle={() => {}}
+        dot={false}
         copyAction={previewCopy("projectType")}
-        readOnly={ro()}
-        noToggle={lockTap}
+        readOnly={true}
+        noToggle={() => {}}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {([
-            { value: "feature" as const, label: "Feature Film" },
-            { value: "short" as const, label: "Short Film" },
-            { value: "tv-show" as const, label: "TV Show" },
-          ]).map(pt => (
-            <button
-              key={pt.value}
-              className={`choice ${story.projectType === pt.value ? "selected" : ""}`}
-              onClick={() => {
-                setStory(s => updateConceptDraft({ ...s, projectType: pt.value }, {}));
-                capture("projectTypes", pt.value);
-              }}
-              style={{ textAlign: "left", padding: "12px 17px" }}
-            >
-              <div className="choice-title">{pt.label}</div>
-            </button>
-          ))}
-        </div>
+        {/* noToggle prevents expansion; children never render. */}
+        <></>
       </AttrRow>
+
+      {/* Episode Count — TV-only. Placed directly under Format per
+          spec. Drives the X-axis length of the Arcs timeline graph
+          (one score per episode on every arc). When the user changes
+          this value, every arc's `scores` array in the active arcs
+          draft is padded or trimmed to match — keeps the curves
+          continuous across the new axis. */}
+      {isTV && (
+        <AttrRow
+          label="Episode Count"
+          values={d.settings.episodeCount ? [`${d.settings.episodeCount} EP${d.settings.episodeCount === 1 ? "" : "S"}`] : undefined}
+          placeholder="e.g. 10"
+          expanded={openAttr === "episodeCount"}
+          onToggle={() => toggle("episodeCount")}
+          readOnly={ro()}
+          noToggle={lockTap}
+        >
+          <Input
+            type="number"
+            min={1}
+            max={30}
+            placeholder="e.g. 10"
+            value={d.settings.episodeCount ?? ""}
+            onChange={e => {
+              const n = parseInt(e.target.value, 10);
+              const next = Number.isFinite(n) && n >= 1 ? Math.min(30, n) : undefined;
+              setStory(s => {
+                // Patch concept first, then normalize arc score arrays
+                // to the new length so the graph stays continuous.
+                const conceptDraft = getActiveConceptDraft(s);
+                const patched = updateConceptDraft(s, {
+                  settings: { ...conceptDraft.settings, episodeCount: next },
+                });
+                return next !== undefined ? normalizeArcScoresToCount(patched, next) : patched;
+              });
+            }}
+          />
+        </AttrRow>
+      )}
 
       {/* Short Structure — short-film only. Sits directly under Format
           because it's the primary structural lever for shorts: prompts
@@ -7531,44 +7560,6 @@ function ConceptTab({
               const n = parseInt(e.target.value, 10);
               const next = Number.isFinite(n) && n > 0 ? Math.min(60, n) : undefined;
               updateDraft({ settings: { ...d.settings, duration: next } });
-            }}
-          />
-        </AttrRow>
-      )}
-
-      {/* Episode Count — TV-only. Drives the X-axis length of the
-          Arcs timeline graph (one score per episode on every arc).
-          When the user changes this value, every arc's `scores` array
-          in the active arcs draft is padded or trimmed to match —
-          keeps the curves continuous across the new axis. */}
-      {isTV && (
-        <AttrRow
-          label="Episode Count"
-          values={d.settings.episodeCount ? [`${d.settings.episodeCount} EP${d.settings.episodeCount === 1 ? "" : "S"}`] : undefined}
-          placeholder="e.g. 10"
-          expanded={openAttr === "episodeCount"}
-          onToggle={() => toggle("episodeCount")}
-          readOnly={ro()}
-          noToggle={lockTap}
-        >
-          <Input
-            type="number"
-            min={1}
-            max={30}
-            placeholder="e.g. 10"
-            value={d.settings.episodeCount ?? ""}
-            onChange={e => {
-              const n = parseInt(e.target.value, 10);
-              const next = Number.isFinite(n) && n >= 1 ? Math.min(30, n) : undefined;
-              setStory(s => {
-                // Patch concept first, then normalize arc score arrays
-                // to the new length so the graph stays continuous.
-                const conceptDraft = getActiveConceptDraft(s);
-                const patched = updateConceptDraft(s, {
-                  settings: { ...conceptDraft.settings, episodeCount: next },
-                });
-                return next !== undefined ? normalizeArcScoresToCount(patched, next) : patched;
-              });
             }}
           />
         </AttrRow>
@@ -8043,32 +8034,13 @@ function ConceptTab({
         />
       </AttrRow>
 
-      {/* TV-only: Season Arc — a series-wide outline of the story
-          arcs that span the season. Every TV-targeted prompt picks
-          this up via storyBible's "Season Arc (HIGH PRIORITY)" block,
-          so individual episode generations stay in sync with the
-          larger arc (pilot seeds it, finale pays it off, middles
-          escalate). */}
-      {story.projectType === "tv-show" && (
-        <AttrRow
-          label="Season Arc"
-          values={d.concept.seriesArc?.trim() ? [d.concept.seriesArc.trim().slice(0, 60) + (d.concept.seriesArc.length > 60 ? "…" : "")] : undefined}
-          placeholder="Outline the season-spanning arcs"
-          expanded={openAttr === "seriesArc"}
-          onToggle={() => toggle("seriesArc")}
-          readOnly={ro()}
-          noToggle={lockTap}
-        >
-          <Textarea
-            value={d.concept.seriesArc ?? ""}
-            onChange={e => updateDraft({ concept: { ...d.concept, seriesArc: e.target.value } })}
-            placeholder={`Outline the arc that runs across the whole season — what happens in the pilot, mid-season turn, finale. E.g. "Ep 1: discovery. Eps 2–4: the team forms, false leads. Mid-season (5–6): the antagonist's plan revealed. Eps 7–9: the cost — characters pay. Finale (10): confrontation and irreversible change."`}
-            rows={8}
-            style={{ marginBottom: 0 }}
-            readOnly={ro()}
-          />
-        </AttrRow>
-      )}
+      {/* Season Arc field retired from the UI. TV projects now plan
+          season-spanning arcs on the Archs tab (cards + timeline
+          graph) — the free-text Season Arc was made obsolete by
+          that surface. The data field stays in the type/storage
+          layer for back-compat with existing saves and so prompts
+          that still read concept.seriesArc don't break; new edits
+          flow through the Archs tab instead. */}
 
       {/* Story Framework — beat-skeleton framework the AI uses when generating
           beats and syncing Story from other layers. Optional: if unset,
@@ -8140,50 +8112,55 @@ function ConceptTab({
         />
       </AttrRow>
 
-      {/* Ending */}
-      <AttrRow
-        label="Ending"
-        values={d.settings.endingTypes.length > 0 ? d.settings.endingTypes.map(e => e.toUpperCase()) : undefined}
-        placeholder="Select ending type"
-        expanded={openAttr === "ending"}
-        onToggle={() => toggle("ending")}
-        dot={!autosaveEnabled && isConceptFieldDirty(story, "endingTypes")}
-        ai={() => generateConcept("ending")}
-        aiLoading={aiBusy === "ending"}
-        copyAction={previewCopy("endingTypes")}
-        readOnly={ro()}
-        noToggle={lockTap}
-        note={d.settings.endingNote}
-      >
-        <div className="chip-row">
-          {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
-            <Selector key={e}
-              selected={d.settings.endingTypes.includes(e)}
-              onClick={() => {
-                const isAdding = !d.settings.endingTypes.includes(e);
-                updateDraft({
-                  settings: {
-                    ...d.settings,
-                    endingTypes: isAdding
-                      ? [...d.settings.endingTypes, e]
-                      : d.settings.endingTypes.filter(x => x !== e),
-                  },
-                });
-                if (isAdding) capture("endingTypes", e);
-              }}>
-              {e}
-            </Selector>
-          ))}
-        </div>
-        <Textarea
-          value={d.settings.endingNote ?? ""}
-          onChange={e => updateDraft({ settings: { ...d.settings, endingNote: e.target.value } })}
-          placeholder="Add direction (optional) — elaborate on the ending you want, in your own words"
-          rows={3}
-          style={{ marginTop: 12, marginBottom: 0 }}
+      {/* Ending — Feature + Short only. TV doesn't surface this row
+          because per-season endings are handled at the Archs tab
+          (the timeline graph's right edge = "PROBLEM RESOLVES") and
+          per-episode endings live inside each episode. */}
+      {!isTV && (
+        <AttrRow
+          label="Ending"
+          values={d.settings.endingTypes.length > 0 ? d.settings.endingTypes.map(e => e.toUpperCase()) : undefined}
+          placeholder="Select ending type"
+          expanded={openAttr === "ending"}
+          onToggle={() => toggle("ending")}
+          dot={!autosaveEnabled && isConceptFieldDirty(story, "endingTypes")}
+          ai={() => generateConcept("ending")}
+          aiLoading={aiBusy === "ending"}
+          copyAction={previewCopy("endingTypes")}
           readOnly={ro()}
-        />
-      </AttrRow>
+          noToggle={lockTap}
+          note={d.settings.endingNote}
+        >
+          <div className="chip-row">
+            {(["happy","bittersweet","tragic","ambiguous","twist"] as const).map(e => (
+              <Selector key={e}
+                selected={d.settings.endingTypes.includes(e)}
+                onClick={() => {
+                  const isAdding = !d.settings.endingTypes.includes(e);
+                  updateDraft({
+                    settings: {
+                      ...d.settings,
+                      endingTypes: isAdding
+                        ? [...d.settings.endingTypes, e]
+                        : d.settings.endingTypes.filter(x => x !== e),
+                    },
+                  });
+                  if (isAdding) capture("endingTypes", e);
+                }}>
+                {e}
+              </Selector>
+            ))}
+          </div>
+          <Textarea
+            value={d.settings.endingNote ?? ""}
+            onChange={e => updateDraft({ settings: { ...d.settings, endingNote: e.target.value } })}
+            placeholder="Add direction (optional) — elaborate on the ending you want, in your own words"
+            rows={3}
+            style={{ marginTop: 12, marginBottom: 0 }}
+            readOnly={ro()}
+          />
+        </AttrRow>
+      )}
       </div>{/* /.v2-concept-col-right */}
 
       {/* Writer-style picker — fly-up sheet with a filterable roster of
@@ -10375,30 +10352,36 @@ function ArcsTab({
                   ? "Every season starts with the central external story — the spine that drives the plot. We'll add it as your Main Plot Arch."
                   : "Pick the type, write a one-sentence description, then score the arc's intensity at each episode (1 = order, 10 = chaos)."}
               </p>
-              {!isFirstAndCreating && (
-                <label className="v2-direction-prompt-field">
+              {/* Type — chip-row picker using the same Selector
+                  primitive the Character form uses for Gender. The
+                  Main Plot Arch type is locked to the first arc;
+                  in edit mode for an existing main-plot arc the
+                  chip row is hidden entirely (you can't change a
+                  Main Plot Arch into anything else without
+                  orphaning the season's spine). */}
+              {!isFirstAndCreating && !(isEditMode && promptType === "main-plot") && (
+                <div className="v2-direction-prompt-field">
                   <span className="v2-direction-prompt-field-label">Type</span>
-                  <select
-                    className="v2-direction-prompt-textarea"
-                    value={promptType}
-                    onChange={e => setPromptType(e.target.value as ArcType)}
-                    style={{ height: 44, padding: "0 12px" }}
-                    disabled={isEditMode && promptType === "main-plot"}
-                  >
-                    {(isEditMode && promptType === "main-plot"
-                      ? ARC_TYPES
-                      : ARC_TYPES.filter(t => t !== "main-plot")
-                    ).map(t => (
-                      <option key={t} value={t}>{ARC_TYPE_LABELS[t]}</option>
+                  <div className="chip-row v2-arc-prompt-type-row">
+                    {ARC_TYPES.filter(t => t !== "main-plot").map(t => (
+                      <Selector
+                        key={t}
+                        selected={promptType === t}
+                        onClick={() => setPromptType(t)}
+                      >
+                        {ARC_TYPE_LABELS[t].replace(/ Arch$/, "")}
+                      </Selector>
                     ))}
-                  </select>
-                </label>
+                  </div>
+                </div>
               )}
-              <label className="v2-direction-prompt-field">
+              {/* Title — same Input primitive the Character form
+                  uses for Name. Standard variant, with the built-
+                  in clear button. */}
+              <div className="v2-direction-prompt-field">
                 <span className="v2-direction-prompt-field-label">Title</span>
-                <input
+                <Input
                   type="text"
-                  className="v2-direction-prompt-textarea"
                   value={promptTitle}
                   onChange={e => setPromptTitle(e.target.value)}
                   placeholder={
@@ -10406,9 +10389,8 @@ function ArcsTab({
                       ? "e.g. The Meth Business"
                       : "e.g. Walt's Descent"
                   }
-                  style={{ height: 44, padding: "0 12px" }}
                 />
-              </label>
+              </div>
               <label className="v2-direction-prompt-field">
                 <span className="v2-direction-prompt-field-label">
                   One-sentence description
