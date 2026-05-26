@@ -7327,19 +7327,36 @@ html[data-design="v2"] .record-label {
      `+ .attr-row` shortcut any more because flex `order` decouples
      visual order from DOM order — the DOM-first row may not be the
      visually-first, so :first-child / `+` would draw the wrong
-     dividers after reorder. */
+     dividers after reorder.
+
+     Must match the SAME modifier classes (.attr-row-inline-input,
+     .attr-row-text-open) as the strip rule above — rows rendered
+     by TextAttrRow / open-text rows carry those modifier classes,
+     which raises the strip rule's specificity to (0,4,1) and would
+     otherwise BEAT a bare `.v2-concept-col-left .attr-row` divider
+     selector (0,3,1), wiping the hairline divider on Show Title
+     (and any other inline-text row inside the column). Mirroring
+     the modifier set here keeps specificities parallel so the
+     later-declared divider rule wins as intended. */
   html[data-design="v2"] .v2-concept-col-left .attr-row,
-  html[data-design="v2"] .v2-concept-col-right .attr-row {
+  html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-inline-input,
+  html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-text-open,
+  html[data-design="v2"] .v2-concept-col-right .attr-row,
+  html[data-design="v2"] .v2-concept-col-right .attr-row.attr-row-inline-input,
+  html[data-design="v2"] .v2-concept-col-right .attr-row.attr-row-text-open {
     border-top: 0.7px solid var(--ds-color-gray-outline);
   }
   /* Format is now visually first in the left column (order: 1).
      Logline stays visually first in the right column. Both get
-     their top divider stripped. (Title/Show Title used to be the
-     visually-first row here pre-Episode-Count, hence the legacy
-     comment elsewhere — they now need their divider so they read
-     as a separate section from Episode Count above.) */
+     their top divider stripped. Same selector-mirror trick: include
+     the modifier-class variants so this exception out-specifics the
+     strip rule for any future inline-text variants of these rows. */
   html[data-design="v2"] .v2-concept-col-left .attr-row[data-label="Format"],
-  html[data-design="v2"] .v2-concept-col-right .attr-row[data-label="Logline"] {
+  html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-inline-input[data-label="Format"],
+  html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-text-open[data-label="Format"],
+  html[data-design="v2"] .v2-concept-col-right .attr-row[data-label="Logline"],
+  html[data-design="v2"] .v2-concept-col-right .attr-row.attr-row-inline-input[data-label="Logline"],
+  html[data-design="v2"] .v2-concept-col-right .attr-row.attr-row-text-open[data-label="Logline"] {
     border-top: 0;
   }
   /* LEFT column — Title FIRST per spec, then Format, Short Structure
