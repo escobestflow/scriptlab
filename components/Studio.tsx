@@ -10139,6 +10139,12 @@ function ArcsTab({
   // One score per episode, 1-10. Defaults to a gentle 3→8 climb on
   // first open; restored to the existing arc's scores in edit mode.
   const [promptScores, setPromptScores] = useState<number[]>([]);
+  // FULL stored scores array for the arc being edited. Can be LONGER
+  // than `episodeCount` if the user previously had more episodes in
+  // Concept — that tail is preserved (non-destructive shrink) so the
+  // intensities reappear if the user later grows the episode count
+  // back. On save we merge: visible cells (first N) + preserved tail.
+  const [promptScoresFull, setPromptScoresFull] = useState<number[]>([]);
 
   function defaultScores(n: number): number[] {
     const out: number[] = [];
@@ -10155,7 +10161,9 @@ function ArcsTab({
     setPromptType(defaultType);
     setPromptTitle("");
     setPromptDescription("");
-    setPromptScores(defaultScores(episodeCount));
+    const initial = defaultScores(episodeCount);
+    setPromptScores(initial);
+    setPromptScoresFull(initial);
     setPromptOpen(true);
   }
 
@@ -10164,13 +10172,16 @@ function ArcsTab({
     setPromptType(arc.type);
     setPromptTitle(arc.title);
     setPromptDescription(arc.description);
-    // Pad/trim the arc's stored scores to match the current
-    // episode count so the popup always shows one input per slot.
-    const scores = [...arc.scores];
-    while (scores.length < episodeCount) {
-      scores.push(scores[scores.length - 1] ?? 5);
+    // Capture the FULL stored scores (which may be longer than
+    // episodeCount if the user previously shrank Concept) so the tail
+    // beyond the visible cells survives the save. The popup only
+    // renders the first `episodeCount` cells.
+    const full = [...arc.scores];
+    while (full.length < episodeCount) {
+      full.push(full[full.length - 1] ?? 5);
     }
-    setPromptScores(scores.slice(0, episodeCount));
+    setPromptScoresFull(full);
+    setPromptScores(full.slice(0, episodeCount));
     setPromptOpen(true);
   }
 
@@ -10178,6 +10189,13 @@ function ArcsTab({
     const title = promptTitle.trim();
     const description = promptDescription.trim();
     setPromptOpen(false);
+    // Merge visible cells (0..episodeCount-1) with any preserved tail
+    // (episodeCount..) so shrinking the episode count in Concept and
+    // re-saving an arc doesn't blow away past intensities.
+    const mergedScores = [
+      ...promptScores,
+      ...promptScoresFull.slice(promptScores.length),
+    ];
     if (editingArcId) {
       // Edit mode — patch the existing arc.
       const id = editingArcId;
@@ -10185,7 +10203,7 @@ function ArcsTab({
         type: promptType,
         title,
         description,
-        scores: promptScores,
+        scores: mergedScores,
       }));
     } else {
       // Create mode — append a new arc with the user's scores.
@@ -10193,13 +10211,14 @@ function ArcsTab({
         type: promptType,
         title,
         description,
-        scores: promptScores,
+        scores: mergedScores,
       }));
     }
     setEditingArcId(null);
     setPromptTitle("");
     setPromptDescription("");
     setPromptScores([]);
+    setPromptScoresFull([]);
   }
 
   function handleDeleteArc() {
@@ -10233,25 +10252,27 @@ function ArcsTab({
         onOpenUpdateTray={() => {}}
         rightSlot={hasArcs ? (
           isDesktop ? (
-            <div className="v2-episodes-add-row">
-              <Button
-                variant="primary"
-                size="sm"
+            // Match the populated Characters tab's paired-chip
+            // treatment: black primary (manual add) + white secondary
+            // (AI add). Same .add-one-chip-primary + .add-one-chip
+            // classes, same icons, same .v2-add-one-actions wrapper.
+            <div className="v2-add-one-actions">
+              <button
+                type="button"
+                className="add-one-chip-primary"
                 onClick={openAddArcPrompt}
-                icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
-                className="ds-type-cta"
               >
-                Add an Arch
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
+                <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
+                <span>Add an Arch</span>
+              </button>
+              <button
+                type="button"
+                className="add-one-chip"
                 onClick={openAddArcPrompt}
-                icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
-                className="empty-state-ai-btn ds-type-cta"
               >
-                Add an Arch
-              </Button>
+                <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                <span>Add an Arch</span>
+              </button>
             </div>
           ) : (
             <button

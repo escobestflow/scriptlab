@@ -810,16 +810,24 @@ export function deleteArcFromActiveDraft(story: Story, arcId: string): Story {
  *  the Concept tab — keeps each arc's curve continuous across the
  *  new axis (last-value padding when extending; trim from the end
  *  when shortening). */
+// NON-DESTRUCTIVE on shrink. When the user lowers the episode count in
+// Concept, we keep the entire stored scores array — the graph and edit
+// popup just read the first N entries. Reasons:
+//   1) Per spec: "If the episodes are updated to less, keep the episode
+//      intensity of the previous set episodes under the arch the same."
+//   2) The user might be mid-typing a multi-digit number ("10" → "1" →
+//      "10"). The intermediate single-digit value would otherwise
+//      truncate scores destructively before the "10" stroke could
+//      restore them.
+// When the user RAISES the count, we still pad with the last set value
+// so the curve extends flat into the new episodes rather than collapsing.
 export function normalizeArcScoresToCount(story: Story, n: number): Story {
   const active = getActiveArcsDraft(story);
   if (!active || active.arcs.length === 0) return story;
   return updateArcsDraft(story, {
     arcs: active.arcs.map(a => {
       const scores = [...a.scores];
-      if (scores.length === n) return a;
-      if (scores.length > n) return { ...a, scores: scores.slice(0, n) };
-      // Pad with the last value (or 5 if empty) so the curve extends
-      // flat into the new episodes rather than collapsing to 1.
+      if (scores.length >= n) return a; // keep tail — never truncate
       const padValue = scores[scores.length - 1] ?? 5;
       while (scores.length < n) scores.push(padValue);
       return { ...a, scores };

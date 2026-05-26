@@ -7290,9 +7290,13 @@ html[data-design="v2"] .record-label {
   /* Strip the per-row card chrome inside both wrappers so the rows
      look like sections of one continuous card. Background, border,
      border-radius, and margin all go to zero — the wrapper supplies
-     the surface. 12px top + 12px bottom padding bumps each row's
-     height by 24px so the contents get extra breathing room above
-     and below per spec. */
+     the surface.
+
+     Padding-top/bottom is intentionally ZERO at the row level — the
+     12+12 breathing room moves INSIDE `.attr-row-header` below so
+     the whole padded surface is the click target (the click handler
+     lives on the header, not on the row, so any padding hanging off
+     the row is dead space that doesn't toggle). */
   html[data-design="v2"] .v2-concept-col-left .attr-row,
   html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-inline-input,
   html[data-design="v2"] .v2-concept-col-left .attr-row.attr-row-text-open,
@@ -7303,9 +7307,19 @@ html[data-design="v2"] .record-label {
     border: none;
     border-radius: 0;
     margin: 0;
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding-top: 0;
+    padding-bottom: 0;
     box-shadow: none;
+  }
+  /* Pull the 12+12 breathing pad into the header so the entire row
+     card (top edge to bottom edge of the divider band) is the click
+     target. Base v2 header padding is 14/16 — we ADD 12 top and 12
+     bottom to land at 26/16. The horizontal pad stays 16 because
+     left/right padding on the row WAS already on the header. */
+  html[data-design="v2"] .v2-concept-col-left .attr-row > .attr-row-header,
+  html[data-design="v2"] .v2-concept-col-right .attr-row > .attr-row-header {
+    padding-top: 26px;
+    padding-bottom: 26px;
   }
   /* Hairline divider between rows. Apply border-top to EVERY row in
      the wrappers, then strip from the visually-first row in each
@@ -7318,8 +7332,13 @@ html[data-design="v2"] .record-label {
   html[data-design="v2"] .v2-concept-col-right .attr-row {
     border-top: 0.7px solid var(--ds-color-gray-outline);
   }
-  html[data-design="v2"] .v2-concept-col-left .attr-row[data-label="Title"],
-  html[data-design="v2"] .v2-concept-col-left .attr-row[data-label="Show Title"],
+  /* Format is now visually first in the left column (order: 1).
+     Logline stays visually first in the right column. Both get
+     their top divider stripped. (Title/Show Title used to be the
+     visually-first row here pre-Episode-Count, hence the legacy
+     comment elsewhere — they now need their divider so they read
+     as a separate section from Episode Count above.) */
+  html[data-design="v2"] .v2-concept-col-left .attr-row[data-label="Format"],
   html[data-design="v2"] .v2-concept-col-right .attr-row[data-label="Logline"] {
     border-top: 0;
   }
@@ -13120,7 +13139,15 @@ html[data-design="v2"] .menu-panel-utility svg {
        visually closer to the arc cards so they read as a single
        module rather than two columns floating apart. */
     gap: 16px;
-    max-width: 1300px;
+    /* No max-width — let the graph extend to the same right edge as
+       the other tabs (Concept / Characters / Story). The studio's
+       `.tab-content-wrap` already provides the 22px right inset, so
+       the graph's right edge lands wherever the wrapper ends —
+       ≈60px from the viewport edge on a typical desktop. The cards
+       column is fixed at 248px; the graph (flex: 1 1 auto) takes
+       all the remaining horizontal space. */
+    max-width: none;
+    width: 100%;
     margin: 0;
     padding-top: 8px;
   }
@@ -13138,6 +13165,15 @@ html[data-design="v2"] .menu-panel-utility svg {
        container edge. The SVG itself uses preserveAspectRatio to
        scale within whatever box it gets. */
     padding: 0 8px;
+    /* Sticky on scroll — the cards list can be tall, but the graph
+       should stay in view as the user scrolls through cards. `top`
+       clears the layer-bar above (which sits at the top of the tab
+       content area). `align-self: flex-start` lets sticky work
+       inside the flex parent without the graph stretching to match
+       the cards column's height. */
+    position: sticky;
+    top: 12px;
+    align-self: flex-start;
   }
   html[data-design="v2"] .v2-arc-graph-svg {
     width: 100%;
@@ -13167,7 +13203,19 @@ html[data-design="v2"] .menu-panel-utility svg {
     border: 0;
     font: inherit;
     color: inherit;
+    /* z-index keeps the card above any sibling that might otherwise
+       overlap from a flex/grid quirk; pointer-events on direct
+       children get neutralized below so the entire card surface is
+       a single click target (otherwise the title / type / clamped
+       description divs can swallow clicks that don't bubble cleanly
+       through some browsers). */
+    z-index: 1;
     transition: box-shadow 200ms var(--ease), transform 200ms var(--ease);
+  }
+  /* Whole-card click target: child elements never receive clicks,
+     so taps anywhere inside the card hit the <button> root. */
+  html[data-design="v2"] .v2-arc-card > * {
+    pointer-events: none;
   }
   html[data-design="v2"] .v2-arc-card:hover {
     transform: translateY(-1px);
