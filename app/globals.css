@@ -13250,9 +13250,12 @@ html[data-design="v2"] .menu-panel-utility svg {
     z-index: 1;
     transition: box-shadow 200ms var(--ease), transform 200ms var(--ease);
   }
-  /* Whole-card click target: child elements never receive clicks,
-     so taps anywhere inside the card hit the <button> root. */
-  html[data-design="v2"] .v2-arc-card > * {
+  /* Whole-card click target for the BODY area: title/type/description
+     don't intercept clicks so taps anywhere on the body hit the card
+     root. The moments section below the body is EXEMPT because each
+     moment row is its own clickable button (different target). */
+  html[data-design="v2"] .v2-arc-card .v2-arc-card-body,
+  html[data-design="v2"] .v2-arc-card .v2-arc-card-body > * {
     pointer-events: none;
   }
   html[data-design="v2"] .v2-arc-card:hover {
@@ -13472,6 +13475,215 @@ html[data-design="v2"] .menu-panel-utility svg {
   }
   html[data-design="v2"] .v2-arc-prompt-delete:hover {
     background: #fdf3f3;
+  }
+
+  /* ── Arc graph: wrap + "+ Add moment" hover tooltip ──────────────
+     ArcGraph now returns a relative-positioned wrap so the tooltip
+     div can sit absolutely over the SVG, following the cursor as it
+     tracks the curve's hit path. Pointer-events disabled on the
+     tooltip itself so the click underneath still lands. */
+  html[data-design="v2"] .v2-arc-graph-wrap {
+    position: relative;
+  }
+  html[data-design="v2"] .v2-arc-graph-add-moment-tooltip {
+    position: absolute;
+    pointer-events: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--ds-color-black);
+    color: var(--ds-color-white);
+    font-family: var(--ds-font-body);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.18);
+    z-index: 5;
+  }
+
+  /* ── Moment markers (diamonds) on the curve ──────────────────────
+     Always-visible white-fill diamonds outlined in the arc's color.
+     Slight pop on hover so the click affordance reads. */
+  html[data-design="v2"] .v2-arc-graph-moment {
+    cursor: pointer;
+  }
+  html[data-design="v2"] .v2-arc-graph-moment-marker {
+    transition: stroke-width 120ms var(--ease, ease), filter 120ms var(--ease, ease);
+  }
+  html[data-design="v2"] .v2-arc-graph-moment:hover .v2-arc-graph-moment-marker {
+    stroke-width: 3.4;
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.18));
+  }
+
+  /* ── Arc card: moments rows at the bottom ───────────────────────
+     Compact list of turning-point markers attached to this arc.
+     Each row is its own button (so we can edit individual moments
+     without re-opening the whole arc), but the card body above it
+     remains the "open arc" target. Visual: indented under the
+     description, soft separator line, position chip + truncated text. */
+  html[data-design="v2"] .v2-arc-card-moments {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 0.7px solid var(--ds-color-gray-outline);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  html[data-design="v2"] .v2-arc-card-moment-row {
+    /* button reset */
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* layout */
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 2px 0;
+    width: 100%;
+    border-radius: 4px;
+    transition: background-color 120ms var(--ease, ease);
+  }
+  html[data-design="v2"] .v2-arc-card-moment-row:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+  html[data-design="v2"] .v2-arc-card-moment-pos {
+    flex: 0 0 auto;
+    font-family: var(--ds-font-body);
+    font-weight: 600;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--ds-color-gray-chip-label);
+    text-transform: uppercase;
+    min-width: 26px;
+  }
+  html[data-design="v2"] .v2-arc-card-moment-text {
+    flex: 1 1 auto;
+    font-family: var(--ds-font-body);
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--ds-color-black);
+    /* Line-clamp to keep the card compact. Single line per moment. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Add Moment popup: linked-idea preview + idea picker list ───
+     The popup is the same shell as the Add Arc popup (.v2-arc-prompt-
+     card / .v2-direction-prompt-*). These additions style the
+     idea-picker rows + linked-idea preview specifically. */
+  html[data-design="v2"] .v2-arc-moment-linked-preview {
+    margin: 6px 0 12px;
+    padding: 10px 12px;
+    border: 0.7px solid var(--ds-color-gray-outline);
+    border-radius: 8px;
+    background: var(--ds-color-gray-lightest);
+  }
+  html[data-design="v2"] .v2-arc-moment-linked-preview-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  html[data-design="v2"] .v2-arc-moment-linked-preview-type {
+    font-family: var(--ds-font-body);
+    font-weight: 600;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--ds-color-gray-chip-label);
+  }
+  html[data-design="v2"] .v2-arc-moment-linked-preview-clear {
+    /* button reset */
+    border: 0;
+    background: transparent;
+    color: var(--ds-color-gray-chip-label);
+    font: inherit;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  html[data-design="v2"] .v2-arc-moment-linked-preview-clear:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .v2-arc-moment-linked-preview-text {
+    font-family: var(--ds-font-body);
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ds-color-black);
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-list {
+    margin-top: 8px;
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px;
+    border: 0.7px solid var(--ds-color-gray-outline);
+    border-radius: 8px;
+    background: var(--ds-color-gray-lightest);
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-row {
+    /* button reset */
+    border: 0;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    /* layout */
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--ds-color-white);
+    color: var(--ds-color-black);
+    transition: background-color 120ms var(--ease, ease);
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-row:hover {
+    background: #f1eeec;
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-row.is-selected {
+    background: var(--ds-color-black);
+    color: var(--ds-color-white);
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-row.is-selected .v2-arc-moment-idea-type {
+    color: var(--ds-color-white);
+    opacity: 0.7;
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-type {
+    flex: 0 0 auto;
+    font-family: var(--ds-font-body);
+    font-weight: 600;
+    font-size: 8px;
+    letter-spacing: 0.08em;
+    color: var(--ds-color-gray-chip-label);
+    min-width: 56px;
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-text {
+    flex: 1 1 auto;
+    font-family: var(--ds-font-body);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  html[data-design="v2"] .v2-arc-moment-idea-empty {
+    padding: 12px 8px;
+    text-align: center;
+    font-family: var(--ds-font-body);
+    font-size: 11px;
+    color: var(--ds-color-gray-chip-label);
   }
 
   /* ── Character popup: Character Arcs section ─────────────────────

@@ -461,6 +461,30 @@ export const ARC_COLORS: string[] = [
   "#C77BD9", // magenta
 ];
 
+/** A key turning point attached to a specific spot along an arc.
+ *  Rendered as a diamond marker on the arc's curve (always visible,
+ *  regardless of hover state) and as a row at the bottom of the
+ *  arc card. The user creates one by clicking anywhere on the curve
+ *  in the Arcs tab — the click position becomes `position`. */
+export interface ArcMoment {
+  id: string;
+  /** Fractional episode position along the X axis of the graph.
+   *  0 = exactly at episode 1's marker, 1 = exactly at episode 2's
+   *  marker, episodeCount - 1 = the last episode. Non-integer values
+   *  ("between EP3 and EP4") are allowed and rendered at the
+   *  proportional pixel offset between adjacent episode columns. */
+  position: number;
+  /** Free-text turning-point description. Used when the user wrote a
+   *  moment inline. May be empty when `momentId` is set (the linked
+   *  saved Moment carries the body text). */
+  text: string;
+  /** Optional link to a saved Moment (from the user-wide Moments
+   *  pool — `moments` state on the Projects page). When set, the
+   *  UI prefers the linked Moment's `text` for display so edits to
+   *  the canonical saved idea propagate to this arc marker. */
+  momentId?: string;
+}
+
 export interface Arc {
   id: string;
   type: ArcType;
@@ -471,6 +495,11 @@ export interface Arc {
    *  active episodes-draft's episode count; emptyArc / addArcToActive-
    *  Draft handle the alignment. Each value is 1-10. */
   scores: number[];
+  /** Optional turning-point markers attached to specific points along
+   *  this arc's curve. Always rendered on the graph (unlike intensity
+   *  nodes which only show on hover) so the writer can see the
+   *  season's key beats at a glance. */
+  moments?: ArcMoment[];
   /** When set, this arc belongs to a specific character — managed
    *  from the character popup's "Character Arcs" section AS WELL AS
    *  from the Arcs tab popup. Only meaningful when `type === "character"`.
@@ -861,6 +890,69 @@ export function deleteArcFromActiveDraft(story: Story, arcId: string): Story {
   if (!active) return story;
   return updateArcsDraft(story, {
     arcs: active.arcs.filter(a => a.id !== arcId),
+  });
+}
+
+/** Append a moment marker to a specific arc. Caller supplies the
+ *  position (fractional episode index) — usually derived from where
+ *  the user clicked on the curve. */
+export function addMomentToArc(
+  story: Story,
+  arcId: string,
+  input: { position: number; text?: string; momentId?: string },
+): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  const id = `mom_${Math.random().toString(36).slice(2, 10)}`;
+  const moment: ArcMoment = {
+    id,
+    position: input.position,
+    text: input.text?.trim() ?? "",
+    ...(input.momentId ? { momentId: input.momentId } : {}),
+  };
+  return updateArcsDraft(story, {
+    arcs: active.arcs.map(a =>
+      a.id === arcId
+        ? { ...a, moments: [...(a.moments ?? []), moment] }
+        : a,
+    ),
+  });
+}
+
+/** Patch a moment on a specific arc. Used by the Edit Moment popup. */
+export function updateMomentOnArc(
+  story: Story,
+  arcId: string,
+  momentId: string,
+  patch: Partial<Pick<ArcMoment, "position" | "text" | "momentId">>,
+): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  return updateArcsDraft(story, {
+    arcs: active.arcs.map(a => {
+      if (a.id !== arcId) return a;
+      const moments = (a.moments ?? []).map(m =>
+        m.id === momentId ? { ...m, ...patch } : m,
+      );
+      return { ...a, moments };
+    }),
+  });
+}
+
+/** Remove a moment marker from a specific arc. */
+export function deleteMomentFromArc(
+  story: Story,
+  arcId: string,
+  momentId: string,
+): Story {
+  const active = getActiveArcsDraft(story);
+  if (!active) return story;
+  return updateArcsDraft(story, {
+    arcs: active.arcs.map(a =>
+      a.id === arcId
+        ? { ...a, moments: (a.moments ?? []).filter(m => m.id !== momentId) }
+        : a,
+    ),
   });
 }
 

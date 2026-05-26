@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo, cre
 import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, EpisodeArchetype, Character, CharacterRelationship, Scene, StorySettings, Reference,
-  Arc, ArcType, ArcsLayerDraft, ARC_TYPES, ARC_TYPE_LABELS, ARC_COLORS,
+  Arc, ArcType, ArcsLayerDraft, ArcMoment, ARC_TYPES, ARC_TYPE_LABELS, ARC_COLORS,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, EpisodesLayerDraft, ProjectDraft,
   LayerKey, LayerSyncState,
   getActiveProjectDraft,
@@ -12,6 +12,7 @@ import {
   getActiveArcsDraft, getEpisodeCountForArcs,
   updateConceptDraft, updateCharactersDraft, updateStoryLayerDraft, updateScriptDraft, updateEpisodesDraft,
   updateArcsDraft, addArcToActiveDraft, updateArcInActiveDraft, deleteArcFromActiveDraft, normalizeArcScoresToCount,
+  addMomentToArc, updateMomentOnArc, deleteMomentFromArc,
   addEpisodeToActiveDraft, upsertEpisodeInActiveDraft,
   createNewLayerDraft, createEmptyLayerDraft, switchLayerDraft, deleteLayerDraft,
   createNewProjectDraft, duplicateActiveProjectDraft, createEmptyProjectDraft, switchProjectDraft, deleteProjectDraft,
@@ -2905,6 +2906,7 @@ export function Studio({
               story={tabStory}
               setStory={tabSetStory}
               autosaveEnabled={autosaveEnabled}
+              moments={moments}
             />
           )}
           {section === "story" && (
@@ -10238,6 +10240,8 @@ function ArcGraph({
   highlightedArcId,
   onHoverArc,
   onScoreCommit,
+  onAddMomentAt,
+  onMomentClick,
 }: {
   arcs: Arc[];
   episodeCount: number;
@@ -10250,6 +10254,13 @@ function ArcGraph({
   /** Fired on pointer-up at the end of a node drag. Parent commits
    *  the new score (1–10) to the active arcs draft. */
   onScoreCommit: (arcId: string, index: number, score: number) => void;
+  /** Fired when the user clicks somewhere on an arc curve (NOT on an
+   *  intensity node). Position is a fractional episode index — the
+   *  parent opens the Add Moment popup with this anchor. */
+  onAddMomentAt: (arcId: string, position: number) => void;
+  /** Fired when the user clicks an existing moment marker on the
+   *  curve. Parent opens the Edit Moment popup. */
+  onMomentClick: (arcId: string, momentId: string) => void;
 }) {
   // Display fallback: when no episodes exist yet, use a placeholder
   // 7-episode axis so the chart isn't empty. The defaultArc shape
@@ -10340,7 +10351,67 @@ function ArcGraph({
   // curve doesn't yank the highlight away.
   const effectiveHighlight = drag ? drag.arcId : highlightedArcId;
 
+  // ── Cursor tracking for the "Add moment" tooltip ────────────────
+  // While the cursor is over the active curve's hit path, we stash
+  // the pointer's position in container-relative pixels so the
+  // tooltip can render with a fixed offset next to the cursor. The
+  // tooltip sits outside the SVG so it doesn't have to scale-compete
+  // with the viewBox — easier sizing + positioning + readability.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [cursor, setCursor] = useState<{ x: number; y: number; arcId: string } | null>(null);
+
+  /** Fractional episode index for a given clientX (e.g., 2.5 = midway
+   *  between EP3 and EP4). Used both for placing moment markers and
+   *  for converting a click on the curve into a moment-position
+   *  payload. */
+  function positionFromClientX(clientX: number): number {
+    const svg = svgRef.current;
+    if (!svg) return 0;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return 0;
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = 0;
+    const local = pt.matrixTransform(ctm.inverse());
+    const denom = Math.max(1, n - 1);
+    const raw = ((local.x - padL) / plotW) * denom;
+    return Math.max(0, Math.min(n - 1, raw));
+  }
+
+  function onCurvePointerMove(e: React.PointerEvent, arcId: string) {
+    if (drag) return; // mid-node-drag: hide the "add moment" affordance
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const r = wrap.getBoundingClientRect();
+    setCursor({ arcId, x: e.clientX - r.left, y: e.clientY - r.top });
+  }
+  function onCurvePointerLeave() {
+    setCursor(null);
+  }
+
+  function onCurveClick(e: React.MouseEvent, arcId: string) {
+    if (drag) return;
+    const position = positionFromClientX(e.clientX);
+    onAddMomentAt(arcId, position);
+  }
+
+  /** Linear-interpolate the arc's Y at a fractional episode position.
+   *  Used to anchor moment markers ON the curve at non-integer x's.
+   *  We deliberately interpolate the SCORES (not the pixel Y after
+   *  Catmull-Rom smoothing) — keeps the marker on the spline by
+   *  reusing the same y() mapping the integer nodes use, but it's
+   *  visually within a pixel or two of the smoothed curve in practice. */
+  function scoreAtPosition(arc: Arc, position: number): number {
+    const i0 = Math.max(0, Math.floor(position));
+    const i1 = Math.min(n - 1, i0 + 1);
+    const t = position - i0;
+    const s0 = effectiveScores(arc)[i0] ?? 5;
+    const s1 = effectiveScores(arc)[i1] ?? s0;
+    return s0 + (s1 - s0) * t;
+  }
+
   return (
+    <div className="v2-arc-graph-wrap" ref={wrapRef}>
     <svg
       ref={svgRef}
       viewBox={`0 0 ${W} ${H}`}
@@ -10435,15 +10506,43 @@ function ArcGraph({
                 stroke` (CSS) restricts the hit to the stroked line
                 so the whole bounding box of the path doesn't catch
                 clicks. Rendered before the visible path so the
-                visible curve paints on top. */}
+                visible curve paints on top. Carries the click +
+                cursor-tracking events for the "Add moment" affordance. */}
             <path
               d={d}
               stroke="transparent"
               strokeWidth={16}
               fill="none"
               className="v2-arc-graph-curve-hit"
+              onPointerMove={e => onCurvePointerMove(e, arc.id)}
+              onPointerLeave={onCurvePointerLeave}
+              onClick={e => onCurveClick(e, arc.id)}
             />
             <path d={d} stroke={arc.color} className="v2-arc-graph-curve-path" />
+            {/* Always-visible moment markers (diamond) at each
+                arc.moments[i].position. Stop click propagation so the
+                tap edits the moment instead of opening a fresh Add
+                Moment popup at the same spot. */}
+            {(arc.moments ?? []).map(m => {
+              const mx = padL + (m.position / Math.max(1, n - 1)) * plotW;
+              const my = y(scoreAtPosition(arc, m.position));
+              return (
+                <g
+                  key={m.id}
+                  className="v2-arc-graph-moment"
+                  onClick={e => { e.stopPropagation(); onMomentClick(arc.id, m.id); }}
+                  onPointerMove={e => { e.stopPropagation(); }}
+                >
+                  <polygon
+                    points={`${mx},${my - 7} ${mx + 7},${my} ${mx},${my + 7} ${mx - 7},${my}`}
+                    fill="white"
+                    stroke={arc.color}
+                    strokeWidth={2.4}
+                    className="v2-arc-graph-moment-marker"
+                  />
+                </g>
+              );
+            })}
             {isActive && points.map((p, i) => (
               <circle
                 key={i}
@@ -10475,51 +10574,121 @@ function ArcGraph({
         PROBLEM RESOLVES
       </text>
     </svg>
+    {/* "+ Add moment" tooltip — follows the cursor while it tracks an
+        active curve's hit path. Offset slightly so the label sits
+        next to (not under) the cursor. Pointer-events: none so the
+        label never intercepts the click/drag underneath it. */}
+    {cursor && (
+      <div
+        className="v2-arc-graph-add-moment-tooltip"
+        style={{ left: cursor.x + 12, top: cursor.y + 12 }}
+      >
+        + Add moment
+      </div>
+    )}
+    </div>
   );
 }
 
 /* ArcCard — individual arc tile shown in the left column of the
- * Archs tab. 248px wide on desktop. Left-edge color marker uses the
+ * Arcs tab. 248px wide on desktop. Left-edge color marker uses the
  * arc's color (matches the curve in the graph). Hover/focus tells
- * the parent which arc to highlight in the graph. Click opens the
- * arc-edit popup (same shell as the add-arc popup). */
+ * the parent which arc to highlight in the graph. Click on the body
+ * opens the arc-edit popup; click on a moment row opens the
+ * moment-edit popup for that specific moment. */
 function ArcCard({
   arc,
+  userMoments,
   onHover,
   onLeave,
   onClick,
+  onMomentClick,
   isActive,
 }: {
   arc: Arc;
+  /** User-wide Moments pool, used to resolve `arcMoment.momentId` to
+   *  the linked Moment's text for display in the moment rows below. */
+  userMoments: Moment[];
   onHover: () => void;
   onLeave: () => void;
   onClick: () => void;
+  /** Click on a specific moment row — opens the Edit Moment popup
+   *  pre-populated with that moment. Bubbling is stopped at the
+   *  source so the outer card click doesn't also fire. */
+  onMomentClick: (momentId: string) => void;
   isActive: boolean;
 }) {
+  // Card root is a div (not <button>) so the moment rows below can
+  // themselves be real <button>s — nested buttons aren't valid HTML
+  // and React warns about them in dev. role="button" + Enter/Space
+  // keyboard handler preserves the original accessibility.
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className={`v2-arc-card${isActive ? " is-active" : ""}`}
       style={{ "--arc-color": arc.color } as React.CSSProperties}
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
       onClick={onClick}
+      onKeyDown={e => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
     >
-      <div className="v2-arc-card-title">{arc.title || ARC_TYPE_LABELS[arc.type]}</div>
-      <div className="v2-arc-card-type">{ARC_TYPE_LABELS[arc.type].toUpperCase()}</div>
-      {arc.description && (
-        <div className="v2-arc-card-description">{arc.description}</div>
+      <div className="v2-arc-card-body">
+        <div className="v2-arc-card-title">{arc.title || ARC_TYPE_LABELS[arc.type]}</div>
+        <div className="v2-arc-card-type">{ARC_TYPE_LABELS[arc.type].toUpperCase()}</div>
+        {arc.description && (
+          <div className="v2-arc-card-description">{arc.description}</div>
+        )}
+      </div>
+      {(arc.moments?.length ?? 0) > 0 && (
+        <div className="v2-arc-card-moments">
+          {[...arc.moments!]
+            // Display in chronological order along the season.
+            .sort((a, b) => a.position - b.position)
+            .map(m => {
+              const linked = m.momentId
+                ? userMoments.find(u => u.id === m.momentId)
+                : null;
+              const display = m.text.trim() || linked?.text || "(empty moment)";
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="v2-arc-card-moment-row"
+                  onClick={e => {
+                    e.stopPropagation();
+                    onMomentClick(m.id);
+                  }}
+                >
+                  <span className="v2-arc-card-moment-pos">
+                    EP{Math.floor(m.position) + 1}
+                  </span>
+                  <span className="v2-arc-card-moment-text">{display}</span>
+                </button>
+              );
+            })}
+        </div>
       )}
-    </button>
+    </div>
   );
 }
 
 function ArcsTab({
-  story, setStory, autosaveEnabled,
+  story, setStory, autosaveEnabled, moments,
 }: {
   story: Story;
   setStory: (u: (s: Story) => Story) => void;
   autosaveEnabled: boolean;
+  /** User-wide Moments pool. Surfaced inside the Add-Moment popup so
+   *  the writer can attach an existing saved idea to an arc instead
+   *  of typing a fresh turning point inline. Same `moments` state
+   *  the Story tab + beat editor already use. */
+  moments: Moment[];
 }) {
   const isV2 = useIsV2();
   const isDesktop = useIsDesktopStudio();
@@ -10550,6 +10719,81 @@ function ArcsTab({
   // intensities reappear if the user later grows the episode count
   // back. On save we merge: visible cells (first N) + preserved tail.
   const [promptScoresFull, setPromptScoresFull] = useState<number[]>([]);
+
+  // ── Add/Edit Moment popup (turning-point marker on an arc) ───────
+  const [momentPopupOpen, setMomentPopupOpen] = useState(false);
+  const [momentArcId, setMomentArcId] = useState<string | null>(null);
+  const [momentEditingId, setMomentEditingId] = useState<string | null>(null);
+  const [momentPosition, setMomentPosition] = useState<number>(0);
+  const [momentText, setMomentText] = useState("");
+  const [momentLinkedId, setMomentLinkedId] = useState<string | null>(null);
+  // Search filter for the saved-ideas picker inside the moment popup.
+  const [momentIdeaQuery, setMomentIdeaQuery] = useState("");
+
+  function openAddMomentAt(arcId: string, position: number) {
+    setMomentArcId(arcId);
+    setMomentEditingId(null);
+    setMomentPosition(position);
+    setMomentText("");
+    setMomentLinkedId(null);
+    setMomentIdeaQuery("");
+    setMomentPopupOpen(true);
+  }
+
+  function openEditMoment(arcId: string, momentId: string) {
+    const arc = arcs.find(a => a.id === arcId);
+    const m = arc?.moments?.find(mm => mm.id === momentId);
+    if (!arc || !m) return;
+    setMomentArcId(arcId);
+    setMomentEditingId(momentId);
+    setMomentPosition(m.position);
+    setMomentText(m.text);
+    setMomentLinkedId(m.momentId ?? null);
+    setMomentIdeaQuery("");
+    setMomentPopupOpen(true);
+  }
+
+  function confirmMoment() {
+    if (!momentArcId) return;
+    const arcId = momentArcId;
+    const payload = {
+      position: momentPosition,
+      text: momentText.trim(),
+      momentId: momentLinkedId ?? undefined,
+    };
+    setMomentPopupOpen(false);
+    if (momentEditingId) {
+      const mid = momentEditingId;
+      setStory(s => updateMomentOnArc(s, arcId, mid, payload));
+    } else {
+      setStory(s => addMomentToArc(s, arcId, payload));
+    }
+    setMomentArcId(null);
+    setMomentEditingId(null);
+    setMomentText("");
+    setMomentLinkedId(null);
+  }
+
+  function handleDeleteMoment() {
+    if (!momentArcId || !momentEditingId) return;
+    const arcId = momentArcId;
+    const mid = momentEditingId;
+    setMomentPopupOpen(false);
+    setStory(s => deleteMomentFromArc(s, arcId, mid));
+    setMomentArcId(null);
+    setMomentEditingId(null);
+  }
+
+  /** Human-facing label for a fractional episode position. Integer
+   *  → "Episode 3". Non-integer → "Between EP3 and EP4". */
+  function formatMomentPosition(position: number): string {
+    const epLow = Math.floor(position) + 1;
+    const epHigh = Math.floor(position) + 2;
+    if (Math.abs(position - Math.round(position)) < 0.05) {
+      return `Episode ${Math.round(position) + 1}`;
+    }
+    return `Between EP${epLow} and EP${epHigh}`;
+  }
 
   function defaultScores(n: number): number[] {
     const out: number[] = [];
@@ -10733,9 +10977,11 @@ function ArcsTab({
               <ArcCard
                 key={arc.id}
                 arc={arc}
+                userMoments={moments}
                 onHover={() => setHighlightedArcId(arc.id)}
                 onLeave={() => setHighlightedArcId(null)}
                 onClick={() => openEditArcPrompt(arc)}
+                onMomentClick={mid => openEditMoment(arc.id, mid)}
                 isActive={highlightedArcId === arc.id}
               />
             ))}
@@ -10746,6 +10992,8 @@ function ArcsTab({
               episodeCount={episodeCount}
               highlightedArcId={highlightedArcId}
               onHoverArc={setHighlightedArcId}
+              onAddMomentAt={openAddMomentAt}
+              onMomentClick={openEditMoment}
               onScoreCommit={(arcId, index, score) => {
                 setStory(s => {
                   const active = getActiveArcsDraft(s);
@@ -10912,7 +11160,157 @@ function ArcsTab({
                   className="v2-direction-prompt-confirm"
                   onClick={confirmPrompt}
                 >
-                  {isEditMode ? "Save" : "Add Arch"}
+                  {isEditMode ? "Save" : "Add Arc"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Add / Edit Moment popup ─ a turning-point marker attached to
+          a specific spot along an arc curve. The user gets two ways
+          to fill it in: type a fresh turning-point inline, or pick a
+          saved idea from the user-wide Moments pool. Either path
+          writes a single ArcMoment entry; the marker renders as a
+          diamond on the graph and as a row at the bottom of the arc
+          card. */}
+      {momentPopupOpen && momentArcId && (() => {
+        const arc = arcs.find(a => a.id === momentArcId);
+        if (!arc) return null;
+        const q = momentIdeaQuery.trim().toLowerCase();
+        const filteredIdeas = q
+          ? moments.filter(m =>
+              m.text.toLowerCase().includes(q) ||
+              m.type.toLowerCase().includes(q) ||
+              m.tags.some(t => t.toLowerCase().includes(q)))
+          : moments;
+        const isEditing = momentEditingId !== null;
+        return (
+          <div
+            className="v2-direction-prompt-scrim"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="v2-moment-prompt-title"
+            onClick={() => setMomentPopupOpen(false)}
+          >
+            <div
+              className="v2-direction-prompt-card v2-arc-prompt-card"
+              onClick={e => e.stopPropagation()}
+            >
+              <h2
+                id="v2-moment-prompt-title"
+                className="v2-direction-prompt-title ds-type-empty-header"
+              >
+                {isEditing ? "Edit moment" : "Add a moment"}
+              </h2>
+              <p className="v2-direction-prompt-caption ds-type-body">
+                {(arc.title || ARC_TYPE_LABELS[arc.type]) + " · " + formatMomentPosition(momentPosition)}
+              </p>
+
+              <div className="v2-direction-prompt-field">
+                <span className="v2-direction-prompt-field-label">Key turning point</span>
+                <textarea
+                  className="v2-direction-prompt-textarea"
+                  value={momentText}
+                  onChange={e => {
+                    setMomentText(e.target.value);
+                    // Typing a fresh moment auto-clears any linked idea
+                    // — they're alternate inputs into the same slot.
+                    if (momentLinkedId) setMomentLinkedId(null);
+                  }}
+                  placeholder="e.g. He chooses to lie to Skyler for the first time."
+                  rows={3}
+                />
+              </div>
+
+              {momentLinkedId && (() => {
+                const linked = moments.find(m => m.id === momentLinkedId);
+                if (!linked) return null;
+                return (
+                  <div className="v2-arc-moment-linked-preview">
+                    <div className="v2-arc-moment-linked-preview-meta">
+                      <span className="v2-arc-moment-linked-preview-type">
+                        {linked.type.toUpperCase()}
+                      </span>
+                      <button
+                        type="button"
+                        className="v2-arc-moment-linked-preview-clear"
+                        onClick={() => setMomentLinkedId(null)}
+                      >
+                        ✕ Unlink
+                      </button>
+                    </div>
+                    <div className="v2-arc-moment-linked-preview-text">{linked.text}</div>
+                  </div>
+                );
+              })()}
+
+              <div className="v2-direction-prompt-field">
+                <span className="v2-direction-prompt-field-label">
+                  Or pick a saved idea
+                </span>
+                <Input
+                  type="text"
+                  value={momentIdeaQuery}
+                  onChange={e => setMomentIdeaQuery(e.target.value)}
+                  placeholder={moments.length === 0
+                    ? "No saved ideas yet — write one above"
+                    : "Search by text, type, or tag…"}
+                />
+                {moments.length > 0 && (
+                  <div className="v2-arc-moment-idea-list">
+                    {filteredIdeas.slice(0, 30).map(m => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`v2-arc-moment-idea-row${momentLinkedId === m.id ? " is-selected" : ""}`}
+                        onClick={() => {
+                          setMomentLinkedId(m.id);
+                          // Setting a linked idea wipes the inline text
+                          // so the popup only renders one source of
+                          // truth for the moment.
+                          setMomentText("");
+                        }}
+                      >
+                        <span className="v2-arc-moment-idea-type">{m.type.toUpperCase()}</span>
+                        <span className="v2-arc-moment-idea-text">{m.text}</span>
+                      </button>
+                    ))}
+                    {filteredIdeas.length === 0 && (
+                      <div className="v2-arc-moment-idea-empty">
+                        No ideas match "{momentIdeaQuery}"
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="v2-direction-prompt-actions">
+                {isEditing && (
+                  <button
+                    type="button"
+                    className="v2-arc-prompt-delete"
+                    onClick={handleDeleteMoment}
+                    style={{ marginRight: "auto" }}
+                  >
+                    Delete Moment
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="v2-direction-prompt-cancel"
+                  onClick={() => setMomentPopupOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="v2-direction-prompt-confirm"
+                  onClick={confirmMoment}
+                  disabled={!momentLinkedId && !momentText.trim()}
+                >
+                  {isEditing ? "Save" : "Add Moment"}
                 </button>
               </div>
             </div>
