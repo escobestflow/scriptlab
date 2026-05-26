@@ -7327,14 +7327,15 @@ html[data-design="v2"] .record-label {
      (short-only), Duration (short-only), Episode Title (TV-only),
      Genre, Sub-Genre. The `order` numbers don't need to be
      contiguous; flex sorts ascending. */
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Format"] { grid-column: 1; order: 1; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Count"] { grid-column: 1; order: 2; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Title"],
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Show Title"] { grid-column: 1; order: 1; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Format"] { grid-column: 1; order: 2; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 3; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 4; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Title"] { grid-column: 1; order: 5; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Genre"] { grid-column: 1; order: 6; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Sub-Genre"] { grid-column: 1; order: 7; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Show Title"] { grid-column: 1; order: 3; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 4; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 5; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Title"] { grid-column: 1; order: 6; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Genre"] { grid-column: 1; order: 7; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Sub-Genre"] { grid-column: 1; order: 8; }
   /* RIGHT column — Logline FIRST per spec, then Summary, Similar To,
      Writer Style, Tone, Themes, Story Framework, Ending. */
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Logline"] { grid-column: 2; order: 1; }
