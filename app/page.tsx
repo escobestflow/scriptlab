@@ -163,6 +163,8 @@ function SettingsScreen({
   setAutosaveEnabled,
   forceEmptyState,
   setForceEmptyState,
+  premiumImages,
+  setPremiumImages,
   onOpenStyleGuide,
 }: {
   email: string;
@@ -175,6 +177,11 @@ function SettingsScreen({
   setAutosaveEnabled: (v: boolean) => void;
   forceEmptyState: boolean;
   setForceEmptyState: (v: boolean) => void;
+  /** Whether AUTO-generated character / scene / episode images use
+   *  gpt-image-2 (premium, ~5× cost) or DALL-E 3 (cheaper default).
+   *  Project covers are unaffected — always premium. */
+  premiumImages: boolean;
+  setPremiumImages: (v: boolean) => void;
   onOpenStyleGuide: () => void;
 }) {
   // Preferences toggles — array-driven so the markup stays uniform
@@ -202,6 +209,12 @@ function SettingsScreen({
       caption: "Automatically save your work in real-time",
       value: autosaveEnabled,
       onChange: v => setAutosaveEnabled(v),
+    },
+    {
+      label: "Premium Image Quality",
+      caption: "Use gpt-image-2 for character / scene / episode generations (higher quality, ~5× cost). Off = DALL-E 3 (cheaper). Project covers always use premium.",
+      value: premiumImages,
+      onChange: v => setPremiumImages(v),
     },
     {
       label: "Empty State Preview",
@@ -1912,6 +1925,8 @@ export default function Page() {
                 setAutosaveEnabled={setAutosaveEnabled}
                 forceEmptyState={forceEmptyState}
                 setForceEmptyState={setForceEmptyState}
+                premiumImages={premiumImages}
+                setPremiumImages={(v) => setImageModel(v ? "gpt-image-2" : "dall-e-3")}
                 onOpenStyleGuide={() => {
                   if (typeof window !== "undefined") {
                     window.location.href = "/style-guide";
