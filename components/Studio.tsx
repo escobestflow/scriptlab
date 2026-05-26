@@ -3375,6 +3375,35 @@ export function Studio({
                       }}
                       onRemove={() => {
                         if (isCharLocked) return;
+                        // Risk 4 (arcs Phase 2): if this character owns
+                        // any structured Character Arcs in the active
+                        // arcs draft, surface a confirm so the writer
+                        // explicitly chooses whether to take the arcs
+                        // down with the character. Cancel preserves
+                        // both — least-surprise default.
+                        const linkedArcs = (getActiveArcsDraft(story)?.arcs ?? [])
+                          .filter(a => a.characterId === activeChar.id);
+                        if (linkedArcs.length > 0) {
+                          const titles = linkedArcs
+                            .map(a => `• ${a.title?.trim() || "Untitled arc"}`)
+                            .join("\n");
+                          const ok = window.confirm(
+                            `${linkedArcs.length} arc${linkedArcs.length === 1 ? "" : "s"} ${linkedArcs.length === 1 ? "is" : "are"} linked to "${activeChar.name || "this character"}":\n\n${titles}\n\nDelete the character AND ${linkedArcs.length === 1 ? "this arc" : "these arcs"} from the Arcs tab?\n\n(Cancel keeps both — you can unlink arcs manually in the Arcs tab.)`,
+                          );
+                          if (!ok) return;
+                          setStory(s => {
+                            let next = updateCharactersDraft(s, {
+                              characters: getActiveCharactersDraft(s).characters.filter(c => c.id !== activeChar.id),
+                            });
+                            for (const arc of linkedArcs) {
+                              next = deleteArcFromActiveDraft(next, arc.id);
+                            }
+                            return next;
+                          });
+                          setCharSheetCharId(null);
+                          return;
+                        }
+                        // No linked arcs — plain delete path.
                         setStory(s => updateCharactersDraft(s, {
                           characters: getActiveCharactersDraft(s).characters.filter(c => c.id !== activeChar.id),
                         }));
@@ -8798,6 +8827,50 @@ function CharacterEditForm({
   const allArcs = getActiveArcsDraft(story)?.arcs ?? [];
   const charArcs = allArcs.filter(a => a.characterId === ch.id);
   const charEpisodeCount = getEpisodeCountForArcs(story);
+
+  // ── Risk 5 mitigation: lazy migration of legacy character.arc ──
+  //
+  // Pre-Phase-2 character arcs were a single free-text field on the
+  // Character record. We replaced that UI on TV projects with the
+  // structured Character Arcs section above. Any pre-existing free
+  // text on `ch.arc` is now invisible — we lazily migrate it into a
+  // structured Character Arc the first time the writer opens this
+  // character's popup, then clear the legacy field so the migration
+  // is one-shot per character.
+  //
+  // Guard rails:
+  //   - TV projects only (feature/short still use the text field).
+  //   - Only migrates when `ch.arc` has non-whitespace text AND there
+  //     is NO existing arc with `characterId === ch.id`. If the user
+  //     already authored a structured Character Arc, we don't want to
+  //     duplicate intent.
+  //   - The migrated arc lands with `intensitySet: false` so it
+  //     doesn't auto-show in the timeline graph — the writer can
+  //     opt-in to the curve later. Description = the legacy text.
+  //   - Ref prevents the effect from re-firing within the same mount
+  //     if a parent re-render briefly resets the state mid-flight.
+  const migrationDoneRef = useRef(false);
+  useEffect(() => {
+    if (!isCharProjectTV) return;
+    if (migrationDoneRef.current) return;
+    const legacy = ch.arc?.trim();
+    if (!legacy) return;
+    const alreadyMigrated = charArcs.some(a => a.characterId === ch.id);
+    if (alreadyMigrated) return;
+    migrationDoneRef.current = true;
+    setStory(s => addArcToActiveDraft(s, {
+      type: "character",
+      characterId: ch.id,
+      title: "Character Arc",
+      description: legacy,
+      intensitySet: false,
+    }));
+    onUpdate({ arc: "" });
+    // Intentionally narrow deps: this should only ever fire once per
+    // character popup mount. Adding `charArcs` or `ch.arc` would cause
+    // a re-fire loop right after the first run when the patch lands.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ch.id]);
 
   const [arcPopupOpen, setArcPopupOpen] = useState(false);
   const [arcEditingId, setArcEditingId] = useState<string | null>(null);
