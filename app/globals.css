@@ -13297,20 +13297,25 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .v2-arc-card-placeholder::before {
     /* Tan color bar — distinct from any of the arc colors in
        ARC_COLORS so a placeholder is never confused with a real arc.
-       Geometry matches the real .v2-arc-card::before: 14px from top
-       and bottom, 4px wide, anchored to the left edge. */
+       Full-height (top:0/bottom:0) so it reads as a "masked" inset
+       stripe matching the real .v2-arc-card. The parent's
+       overflow: hidden + border-radius clips the corners. */
     content: "";
     position: absolute;
     left: 0;
-    top: 14px;
-    bottom: 14px;
+    top: 0;
+    bottom: 0;
     width: 4px;
-    border-radius: 2px;
+    border-radius: 0;
     background: #AC9175;
   }
   html[data-design="v2"] .v2-arc-card-placeholder-icon {
-    width: 22px;
-    height: 22px;
+    /* Desktop spec: 39 × 39. The entire placeholder CSS block lives
+       inside @media (min-width: 1440px), so this only applies at
+       desktop widths — mobile renders these placeholder buttons via
+       the JSX with no v2 styling. */
+    width: 39px;
+    height: 39px;
     flex: 0 0 auto;
     pointer-events: none;
   }
@@ -13326,10 +13331,14 @@ html[data-design="v2"] .menu-panel-utility svg {
     content: "";
     position: absolute;
     left: 0;
-    top: 14px;
-    bottom: 14px;
+    /* Full-height color bar — clipped at top/bottom by the parent's
+       border-radius via its overflow: hidden. Reads as a "masked"
+       stripe inset into the card surface rather than a floating
+       pill, matching the placeholder cards below. */
+    top: 0;
+    bottom: 0;
     width: 4px;
-    border-radius: 2px;
+    border-radius: 0;
     background: var(--arc-color, var(--ds-color-gray-outline));
   }
   html[data-design="v2"] .v2-arc-card.is-active {

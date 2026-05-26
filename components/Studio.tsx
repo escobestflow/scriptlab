@@ -10755,6 +10755,13 @@ function ArcsTab({
   // unlinked characterId so it shows up in the Arcs tab cards but
   // not on any specific character's page.
   const [promptCharacterId, setPromptCharacterId] = useState<string | null>(null);
+  // Which AttrRow (if any) inside the Add Arc popup is currently
+  // expanded. Mirrors the Character popup's `openAttr` state — same
+  // single-row-open-at-a-time UX so the popup stays compact and the
+  // user only sees the chips they care about.
+  const [popupOpenAttr, setPopupOpenAttr] = useState<string | null>(null);
+  const toggleArcAttr = (k: string) =>
+    setPopupOpenAttr(o => (o === k ? null : k));
 
   // ── Add/Edit Moment popup (turning-point marker on an arc) ───────
   const [momentPopupOpen, setMomentPopupOpen] = useState(false);
@@ -10849,6 +10856,7 @@ function ArcsTab({
     setPromptTitle("");
     setPromptDescription("");
     setPromptCharacterId(null);
+    setPopupOpenAttr(null);
     const initial = defaultScores(episodeCount);
     setPromptScores(initial);
     setPromptScoresFull(initial);
@@ -10861,6 +10869,7 @@ function ArcsTab({
     setPromptTitle(arc.title);
     setPromptDescription(arc.description);
     setPromptCharacterId(arc.characterId ?? null);
+    setPopupOpenAttr(null);
     // Capture the FULL stored scores (which may be longer than
     // episodeCount if the user previously shrank Concept) so the tail
     // beyond the visible cells survives the save. The popup only
@@ -11034,25 +11043,38 @@ function ArcsTab({
                 isActive={highlightedArcId === arc.id}
               />
             ))}
-            {/* Always-visible "+ CHARACTER ARC" placeholder card.
-                Click pre-selects character type in the Add Arc popup
-                so the character picker is already showing — the
-                writer just picks who the arc belongs to. */}
-            <button
-              type="button"
-              className="v2-arc-card-placeholder"
-              onClick={() => openAddArcPrompt({ initialType: "character" })}
-            >
-              <img
-                src="/v2/icon-add-arc.svg"
-                alt=""
-                aria-hidden="true"
-                className="v2-arc-card-placeholder-icon"
-              />
-              <span className="v2-arc-card-placeholder-label ds-type-project-tab-nav-inactive">
-                CHARACTER ARC
-              </span>
-            </button>
+            {/* Always-visible "+ ARC" placeholder slots — one per
+                common arc type the writer reaches for most often.
+                Each click jumps straight into the Add Arc popup
+                with that type pre-selected, skipping the chip-row
+                pick step. Order matches the writer's typical season-
+                planning flow: characters first (drives everything),
+                relationships (between characters), mystery (audience
+                pull), then the broader world / theme. */}
+            {([
+              { type: "character" as ArcType,      label: "CHARACTER ARC" },
+              { type: "relationship" as ArcType,   label: "RELATIONSHIP ARC" },
+              { type: "mystery-reveal" as ArcType, label: "MYSTERY ARC" },
+              { type: "world" as ArcType,          label: "WORLD ARC" },
+              { type: "theme" as ArcType,          label: "THEME ARC" },
+            ]).map(slot => (
+              <button
+                key={slot.type}
+                type="button"
+                className="v2-arc-card-placeholder"
+                onClick={() => openAddArcPrompt({ initialType: slot.type })}
+              >
+                <img
+                  src="/v2/icon-add-arc.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="v2-arc-card-placeholder-icon"
+                />
+                <span className="v2-arc-card-placeholder-label ds-type-project-tab-nav-inactive">
+                  {slot.label}
+                </span>
+              </button>
+            ))}
           </div>
           <div className="v2-arcs-graph">
             <ArcGraph
@@ -11123,19 +11145,25 @@ function ArcsTab({
                   ? "Every season starts with the central external story — the spine that drives the plot. We'll add it as your Main Plot Arch."
                   : "Pick the type, write a one-sentence description, then score the arc's intensity at each episode (1 = order, 10 = chaos)."}
               </p>
-              {/* Type — chip-row picker using the same Selector
-                  primitive the Character form uses for Gender. The
-                  first arc still defaults to Main Plot (it's the
-                  natural starting beat for a season), but the user
-                  can pick anything from this picker — including
-                  another Main Plot. We used to filter Main Plot out
-                  to enforce "one main plot per season"; the writer
-                  pushed back on that since some seasons run two
-                  parallel core arcs (A-plot / B-plot). */}
+              {/* Type — AttrRow wrapper around the chip-row, matching
+                  the Character popup's Gender selector exactly:
+                  collapsed by default with a value preview + caret,
+                  expands on tap to reveal all 20 type chips. Lets
+                  the popup stay compact instead of dumping the full
+                  20-chip grid into the user's face every time.
+                  First arc still gets the Main Plot default (the
+                  natural opening beat for a season), but the user
+                  can pick anything — including another Main Plot for
+                  A-plot/B-plot season structures. */}
               {!isFirstAndCreating && (
-                <div className="v2-direction-prompt-field">
-                  <span className="v2-direction-prompt-field-label">Type</span>
-                  <div className="chip-row v2-arc-prompt-type-row">
+                <AttrRow
+                  label="Type"
+                  values={[ARC_TYPE_LABELS[promptType].replace(/ Arc$/, "")]}
+                  placeholder="Pick a type"
+                  expanded={popupOpenAttr === "type"}
+                  onToggle={() => toggleArcAttr("type")}
+                >
+                  <div className="chip-row">
                     {ARC_TYPES.map(t => (
                       <Selector
                         key={t}
@@ -11146,37 +11174,49 @@ function ArcsTab({
                       </Selector>
                     ))}
                   </div>
-                </div>
+                </AttrRow>
               )}
               {/* Character picker — appears only when the arc type is
                   "character" so the writer can pin the arc to a
-                  specific cast member from the Arcs-tab popup
-                  (matches what the Character popup's own arc flow
-                  does, but here surfaced as an inline chip row). */}
-              {promptType === "character" && (
-                <div className="v2-direction-prompt-field">
-                  <span className="v2-direction-prompt-field-label">Character</span>
-                  <div className="chip-row v2-arc-prompt-type-row">
-                    {(getActiveCharactersDraft(story).characters ?? []).length === 0 ? (
-                      <span className="v2-arc-moment-idea-empty" style={{ padding: 0 }}>
-                        No characters in this project yet — add one from the Characters tab first.
-                      </span>
-                    ) : (
-                      getActiveCharactersDraft(story).characters.map(c => (
-                        <Selector
-                          key={c.id}
-                          selected={promptCharacterId === c.id}
-                          onClick={() =>
-                            setPromptCharacterId(promptCharacterId === c.id ? null : c.id)
-                          }
-                        >
-                          {c.name || "Unnamed"}
-                        </Selector>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
+                  specific cast member from the Arcs-tab popup. Same
+                  AttrRow / chip-row shell as the Gender selector
+                  pattern; the value preview shows which character
+                  is currently linked. */}
+              {promptType === "character" && (() => {
+                const chars = getActiveCharactersDraft(story).characters ?? [];
+                const picked = chars.find(c => c.id === promptCharacterId);
+                return (
+                  <AttrRow
+                    label="Character"
+                    values={picked ? [picked.name || "Unnamed"] : undefined}
+                    placeholder={chars.length === 0
+                      ? "Add a character first"
+                      : "Pick a character"}
+                    expanded={popupOpenAttr === "character"}
+                    onToggle={() => toggleArcAttr("character")}
+                  >
+                    <div className="chip-row">
+                      {chars.length === 0 ? (
+                        <span className="v2-arc-moment-idea-empty" style={{ padding: 0 }}>
+                          No characters in this project yet — add one from the Characters tab first.
+                        </span>
+                      ) : (
+                        chars.map(c => (
+                          <Selector
+                            key={c.id}
+                            selected={promptCharacterId === c.id}
+                            onClick={() =>
+                              setPromptCharacterId(promptCharacterId === c.id ? null : c.id)
+                            }
+                          >
+                            {c.name || "Unnamed"}
+                          </Selector>
+                        ))
+                      )}
+                    </div>
+                  </AttrRow>
+                );
+              })()}
               {/* Title — same Input primitive the Character form
                   uses for Name. Standard variant, with the built-
                   in clear button. */}
