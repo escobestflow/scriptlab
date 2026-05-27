@@ -65,7 +65,21 @@ export async function POST(req: Request) {
       action.type === "sync_characters_to_script" ||
       action.type === "sync_story_to_script" ||
       action.type === "import_extract_scenes" ||
-      action.type === "import_summarize_scenes";
+      action.type === "import_summarize_scenes" ||
+      // TV "Upload Script" pipeline:
+      // - tv_import_episodes emits 8-30 episodes × ~600 tokens of
+      //   beats each → 5-18K just on the beats array. Hit the 8K
+      //   cap mid-array with no way to recover (parse fails).
+      // - tv_import_pilot emits a full pilot screenplay → 8-15K
+      //   tokens of prose. Same cap concern.
+      // - tv_import_characters / tv_import_arcs are smaller but
+      //   benefit from headroom for large casts / many arcs.
+      // - tv_import_concept stays at the 8K default (output is 4
+      //   short fields — never needs more).
+      action.type === "tv_import_characters" ||
+      action.type === "tv_import_arcs" ||
+      action.type === "tv_import_episodes" ||
+      action.type === "tv_import_pilot";
     const maxTokens = isScriptHeavy ? 32000 : wantsJsonPrefill ? 8192 : 4096;
 
     const messages: any[] = [{ role: "user", content: userMessage }];
