@@ -142,27 +142,38 @@ export async function generateImageWithFallback(opts: {
   }
 
   async function tryModel(model: "gpt-image-2" | "dall-e-3"): Promise<ImageGenResult> {
-    // The OpenAI /v1/images/generations endpoint dropped `response_format`
-    // when they unified the API across DALL-E 3 + gpt-image-1/2 (it now
-    // 400s with "Unknown parameter: 'response_format'."). Both models
-    // return b64_json by default in the response — no opt-in needed.
-    // We still pass `quality` per-model since the accepted values differ
-    // (DALL-E: standard|hd; gpt-image-2: low|medium|high|auto).
-    const body = model === "gpt-image-2"
-      ? {
-          model,
-          prompt,
-          n: 1,
-          size: sizes.gptImage2,
-          quality: "high",
-        }
-      : {
-          model,
-          prompt,
-          n: 1,
-          size: sizes.dallE3,
-          quality: "standard",
-        };
+    // The OpenAI /v1/images/generations endpoint dropped DALL-E 3
+    // entirely when they unified the API around gpt-image-1/2. A
+    // request with model="dall-e-3" now 400s with "The model
+    // 'dall-e-3' does not exist." To avoid a sweeping rename across
+    // 11 files (routes, prefs, usageLog pricing, every client call
+    // site), we keep "dall-e-3" as the *user-facing* "cheap path"
+    // identifier and substitute gpt-image-1 at quality=medium as
+    // the actual API model right here. Same ballpark cost (~$0.04
+    // at 1024x1024 standard, scaling to ~$0.06 at portrait/landscape).
+    const apiModel = model === "dall-e-3" ? "gpt-image-1" : model;
+    // Quality tiers: gpt-image-2 keeps "high" (the premium toggle is
+    // explicitly opting into that cost). gpt-image-1 uses "medium" —
+    // good enough for character/scene/episode thumbnails, cheap to
+    // run. low quality is too soft for the painted-portrait look.
+    const apiQuality = model === "gpt-image-2" ? "high" : "medium";
+    // gpt-image-1 only accepts square (1024x1024), portrait
+    // (1024x1536), and landscape (1536x1024). Remap the dall-e-3
+    // sizes that no longer fit — the callers' size constants are
+    // still labeled "dallE3" for backwards compat but the values
+    // get translated here.
+    const dallSize = sizes.dallE3 === "1024x1792"
+      ? "1024x1536"
+      : sizes.dallE3 === "1792x1024"
+        ? "1536x1024"
+        : sizes.dallE3;
+    const body = {
+      model: apiModel,
+      prompt,
+      n: 1,
+      size: model === "gpt-image-2" ? sizes.gptImage2 : dallSize,
+      quality: apiQuality,
+    };
     try {
       const res = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",
