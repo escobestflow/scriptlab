@@ -1307,7 +1307,12 @@ Rules:
     case "tv_import_episodes": {
       const p = action.payload as { scriptText?: string; notes?: string; episodeCount?: number };
       const epCount = Math.max(1, Math.min(30, Number(p.episodeCount) || 8));
-      return `Build the FULL slate of episodes for this TV series — title, logline, and a seed beat sheet for every episode from pilot through finale.
+      // Episode containers only — title, logline, archetype. NO beats.
+      // Beats for the pilot get generated in the next step (tv_import_pilot)
+      // alongside the screenplay. Beats for episodes 2..N stay empty and
+      // get generated lazily later (per-episode, on demand) so this single
+      // bulk call doesn't blow past the output-token cap on long seasons.
+      return `Build the FULL slate of episode CONTAINERS for this TV series — title, logline, and archetype for every episode from pilot through finale. Do NOT generate beats; those come in later steps.
 
 # Source material
 ${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
@@ -1323,35 +1328,36 @@ Return STRICT JSON in this exact schema:
       "number": number,             // 1..${epCount}, in order
       "title": string,              // 1-5 words; specific, sensory, NOT a generic episode number
       "logline": string,            // 2-4 sentences. What happens this episode + the emotional stakes
-      "archetype": "pilot" | "case-of-the-week" | "myth-arc" | "character-focus" | "two-hander" | "bottle" | "flashback" | "finale" | "premiere" | null,
-      "beats": [                    // 5-8 seed beats for this episode (name + summary + purpose each)
-        { "name": string, "summary": string, "purpose": string }
-      ]
+      "archetype": "pilot" | "case-of-the-week" | "myth-arc" | "character-focus" | "two-hander" | "bottle" | "flashback" | "finale" | "premiere" | null
     }
   ]
 }
 
 Rules:
 - Return EXACTLY ${epCount} episodes, numbered 1..${epCount}, in chronological order.
-- Pilot (Episode 1): introduce world + protagonist + central conflict; end on a hook strong enough to demand Episode 2.
-- Finale (Episode ${epCount}): per the series-type structural rules in the bible — Limited resolves; Ongoing/Anthology/Hybrid leaves seeds; Episodic returns to baseline.
-- Middle episodes: escalate the season's arcs; the per-episode arc intensity in the bible's "Season arcs" block tells you which arcs are dominant when.
-- Each episode's beats should HIT the active arcs at that episode's intensity. Dominant arc → 1-2 beats; active arc → at least 1 beat.
-- The FINAL beat of every non-finale episode (and the finale itself, except for Limited) must create momentum into the next episode per the TV-momentum principle in the system instructions.
+- Pilot (Episode 1): introduce world + protagonist + central conflict; the logline should signal a hook strong enough to demand Episode 2.
+- Finale (Episode ${epCount}): per the series-type structural rules in the bible — Limited resolves; Ongoing/Anthology/Hybrid leaves seeds; Episodic returns to baseline. The logline reflects that posture.
+- Middle episodes: each logline should signal where in the season's arc escalation this episode sits — the per-episode arc intensity in the bible's "Season arcs" block tells you which arcs dominate when.
+- Each episode's logline should hint at which active arcs the episode will hit, even though you are NOT writing the beats here.
+- Do NOT include a "beats" field. We only want episode containers.
 - No prose outside the JSON.`;
     }
 
     case "tv_import_pilot": {
       const p = action.payload as { scriptText?: string; notes?: string };
-      // Pull the pilot from the episodes draft (set by step 4).
+      // Pull the pilot from the episodes draft (set by step 4). The pilot
+      // is the first episode (sorted by number). The pilot has NO beats
+      // yet — step 4 only set up containers — so this prompt generates
+      // both the pilot's beat sheet AND a screenplay scene per beat in
+      // a single call.
       const epd = getActiveEpisodesDraft(story);
       const pilot = epd?.episodes
         ? [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0))[0]
         : null;
-      const pilotBeats = pilot?.beats?.length
-        ? pilot.beats.map((b, i) => `${i + 1}. ${b.name}${b.summary ? ` — ${b.summary}` : ""}${b.purpose ? ` (purpose: ${b.purpose})` : ""}`).join("\n")
-        : "(no beats — generate 5-8 fresh seed beats first, then write a scene per beat)";
-      return `Write the FULL PILOT SCREENPLAY for this TV series.
+      const pilotContext = pilot
+        ? `Episode 1 — "${pilot.title || "(untitled)"}"\nLogline: ${pilot.logline || "(none — infer from the bible above)"}`
+        : "(no pilot container found — use the bible to invent a pilot title + logline before generating beats and scenes)";
+      return `Write the FULL PILOT for this TV series — both the beat sheet AND the screenplay prose.
 
 This is the most important episode in the season — the first impression. It must be:
 - IMPACTFUL — the cold open hooks immediately; the closing image refuses to be forgotten.
@@ -1362,21 +1368,34 @@ This is the most important episode in the season — the first impression. It mu
 ${p.scriptText ? `## Uploaded script / treatment / notes (use as ground truth — if this IS the actual pilot script, extract its scenes near-verbatim; if it's a treatment, adapt it into screenplay form)\n${p.scriptText}\n` : "(no script uploaded — generate from scratch using the project bible + notes)"}
 ${p.notes?.trim() ? `\n## Additional information from the writer\n${p.notes.trim()}\n` : ""}
 
-# Pilot beats (from the previous step, ALREADY in the project bible — write one scene per beat in order)
-${pilotBeats}
+# Pilot container (from the previous step — title + logline established; beats are NOT yet written, you will generate them now)
+${pilotContext}
 
 Return STRICT JSON in this exact schema:
 {
+  "beats": [
+    {
+      "name": string,         // 1-5 word beat label, sensory + specific
+      "summary": string,      // 1-2 sentences. What happens in this beat.
+      "purpose": string       // 1 sentence. What this beat does for the audience.
+    }
+  ],
   "scenes": [
     {
-      "beatIndex": number,    // 0-based index into the pilot's beat array — exactly one scene per beat in order
+      "beatIndex": number,    // 0-based index into the beats array above — exactly one scene per beat in order
       "heading": string,      // standard screenplay slug, e.g. "INT. KITCHEN - NIGHT"
       "content": string       // the actual screenplay prose for this scene
     }
   ]
 }
 
+Beat-writing rules:
+- Produce 5-8 beats total.
+- Beats trace the pilot's narrative arc from cold open through the closing image — setup → escalation → turn → button.
+- Every active season arc in the bible's "Season arcs" block should get touched by at least one beat. Dominant arcs anchor 1-2 beats.
+
 Scene-writing rules:
+- Exactly one scene per beat, in order. The scenes array length === the beats array length.
 - Real screenplay format: slugline, action lines, character names ALL CAPS above their dialogue, dialogue blocks.
 - No scene-number prefixes (no "1.", no "SCENE 1") — just the slugline.
 - Action is present-tense, visual, sensory. Avoid "we see" / "we hear" — show the image.

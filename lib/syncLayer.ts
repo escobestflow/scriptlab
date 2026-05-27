@@ -642,20 +642,15 @@ function applyTVImportEpisodesResult(story: Story, parsed: any): Story {
     "pilot", "case-of-the-week", "myth-arc", "character-focus",
     "two-hander", "bottle", "flashback", "finale", "premiere",
   ]);
+  // Bulk step intentionally returns NO beats. Every episode is a fresh
+  // empty container — beats for the pilot get generated in the next
+  // step (tv_import_pilot, alongside the screenplay); beats for episodes
+  // 2..N stay empty and are generated lazily later (per-episode, on
+  // demand) so this single bulk call stays well under the output cap on
+  // long seasons. If the model accidentally returns a `beats` array we
+  // discard it — the schema only asks for containers.
   const episodes: Episode[] = raw
     .map((ep: any, i: number): Episode => {
-      const beats: Beat[] = Array.isArray(ep?.beats)
-        ? ep.beats.map((b: any, j: number): Beat => ({
-            id: `b_${Math.random().toString(36).slice(2, 10)}`,
-            name: typeof b?.name === "string" ? b.name : `Beat ${j + 1}`,
-            summary: typeof b?.summary === "string" ? b.summary : "",
-            purpose: typeof b?.purpose === "string" ? b.purpose : "",
-            position: j,
-            momentIds: [],
-            characterIds: [],
-            status: "design",
-          }))
-        : [];
       const num = Number(ep?.number);
       return {
         id: `ep_${Math.random().toString(36).slice(2, 10)}`,
@@ -663,48 +658,81 @@ function applyTVImportEpisodesResult(story: Story, parsed: any): Story {
         title: typeof ep?.title === "string" ? ep.title.trim() : `Episode ${i + 1}`,
         logline: typeof ep?.logline === "string" ? ep.logline.trim() : "",
         archetype: allowedArchetypes.has(ep?.archetype) ? ep.archetype : undefined,
-        beats,
+        beats: [],
       };
     })
     .sort((a: Episode, b: Episode) => (a.number ?? 0) - (b.number ?? 0));
   return updateEpisodesDraft(story, { episodes });
 }
 
-/** Apply the AI's pilot screenplay. Walks the scenes array, each of
- *  which references a `beatIndex` into the pilot's beat list, and
- *  splices each scene's prose onto its matching beat as `sceneContent`
- *  + flips status to "written" — mirrors what the existing
- *  importScriptFromText does for feature/short projects, just scoped
- *  to Episode 1 only. The Scene[] for the active Script draft is
- *  rebuilt from the scenes too (linking back to beats via beatId). */
+/** Apply the AI's pilot output. Step 4 (tv_import_episodes) leaves
+ *  the pilot's beats EMPTY — this step generates both the beat sheet
+ *  and a screenplay scene per beat in a single Opus call, so we have
+ *  to materialize the beats FIRST (from parsed.beats), then splice
+ *  each scene's prose onto its matching beat by `beatIndex`. Mirrors
+ *  what the existing importScriptFromText does for feature/short
+ *  projects, just scoped to Episode 1. The Scene[] for the active
+ *  Script draft is rebuilt from the scenes too (linking back to
+ *  beats via beatId).
+ *
+ *  Resilience: if parsed.beats is missing/empty but parsed.scenes is
+ *  present (older model output, or the model decided to skip the
+ *  beats array), we fall back to deriving beats from the scenes —
+ *  one beat per scene, name = "Scene N" — so the pilot at least
+ *  renders. Better than dropping the whole step on a schema slip. */
 function applyTVImportPilotResult(story: Story, parsed: any): Story {
+  const rawBeats = Array.isArray(parsed?.beats) ? parsed.beats : [];
   const rawScenes = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
   const epd = getActiveEpisodesDraft(story);
   if (!epd || epd.episodes.length === 0) return story;
   const sorted = [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
   const pilot = sorted[0];
 
-  // Match scenes to beats by `beatIndex`. Missing indices fall through
-  // unchanged. Each beat with a matched scene gets its sceneContent +
-  // status flipped to "written".
-  const nextBeats: Beat[] = pilot.beats.map((b, i) => {
+  // 1. Materialize pilot beats. Prefer parsed.beats; fall back to
+  //    one-beat-per-scene if the model skipped the beats array.
+  const beatSeeds: { name: string; summary: string; purpose: string }[] =
+    rawBeats.length > 0
+      ? rawBeats.map((b: any, i: number) => ({
+          name: typeof b?.name === "string" ? b.name : `Beat ${i + 1}`,
+          summary: typeof b?.summary === "string" ? b.summary : "",
+          purpose: typeof b?.purpose === "string" ? b.purpose : "",
+        }))
+      : rawScenes.map((_s: any, i: number) => ({
+          name: `Scene ${i + 1}`,
+          summary: "",
+          purpose: "",
+        }));
+
+  const pilotBeats: Beat[] = beatSeeds.map((seed, i) => {
     const match = rawScenes.find((s: any) => Number(s?.beatIndex) === i);
-    if (!match) return b;
     const content = typeof match?.content === "string" ? match.content : "";
-    if (!content.trim()) return b;
-    return { ...b, sceneContent: content, status: "written" as const };
+    return {
+      id: `b_${Math.random().toString(36).slice(2, 10)}`,
+      name: seed.name,
+      summary: seed.summary,
+      purpose: seed.purpose,
+      position: i,
+      momentIds: [],
+      characterIds: [],
+      // Beats with a matched scene get their prose + "written" status;
+      // any beat the model failed to write a scene for stays "design".
+      ...(content.trim()
+        ? { sceneContent: content, status: "written" as const }
+        : { status: "design" as const }),
+    };
   });
+
   // Patch the pilot episode with the new beats array.
   const nextEpisodes = sorted.map(e =>
-    e.id === pilot.id ? { ...e, beats: nextBeats } : e,
+    e.id === pilot.id ? { ...e, beats: pilotBeats } : e,
   );
   let next = updateEpisodesDraft(story, { episodes: nextEpisodes });
 
-  // Build the Script-layer Scene[] for the pilot's scenes so the
-  // Script tab renders the prose. Mirror what the existing import
-  // does: one Scene per written beat, linked via beatId, heading from
-  // the AI's "INT./EXT. …" slug.
-  const scenes: Scene[] = nextBeats
+  // 2. Build the Script-layer Scene[] for the pilot's scenes so the
+  //    Script tab renders the prose. Mirror what the existing import
+  //    does: one Scene per written beat, linked via beatId, heading
+  //    from the AI's "INT./EXT. …" slug.
+  const scenes: Scene[] = pilotBeats
     .map((b, i): Scene | null => {
       if (b.status !== "written" || !b.sceneContent?.trim()) return null;
       const match = rawScenes.find((s: any) => Number(s?.beatIndex) === i);

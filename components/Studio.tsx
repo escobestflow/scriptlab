@@ -3732,8 +3732,8 @@ export function Studio({
               <li><strong>Concept</strong> — fills any empty fields (logline, summary, themes, story framework). <em>Already-filled fields are preserved.</em></li>
               <li><strong>Characters</strong> — full cast roster from the source.</li>
               <li><strong>Arcs</strong> — season arcs + character arcs for the top 3–5 most important characters.</li>
-              <li><strong>Episodes</strong> — every episode in the season gets a title, logline, and seed beat sheet.</li>
-              <li><strong>Pilot screenplay</strong> — only Episode 1 is fully scripted (impactful, raw, and a setup for the rest of the season). Other episodes ship as scaffolding you can write or generate later.</li>
+              <li><strong>Episodes</strong> — every episode in the season gets a title, logline, and archetype. Beats are written per-episode later, on demand.</li>
+              <li><strong>Pilot screenplay</strong> — only Episode 1 gets a beat sheet AND full screenplay in this run (impactful, raw, and a setup for the rest of the season). Other episodes ship as scaffolding you can write or generate later.</li>
             </ul>
 
             {/* File upload */}
