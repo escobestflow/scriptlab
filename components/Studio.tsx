@@ -35,6 +35,11 @@ import {
   syncLayers,
   importExtractScenes,
   importSummarizeScenesIntoBeats,
+  // TV-only "Upload Script" pipeline — 5-step orchestrator that
+  // takes script + notes + episode count and populates concept →
+  // characters → arcs → episodes → pilot screenplay.
+  importTVProjectFromScript,
+  type TVImportStep,
 } from "@/lib/syncLayer";
 import {
   extractTextFromFile,
@@ -571,6 +576,76 @@ export function Studio({
   // can show "Generating Concept…" etc. in the card.
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<LayerKey | null>(null);
+  // TV "Upload Script" pipeline state. Separate from the legacy
+  // import state above because the pipeline shape is different (5
+  // sequential AI calls instead of the legacy scene-extract → summarize
+  // → sync flow) and the in-flight UX is its own popup.
+  const [tvImportOpen, setTVImportOpen] = useState(false);
+  const [tvImporting, setTVImporting] = useState(false);
+  const [tvImportStep, setTVImportStep] = useState<TVImportStep | null>(null);
+  const [tvImportError, setTVImportError] = useState<string | null>(null);
+  const [tvImportScriptFile, setTVImportScriptFile] = useState<File | null>(null);
+  const [tvImportNotes, setTVImportNotes] = useState("");
+  const [tvImportEpisodeCount, setTVImportEpisodeCount] = useState<number>(8);
+
+  async function runTVImport() {
+    if (tvImporting) return;
+    // Need at least one source: a script OR notes.
+    if (!tvImportScriptFile && !tvImportNotes.trim()) {
+      setTVImportError("Upload a script OR write some additional information — we need at least one source to work from.");
+      return;
+    }
+    setTVImporting(true);
+    setTVImportError(null);
+    setTVImportStep(null);
+    try {
+      // Extract text from the file IF provided. Notes are pass-through.
+      let scriptText = "";
+      if (tvImportScriptFile) {
+        try {
+          scriptText = await extractTextFromFile(tvImportScriptFile);
+        } catch (e: any) {
+          throw new Error(`Could not read the uploaded file: ${e?.message || String(e)}`);
+        }
+        if (!scriptText.trim() && !tvImportNotes.trim()) {
+          throw new Error("No text could be extracted from the uploaded file (it may be an image-only PDF). Try a .txt file or add notes instead.");
+        }
+      }
+      const finalStory = await importTVProjectFromScript(
+        story,
+        {
+          scriptText: scriptText.trim() || undefined,
+          notes: tvImportNotes.trim() || undefined,
+          episodeCount: tvImportEpisodeCount,
+        },
+        {
+          onStep: step => setTVImportStep(step),
+          onPartialStory: s => setStory(() => s),
+        },
+        profile,
+      );
+      setStory(() => finalStory);
+      // Land the user inside Episode 1 → Script tab per spec. We pick
+      // the first episode in the active episodes draft (which step 4
+      // just populated) and route to its script view.
+      const epd = getActiveEpisodesDraft(finalStory);
+      const firstEp = epd?.episodes
+        ? [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0))[0]
+        : null;
+      if (firstEp) {
+        setActiveEpisodeId(firstEp.id);
+        setSection("script");
+      }
+      setTVImportOpen(false);
+      setTVImportScriptFile(null);
+      setTVImportNotes("");
+    } catch (e: any) {
+      setTVImportError(e?.message || String(e));
+    } finally {
+      setTVImporting(false);
+      setTVImportStep(null);
+    }
+  }
 
   // Full-screen "generating" scrim. Covers everything (including open
   // sheets) while a "Create all" action is in flight. Any open sheet is
@@ -2544,6 +2619,30 @@ export function Studio({
               isTV={isTV}
               activeEpisodeId={activeEpisodeId}
             />
+            {/* Upload Script button — TV-only, desktop-only. Floats
+                27px above the tab bar's top edge and 60px from the
+                right of the viewport. Styled like the secondary
+                "Create with AI" CTA in the empty Characters state.
+                Click opens the dedicated TV-import popup that runs
+                the 5-step pipeline (concept → characters → arcs →
+                episodes → pilot screenplay). */}
+            {isTV && isDesktop && !activeEpisodeId && (
+              <button
+                type="button"
+                className="v2-tv-upload-script-btn empty-state-ai-btn ds-type-cta"
+                onClick={() => setTVImportOpen(true)}
+                disabled={tvImporting}
+                title="Upload a script or notes to auto-populate the whole show"
+              >
+                <img
+                  src="/icon-button-upload.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="v2-tv-upload-script-icon"
+                />
+                <span>{tvImporting ? "Importing…" : "Upload Script"}</span>
+              </button>
+            )}
           </div>
 
         </div>
@@ -3601,6 +3700,138 @@ export function Studio({
       {generatingAll && typeof document !== "undefined" && createPortal(
         <div className="generate-scrim" role="status" aria-live="polite" aria-label="Generating">
           <div className="generate-scrim-spinner" />
+        </div>,
+        document.body,
+      )}
+
+      {/* TV "Upload Script" popup. Desktop + TV-only entry point.
+          Walks the writer through what's about to happen, takes the
+          source material (script file and / or notes) + the season
+          length, then kicks off the 5-step pipeline that builds the
+          whole show. Shows per-step progress; on success, the writer
+          lands inside Episode 1 → Script tab. */}
+      {tvImportOpen && typeof document !== "undefined" && createPortal(
+        <div
+          className="v2-direction-prompt-scrim"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="v2-tv-import-title"
+          onClick={() => { if (!tvImporting) setTVImportOpen(false); }}
+        >
+          <div
+            className="v2-direction-prompt-card v2-tv-import-card"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 id="v2-tv-import-title" className="v2-direction-prompt-title ds-type-empty-header">
+              Build the show from your script
+            </h2>
+            <p className="v2-direction-prompt-caption ds-type-body">
+              Upload the pilot, a series treatment, a bible, or just notes — we'll generate the rest of the project from it:
+            </p>
+            <ul className="v2-tv-import-pipeline-list">
+              <li><strong>Concept</strong> — fills any empty fields (logline, summary, themes, story framework). <em>Already-filled fields are preserved.</em></li>
+              <li><strong>Characters</strong> — full cast roster from the source.</li>
+              <li><strong>Arcs</strong> — season arcs + character arcs for the top 3–5 most important characters.</li>
+              <li><strong>Episodes</strong> — every episode in the season gets a title, logline, and seed beat sheet.</li>
+              <li><strong>Pilot screenplay</strong> — only Episode 1 is fully scripted (impactful, raw, and a setup for the rest of the season). Other episodes ship as scaffolding you can write or generate later.</li>
+            </ul>
+
+            {/* File upload */}
+            <div className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">
+                Script / treatment / bible (optional)
+              </span>
+              <input
+                type="file"
+                accept={IMPORT_ACCEPT}
+                disabled={tvImporting}
+                onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  setTVImportScriptFile(f);
+                  setTVImportError(null);
+                }}
+                className="v2-tv-import-file"
+              />
+              {tvImportScriptFile && (
+                <div className="v2-tv-import-file-name">
+                  {tvImportScriptFile.name} ({Math.round(tvImportScriptFile.size / 1024)} KB)
+                </div>
+              )}
+            </div>
+
+            {/* Additional info */}
+            <label className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">
+                Additional information (optional)
+              </span>
+              <textarea
+                className="v2-direction-prompt-textarea"
+                value={tvImportNotes}
+                onChange={e => { setTVImportNotes(e.target.value); setTVImportError(null); }}
+                placeholder="World, tone, target audience, specific plot directions, casting ideas, anything else the AI should know."
+                rows={5}
+                disabled={tvImporting}
+              />
+            </label>
+
+            {/* Episode count */}
+            <div className="v2-direction-prompt-field">
+              <span className="v2-direction-prompt-field-label">Number of episodes</span>
+              <Input
+                type="number"
+                min={1}
+                max={30}
+                value={tvImportEpisodeCount}
+                onChange={e => {
+                  const n = parseInt(e.target.value, 10);
+                  if (Number.isFinite(n)) setTVImportEpisodeCount(Math.max(1, Math.min(30, n)));
+                }}
+                disabled={tvImporting}
+                placeholder="8"
+              />
+            </div>
+
+            {/* In-progress step indicator */}
+            {tvImporting && (
+              <div className="v2-tv-import-progress">
+                <div className="v2-tv-import-progress-spinner" />
+                <div className="v2-tv-import-progress-label">
+                  {tvImportStep === "concept"    && "Filling empty Concept fields…"}
+                  {tvImportStep === "characters" && "Writing the cast…"}
+                  {tvImportStep === "arcs"       && "Building season arcs…"}
+                  {tvImportStep === "episodes"   && "Drafting every episode…"}
+                  {tvImportStep === "pilot"      && "Writing the pilot screenplay…"}
+                  {!tvImportStep && "Starting…"}
+                </div>
+              </div>
+            )}
+
+            {/* Error surface */}
+            {tvImportError && !tvImporting && (
+              <div className="v2-tv-import-error" role="alert">
+                {tvImportError}
+              </div>
+            )}
+
+            <div className="v2-direction-prompt-actions">
+              <button
+                type="button"
+                className="v2-direction-prompt-cancel"
+                onClick={() => setTVImportOpen(false)}
+                disabled={tvImporting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="v2-direction-prompt-confirm"
+                onClick={runTVImport}
+                disabled={tvImporting || (!tvImportScriptFile && !tvImportNotes.trim())}
+              >
+                {tvImporting ? "Building…" : "Build the show"}
+              </button>
+            </div>
+          </div>
         </div>,
         document.body,
       )}
@@ -12967,11 +13198,22 @@ function ScriptTab({
              story description. Same 3-path pipeline the v1 mobile
              ImportScriptCard exposes. Hidden on mobile + v1 since
              those surfaces already have their own import affordance
-             (project-creation flow + bottom card). */
-          onGenerate={isV2 && isDesktop ? () => setImportPopupOpen(true) : undefined}
-          generateLabel={isV2 && isDesktop
-            ? (importing ? "Importing…" : "Import a Script")
-            : undefined}
+             (project-creation flow + bottom card). ALSO hidden on
+             TV projects — TV gets its own "Upload Script" entry
+             point in the studio tab bar that runs a different
+             pipeline (concept → characters → arcs → episodes →
+             pilot screenplay), and two competing import buttons
+             would be confusing. */
+          onGenerate={
+            isV2 && isDesktop && story.projectType !== "tv-show"
+              ? () => setImportPopupOpen(true)
+              : undefined
+          }
+          generateLabel={
+            isV2 && isDesktop && story.projectType !== "tv-show"
+              ? (importing ? "Importing…" : "Import a Script")
+              : undefined
+          }
           generating={importing}
           generatingLabel="Importing…"
         />

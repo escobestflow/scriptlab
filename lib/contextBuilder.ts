@@ -1178,6 +1178,215 @@ Rules:
 - No prose outside the JSON.`;
     }
 
+    // ── TV-only "Upload Script → build the show" pipeline ─────────────
+    //
+    // Five sequential prompts that take an uploaded script + free-text
+    // notes (either or both — the user provides one) and populate the
+    // entire project: concept fields → characters → season arcs (incl.
+    // 3-5 character arcs for the most important characters) → ALL N
+    // episodes (title + logline + seed beats) → FULL pilot screenplay.
+    //
+    // Each step reads `payload.scriptText` (the uploaded source) and
+    // `payload.notes` (the user's free-text additional info). The story
+    // bible carries each previous step's output forward, so step 5 sees
+    // concept + characters + arcs + episodes; step 4 sees concept +
+    // characters + arcs; etc.
+    //
+    // The pilot's tone instruction is explicit: impactful, raw, and a
+    // setup for the rest of the season — per the user's product brief.
+    case "tv_import_concept": {
+      const p = action.payload as { scriptText?: string; notes?: string };
+      const concept = c.concept;
+      const filled = {
+        logline: !!c.logline?.trim(),
+        summary: !!concept.summary?.trim(),
+        themes: (concept.themes?.length ?? 0) > 0,
+        framework: !!c.settings.framework,
+      };
+      return `Build the Concept layer of a TV series from the source material below. The project already has some Concept fields filled in — those MUST NOT be overwritten. Only propose values for fields marked "needs filling."
+
+# Source material
+${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
+${p.notes?.trim() ? `\n## Additional information from the writer\n${p.notes.trim()}\n` : "(no extra notes)"}
+
+# Currently filled Concept fields (DO NOT propose values for these — return null instead)
+- logline: ${filled.logline ? "(filled — leave null)" : "needs filling"}
+- summary: ${filled.summary ? "(filled — leave null)" : "needs filling"}
+- themes:  ${filled.themes  ? "(filled — leave null)" : "needs filling"}
+- framework: ${filled.framework ? `(filled with "${c.settings.framework}" — leave null)` : "needs filling"}
+
+Return STRICT JSON in this exact schema:
+{
+  "logline": string | null,
+  "summary": string | null,
+  "themes": string[] | null,
+  "framework": "Save the Cat" | "Hero's Journey" | "Three-Act" | "Story Circle" | null
+}
+
+Rules:
+- Return null for any field already filled (per the list above) — you MUST NOT propose a value.
+- Return null for any field where the source material doesn't give you enough information to propose confidently.
+- Logline: 2-3 sentences, present-tense, names the protagonist + central tension + stakes.
+- Summary: a 1-paragraph series premise (4-6 sentences) — what the show IS, not just plot.
+- Themes: 3-5 short noun phrases. No clichés.
+- Framework: pick the one that best fits the SHAPE of the season, not the genre.
+- No prose outside the JSON.`;
+    }
+
+    case "tv_import_characters": {
+      const p = action.payload as { scriptText?: string; notes?: string };
+      return `Build the full Characters roster for this TV series from the source material below + the Concept already in the project bible above.
+
+# Source material
+${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
+${p.notes?.trim() ? `\n## Additional information from the writer\n${p.notes.trim()}\n` : "(no extra notes)"}
+
+Return STRICT JSON in this exact schema:
+{
+  "characters": [
+    {
+      "name": string,
+      "role": "protagonist" | "antagonist" | "supporting" | "mentor" | "love_interest" | "comic_relief",
+      "archetype": string,          // 2-4 word genre label, e.g. "reluctant hero", "shadow mentor"
+      "gender": "male" | "female" | "nonbinary" | "unspecified" | "",
+      "age": string,                // numeric, range, or descriptive ("late 30s")
+      "backstory": string,          // 2-4 sentences of history before episode 1
+      "motivations": string,        // 1-2 sentences of what drives them
+      "flaws": string,              // 1-2 sentences of where they break
+      "want": string,               // the conscious goal — 1 sentence
+      "need": string,               // the unconscious need — 1 sentence
+      "voice": string,              // dialogue voice in 1 sentence ("clipped, deflects with humor")
+      "arc": string,                // 1-2 sentence freeform character-arc summary (legacy field — structured arcs come next step)
+      "notes": string               // anything else worth knowing — 0-2 sentences
+    }
+  ]
+}
+
+Rules:
+- Include EVERY character with a meaningful presence in the source. Minor characters get tighter entries; major characters get the full treatment.
+- Order: protagonist(s) FIRST, antagonist(s) next, supporting after — the order matters for downstream steps that ask for "top N" characters.
+- The Concept tab above defines tone / themes / genre — character archetypes and voices must align with those.
+- No prose outside the JSON.`;
+    }
+
+    case "tv_import_arcs": {
+      const p = action.payload as { scriptText?: string; notes?: string; episodeCount?: number };
+      const epCount = Math.max(1, Math.min(30, Number(p.episodeCount) || 8));
+      return `Build the Season Arcs layer for this TV series from the source material + the Concept and Characters already in the project bible above.
+
+# Source material
+${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
+${p.notes?.trim() ? `\n## Additional information from the writer\n${p.notes.trim()}\n` : "(no extra notes)"}
+
+# Target season length
+${epCount} episodes
+
+Return STRICT JSON in this exact schema:
+{
+  "arcs": [
+    {
+      "type": "main-plot" | "character" | "relationship" | "subplot" | "secrecy" | "investigation" | "mystery-reveal" | "antagonist" | "world" | "theme" | "power" | "moral-descent" | "redemption" | "rise" | "fall" | "survival" | "revenge" | "love-romance" | "family" | "identity",
+      "title": string,                  // short, evocative (e.g. "Walt's Descent")
+      "description": string,            // 1-2 sentences
+      "scores": number[],               // EXACTLY ${epCount} entries, each integer 1-10, intensity per episode
+      "characterName": string | null    // only for type=character — must match one of the character names in the bible
+    }
+  ]
+}
+
+Rules:
+- Include ONE main-plot arc that spans the whole season.
+- Include 1-2 subplot arcs and 1 thematic arc (type=theme).
+- Include a mystery-reveal or world arc if the genre supports it.
+- ALSO INCLUDE 3-5 character arcs — pick the TOP 3-5 most important characters by their emphasis in the source material (regardless of declared role tag). For each, characterName must match a name in the project bible's Characters list exactly.
+- Each arc's scores array must be exactly ${epCount} integers in [1, 10]. Use the score to show the arc's prominence at that episode — 1=quiet/background, 10=dominant.
+- Honor the series-type structural rules in the bible — limited series arcs land on the finale; ongoing-series arcs leave seeds.
+- No prose outside the JSON.`;
+    }
+
+    case "tv_import_episodes": {
+      const p = action.payload as { scriptText?: string; notes?: string; episodeCount?: number };
+      const epCount = Math.max(1, Math.min(30, Number(p.episodeCount) || 8));
+      return `Build the FULL slate of episodes for this TV series — title, logline, and a seed beat sheet for every episode from pilot through finale.
+
+# Source material
+${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
+${p.notes?.trim() ? `\n## Additional information from the writer\n${p.notes.trim()}\n` : "(no extra notes)"}
+
+# Target season length
+${epCount} episodes
+
+Return STRICT JSON in this exact schema:
+{
+  "episodes": [
+    {
+      "number": number,             // 1..${epCount}, in order
+      "title": string,              // 1-5 words; specific, sensory, NOT a generic episode number
+      "logline": string,            // 2-4 sentences. What happens this episode + the emotional stakes
+      "archetype": "pilot" | "case-of-the-week" | "myth-arc" | "character-focus" | "two-hander" | "bottle" | "flashback" | "finale" | "premiere" | null,
+      "beats": [                    // 5-8 seed beats for this episode (name + summary + purpose each)
+        { "name": string, "summary": string, "purpose": string }
+      ]
+    }
+  ]
+}
+
+Rules:
+- Return EXACTLY ${epCount} episodes, numbered 1..${epCount}, in chronological order.
+- Pilot (Episode 1): introduce world + protagonist + central conflict; end on a hook strong enough to demand Episode 2.
+- Finale (Episode ${epCount}): per the series-type structural rules in the bible — Limited resolves; Ongoing/Anthology/Hybrid leaves seeds; Episodic returns to baseline.
+- Middle episodes: escalate the season's arcs; the per-episode arc intensity in the bible's "Season arcs" block tells you which arcs are dominant when.
+- Each episode's beats should HIT the active arcs at that episode's intensity. Dominant arc → 1-2 beats; active arc → at least 1 beat.
+- The FINAL beat of every non-finale episode (and the finale itself, except for Limited) must create momentum into the next episode per the TV-momentum principle in the system instructions.
+- No prose outside the JSON.`;
+    }
+
+    case "tv_import_pilot": {
+      const p = action.payload as { scriptText?: string; notes?: string };
+      // Pull the pilot from the episodes draft (set by step 4).
+      const epd = getActiveEpisodesDraft(story);
+      const pilot = epd?.episodes
+        ? [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0))[0]
+        : null;
+      const pilotBeats = pilot?.beats?.length
+        ? pilot.beats.map((b, i) => `${i + 1}. ${b.name}${b.summary ? ` — ${b.summary}` : ""}${b.purpose ? ` (purpose: ${b.purpose})` : ""}`).join("\n")
+        : "(no beats — generate 5-8 fresh seed beats first, then write a scene per beat)";
+      return `Write the FULL PILOT SCREENPLAY for this TV series.
+
+This is the most important episode in the season — the first impression. It must be:
+- IMPACTFUL — the cold open hooks immediately; the closing image refuses to be forgotten.
+- RAW — honest emotional tone. No clichéd setups, no on-the-nose exposition, no easy answers.
+- SETUP-HEAVY — plants seeds for every active season arc in the bible. The pilot's job is to make Episode 2 feel necessary.
+
+# Source material
+${p.scriptText ? `## Uploaded script / treatment / notes (use as ground truth — if this IS the actual pilot script, extract its scenes near-verbatim; if it's a treatment, adapt it into screenplay form)\n${p.scriptText}\n` : "(no script uploaded — generate from scratch using the project bible + notes)"}
+${p.notes?.trim() ? `\n## Additional information from the writer\n${p.notes.trim()}\n` : ""}
+
+# Pilot beats (from the previous step, ALREADY in the project bible — write one scene per beat in order)
+${pilotBeats}
+
+Return STRICT JSON in this exact schema:
+{
+  "scenes": [
+    {
+      "beatIndex": number,    // 0-based index into the pilot's beat array — exactly one scene per beat in order
+      "heading": string,      // standard screenplay slug, e.g. "INT. KITCHEN - NIGHT"
+      "content": string       // the actual screenplay prose for this scene
+    }
+  ]
+}
+
+Scene-writing rules:
+- Real screenplay format: slugline, action lines, character names ALL CAPS above their dialogue, dialogue blocks.
+- No scene-number prefixes (no "1.", no "SCENE 1") — just the slugline.
+- Action is present-tense, visual, sensory. Avoid "we see" / "we hear" — show the image.
+- Dialogue is the character's voice as defined in the bible. Distinct rhythms per character.
+- Each scene has a DECISION or REVELATION inside it — no idle "people talk about exposition" filler.
+- The first scene is a true COLD OPEN — drop us in mid-tension, no establishing throat-clearing.
+- The final scene of the pilot per the TV-momentum principle: closing image / line / action MUST carry unresolved energy. The audience should HAVE to watch Episode 2.
+- No prose outside the JSON.`;
+    }
+
     default:
       return `Unknown action.`;
   }

@@ -32,8 +32,23 @@ import type {
   Episode,
   Scene,
   EndingType,
+  Arc,
+  ArcType,
+  Framework,
 } from "./story";
-import { applySyncResult } from "./story";
+import {
+  applySyncResult,
+  // TV import pipeline helpers — concept fill, characters, arcs,
+  // episodes, pilot. The pipeline at the bottom of this file
+  // orchestrates these one after the other.
+  getActiveConceptDraft, updateConceptDraft,
+  getActiveCharactersDraft, updateCharactersDraft,
+  getActiveArcsDraft, updateArcsDraft, addArcToActiveDraft,
+  getActiveEpisodesDraft, updateEpisodesDraft, upsertEpisodeInActiveDraft,
+  updateStoryLayerDraft, updateScriptDraft,
+  getActiveStoryLayerDraft, getActiveScriptDraft,
+  ARC_COLORS, ARC_TYPES,
+} from "./story";
 import type { ActionRequest, ActionType } from "./prompt";
 import type { WriterProfile } from "./writerProfile";
 
@@ -466,4 +481,339 @@ export async function syncLayers(
     }
   }
   return next;
+}
+
+// ── TV "Upload Script → build the show" pipeline ──────────────────
+//
+// Five sequential steps that populate the whole project from an
+// uploaded script + free-text notes. The driver `importTVProjectFromScript`
+// owns the choreography:
+//
+//   1. Concept fill   — propose ONLY the empty Concept fields
+//                       (preserve filled ones).
+//   2. Characters     — full cast roster.
+//   3. Arcs           — season arcs + character arcs for the top
+//                       3-5 most important characters.
+//   4. Episodes       — title + logline + seed beats for ALL N
+//                       episodes (pilot through finale).
+//   5. Pilot screenplay — full scene-prose for Episode 1, written
+//                         to be impactful, raw, and setup for the
+//                         rest of the season.
+//
+// Each step's output is APPLIED to the in-flight Story before the
+// next step runs, so the bible carries each layer's output forward.
+// The `onStep` callback fires with the upcoming step name so the UI
+// can show progress; the `onPartialStory` callback fires after each
+// successful step so the autosave queue picks up incremental writes
+// even if a later step fails.
+
+const TV_IMPORT_STEPS = [
+  "concept",
+  "characters",
+  "arcs",
+  "episodes",
+  "pilot",
+] as const;
+export type TVImportStep = (typeof TV_IMPORT_STEPS)[number];
+
+// Map the AI-returned friendly framework labels back to the canonical
+// kebab-case slugs the data model uses. We accept either the friendly
+// label OR the slug, in case the model leaks the schema verbatim.
+const FRAMEWORK_LABEL_TO_SLUG: Record<string, Framework> = {
+  "save the cat":   "save-the-cat",
+  "save-the-cat":   "save-the-cat",
+  "hero's journey": "heros-journey",
+  "heros journey":  "heros-journey",
+  "heros-journey":  "heros-journey",
+  "three-act":      "three-act",
+  "three act":      "three-act",
+  "story circle":   "story-circle",
+  "story-circle":   "story-circle",
+};
+
+/** Apply the AI's Concept-fill proposal, honoring the no-overwrite rule.
+ *  The prompt is supposed to return null for filled fields, but we
+ *  belt-and-suspenders by checking each filled field on the client too. */
+function applyTVImportConceptResult(story: Story, parsed: any): Story {
+  const c = getActiveConceptDraft(story);
+  const out: any = { ...c };
+  // Each field: only adopt the AI's value if the field is currently
+  // empty AND the AI proposed a non-null value of the right shape.
+  if (!c.logline?.trim() && typeof parsed?.logline === "string" && parsed.logline.trim()) {
+    out.logline = parsed.logline.trim();
+  }
+  const concept = { ...c.concept };
+  if (!c.concept?.summary?.trim() && typeof parsed?.summary === "string" && parsed.summary.trim()) {
+    concept.summary = parsed.summary.trim();
+  }
+  if ((c.concept?.themes?.length ?? 0) === 0 && Array.isArray(parsed?.themes)) {
+    const themes = parsed.themes
+      .map((t: any) => (typeof t === "string" ? t.trim() : ""))
+      .filter((t: string) => t.length > 0);
+    if (themes.length > 0) concept.themes = themes;
+  }
+  out.concept = concept;
+  const settings = { ...c.settings };
+  if (!c.settings.framework && typeof parsed?.framework === "string") {
+    const mapped = FRAMEWORK_LABEL_TO_SLUG[parsed.framework.trim().toLowerCase()];
+    if (mapped) settings.framework = mapped;
+  }
+  out.settings = settings;
+  return updateConceptDraft(story, out);
+}
+
+/** Apply the AI's character roster. Replaces the active draft's
+ *  characters wholesale — TV import is a fresh-population flow, not
+ *  an incremental merge, so the writer starts from a clean slate. */
+function applyTVImportCharactersResult(story: Story, parsed: any): Story {
+  const raw = Array.isArray(parsed?.characters) ? parsed.characters : [];
+  const allowedRoles = new Set([
+    "protagonist", "antagonist", "supporting", "mentor", "love_interest", "comic_relief",
+  ]);
+  const characters: Character[] = raw.map((ch: any, i: number): Character => ({
+    id: `ch_${Math.random().toString(36).slice(2, 10)}`,
+    name: typeof ch?.name === "string" ? ch.name.trim() : `Character ${i + 1}`,
+    role: allowedRoles.has(ch?.role) ? ch.role : "supporting",
+    archetype: typeof ch?.archetype === "string" ? ch.archetype.trim() : "",
+    gender: typeof ch?.gender === "string" ? (ch.gender as any) : undefined,
+    age: typeof ch?.age === "string" ? ch.age : "",
+    backstory: typeof ch?.backstory === "string" ? ch.backstory : "",
+    motivations: typeof ch?.motivations === "string" ? ch.motivations : "",
+    flaws: typeof ch?.flaws === "string" ? ch.flaws : "",
+    want: typeof ch?.want === "string" ? ch.want : "",
+    need: typeof ch?.need === "string" ? ch.need : "",
+    // Cross-character relationships aren't part of the TV-import schema
+    // (the AI tracks relationships through scenes/arcs, not a separate
+    // map). Start empty; user can add via the character popup later.
+    relationships: [],
+    voice: typeof ch?.voice === "string" ? ch.voice : "",
+    arc: typeof ch?.arc === "string" ? ch.arc : "",
+    notes: typeof ch?.notes === "string" ? ch.notes : "",
+  }));
+  return updateCharactersDraft(story, { characters });
+}
+
+/** Apply the AI's season arcs. Each arc gets a fresh id + an assigned
+ *  color from ARC_COLORS in order. Character-type arcs resolve their
+ *  characterName back to a characterId by exact-match search against
+ *  the cast (case-insensitive). Anything unresolvable falls back to a
+ *  generic character arc without an explicit linked character. */
+function applyTVImportArcsResult(story: Story, parsed: any, episodeCount: number): Story {
+  const raw = Array.isArray(parsed?.arcs) ? parsed.arcs : [];
+  const chars = getActiveCharactersDraft(story).characters;
+  const byName = new Map(chars.map(c => [c.name.trim().toLowerCase(), c.id]));
+  let next = story;
+  let colorIdx = 0;
+  for (const a of raw) {
+    const type = typeof a?.type === "string" && (ARC_TYPES as readonly string[]).includes(a.type)
+      ? (a.type as ArcType)
+      : "subplot";
+    const title = typeof a?.title === "string" ? a.title.trim() : "";
+    const description = typeof a?.description === "string" ? a.description.trim() : "";
+    const rawScores = Array.isArray(a?.scores) ? a.scores : [];
+    const scores: number[] = [];
+    for (let i = 0; i < episodeCount; i++) {
+      const s = Number(rawScores[i]);
+      scores.push(Number.isFinite(s) ? Math.max(1, Math.min(10, Math.round(s))) : 5);
+    }
+    const linkedName = typeof a?.characterName === "string" ? a.characterName.trim().toLowerCase() : "";
+    const characterId = linkedName ? byName.get(linkedName) : undefined;
+    next = addArcToActiveDraft(next, {
+      type: characterId ? "character" : type,
+      title,
+      description,
+      scores,
+      // Character arcs from the AI implicitly have intensitySet=true —
+      // the writer's job here is to seed the arc with intent.
+      intensitySet: true,
+      ...(characterId ? { characterId } : {}),
+    });
+    colorIdx++;
+  }
+  return next;
+}
+
+/** Apply the AI's full season of episodes. Each episode gets a fresh
+ *  id; beats inside each episode also get fresh ids. Replaces the
+ *  active episodes draft's episodes array wholesale. */
+function applyTVImportEpisodesResult(story: Story, parsed: any): Story {
+  const raw = Array.isArray(parsed?.episodes) ? parsed.episodes : [];
+  const allowedArchetypes = new Set([
+    "pilot", "case-of-the-week", "myth-arc", "character-focus",
+    "two-hander", "bottle", "flashback", "finale", "premiere",
+  ]);
+  const episodes: Episode[] = raw
+    .map((ep: any, i: number): Episode => {
+      const beats: Beat[] = Array.isArray(ep?.beats)
+        ? ep.beats.map((b: any, j: number): Beat => ({
+            id: `b_${Math.random().toString(36).slice(2, 10)}`,
+            name: typeof b?.name === "string" ? b.name : `Beat ${j + 1}`,
+            summary: typeof b?.summary === "string" ? b.summary : "",
+            purpose: typeof b?.purpose === "string" ? b.purpose : "",
+            position: j,
+            momentIds: [],
+            characterIds: [],
+            status: "design",
+          }))
+        : [];
+      const num = Number(ep?.number);
+      return {
+        id: `ep_${Math.random().toString(36).slice(2, 10)}`,
+        number: Number.isFinite(num) && num > 0 ? Math.round(num) : i + 1,
+        title: typeof ep?.title === "string" ? ep.title.trim() : `Episode ${i + 1}`,
+        logline: typeof ep?.logline === "string" ? ep.logline.trim() : "",
+        archetype: allowedArchetypes.has(ep?.archetype) ? ep.archetype : undefined,
+        beats,
+      };
+    })
+    .sort((a: Episode, b: Episode) => (a.number ?? 0) - (b.number ?? 0));
+  return updateEpisodesDraft(story, { episodes });
+}
+
+/** Apply the AI's pilot screenplay. Walks the scenes array, each of
+ *  which references a `beatIndex` into the pilot's beat list, and
+ *  splices each scene's prose onto its matching beat as `sceneContent`
+ *  + flips status to "written" — mirrors what the existing
+ *  importScriptFromText does for feature/short projects, just scoped
+ *  to Episode 1 only. The Scene[] for the active Script draft is
+ *  rebuilt from the scenes too (linking back to beats via beatId). */
+function applyTVImportPilotResult(story: Story, parsed: any): Story {
+  const rawScenes = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
+  const epd = getActiveEpisodesDraft(story);
+  if (!epd || epd.episodes.length === 0) return story;
+  const sorted = [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
+  const pilot = sorted[0];
+
+  // Match scenes to beats by `beatIndex`. Missing indices fall through
+  // unchanged. Each beat with a matched scene gets its sceneContent +
+  // status flipped to "written".
+  const nextBeats: Beat[] = pilot.beats.map((b, i) => {
+    const match = rawScenes.find((s: any) => Number(s?.beatIndex) === i);
+    if (!match) return b;
+    const content = typeof match?.content === "string" ? match.content : "";
+    if (!content.trim()) return b;
+    return { ...b, sceneContent: content, status: "written" as const };
+  });
+  // Patch the pilot episode with the new beats array.
+  const nextEpisodes = sorted.map(e =>
+    e.id === pilot.id ? { ...e, beats: nextBeats } : e,
+  );
+  let next = updateEpisodesDraft(story, { episodes: nextEpisodes });
+
+  // Build the Script-layer Scene[] for the pilot's scenes so the
+  // Script tab renders the prose. Mirror what the existing import
+  // does: one Scene per written beat, linked via beatId, heading from
+  // the AI's "INT./EXT. …" slug.
+  const scenes: Scene[] = nextBeats
+    .map((b, i): Scene | null => {
+      if (b.status !== "written" || !b.sceneContent?.trim()) return null;
+      const match = rawScenes.find((s: any) => Number(s?.beatIndex) === i);
+      const heading = typeof match?.heading === "string" && match.heading.trim()
+        ? match.heading.trim().toUpperCase()
+        : `SCENE ${i + 1}`;
+      return {
+        id: `sc_${Math.random().toString(36).slice(2, 10)}`,
+        beatId: b.id,
+        heading,
+        content: b.sceneContent ?? "",
+        notes: "",
+      };
+    })
+    .filter((s): s is Scene => s !== null);
+  const scriptDraft = getActiveScriptDraft(next);
+  if (scriptDraft) {
+    next = updateScriptDraft(next, {
+      script: { ...scriptDraft.script, scenes },
+    });
+  }
+  return next;
+}
+
+export interface TVImportInput {
+  scriptText?: string;
+  notes?: string;
+  episodeCount?: number;
+}
+
+export interface TVImportCallbacks {
+  /** Fires with the NEXT step about to start so the UI can swap the
+   *  caption / spinner. Called five times total. */
+  onStep?: (step: TVImportStep) => void;
+  /** Fires after each successful step with the evolving Story. The
+   *  caller should call setStory() so the autosave queue picks up
+   *  incremental writes even if a later step fails. */
+  onPartialStory?: (s: Story) => void;
+}
+
+/** Top-level orchestrator. Runs the 5 steps sequentially against the
+ *  same evolving Story, calls back per step, returns the final Story. */
+export async function importTVProjectFromScript(
+  initial: Story,
+  input: TVImportInput,
+  callbacks: TVImportCallbacks = {},
+  profile?: WriterProfile | null,
+): Promise<Story> {
+  const { onStep, onPartialStory } = callbacks;
+  const episodeCount = Math.max(1, Math.min(30, Number(input.episodeCount) || 8));
+  let story = initial;
+
+  async function runStep<T = void>(
+    step: TVImportStep,
+    action: ActionRequest,
+    apply: (parsed: any) => Story,
+  ): Promise<void> {
+    onStep?.(step);
+    const raw = await callGenerate(story, action, profile);
+    const parsed = extractJson(raw);
+    if (!parsed) {
+      throw new Error(`Step "${step}" returned unparseable JSON. The model output was probably truncated — try a shorter source document.`);
+    }
+    story = apply(parsed);
+    onPartialStory?.(story);
+  }
+
+  // Step 1 — Concept fill (no overwrite).
+  await runStep(
+    "concept",
+    { type: "tv_import_concept", payload: { scriptText: input.scriptText, notes: input.notes } },
+    parsed => applyTVImportConceptResult(story, parsed),
+  );
+
+  // Step 2 — Characters.
+  await runStep(
+    "characters",
+    { type: "tv_import_characters", payload: { scriptText: input.scriptText, notes: input.notes } },
+    parsed => applyTVImportCharactersResult(story, parsed),
+  );
+
+  // Persist the episodeCount setting BEFORE Step 3 so the arcs step
+  // sees the right value in the bible (and so the AI's scores arrays
+  // come back the right length).
+  story = updateConceptDraft(story, {
+    settings: { ...getActiveConceptDraft(story).settings, episodeCount },
+  });
+  onPartialStory?.(story);
+
+  // Step 3 — Arcs (including 3-5 character arcs for the top mains).
+  await runStep(
+    "arcs",
+    { type: "tv_import_arcs", payload: { scriptText: input.scriptText, notes: input.notes, episodeCount } },
+    parsed => applyTVImportArcsResult(story, parsed, episodeCount),
+  );
+
+  // Step 4 — Full slate of episodes.
+  await runStep(
+    "episodes",
+    { type: "tv_import_episodes", payload: { scriptText: input.scriptText, notes: input.notes, episodeCount } },
+    parsed => applyTVImportEpisodesResult(story, parsed),
+  );
+
+  // Step 5 — Pilot screenplay.
+  await runStep(
+    "pilot",
+    { type: "tv_import_pilot", payload: { scriptText: input.scriptText, notes: input.notes } },
+    parsed => applyTVImportPilotResult(story, parsed),
+  );
+
+  return story;
 }

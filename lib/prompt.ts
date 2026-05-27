@@ -137,7 +137,18 @@ export type ActionType =
   // (character knows something they shouldn't, dropped plot threads,
   // under-used characters). Returns a structured notes list the UI
   // renders as a panel. Sonnet-grade; on-demand only.
-  | "check_continuity";
+  | "check_continuity"
+  // ── TV-only "Upload Script → build the show" pipeline ──
+  // 5-step pipeline that takes an uploaded script + free-text notes and
+  // populates concept → characters → arcs → all episodes → pilot script.
+  // Each step builds on the prior so storyBible carries each layer's
+  // output forward. Concept step is fill-only (no overwrite of filled
+  // fields); the rest are full generations.
+  | "tv_import_concept"
+  | "tv_import_characters"
+  | "tv_import_arcs"
+  | "tv_import_episodes"
+  | "tv_import_pilot";
 
 export interface ActionRequest {
   type: ActionType;
@@ -173,6 +184,16 @@ export function modelForAction(type: ActionType): string {
     // check_continuity reads the entire season and surfaces issues.
     // Long-context + nuanced reasoning ⇒ Sonnet.
     case "check_continuity":
+    // TV-only "Upload Script" pipeline — each step ingests a long
+    // source document (script + notes) and writes structured output
+    // grounded in it. Concept-fill, characters, arcs, full season
+    // of episodes, full pilot script — every one is high-recall +
+    // tonal-continuity work. Sonnet across the board.
+    case "tv_import_concept":
+    case "tv_import_characters":
+    case "tv_import_arcs":
+    case "tv_import_episodes":
+    case "tv_import_pilot":
       return "claude-sonnet-4-5"; // quality matters for prose
     case "generate_beats":
     case "swap_ingredient":

@@ -2268,6 +2268,104 @@ html[data-theme="dark"] .studio-header-sticky { background: var(--bg); }
   justify-content: center;
   padding: 0;
   margin-top: 0;
+  /* Anchor for the absolute-positioned "Upload Script" button on
+     TV/desktop. The button floats 27px above the tab bar and 60px
+     from the right of the viewport — see .v2-tv-upload-script-btn
+     below. */
+  position: relative;
+}
+
+/* "Upload Script" button — TV-only, desktop-only. Styled like the
+   secondary "Create with AI" CTA in the empty Characters state
+   (.empty-state-ai-btn + .ds-type-cta carry the chrome); this rule
+   only positions it. */
+.v2-tv-upload-script-btn {
+  position: absolute;
+  bottom: calc(100% + 27px);
+  right: 60px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.v2-tv-upload-script-icon {
+  width: 14.19px;
+  height: 14.44px;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
+/* ── Upload Script popup card ──────────────────────────────────────
+   Wider than the standard direction prompt because the pipeline list
+   wants to breathe. Otherwise reuses every .v2-direction-prompt-*
+   class from the Arcs / Moments popups. */
+.v2-tv-import-card {
+  max-width: 640px;
+}
+.v2-tv-import-pipeline-list {
+  margin: 4px 0 14px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--ds-font-body, inherit);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft, #444);
+}
+.v2-tv-import-pipeline-list li strong {
+  color: var(--ink, #111);
+  font-weight: 600;
+}
+.v2-tv-import-pipeline-list li em {
+  color: var(--ink-mute, #666);
+  font-style: italic;
+}
+.v2-tv-import-file {
+  padding: 6px 0;
+  font-family: var(--ds-font-body, inherit);
+  font-size: 13px;
+}
+.v2-tv-import-file-name {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-mute, #666);
+  font-family: var(--ds-font-body, inherit);
+}
+.v2-tv-import-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--ds-color-gray-lightest, #f6f4f2);
+  border-radius: 8px;
+  margin: 10px 0 4px;
+}
+.v2-tv-import-progress-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--ds-color-gray-outline, #e4e3e4);
+  border-top-color: var(--ds-color-black, #111);
+  border-radius: 50%;
+  animation: tv-import-spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+@keyframes tv-import-spin {
+  to { transform: rotate(360deg); }
+}
+.v2-tv-import-progress-label {
+  font-family: var(--ds-font-body, inherit);
+  font-size: 13px;
+  color: var(--ink, #111);
+}
+.v2-tv-import-error {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fdf3f3;
+  color: #c0392b;
+  font-family: var(--ds-font-body, inherit);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 /* ======= STUDIO TAB BAR (355x33, fab shadow, centered pill) ======= */
