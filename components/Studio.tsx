@@ -2524,9 +2524,15 @@ export function Studio({
                 // Description is the raw logline. CSS `-webkit-line-clamp:2`
                 // on `.v2-desktop-hero-description` truncates with an
                 // ellipsis before the text would break to a 3rd line.
+                // Wrapped in TruncatedText so a hover reveals the full
+                // logline when it overflows the 2-line clamp.
                 const text = activeConcept.logline?.trim();
                 if (!text) return null;
-                return <p className="v2-desktop-hero-description">{text}</p>;
+                return (
+                  <TruncatedText as="p" className="v2-desktop-hero-description" text={text}>
+                    {text}
+                  </TruncatedText>
+                );
               })()}
               <div className="v2-desktop-hero-updated">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -14703,7 +14709,7 @@ function SceneEditForm({
                         style={{ width: "100%", textAlign: "left" }}
                       >
                         <div style={{ flex: 1 }}>
-                          <div className="mp-text">{m.text}</div>
+                          <TruncatedText className="mp-text" text={m.text}>{m.text}</TruncatedText>
                           {m.tags.length > 0 && (
                             <div className="mp-tags">{m.tags.map(t => <span key={t}>{t}</span>)}</div>
                           )}
@@ -15554,7 +15560,7 @@ function MomentPicker({
             style={{ width: "100%", textAlign: "left" }}>
             <div style={{ flex: 1 }}>
               <div className="mp-type">{m.type}</div>
-              <div className="mp-text">{m.text}</div>
+              <TruncatedText className="mp-text" text={m.text}>{m.text}</TruncatedText>
               {m.tags.length > 0 && (
                 <div className="mp-tags">{m.tags.map(t => <span key={t}>{t}</span>)}</div>
               )}
