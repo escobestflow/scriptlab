@@ -142,6 +142,12 @@ export async function generateImageWithFallback(opts: {
   }
 
   async function tryModel(model: "gpt-image-2" | "dall-e-3"): Promise<ImageGenResult> {
+    // The OpenAI /v1/images/generations endpoint dropped `response_format`
+    // when they unified the API across DALL-E 3 + gpt-image-1/2 (it now
+    // 400s with "Unknown parameter: 'response_format'."). Both models
+    // return b64_json by default in the response — no opt-in needed.
+    // We still pass `quality` per-model since the accepted values differ
+    // (DALL-E: standard|hd; gpt-image-2: low|medium|high|auto).
     const body = model === "gpt-image-2"
       ? {
           model,
@@ -149,15 +155,12 @@ export async function generateImageWithFallback(opts: {
           n: 1,
           size: sizes.gptImage2,
           quality: "high",
-          // No response_format — gpt-image-2 always returns
-          // base64 in data[0].b64_json; passing the param 400s.
         }
       : {
           model,
           prompt,
           n: 1,
           size: sizes.dallE3,
-          response_format: "b64_json",
           quality: "standard",
         };
     try {
@@ -176,11 +179,31 @@ export async function generateImageWithFallback(opts: {
         return { ok: false, error: parsed.message, code: parsed.code, status: res.status };
       }
       const data = await res.json();
-      const b64 = data.data?.[0]?.b64_json;
+      let b64: string | undefined = data.data?.[0]?.b64_json;
+      // Defensive URL fallback: if a future API version flips the
+      // default back to a URL response (or for some models that only
+      // return URLs), fetch + convert here so callers always receive
+      // base64. We only have a 60-minute window before OpenAI's
+      // signed URLs expire, but we're calling immediately so that's
+      // never relevant in practice.
+      if (!b64) {
+        const url = typeof data.data?.[0]?.url === "string" ? data.data[0].url : null;
+        if (url) {
+          try {
+            const imgRes = await fetch(url);
+            if (imgRes.ok) {
+              const buf = Buffer.from(await imgRes.arrayBuffer());
+              b64 = buf.toString("base64");
+            }
+          } catch (e: any) {
+            console.error(`[${context}] ${model} URL fetch failed:`, e?.message || e);
+          }
+        }
+      }
       if (!b64) {
         const preview = JSON.stringify(data).slice(0, 500);
-        console.error(`[${context}] ${model} returned no b64_json:`, preview);
-        return { ok: false, error: "API returned no b64_json", code: null, status: 500 };
+        console.error(`[${context}] ${model} returned no b64_json AND no url:`, preview);
+        return { ok: false, error: "API returned no image data", code: null, status: 500 };
       }
       return { ok: true, b64, model };
     } catch (err: any) {
