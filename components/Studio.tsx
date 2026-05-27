@@ -952,10 +952,15 @@ export function Studio({
     if (!id) return;
     // Capture pre-close beat for auto-gen-image so we can decide
     // whether to fire it without racing the discard logic below.
+    // For TV: canonical beats live on EpisodesLayerDraft, NOT the
+    // legacy storyLayer.episodes (which is empty for any project
+    // newer than the layered-drafts refactor).
     const preBeats = (() => {
-      if (isTV && activeEpisodeId) {
-        const ep = getActiveStoryLayerDraft(story).episodes?.find(e => e.id === activeEpisodeId);
-        return ep?.beats ?? [];
+      if (isTV) {
+        const epd = getActiveEpisodesDraft(story);
+        if (!epd) return [];
+        const epId = activeEpisodeId ?? epd.episodes[0]?.id ?? null;
+        return epd.episodes.find(e => e.id === epId)?.beats ?? [];
       }
       return getActiveStoryLayerDraft(story).beats;
     })();
@@ -1041,10 +1046,21 @@ export function Studio({
   // is skipped — same reasoning as the character version above
   // (typing the name fires premature gens on partial names).
   useEffect(() => {
-    const draft = getActiveStoryLayerDraft(story);
-    const allBeats = isTV && activeEpisodeId
-      ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
-      : draft.beats;
+    // For TV: beats live on EpisodesLayerDraft.episodes[].beats, NOT
+    // on the legacy StoryLayerDraft.episodes field. The TV import +
+    // every new manual-add path writes to the episodes draft. The
+    // legacy read here was returning [] for any TV project newer
+    // than the layered-drafts refactor — every pilot beat went
+    // un-auto-genned because this effect never saw them.
+    const allBeats = (() => {
+      if (isTV) {
+        const epd = getActiveEpisodesDraft(story);
+        if (!epd) return [];
+        const epId = activeEpisodeId ?? epd.episodes[0]?.id ?? null;
+        return epd.episodes.find(e => e.id === epId)?.beats ?? [];
+      }
+      return getActiveStoryLayerDraft(story).beats;
+    })();
     const skipId = sceneSheetIsNew ? sceneSheetBeatId : null;
     for (const b of allBeats) {
       if (b.id === skipId) continue;
@@ -1363,10 +1379,19 @@ export function Studio({
     // Mirror the character circuit-breaker — one failed/aborted
     // attempt per beat per session, never re-fired.
     if (sceneImagesFailed.current.has(beatId)) return;
-    const draft = getActiveStoryLayerDraft(story);
-    const allBeats = isTV && activeEpisodeId
-      ? (draft.episodes?.find(e => e.id === activeEpisodeId)?.beats ?? [])
-      : draft.beats;
+    // For TV, look up the beat in EpisodesLayerDraft (canonical),
+    // not the legacy StoryLayerDraft.episodes. Same fix as the
+    // useEffect above — without this, every imported pilot beat
+    // looked "missing" to the lookup and the gen call never fired.
+    const allBeats = (() => {
+      if (isTV) {
+        const epd = getActiveEpisodesDraft(story);
+        if (!epd) return [];
+        const epId = activeEpisodeId ?? epd.episodes[0]?.id ?? null;
+        return epd.episodes.find(e => e.id === epId)?.beats ?? [];
+      }
+      return getActiveStoryLayerDraft(story).beats;
+    })();
     const beat = allBeats.find(b => b.id === beatId);
     if (!beat || beat.thumbnail) return;
     // PERSISTENT sentinel — once this beat has been tried (success or
