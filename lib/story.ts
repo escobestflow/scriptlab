@@ -21,6 +21,99 @@ export type EndingType =
 export type ShortStructure =
   | "complete" | "open-ended" | "proof-of-concept" | "slice-of-life" | "twist";
 
+/** What KIND of TV show this is. Drives a stack of downstream prompt
+ *  modifiers — episode-independence, arc continuity, ending posture,
+ *  finale shape. The 5 values map roughly to the writer's-room
+ *  vocabulary; "ongoing" collapses Serialized + Ongoing into one
+ *  bucket per spec (a continuing show where episodes connect tightly).
+ *
+ *  - "limited"   — self-contained, one season, finale resolves the arc.
+ *  - "anthology" — each season is its own story (new cast / setting OK).
+ *  - "ongoing"   — multi-season, highly connected episodes, must-watch-
+ *                  in-order, threads carry across episodes and seasons.
+ *  - "episodic"  — each episode largely standalone (case/problem/patient
+ *                  of the week), characters reset to baseline at ep end.
+ *  - "hybrid"    — episode-of-the-week + serialized background arcs.
+ *
+ *  Surfaced in the UI only when projectType === "tv-show". `null`
+ *  means the writer hasn't picked one yet → prompts fall back to a
+ *  neutral "let the concept dictate" mode. */
+export type SeriesType =
+  | "limited"
+  | "anthology"
+  | "ongoing"
+  | "episodic"
+  | "hybrid";
+
+/** Human-facing label for each series type — same casing the picker
+ *  uses. Used by both the AttrRow chip value and the storyBible
+ *  rendering. */
+export const SERIES_TYPE_LABELS: Record<SeriesType, string> = {
+  limited:    "Limited Series",
+  anthology:  "Anthology Series",
+  ongoing:    "Ongoing / Serialized Series",
+  episodic:   "Episodic Series",
+  hybrid:     "Hybrid Series",
+};
+
+/** Long-form definition shown inside the picker popup so the writer
+ *  has the canonical phrasing to read alongside each option. These
+ *  strings are ALSO injected into prompts as the seriesType context
+ *  block, so editing here changes both the UI and the AI's behavior. */
+export const SERIES_TYPE_DESCRIPTIONS: Record<SeriesType, string> = {
+  limited:
+    "A self-contained story designed to begin and end in one season. The season has a complete arc and does not require future seasons. Example structure: Beef, Mare of Easttown, The Queen's Gambit.",
+  anthology:
+    "A show where each season tells a new story, often with new characters, new setting, or new conflict. Example structure: Fargo, True Detective, American Crime Story.",
+  ongoing:
+    "A show designed to continue across multiple seasons, with characters and storylines evolving over time. Episodes are highly connected and should be watched in order — the main storylines continue across episodes and often across seasons. Example structure: Breaking Bad, The Sopranos, Succession, Lost, Dark.",
+  episodic:
+    "A show where each episode mostly stands alone, with a new case, problem, client, patient, mystery, or situation each week. Example structure: older network procedurals, sitcoms, case-of-the-week dramas.",
+  hybrid:
+    "A show that combines episodic stories with serialized season arcs. Each episode may have a contained case or story, while larger character, mystery, or relationship arcs build in the background.",
+};
+
+/** Prompt-side structural rules for each series type. Concatenated
+ *  into the storyBible and into per-episode generation prompts so the
+ *  model receives concrete instructions, not just a category name.
+ *  These are the LEVER — editing one of these lines is the fastest
+ *  way to change how the AI shapes a series of that type. */
+export const SERIES_TYPE_RULES: Record<SeriesType, string> = {
+  limited: [
+    "This season tells ONE complete story. The finale must RESOLVE the central arc — no sequel hooks, no open questions that require another season.",
+    "Every episode escalates toward a single definitive ending. Do not seed plot threads that the season can't pay off by the finale.",
+    "Character arcs land. Mysteries reveal. Relationships resolve (consummated, broken, or transformed) by the last episode.",
+    "Pacing is dense — there's no room for a 'breather' episode unless it earns its place by deepening character ahead of a key turn.",
+  ].join("\n  - "),
+  anthology: [
+    "Treat this season as a self-contained unit. Future seasons (if any) will have new characters, new setting, new conflict — do not write toward continuity beyond the finale.",
+    "The season arc IS the unit of story, not the series. Earlier-episode setups must pay off WITHIN this season.",
+    "Characters can be season-specific. Don't preserve them for a future season; let them complete their arcs.",
+    "Pacing matches the season's intended length — a limited-anthology season is denser than an ongoing one.",
+  ].join("\n  - "),
+  ongoing: [
+    "Episodes are HIGHLY CONNECTED. Must-watch-in-order. Every episode references prior ones; every episode advances plot threads forward.",
+    "Open threads from earlier episodes must be honored, advanced, OR explicitly paid off. Don't drop them.",
+    "The season finale should NOT tie everything up — leave seeds and dangling questions for next season. A clean bow on a serialized finale is a failure mode.",
+    "Characters evolve cumulatively. They carry the bruises of earlier episodes into later ones; do not reset them between weeks.",
+    "Each episode's ending should hand significant momentum to the next (the universal episode-momentum rule applies at maximum strength).",
+  ].join("\n  - "),
+  episodic: [
+    "Each episode is LARGELY STANDALONE. New case, new problem, new client, new patient, new mystery, new situation — one per episode, resolved within that episode.",
+    "Characters return to baseline by episode end. Status quo holds. The next episode starts roughly where this one began.",
+    "Cross-episode arcs are LIGHT — occasional minor B-thread is fine, but the A-story is the week's situation.",
+    "The episode-ending momentum rule is RELAXED for this type. A satisfying contained resolution + a small character note IS a valid ending. Cliffhangers should be rare and reserved for tentpole moments.",
+    "Order does not strictly matter — a viewer should be able to drop into any episode and follow it.",
+  ].join("\n  - "),
+  hybrid: [
+    "Each episode has a CONTAINED A-story (case/problem/situation of the week) that resolves within the episode.",
+    "Underneath, serialized arcs (character relationships, mystery, season-long plot) advance 1–2 beats per episode.",
+    "The episode ending lands the week's A-story AND advances at least one serialized arc — both, not either/or.",
+    "Honor the universal momentum rule on the serialized arc thread — even if the A-story resolved cleanly, a serialized arc should escalate or open a question by episode end.",
+    "Mid-season episodes can shift weight toward the serialized side temporarily (mythology episodes) but should still gesture at the standalone A-story tradition.",
+  ].join("\n  - "),
+};
+
 export type ProjectType = "feature" | "short" | "tv-show";
 
 export interface StorySettings {
@@ -57,6 +150,14 @@ export interface StorySettings {
    *  AI's season-planning prompts. Clamped 1–30 by the normalizer;
    *  `undefined` = unset → arcs fall back to 7-episode defaults. */
   episodeCount?: number;
+  /** For projectType === "tv-show" only. What KIND of TV show this
+   *  is — drives a stack of prompt modifiers that change how every
+   *  episode, beat, and scene gets generated (episode independence,
+   *  arc continuity, ending posture). See SERIES_TYPE_RULES in this
+   *  file for the per-type structural rules injected into prompts.
+   *  `null` = unset → prompts fall back to a neutral mode (the
+   *  bible just notes the project is TV without specifying type). */
+  seriesType?: SeriesType | null;
   /** For projectType === "short" only. Which kind of short the user
    *  is making — drives the beat-skeleton flavor the model produces.
    *  `null` = unset → prompts fall back to a generic Situation →

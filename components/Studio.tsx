@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   Story, Beat, Episode, EpisodeArchetype, Character, CharacterRelationship, Scene, StorySettings, Reference,
   Arc, ArcType, ArcsLayerDraft, ArcMoment, ARC_TYPES, ARC_TYPE_LABELS, ARC_COLORS,
+  SeriesType, SERIES_TYPE_LABELS, SERIES_TYPE_DESCRIPTIONS,
   ConceptLayerDraft, CharactersLayerDraft, StoryLayerDraft, ScriptLayerDraft, EpisodesLayerDraft, ProjectDraft,
   LayerKey, LayerSyncState,
   getActiveProjectDraft,
@@ -7346,6 +7347,10 @@ function ConceptTab({
   const [referenceInput, setReferenceInput] = useState("");
   const [writerSheetOpen, setWriterSheetOpen] = useState(false);
   const [writerFilter, setWriterFilter] = useState("");
+  // Fly-up picker for the Series Type AttrRow (TV-only). Mirrors the
+  // writer-style sheet pattern but with single-select + per-option
+  // definition text underneath the option label.
+  const [seriesTypeSheetOpen, setSeriesTypeSheetOpen] = useState(false);
   // Writer-profile capture — every chip toggle and saved prose sample
   // feeds the cumulative per-user taste/voice model. See lib/writerProfile.ts.
   const { profile, capture, captureStyle } = useProfileCapture();
@@ -7591,6 +7596,37 @@ function ConceptTab({
         {/* noToggle prevents expansion; children never render. */}
         <></>
       </AttrRow>
+
+      {/* Series Type — TV-only. Sits directly under Format because
+          it changes the WHOLE shape of how the show gets generated
+          (episode independence, arc continuity, ending posture).
+          Opens a fly-up picker styled like the Writer-style sheet but
+          single-select, with each option's canonical definition shown
+          underneath the chip. The five values map to the writer's
+          room vocabulary; "Ongoing / Serialized" collapses the
+          previously-separate Ongoing and Serialized buckets per spec. */}
+      {isTV && (
+        <AttrRow
+          label="Series Type"
+          values={d.settings.seriesType
+            ? [SERIES_TYPE_LABELS[d.settings.seriesType].toUpperCase()]
+            : undefined}
+          placeholder="Pick a series type"
+          expanded={openAttr === "seriesType"}
+          onToggle={() => toggle("seriesType")}
+          readOnly={ro()}
+          noToggle={lockTap}
+        >
+          <Button
+            variant="secondary"
+            size="lg"
+            block
+            onClick={() => setSeriesTypeSheetOpen(true)}
+          >
+            {d.settings.seriesType ? "Change series type" : "Pick a series type"}
+          </Button>
+        </AttrRow>
+      )}
 
       {/* Episode Count — TV-only. Placed directly under Format per
           spec. Drives the X-axis length of the Arcs timeline graph
@@ -8366,6 +8402,54 @@ function ConceptTab({
           )}
         </div>
       </div>
+      {/* Series-type picker — fly-up sheet with the 5 canonical
+          series types and their definitions. Single-select; chosen
+          value writes to settings.seriesType. Definitions text comes
+          from SERIES_TYPE_DESCRIPTIONS in lib/story.ts so the same
+          phrasing the user reads here is also injected into prompts. */}
+      <div
+        className={`sheet-backdrop ${seriesTypeSheetOpen ? "open" : ""}`}
+        onClick={() => setSeriesTypeSheetOpen(false)}
+      />
+      <div className={`sheet sheet-tall ${seriesTypeSheetOpen ? "open" : ""}`}>
+        <div className="sheet-handle" />
+        <div className="sheet-header">
+          <div className="sheet-title">Series type</div>
+          <Button variant="secondary" size="sm" onClick={() => setSeriesTypeSheetOpen(false)}>Done</Button>
+        </div>
+        <div className="sheet-body" style={{ whiteSpace: "normal", paddingTop: 0 }}>
+          <div className="v2-series-type-list">
+            {(["limited", "anthology", "ongoing", "episodic", "hybrid"] as SeriesType[]).map(t => {
+              const selected = d.settings.seriesType === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  className={`v2-series-type-option${selected ? " is-selected" : ""}`}
+                  onClick={() => {
+                    // Tap-to-toggle: tapping the same row clears it
+                    // (matches the existing Selector chip pattern).
+                    updateDraft({
+                      settings: {
+                        ...d.settings,
+                        seriesType: selected ? null : t,
+                      },
+                    });
+                  }}
+                >
+                  <span className="v2-series-type-option-label">
+                    {SERIES_TYPE_LABELS[t]}
+                  </span>
+                  <span className="v2-series-type-option-desc">
+                    {SERIES_TYPE_DESCRIPTIONS[t]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Cross-episode lock toast — fires when the user taps a Concept
           row on a non-pilot episode. Auto-clears via setTimeout in
           showLockToast. Reuses the global `.toast` class. */}

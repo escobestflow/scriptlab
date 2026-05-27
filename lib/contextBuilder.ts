@@ -18,6 +18,11 @@ import {
   // 20-arc-by-N-episode score matrix into "what matters for THIS ep."
   getActiveArcsDraft, getEpisodeCountForArcs, digestArcsForEpisode, formatArcDigest,
   ARC_TYPE_LABELS,
+  // Series-type wiring: each TV project declares what kind of show it
+  // is, which reshapes episode independence / arc continuity / ending
+  // posture. SERIES_TYPE_RULES is the per-type instruction block we
+  // inject into every prompt.
+  SERIES_TYPE_LABELS, SERIES_TYPE_DESCRIPTIONS, SERIES_TYPE_RULES,
 } from "./story";
 import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
 import { WriterProfile, renderProfileForPrompt, isProfileMeaningful } from "./writerProfile";
@@ -91,6 +96,29 @@ function renderBeatLines(
       return lines.join("\n");
     })
     .join("\n");
+}
+
+/** Render the TV "Series type" block embedded in the bible. Names
+ *  the type, gives the canonical definition the writer also sees in
+ *  the picker, and lists the structural rules the model MUST obey.
+ *  Returns "" for non-TV or when seriesType is unset — caller can
+ *  append unconditionally. */
+function renderSeriesTypeBlock(story: Story): string {
+  if (story.projectType !== "tv-show") return "";
+  const c = getActiveConceptDraft(story);
+  const t = c.settings.seriesType;
+  if (!t) return "";
+  const label = SERIES_TYPE_LABELS[t];
+  const def = SERIES_TYPE_DESCRIPTIONS[t];
+  const rules = SERIES_TYPE_RULES[t];
+  return `
+
+## Series type: ${label} (HIGH PRIORITY — applies to every episode generation)
+Definition: ${def}
+
+Structural rules for this series type — these are NOT suggestions, they are constraints. Every episode / beat / scene you generate must obey them:
+  - ${rules}
+`;
 }
 
 /** Render the TV "Season arcs" block embedded in the bible. Lists
@@ -191,7 +219,7 @@ ${story.projectType === "short" ? `
 ## Short-film parameters
 - Target duration: ${settings.duration ? `${settings.duration} min` : "unspecified (default 10–15 min)"}
 - Short structure: ${settings.shortStructure ?? "unspecified (default flexible Situation → Pressure → Shift)"}
-` : ""}${isTV && concept?.seriesArc?.trim() ? `
+` : ""}${isTV ? renderSeriesTypeBlock(story) : ""}${isTV && concept?.seriesArc?.trim() ? `
 ## Season Arc (HIGH PRIORITY — applies to every episode generation)
 The user has authored a season-level arc. Every individual episode you
 generate or modify must serve this arc. Earlier episodes seed setups
@@ -433,12 +461,21 @@ function buildAsk(story: Story, action: ActionRequest): string {
     case "generate_beats": {
       const isTV = story.projectType === "tv-show";
       const tvCtx = tvEpisodeContext(story, action.payload?.episodeId);
-      // Episode-ending rule. Universal version lives in SYSTEM_BRAIN;
-      // we reinforce here for TV-scoped beat generation because the
-      // final-beat property is the single most important quality
-      // gate for an episodic beat sheet.
+      const seriesType = c.settings.seriesType;
+      // Episode-ending rule, type-shifted. Episodic gets the contained-
+      // ending guidance; everything else gets the standard momentum
+      // rule. SYSTEM_BRAIN carries the universal version; we reinforce
+      // here because the final-beat property is the single most
+      // important quality gate for an episodic beat sheet.
       const endingRule = isTV && tvCtx
-        ? `\n- The FINAL beat must end on narrative momentum into the next episode (see TV-specific principle in system instructions). Do not let the episode "stop" — it must hand off energy to the next one.`
+        ? (seriesType === "episodic"
+          ? `\n- This is an Episodic series. The FINAL beat should resolve THIS episode's contained A-story (case / problem / situation of the week) cleanly. A satisfying contained ending + a small character note IS the correct landing — do not force a cliffhanger.`
+          : `\n- The FINAL beat must end on narrative momentum into the next episode (see TV-specific principle in system instructions). Do not let the episode "stop" — it must hand off energy to the next one.`)
+        : "";
+      // Hybrid clarification: the A-story IS contained, but at least
+      // one serialized arc must advance somewhere in the beat sheet.
+      const hybridRule = isTV && seriesType === "hybrid"
+        ? `\n- This is a Hybrid series. Beats must do TWO things: (1) introduce + escalate + resolve a contained A-story (the week's case / problem / situation), AND (2) advance at least one serialized arc by a meaningful beat. Even when the A-story resolves cleanly, a serialized thread should escalate or open a question by episode end.`
         : "";
       // Arc-active rule. Every arc surfaced in the per-episode digest
       // (inside tvCtx) above intensity threshold must touch at least
@@ -455,7 +492,7 @@ Rules:
 - Use every locked ingredient meaningfully.
 - Weave in at least one snippet where it fits naturally (reference by title in the purpose field).
 - Match the darkness/pace/unpredictability levels.
-- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${arcRule}${endingRule}${shortFilmGuidance(story)}${tvCtx}${directionBlock(story)}`;
+- Respect the ending types: "${d.settings.endingTypes?.join(", ") || "any"}".${arcRule}${hybridRule}${endingRule}${shortFilmGuidance(story)}${tvCtx}${directionBlock(story)}`;
     }
 
     case "swap_ingredient": {
@@ -1003,14 +1040,33 @@ Use this history. The new episode must NOT contradict what's established here. H
       // SYSTEM_BRAIN carries the universal version — the writer told us
       // it's the single most important property of a TV episode and
       // wanted it loud at every relevant prompt boundary.
-      const endingMomentum = `
+      //
+      // Series-type modifier: the rule shifts for Episodic series (the
+      // contained ending IS valid there) and inverts for the Limited
+      // FINALE (which MUST resolve). The line we emit reflects the
+      // active type so the model gets one clean instruction, not a
+      // pile of caveats.
+      const seriesType = c.settings.seriesType;
+      const isLimitedFinale =
+        seriesType === "limited" && totalPlanned && nextNumber === totalPlanned;
+      let endingMomentum: string;
+      if (isLimitedFinale) {
+        endingMomentum = `
+- This is the Limited Series FINALE. Per the series type's structural rules, the final beat must RESOLVE the central season arc — no cliffhangers, no sequel hooks, no open questions left dangling. The episode should land with a definitive sense of "this story is complete."`;
+      } else if (seriesType === "episodic") {
+        endingMomentum = `
+- This is an Episodic series. The final beat should resolve THIS episode's contained A-story (case / problem / situation of the week) and leave the characters near their baseline. The cross-episode momentum rule is relaxed for this type — a satisfying contained ending + a small character note IS valid. Do not force a cliffhanger.`;
+      } else {
+        endingMomentum = `
 - The FINAL beat of the episode must create narrative momentum into the next episode. Do not simply stop the story. Land on one of:
   · a change in the audience's understanding (a piece of context reframes what we just watched),
   · an escalation of a key arc (the active arcs above level up — stakes, scope, or trajectory),
   · a reveal of new information (audience learns something the protagonist may or may not know yet),
   · a deepened character conflict (an existing tension cracks open or a new one ignites),
-  · an emotionally or dramatically charged question left unresolved (a cliffhanger of meaning, not just plot).
-  Even on a finale this rule applies — the final-finale beat should leave the audience with a question that lingers past the credits.`;
+  · an emotionally or dramatically charged question left unresolved (a cliffhanger of meaning, not just plot).${seriesType === "ongoing" || seriesType === "anthology" || seriesType === "hybrid" ? `
+  Even on a finale this rule applies — the final-finale beat should leave the audience with a question that lingers past the credits.` : `
+  Even on a finale this rule applies — the final-finale beat should leave the audience with a question that lingers past the credits.`}`;
+      }
 
       return `Compose a new TV episode for this series. Position: Episode ${nextNumber}.
 
@@ -1061,7 +1117,31 @@ Beats:
 ${beatLines}`;
       }).join("\n\n");
 
-      return `Audit the continuity of this TV series. Read every episode below in order. Surface any of the following issues:
+      // Series-type-aware audit guidance. The continuity check needs
+      // to know what KIND of show this is so it doesn't mis-flag a
+      // valid episodic ending as a stall, or mis-flag a serialized
+      // open-thread as a dropped thread, etc.
+      const conceptForCheck = getActiveConceptDraft(story);
+      const seriesType = conceptForCheck.settings.seriesType;
+      const seriesTypeHint = seriesType ? `
+
+# Series type for this project: ${SERIES_TYPE_LABELS[seriesType]}
+${SERIES_TYPE_DESCRIPTIONS[seriesType]}
+
+Series-type-aware rules for THIS audit:
+${seriesType === "limited"
+  ? "- Limited series: dropped threads weigh MAX severity (high). The finale MUST resolve — flag any open question that survives the finale as high-severity 'dropped-thread'."
+  : seriesType === "anthology"
+    ? "- Anthology series: dropped threads within THIS season are high-severity; threads opened that imply a future season are 'wrong-type-pacing' instead (anthology seasons are self-contained)."
+    : seriesType === "ongoing"
+      ? "- Ongoing/Serialized: a clean-bow finale is a FAILURE MODE. Flag any finale that resolves everything with no seeds for next season as 'ending-stall' (high). Dropped threads weigh medium — some thread carry-over IS expected."
+      : seriesType === "episodic"
+        ? "- Episodic: the 'ending-stall' finding is RELAXED. A contained per-episode ending is correct; only flag a stall if the closing beat literally provides no satisfying resolution to the week's A-story. Cross-episode arc-pacing findings weigh lower (light cross-episode arcs are expected). Conversely, an unresolved A-story that carries multiple episodes is 'wrong-type-pacing' (it doesn't fit the type)."
+        : "- Hybrid: each episode should both resolve a contained A-story AND advance a serialized arc. Flag episodes that miss one half (only A-story OR only serialized advancement) as 'wrong-type-pacing' (medium)."}
+` : "";
+      return `Audit the continuity of this TV series. Read every episode below in order.${seriesTypeHint}
+
+Surface any of the following issues:
 
 - **Contradictions**: a character knows or says something that conflicts with what was established in an earlier episode.
 - **Dropped threads**: a plot setup that's never paid off, or is forgotten between episodes.
@@ -1071,7 +1151,8 @@ ${beatLines}`;
 - **Arc execution mismatch**: an arc from the "Season arcs" block in the bible has a high intensity at episode N, but episode N's beats don't reflect that arc's emphasis. (Warning-level finding, not error — the writer plans the arc, the beats execute it; mismatches are worth flagging, not failing on.)
 - **Arc pacing**: an arc's intensity jumps more than 3 levels between adjacent episodes with no precipitating event in the intervening beats. (Sudden jumps are valid for shocks; flag them so the writer confirms the jolt is intentional.)
 - **Missed hard moment**: an arc has a hard moment anchored to episode N (per the "Hard moments" lines in the bible), but episode N's beats don't contain that moment.
-- **Episode-ending stall**: an episode's final beat reads as a stopping point (everything resolved, no charged question, no escalation, no reveal). Per the TV-momentum principle, every episode should hand off energy to the next.
+- **Episode-ending stall**: an episode's final beat reads as a stopping point (everything resolved, no charged question, no escalation, no reveal). Per the TV-momentum principle, every episode should hand off energy to the next. NOTE: for Episodic series this rule is relaxed — see the series-type rules above.
+- **Wrong-type pacing**: the season's pacing doesn't match the declared series type. E.g. an Episodic series with a 5-episode unresolved A-story, an Ongoing series with too many self-contained eps and no thread carry-over, a Limited series with sequel-hook threads in the finale, a Hybrid episode that only does the contained A-story OR only the serialized arc.
 
 # Episodes in order
 ${episodeBlocks}
@@ -1081,7 +1162,7 @@ Return STRICT JSON:
   "findings": [
     {
       "severity": "high" | "medium" | "low",
-      "kind": "contradiction" | "dropped-thread" | "under-used-character" | "pacing" | "tonal-whiplash" | "arc-execution" | "arc-pacing" | "missed-hard-moment" | "ending-stall" | "other",
+      "kind": "contradiction" | "dropped-thread" | "under-used-character" | "pacing" | "tonal-whiplash" | "arc-execution" | "arc-pacing" | "missed-hard-moment" | "ending-stall" | "wrong-type-pacing" | "other",
       "episodes": [number, …],     // which episode numbers this finding spans (1–N)
       "title": string,             // <= 60 chars, headline-style
       "detail": string             // 1–3 sentences explaining the issue concretely

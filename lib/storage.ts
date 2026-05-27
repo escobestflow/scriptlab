@@ -17,6 +17,9 @@ import { supabase } from "./supabase";
 const ALLOWED_SHORT_STRUCTURES = new Set([
   "complete", "open-ended", "proof-of-concept", "slice-of-life", "twist",
 ]);
+const ALLOWED_SERIES_TYPES = new Set([
+  "limited", "anthology", "ongoing", "episodic", "hybrid",
+]);
 
 function normalizeBeat(b: any, index: number): Beat {
   // Per-scene Twist / Weirdness dials. Both optional — undefined means
@@ -165,6 +168,13 @@ function normalizeSettings(s: any): StorySettings {
       ? Math.round(s.episodeCount) : undefined,
     shortStructure: ALLOWED_SHORT_STRUCTURES.has(s?.shortStructure)
       ? (s.shortStructure as StorySettings["shortStructure"]) : null,
+    // TV-only — validate against the canonical SeriesType union and
+    // fall back to null when missing / unknown. Legacy rows that
+    // pre-date the field load as null and the prompts run in their
+    // neutral "let the concept dictate" mode until the writer picks
+    // a type explicitly.
+    seriesType: ALLOWED_SERIES_TYPES.has(s?.seriesType)
+      ? (s.seriesType as StorySettings["seriesType"]) : null,
     toneNote: typeof s?.toneNote === "string" ? s.toneNote : "",
     themesNote: typeof s?.themesNote === "string" ? s.themesNote : "",
     frameworkNote: typeof s?.frameworkNote === "string" ? s.frameworkNote : "",

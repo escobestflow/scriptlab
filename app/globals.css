@@ -1311,6 +1311,66 @@ input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.15); }
   background: var(--surface);
 }
 .writer-chip-row { gap: 8px; }
+
+/* ── Series-type picker (TV Concept tab) ────────────────────────────
+   Single-select list inside the .sheet fly-up. Each option has a
+   bold label + a paragraph of definition text underneath so the
+   writer can read what they're picking before they commit. The
+   .v2-series-type-option button looks like a card; selected state
+   inverts to the black surface to match other "selected" affordances
+   in the design system (e.g. the moment-idea row in the Arcs popup). */
+.v2-series-type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+}
+.v2-series-type-option {
+  /* button reset */
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  /* surface */
+  background: var(--surface, #fff);
+  color: var(--ink, #111);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 0 0 0.7px var(--border, #e4e3e4);
+  transition: background-color 160ms var(--ease, ease),
+              box-shadow 160ms var(--ease, ease),
+              transform 120ms var(--ease, ease);
+}
+.v2-series-type-option:hover {
+  background: #f6f4f2;
+}
+.v2-series-type-option:active {
+  transform: scale(0.99);
+}
+.v2-series-type-option.is-selected {
+  background: var(--ink, #111);
+  color: var(--surface, #fff);
+  box-shadow: 0 0 0 0.7px var(--ink, #111);
+}
+.v2-series-type-option-label {
+  font-family: var(--ds-font-body, inherit);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+.v2-series-type-option-desc {
+  font-family: var(--ds-font-body, inherit);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+.v2-series-type-option.is-selected .v2-series-type-option-desc {
+  opacity: 0.9;
+}
 .chip {
   padding: 12px 18px;
   border-radius: 999px;
@@ -7374,6 +7434,11 @@ html[data-design="v2"] .record-label {
      Genre, Sub-Genre. The `order` numbers don't need to be
      contiguous; flex sorts ascending. */
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Format"] { grid-column: 1; order: 1; }
+  /* Series Type sits between Format and Episode Count per spec —
+     it changes the WHOLE shape of how a TV project gets generated,
+     so it should read right under Format as the second-most-important
+     structural decision. Hidden by the JSX guard on non-TV projects. */
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Series Type"] { grid-column: 1; order: 1.5; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Count"] { grid-column: 1; order: 2; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Title"],
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Show Title"] { grid-column: 1; order: 3; }
