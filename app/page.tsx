@@ -15,6 +15,10 @@ import {
   loadMomentsFromDB, saveMomentToDB, deleteMomentFromDB,
   loadPartnerProjectData,
 } from "@/lib/storage";
+import {
+  getEffectiveProjectThumbnail,
+  shouldGenerateProjectThumbnail,
+} from "@/lib/projectThumbnail";
 import { supabase } from "@/lib/supabase";
 import {
   listMyPendingInvites,
@@ -1210,6 +1214,11 @@ export default function Page() {
     opts: { auto?: boolean } = {},
   ) {
     if (projectThumbnailsInFlight.current.has(projectId)) return;
+    // Projects with a hardcoded static cover ("Buck Mark") never call
+    // the OpenAI API — the static asset IS the canonical cover. Skip
+    // both auto-fill AND manual regenerate. Manual taps in this state
+    // are a no-op (no toast) because the cover is already correct.
+    if (!shouldGenerateProjectThumbnail({ title })) return;
     // Auto-fill no-ops when the account is out of credit. Manual
     // regenerate (auto !== true) ALWAYS fires — the user's explicit
     // tap should produce SOME response (a toast, at minimum).
@@ -1337,6 +1346,9 @@ export default function Page() {
       // first render after creation). generateThumbnail dedups +
       // manages thumbsInFlight internally.
       if (!p.title?.trim()) continue;
+      // Projects with a hardcoded static cover (e.g. "Buck Mark")
+      // never call the OpenAI API — the static asset IS the cover.
+      if (!shouldGenerateProjectThumbnail(p)) continue;
       const draft = getActiveConceptDraft(p);
       const summary = draft.concept?.summary ?? "";
       generateThumbnail(
@@ -3590,15 +3602,22 @@ function ProjectsTab({
                   nail (thumbsInFlight set, accountLimitHit circuit
                   breaker) prevent the shimmer-visible state from
                   silently re-firing gens. */}
-              {p.thumbnail && !thumbsInFlight.has(p.id) ? (
-                <img src={p.thumbnail} alt="" className="project-cover-img" />
-              ) : (
-                <div
-                  className="project-cover-fill ds-image-shimmer is-dark"
-                  aria-label={thumbsInFlight.has(p.id) ? "Generating project image" : undefined}
-                  aria-hidden={thumbsInFlight.has(p.id) ? undefined : true}
-                />
-              )}
+              {(() => {
+                // Static overrides (e.g. "Buck Mark") win over both
+                // the stored thumbnail and the in-flight shimmer —
+                // they never need to generate so they never shimmer.
+                const cover = getEffectiveProjectThumbnail(p);
+                if (cover && !thumbsInFlight.has(p.id)) {
+                  return <img src={cover} alt="" className="project-cover-img" />;
+                }
+                return (
+                  <div
+                    className="project-cover-fill ds-image-shimmer is-dark"
+                    aria-label={thumbsInFlight.has(p.id) ? "Generating project image" : undefined}
+                    aria-hidden={thumbsInFlight.has(p.id) ? undefined : true}
+                  />
+                );
+              })()}
             </div>
             <div className="project-body">
               <TruncatedText

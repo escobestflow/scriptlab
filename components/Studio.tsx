@@ -49,6 +49,7 @@ import { parseScreenplay } from "@/lib/scriptParse";
 import { subGenresFor, SUB_GENRES_BY_ID } from "@/lib/subGenres";
 import { REFERENCE_ASPECTS, WRITER_STYLES } from "@/lib/references";
 import { createProjectFromDraft } from "@/lib/storage";
+import { getEffectiveProjectThumbnail } from "@/lib/projectThumbnail";
 import { Moment } from "@/lib/sampleData";
 import { ActionRequest } from "@/lib/prompt";
 import { useProfileCapture } from "@/lib/writerProfileStore";
@@ -2395,13 +2396,16 @@ export function Studio({
               onClick={() => setShowSetup(true)}
               aria-label="Open project settings"
             >
-              {story.thumbnail ? (
-                <img src={story.thumbnail} alt="" />
-              ) : (
-                <div className="v2-desktop-hero-image-placeholder">
-                  {story.title ? story.title.charAt(0).toUpperCase() : "?"}
-                </div>
-              )}
+              {(() => {
+                const cover = getEffectiveProjectThumbnail(story);
+                return cover ? (
+                  <img src={cover} alt="" />
+                ) : (
+                  <div className="v2-desktop-hero-image-placeholder">
+                    {story.title ? story.title.charAt(0).toUpperCase() : "?"}
+                  </div>
+                );
+              })()}
               {/* TV-only — back-to-episodes chip overlaid on the hero
                   image's top-left when the user is drilled into an
                   episode. Click → returns to the project-level
@@ -2490,13 +2494,16 @@ export function Studio({
               which for TV inside an episode resets activeEpisodeId and
               flips section back to "episodes". The desktop chip stays
               because desktop hides `.studio-nav-fixed`. */}
-          {story.thumbnail ? (
-            <img src={story.thumbnail} alt="" className="project-header-thumb" />
-          ) : (
-            <div className="project-header-thumb project-header-thumb-placeholder">
-              {story.title ? story.title.charAt(0).toUpperCase() : "?"}
-            </div>
-          )}
+          {(() => {
+            const cover = getEffectiveProjectThumbnail(story);
+            return cover ? (
+              <img src={cover} alt="" className="project-header-thumb" />
+            ) : (
+              <div className="project-header-thumb project-header-thumb-placeholder">
+                {story.title ? story.title.charAt(0).toUpperCase() : "?"}
+              </div>
+            );
+          })()}
         </button>
 
         {/* V2 empty-state title + project-draft trigger painted ON the
@@ -14971,10 +14978,13 @@ function SettingsTab({
             Previously the no-cover state rendered nothing — now it
             shows shimmer to match the rest of the app's "no image
             yet" surfaces. */}
-        {story.thumbnail && !isThumbnailInFlight ? (
+        {(() => {
+          const cover = getEffectiveProjectThumbnail(story);
+          return cover && !isThumbnailInFlight;
+        })() ? (
           <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
             <img
-              src={story.thumbnail}
+              src={getEffectiveProjectThumbnail(story)}
               alt=""
               style={{
                 width: "100%",
