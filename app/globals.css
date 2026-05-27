@@ -12740,6 +12740,13 @@ html[data-design="v2"] .menu-panel-utility svg {
     text-align: initial;
     min-height: 100vh;
   }
+  /* Ideas empty state shares every position/size with Projects, just
+     a different graphic. The `data-tab="ideas"` marker comes from
+     IdeasEmptyState in app/page.tsx — Projects keeps the default
+     bg-image. */
+  html[data-design="v2"] .projects-empty[data-tab="ideas"] {
+    background-image: url("/v2/desktop-empty-ideas-graphic.png");
+  }
   /* Page-level header ("Projects" / "Ideas") on the empty states.
      Desktop: pinned to the top-left of the .projects-empty
      container, aligned visually with the graphic's left edge

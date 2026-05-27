@@ -3956,7 +3956,7 @@ function IdeasEmptyState({
   onStartRecording: () => void;
 }) {
   return (
-    <div className="projects-empty">
+    <div className="projects-empty" data-tab="ideas">
       {/* Same `.projects-empty-page-heading` treatment as the Projects
           empty state — desktop-only via CSS. Mobile keeps the
           full-bleed door layout without a top heading. */}
