@@ -61,6 +61,8 @@ import TruncatedText from "@/components/TruncatedText";
 import { SpeakButton } from "@/components/SpeakButton";
 import { useDraftPickerStylePref, type DraftPickerStyle, loadImageModelPref } from "@/lib/prefs";
 import { useAuth } from "@/lib/auth";
+import { isAdmin } from "@/lib/adminEmails";
+import { isTerminalImageGenError } from "@/lib/imageGenWithFallback";
 import {
   createInvite,
   listInvitesForProject,
@@ -589,6 +591,12 @@ export function Studio({
   const [tvImportScriptFile, setTVImportScriptFile] = useState<File | null>(null);
   const [tvImportNotes, setTVImportNotes] = useState("");
   const [tvImportEpisodeCount, setTVImportEpisodeCount] = useState<number>(8);
+  // Admin-only test mode flag. Gated in the JSX by isAdmin(userEmail) so
+  // end users never see the checkbox. When on, the orchestrator forces
+  // every step to its minimum output (2 chars / 2 arcs / 2 eps / 2 pilot
+  // beats + 2 scenes) so a full smoke test runs for cents instead of
+  // dollars. See lib/syncLayer.ts TVImportInput.testMode.
+  const [tvImportTestMode, setTVImportTestMode] = useState(false);
 
   async function runTVImport() {
     if (tvImporting) return;
@@ -619,6 +627,7 @@ export function Studio({
           scriptText: scriptText.trim() || undefined,
           notes: tvImportNotes.trim() || undefined,
           episodeCount: tvImportEpisodeCount,
+          testMode: tvImportTestMode,
         },
         {
           onStep: step => setTVImportStep(step),
@@ -1381,17 +1390,21 @@ export function Studio({
       });
       if (!res.ok) {
         let message = `HTTP ${res.status}`;
+        let code: string | null = null;
         try {
           const errData = await res.json();
           if (errData?.error) message = String(errData.error);
+          if (errData?.code) code = String(errData.code);
         } catch { /* non-JSON body */ }
-        console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId}: ${message}`);
+        console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId} code=${code || "none"}: ${message}`);
         sceneImagesFailed.current.add(beatId);
-        // Clear the optimistic imageGenAttempted=true on the beat so
-        // the next session retries instead of being stuck.
-        setBeats(bs => bs.map(b =>
-          b.id === beatId && b.imageGenAttempted ? { ...b, imageGenAttempted: false } : b
-        ));
+        // Only clear on transient errors. Terminal codes keep the
+        // stamp so auto-gen doesn't loop next session.
+        if (!isTerminalImageGenError(code)) {
+          setBeats(bs => bs.map(b =>
+            b.id === beatId && b.imageGenAttempted ? { ...b, imageGenAttempted: false } : b
+          ));
+        }
         return;
       }
       const data = await res.json();
@@ -1492,13 +1505,19 @@ export function Studio({
       });
       if (!res.ok) {
         let message = `HTTP ${res.status}`;
+        let code: string | null = null;
         try {
           const errData = await res.json();
           if (errData?.error) message = String(errData.error);
+          if (errData?.code) code = String(errData.code);
         } catch { /* non-JSON body */ }
-        console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId}: ${message}`);
+        console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId} code=${code || "none"}: ${message}`);
         episodeImagesFailed.current.add(episodeId);
-        clearEpisodeImageGenAttempted(episodeId);
+        // Only clear local state on transient errors. Terminal codes
+        // keep the stamp so auto-gen doesn't loop next session.
+        if (!isTerminalImageGenError(code)) {
+          clearEpisodeImageGenAttempted(episodeId);
+        }
         return;
       }
       const data = await res.json();
@@ -1739,17 +1758,21 @@ export function Studio({
       });
       if (!res.ok) {
         let message = `HTTP ${res.status}`;
+        let code: string | null = null;
         try {
           const errData = await res.json();
           if (errData?.error) message = String(errData.error);
+          if (errData?.code) code = String(errData.code);
         } catch { /* non-JSON body */ }
-        console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: ${message}`);
+        console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId} code=${code || "none"}: ${message}`);
         characterImagesFailed.current.add(characterId);
-        // Clear the optimistic imageGenAttempted=true so the autosave
-        // debouncer doesn't overwrite the server's clear. Without
-        // this, the next session still sees attempted=true in the
-        // saved row and the auto-gen effect skips the retry.
-        clearCharacterImageGenAttempted(characterId);
+        // Clear local state ONLY for transient errors so the next
+        // session can retry. Terminal errors (content policy, prompt
+        // invalid, billing) keep the stamp so we don't loop and burn
+        // quota — user recovers via manual Regenerate in the edit sheet.
+        if (!isTerminalImageGenError(code)) {
+          clearCharacterImageGenAttempted(characterId);
+        }
         return;
       }
       const data = await res.json();
@@ -1757,6 +1780,8 @@ export function Studio({
       if (!thumb) {
         console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: API returned no thumbnail`);
         characterImagesFailed.current.add(characterId);
+        // Empty-thumbnail response is an unknown failure mode — treat
+        // as transient so we retry next session.
         clearCharacterImageGenAttempted(characterId);
         return;
       }
@@ -3861,10 +3886,46 @@ export function Studio({
                   const n = parseInt(e.target.value, 10);
                   if (Number.isFinite(n)) setTVImportEpisodeCount(Math.max(1, Math.min(30, n)));
                 }}
-                disabled={tvImporting}
+                disabled={tvImporting || tvImportTestMode}
                 placeholder="8"
               />
             </div>
+
+            {/* Admin-only test mode toggle. Hidden from end users — only
+                renders for emails in the isAdmin allowlist. When on,
+                every pipeline step asks the model for the bare minimum
+                output (2 chars / 2 arcs / 2 episodes / 2 pilot beats +
+                scenes) so a full smoke test runs for ~$0.20 instead of
+                ~$2-3. Episode count input is locked to 2 while test
+                mode is active. */}
+            {isAdmin(authedUser?.email) && (
+              <div className="v2-direction-prompt-field" style={{ marginTop: 4 }}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    opacity: tvImporting ? 0.5 : 1,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={tvImportTestMode}
+                    onChange={e => setTVImportTestMode(e.target.checked)}
+                    disabled={tvImporting}
+                  />
+                  <span className="ds-type-body">
+                    <strong>Test mode (admin)</strong> — minimal output for cheap smoke testing.
+                    <br />
+                    <span style={{ opacity: 0.7, fontSize: 12 }}>
+                      Forces 2 characters / 2 arcs / 2 episodes / 2 pilot beats + scenes.
+                      Use this to verify the pipeline works end-to-end before a real run.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
 
             {/* In-progress step indicator */}
             {tvImporting && (

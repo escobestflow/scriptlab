@@ -683,8 +683,24 @@ function applyTVImportEpisodesResult(story: Story, parsed: any): Story {
 function applyTVImportPilotResult(story: Story, parsed: any): Story {
   const rawBeats = Array.isArray(parsed?.beats) ? parsed.beats : [];
   const rawScenes = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
+
+  // Surface empty-array failures as REAL errors instead of silent no-ops.
+  // Previously, when the model returned `{ "beats": [], "scenes": [] }`,
+  // we'd patch the pilot with empty beats and the user would see "no
+  // beats, no script" with zero diagnostic context. The TV-import popup
+  // would just close as if everything succeeded.
+  if (rawBeats.length === 0 && rawScenes.length === 0) {
+    throw new Error(
+      `Pilot step succeeded HTTP-wise but the model returned empty beats AND scenes arrays. The bible/source may have triggered a refusal, or the prompt was overconstrained. Raw response keys: ${Object.keys(parsed ?? {}).join(", ") || "(none)"}`,
+    );
+  }
+
   const epd = getActiveEpisodesDraft(story);
-  if (!epd || epd.episodes.length === 0) return story;
+  if (!epd || epd.episodes.length === 0) {
+    throw new Error(
+      "Pilot step ran but no episodes draft exists. Step 4 (episodes) must complete successfully before step 5.",
+    );
+  }
   const sorted = [...epd.episodes].sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
   const pilot = sorted[0];
 
@@ -761,6 +777,12 @@ export interface TVImportInput {
   scriptText?: string;
   notes?: string;
   episodeCount?: number;
+  /** Admin-only diagnostic flag. When true, every step asks the model
+   *  for the bare minimum output (2 characters, 2 arcs, 2 episodes,
+   *  2 pilot beats + 2 pilot scenes) so a full pipeline run can be
+   *  smoke-tested for a few cents instead of a few dollars. Gated by
+   *  isAdmin(userEmail) in the UI — never exposed to end users. */
+  testMode?: boolean;
 }
 
 export interface TVImportCallbacks {
@@ -782,7 +804,13 @@ export async function importTVProjectFromScript(
   profile?: WriterProfile | null,
 ): Promise<Story> {
   const { onStep, onPartialStory } = callbacks;
-  const episodeCount = Math.max(1, Math.min(30, Number(input.episodeCount) || 8));
+  // Test mode forces episodeCount=2 regardless of what the user requested.
+  // Gives the smoke-test path a predictable shape so it always exits
+  // through the pilot step (1 pilot + 1 finale).
+  const testMode = input.testMode === true;
+  const episodeCount = testMode
+    ? 2
+    : Math.max(1, Math.min(30, Number(input.episodeCount) || 8));
   let story = initial;
 
   async function runStep<T = void>(
@@ -800,17 +828,26 @@ export async function importTVProjectFromScript(
     onPartialStory?.(story);
   }
 
+  // Common payload shared across every step so the prompts can read
+  // testMode + the user's free-text inputs without each step having to
+  // re-build its own bag.
+  const basePayload = {
+    scriptText: input.scriptText,
+    notes: input.notes,
+    testMode,
+  };
+
   // Step 1 — Concept fill (no overwrite).
   await runStep(
     "concept",
-    { type: "tv_import_concept", payload: { scriptText: input.scriptText, notes: input.notes } },
+    { type: "tv_import_concept", payload: basePayload },
     parsed => applyTVImportConceptResult(story, parsed),
   );
 
   // Step 2 — Characters.
   await runStep(
     "characters",
-    { type: "tv_import_characters", payload: { scriptText: input.scriptText, notes: input.notes } },
+    { type: "tv_import_characters", payload: basePayload },
     parsed => applyTVImportCharactersResult(story, parsed),
   );
 
@@ -825,21 +862,21 @@ export async function importTVProjectFromScript(
   // Step 3 — Arcs (including 3-5 character arcs for the top mains).
   await runStep(
     "arcs",
-    { type: "tv_import_arcs", payload: { scriptText: input.scriptText, notes: input.notes, episodeCount } },
+    { type: "tv_import_arcs", payload: { ...basePayload, episodeCount } },
     parsed => applyTVImportArcsResult(story, parsed, episodeCount),
   );
 
   // Step 4 — Full slate of episodes.
   await runStep(
     "episodes",
-    { type: "tv_import_episodes", payload: { scriptText: input.scriptText, notes: input.notes, episodeCount } },
+    { type: "tv_import_episodes", payload: { ...basePayload, episodeCount } },
     parsed => applyTVImportEpisodesResult(story, parsed),
   );
 
   // Step 5 — Pilot screenplay.
   await runStep(
     "pilot",
-    { type: "tv_import_pilot", payload: { scriptText: input.scriptText, notes: input.notes } },
+    { type: "tv_import_pilot", payload: basePayload },
     parsed => applyTVImportPilotResult(story, parsed),
   );
 

@@ -47,6 +47,39 @@ export type ImageGenSizes = {
   dallE3: string;
 };
 
+// Error-code classification used by both the API routes (to decide
+// whether to clear the imageGenAttempted DB flag) AND the client
+// auto-gen effects (to decide whether to clear it in local state).
+// Centralized here so both sides agree on the policy.
+//
+// TERMINAL — retrying won't help. The same prompt / account / image
+// will produce the same error on the next attempt. Keep imageGen-
+// Attempted set so auto-gen doesn't loop on next page load — user
+// can still recover via the manual "Regenerate" button in the edit
+// sheet, which bypasses the flag.
+//
+// TRANSIENT — retry next time. Network blips, generic 5xx, etc.
+// Clear the flag so auto-gen will fire again on next session.
+const TERMINAL_IMAGE_GEN_CODES = new Set([
+  // OpenAI content moderation rejected the prompt — same input will
+  // fail the same way.
+  "content_policy_violation",
+  "moderation_blocked",
+  // Prompt malformed / too long / invalid params.
+  "invalid_request_error",
+  "string_too_long",
+  // Account-level — until the user resolves billing nothing works.
+  "billing_hard_limit_reached",
+  "insufficient_quota",
+  "account_deactivated",
+  // Quota exhaustion that won't refresh during this session.
+  "rate_limit_exceeded",
+]);
+
+export function isTerminalImageGenError(code: string | null | undefined): boolean {
+  return !!code && TERMINAL_IMAGE_GEN_CODES.has(code);
+}
+
 export async function generateImageWithFallback(opts: {
   apiKey: string;
   prompt: string;

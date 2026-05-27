@@ -10,7 +10,10 @@
 
 import sharp from "sharp";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
-import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
+import {
+  generateImageWithFallback,
+  isTerminalImageGenError,
+} from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
 import { logUsage } from "@/lib/usageLog";
 import {
@@ -136,10 +139,12 @@ export async function POST(req: Request) {
         image: { count: 1, size: attemptedModel === "gpt-image-2" ? sizes.gptImage2 : sizes.dallE3 },
         error: `${attempt.code ?? "error"}: ${attempt.error}`,
       });
-      // Undo the pre-call markEpisodeAttempted=true stamp so auto-gen
-      // can retry on the next session. Otherwise a one-off transient
-      // failure burns the episode's auto-gen budget permanently.
-      if (projectId && episodeId) {
+      // Only clear imageGenAttempted on TRANSIENT errors. Terminal
+      // errors (content policy, prompt invalid, billing, rate limit)
+      // would just fail the same way next session — keep the stamp
+      // so auto-gen doesn't loop and burn quota on every reload.
+      const isTerminal = isTerminalImageGenError(attempt.code);
+      if (projectId && episodeId && !isTerminal) {
         await clearEpisodeAttempted(projectId, episodeId);
       }
       return new Response(JSON.stringify({

@@ -158,6 +158,17 @@ export async function POST(req: Request) {
           console.log("\n[ScriptWriter]",
             JSON.stringify(report, null, 2));
 
+          // Extra diagnostic for the TV-import pilot step: dump the
+          // full model output so we can grep Vercel runtime logs when
+          // it returns empty arrays. Capped at 4KB to keep the log
+          // affordable while still capturing enough JSON to debug.
+          if (action.type === "tv_import_pilot") {
+            console.log(
+              "[ScriptWriter:tv_import_pilot raw output preview]\n",
+              textOut.slice(0, 4096),
+            );
+          }
+
           // Also send the cost report to the client so the UI can show it.
           controller.enqueue(encoder.encode(
             JSON.stringify({ type: "report", value: report }) + "\n"

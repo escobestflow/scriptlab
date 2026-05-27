@@ -1234,8 +1234,9 @@ Rules:
     }
 
     case "tv_import_characters": {
-      const p = action.payload as { scriptText?: string; notes?: string };
-      return `Build the full Characters roster for this TV series from the source material below + the Concept already in the project bible above.
+      const p = action.payload as { scriptText?: string; notes?: string; testMode?: boolean };
+      const isTest = p.testMode === true;
+      return `Build the full Characters roster for this TV series from the source material below + the Concept already in the project bible above.${isTest ? "\n\n**TEST MODE — return EXACTLY 2 characters.** Pick the two most important (the protagonist plus the strongest antagonist or co-lead). This is a smoke test, not a production run." : ""}
 
 # Source material
 ${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
@@ -1270,9 +1271,10 @@ Rules:
     }
 
     case "tv_import_arcs": {
-      const p = action.payload as { scriptText?: string; notes?: string; episodeCount?: number };
+      const p = action.payload as { scriptText?: string; notes?: string; episodeCount?: number; testMode?: boolean };
       const epCount = Math.max(1, Math.min(30, Number(p.episodeCount) || 8));
-      return `Build the Season Arcs layer for this TV series from the source material + the Concept and Characters already in the project bible above.
+      const isTest = p.testMode === true;
+      return `Build the Season Arcs layer for this TV series from the source material + the Concept and Characters already in the project bible above.${isTest ? "\n\n**TEST MODE — return EXACTLY 2 arcs.** One main-plot arc that spans the season, plus one character arc for the protagonist. Skip subplots, thematic arcs, mystery arcs, and additional character arcs for this run." : ""}
 
 # Source material
 ${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
@@ -1295,24 +1297,29 @@ Return STRICT JSON in this exact schema:
 }
 
 Rules:
-- Include ONE main-plot arc that spans the whole season.
+${isTest
+  ? `- Return EXACTLY 2 arcs total — one main-plot arc spanning the season, plus one character arc for the protagonist.
+- The character arc's characterName must match a name in the project bible's Characters list exactly.
+- No subplot, theme, mystery, or additional character arcs in test mode.`
+  : `- Include ONE main-plot arc that spans the whole season.
 - Include 1-2 subplot arcs and 1 thematic arc (type=theme).
 - Include a mystery-reveal or world arc if the genre supports it.
-- ALSO INCLUDE 3-5 character arcs — pick the TOP 3-5 most important characters by their emphasis in the source material (regardless of declared role tag). For each, characterName must match a name in the project bible's Characters list exactly.
+- ALSO INCLUDE 3-5 character arcs — pick the TOP 3-5 most important characters by their emphasis in the source material (regardless of declared role tag). For each, characterName must match a name in the project bible's Characters list exactly.`}
 - Each arc's scores array must be exactly ${epCount} integers in [1, 10]. Use the score to show the arc's prominence at that episode — 1=quiet/background, 10=dominant.
 - Honor the series-type structural rules in the bible — limited series arcs land on the finale; ongoing-series arcs leave seeds.
 - No prose outside the JSON.`;
     }
 
     case "tv_import_episodes": {
-      const p = action.payload as { scriptText?: string; notes?: string; episodeCount?: number };
+      const p = action.payload as { scriptText?: string; notes?: string; episodeCount?: number; testMode?: boolean };
       const epCount = Math.max(1, Math.min(30, Number(p.episodeCount) || 8));
+      const isTest = p.testMode === true;
       // Episode containers only — title, logline, archetype. NO beats.
       // Beats for the pilot get generated in the next step (tv_import_pilot)
       // alongside the screenplay. Beats for episodes 2..N stay empty and
       // get generated lazily later (per-episode, on demand) so this single
       // bulk call doesn't blow past the output-token cap on long seasons.
-      return `Build the FULL slate of episode CONTAINERS for this TV series — title, logline, and archetype for every episode from pilot through finale. Do NOT generate beats; those come in later steps.
+      return `Build the FULL slate of episode CONTAINERS for this TV series — title, logline, and archetype for every episode from pilot through finale. Do NOT generate beats; those come in later steps.${isTest ? "\n\n**TEST MODE — this is a 2-episode smoke test.** Treat Episode 1 as the pilot and Episode 2 as a compact finale that resolves whatever the pilot opened." : ""}
 
 # Source material
 ${p.scriptText ? `## Uploaded script / treatment / notes\n${p.scriptText}\n` : "(no script uploaded)"}
@@ -1344,7 +1351,9 @@ Rules:
     }
 
     case "tv_import_pilot": {
-      const p = action.payload as { scriptText?: string; notes?: string };
+      const p = action.payload as { scriptText?: string; notes?: string; testMode?: boolean };
+      const isTest = p.testMode === true;
+      const beatCountLabel = isTest ? "EXACTLY 2 beats" : "5-8 beats";
       // Pull the pilot from the episodes draft (set by step 4). The pilot
       // is the first episode (sorted by number). The pilot has NO beats
       // yet — step 4 only set up containers — so this prompt generates
@@ -1357,7 +1366,7 @@ Rules:
       const pilotContext = pilot
         ? `Episode 1 — "${pilot.title || "(untitled)"}"\nLogline: ${pilot.logline || "(none — infer from the bible above)"}`
         : "(no pilot container found — use the bible to invent a pilot title + logline before generating beats and scenes)";
-      return `Write the FULL PILOT for this TV series — both the beat sheet AND the screenplay prose.
+      return `Write the FULL PILOT for this TV series — both the beat sheet AND the screenplay prose.${isTest ? "\n\n**TEST MODE — this is a 2-beat / 2-scene smoke test.** Keep it tight: one cold-open beat, one closing beat. Each scene short (50-150 words). Just enough to verify the pipeline works end-to-end." : ""}
 
 This is the most important episode in the season — the first impression. It must be:
 - IMPACTFUL — the cold open hooks immediately; the closing image refuses to be forgotten.
@@ -1389,8 +1398,13 @@ Return STRICT JSON in this exact schema:
   ]
 }
 
+CRITICAL OUTPUT REQUIREMENT:
+- The "beats" array MUST contain at least one entry.
+- The "scenes" array MUST contain at least one entry.
+- An empty array for either is an error and breaks the downstream pipeline. If you have any reason to refuse part of this task, return a valid minimal example rather than an empty array.
+
 Beat-writing rules:
-- Produce 5-8 beats total.
+- Produce ${beatCountLabel} total.
 - Beats trace the pilot's narrative arc from cold open through the closing image — setup → escalation → turn → button.
 - Every active season arc in the bible's "Season arcs" block should get touched by at least one beat. Dominant arcs anchor 1-2 beats.
 

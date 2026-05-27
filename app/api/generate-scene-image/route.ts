@@ -10,7 +10,10 @@
 
 import sharp from "sharp";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
-import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
+import {
+  generateImageWithFallback,
+  isTerminalImageGenError,
+} from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
 import { logUsage } from "@/lib/usageLog";
 import {
@@ -135,9 +138,11 @@ export async function POST(req: Request) {
         image: { count: 1, size: attemptedModel === "gpt-image-2" ? sizes.gptImage2 : sizes.dallE3 },
         error: `${attempt.code ?? "error"}: ${attempt.error}`,
       });
-      // Undo the pre-call markBeatAttempted=true stamp so auto-gen
-      // can retry on the next session.
-      if (projectId && beatId) {
+      // Only clear imageGenAttempted on TRANSIENT errors. Terminal
+      // errors (content policy, prompt invalid, billing, rate limit)
+      // keep the stamp so auto-gen doesn't loop next session.
+      const isTerminal = isTerminalImageGenError(attempt.code);
+      if (projectId && beatId && !isTerminal) {
         await clearBeatAttempted(projectId, beatId);
       }
       return new Response(JSON.stringify({
