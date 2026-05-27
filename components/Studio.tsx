@@ -56,6 +56,7 @@ import { useIsV2 } from "@/lib/v2Access";
 import type { WriterProfile } from "@/lib/writerProfile";
 import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
+import TruncatedText from "@/components/TruncatedText";
 import { SpeakButton } from "@/components/SpeakButton";
 import { useDraftPickerStylePref, type DraftPickerStyle, loadImageModelPref } from "@/lib/prefs";
 import { useAuth } from "@/lib/auth";
@@ -2546,9 +2547,12 @@ export function Studio({
             const ep = epd?.episodes.find(e => e.id === activeEpisodeId);
             if (!ep) return null;
             return (
-              <div className="v2-mobile-header-episode-title ds-type-body-bold">
+              <TruncatedText
+                className="v2-mobile-header-episode-title ds-type-body-bold"
+                text={ep.title?.trim() || `Episode ${ep.number}`}
+              >
                 {ep.title?.trim() || `Episode ${ep.number}`}
-              </div>
+              </TruncatedText>
             );
           })()}
 
@@ -6863,7 +6867,11 @@ function AttrRow({
         </span>
         <div className="attr-values">
           {hasValues
-            ? values.map(v => <span key={v} className="attr-pill">{v}</span>)
+            ? values.map(v => (
+                <TruncatedText key={v} as="span" className="attr-pill" text={v}>
+                  {v}
+                </TruncatedText>
+              ))
             : <span className="attr-placeholder">{(readOnly || isLockedDisplay) ? "None added" : (placeholder || "Not set")}</span>
           }
         </div>
@@ -6874,12 +6882,13 @@ function AttrRow({
         )}
       </div>
       {!expanded && note && note.trim() && (
-        <div
+        <TruncatedText
           className="attr-row-note-preview"
           onClick={interactive ? headerClick : undefined}
+          text={note}
         >
           {note}
-        </div>
+        </TruncatedText>
       )}
       {expanded && !isLockedDisplay && (
         <div className="attr-row-body">
@@ -9059,18 +9068,24 @@ function CharactersTab({
             <div className="v2-character-body" style={isV2 ? undefined : { flex: 1, textAlign: "left" }}>
               {isV2 ? (
                 <>
-                  <div className="v2-character-name ds-type-project-card-title">
+                  <TruncatedText
+                    className="v2-character-name ds-type-project-card-title"
+                    text={ch.name || "Unnamed character"}
+                  >
                     {ch.name || "Unnamed character"}
-                  </div>
+                  </TruncatedText>
                   {roleLabel && (
                     <div className={`v2-character-role-pill v2-character-role-${ch.role || "default"}`}>
                       {roleLabel}
                     </div>
                   )}
                   {v2Description && (
-                    <div className="v2-character-description ds-type-body">
+                    <TruncatedText
+                      className="v2-character-description ds-type-body"
+                      text={v2Description}
+                    >
                       {v2Description}
-                    </div>
+                    </TruncatedText>
                   )}
                   {/* Attribute pills (age / gender / archetype) shown
                       at the bottom of the desktop card per the spec.
@@ -9079,13 +9094,19 @@ function CharactersTab({
                   {(ch.age?.trim() || ch.gender?.trim() || ch.archetype?.trim()) && (
                     <div className="v2-character-attrs">
                       {ch.age?.trim() && (
-                        <span className="v2-character-attr-pill">{ch.age}</span>
+                        <TruncatedText as="span" className="v2-character-attr-pill" text={ch.age}>
+                          {ch.age}
+                        </TruncatedText>
                       )}
                       {ch.gender?.trim() && (
-                        <span className="v2-character-attr-pill">{ch.gender}</span>
+                        <TruncatedText as="span" className="v2-character-attr-pill" text={ch.gender}>
+                          {ch.gender}
+                        </TruncatedText>
                       )}
                       {ch.archetype?.trim() && (
-                        <span className="v2-character-attr-pill">{ch.archetype}</span>
+                        <TruncatedText as="span" className="v2-character-attr-pill" text={ch.archetype}>
+                          {ch.archetype}
+                        </TruncatedText>
                       )}
                     </div>
                   )}
@@ -9913,7 +9934,9 @@ function CharacterEditForm({
                   aria-pressed={selected}
                   aria-label={`${v.label} — ${v.desc}`}
                 >
-                  <span className="char-voice-name">{v.label}</span>
+                  <TruncatedText as="span" className="char-voice-name" text={v.label}>
+                    {v.label}
+                  </TruncatedText>
                 </button>
                 {/* Auto has no preview — it doesn't resolve to a single
                     voice until a name is in play. */}
@@ -10549,12 +10572,18 @@ function EpisodesTab({
                 </button>
               </div>
               <div className="v2-episode-card-body">
-                <div className="v2-episode-card-title ds-type-project-card-title">
+                <TruncatedText
+                  className="v2-episode-card-title ds-type-project-card-title"
+                  text={ep.title || `Episode ${ep.number}`}
+                >
                   {ep.title || `Episode ${ep.number}`}
-                </div>
-                <div className="v2-episode-card-description ds-type-body">
+                </TruncatedText>
+                <TruncatedText
+                  className="v2-episode-card-description ds-type-body"
+                  text={ep.logline || ""}
+                >
                   {ep.logline || ""}
-                </div>
+                </TruncatedText>
                 <div className="v2-episode-card-updated ds-type-body-sm">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" />
@@ -11237,10 +11266,17 @@ function ArcCard({
       }}
     >
       <div className="v2-arc-card-body">
-        <div className="v2-arc-card-title">{arc.title || ARC_TYPE_LABELS[arc.type]}</div>
+        <TruncatedText
+          className="v2-arc-card-title"
+          text={arc.title || ARC_TYPE_LABELS[arc.type]}
+        >
+          {arc.title || ARC_TYPE_LABELS[arc.type]}
+        </TruncatedText>
         <div className="v2-arc-card-type">{ARC_TYPE_LABELS[arc.type].toUpperCase()}</div>
         {arc.description && (
-          <div className="v2-arc-card-description">{arc.description}</div>
+          <TruncatedText className="v2-arc-card-description" text={arc.description}>
+            {arc.description}
+          </TruncatedText>
         )}
       </div>
       {(arc.moments?.length ?? 0) > 0 && (
@@ -11266,7 +11302,13 @@ function ArcCard({
                   <span className="v2-arc-card-moment-pos">
                     EP{Math.floor(m.position) + 1}
                   </span>
-                  <span className="v2-arc-card-moment-text">{display}</span>
+                  <TruncatedText
+                    as="span"
+                    className="v2-arc-card-moment-text"
+                    text={display}
+                  >
+                    {display}
+                  </TruncatedText>
                 </button>
               );
             })}
@@ -12608,8 +12650,18 @@ function StoryTab({
                       if (!slug) return null;
                       return <div className="v2-beat-location ds-type-int-heading">{slug}</div>;
                     })()}
-                    <div className={`beat-name${isV2 ? " ds-type-project-card-title" : " ds-type-body-bold"}`}>{beat.name || "Untitled scene"}</div>
-                    <div className={`beat-summary-preview${isV2 ? " ds-type-body" : ""}`}>{beat.summary || "No summary"}</div>
+                    <TruncatedText
+                      className={`beat-name${isV2 ? " ds-type-project-card-title" : " ds-type-body-bold"}`}
+                      text={beat.name || "Untitled scene"}
+                    >
+                      {beat.name || "Untitled scene"}
+                    </TruncatedText>
+                    <TruncatedText
+                      className={`beat-summary-preview${isV2 ? " ds-type-body" : ""}`}
+                      text={beat.summary || "No summary"}
+                    >
+                      {beat.summary || "No summary"}
+                    </TruncatedText>
                   </div>
                   {isV2 && (() => {
                     // Right-side meta column: character chips + estimated
@@ -13611,8 +13663,12 @@ function ScriptTab({
           <div className="beat-header" style={{ cursor: "default" }}>
             <div className={`beat-number ${beat.status === "written" ? "written" : ""}`}>{i + 1}</div>
             <div className="beat-info">
-              <div className="beat-name">{beat.name}</div>
-              <div className="beat-summary-preview">{beat.summary}</div>
+              <TruncatedText className="beat-name" text={beat.name}>
+                {beat.name}
+              </TruncatedText>
+              <TruncatedText className="beat-summary-preview" text={beat.summary}>
+                {beat.summary}
+              </TruncatedText>
             </div>
             {/* Status badge removed per product direction — the card's
                 body already telegraphs state (prose for "written", the
@@ -13631,7 +13687,9 @@ function ScriptTab({
               {linkedMoments.map(m => (
                 <div key={m.id} className="scene-linked-moment">
                   <span className="scene-linked-moment-type">{m.type}</span>
-                  <span className="scene-linked-moment-text">{m.text}</span>
+                  <TruncatedText as="span" className="scene-linked-moment-text" text={m.text}>
+                    {m.text}
+                  </TruncatedText>
                 </div>
               ))}
             </div>

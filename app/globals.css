@@ -14138,3 +14138,40 @@ html[data-design="v2"] .v2-mobile-header-episode-title {
    Desktop keeps its overlay chip because the desktop layout hides
    `.studio-nav-fixed` entirely.) */
 
+/* ======= TRUNCATION TOOLTIP =======
+   Renders via createPortal at document.body, positioned with inline
+   styles by `components/TruncatedText.tsx`. Dark gray pill, small
+   type, never wider than 320px. Pointer-events: none so it never
+   blocks clicks on the underlying card. */
+.truncate-tooltip {
+  background: #2a2a2a;
+  color: #f4f4f4;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  max-width: 320px;
+  max-height: 200px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  user-select: none;
+  white-space: normal;
+  word-wrap: break-word;
+  /* Soft fade-in so the tooltip doesn't pop in jarringly. */
+  animation: truncate-tooltip-fade-in 80ms ease-out;
+}
+
+@keyframes truncate-tooltip-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Flip-up variant inherits the same fade, but the JS adds its own
+   `translateY(-100%)` on top of the keyframe target — keyframe sets
+   the final translateY explicitly to (0) so we explicitly clear it
+   when the flip variant is active. The component sets transform
+   inline; that wins over the keyframe end state. */
+

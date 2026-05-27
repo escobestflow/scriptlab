@@ -30,6 +30,7 @@ import { isAdmin } from "@/lib/adminEmails";
 import { useIsV2 } from "@/lib/v2Access";
 import { DesktopSidebar, deriveSidebarUserFields, type MainTab } from "@/components/DesktopSidebar";
 import { Studio } from "@/components/Studio";
+import TruncatedText from "@/components/TruncatedText";
 import SplashLoader from "@/components/SplashLoader";
 import PostLoginTransition from "@/components/PostLoginTransition";
 import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
@@ -3431,12 +3432,20 @@ function ProjectsTab({
                 )}
               </div>
               <div className="project-body">
-                <div className="project-title">{inv.projectTitle || "Untitled"}</div>
-                <div className="project-summary" style={{ marginBottom: 10 }}>
+                <TruncatedText className="project-title" text={inv.projectTitle || "Untitled"}>
+                  {inv.projectTitle || "Untitled"}
+                </TruncatedText>
+                <TruncatedText
+                  className="project-summary"
+                  style={{ marginBottom: 10 }}
+                  text={inv.creatorEmail
+                    ? `${inv.creatorEmail} invited you to collaborate`
+                    : "You've been invited to collaborate"}
+                >
                   {inv.creatorEmail
                     ? `${inv.creatorEmail} invited you to collaborate`
                     : "You've been invited to collaborate"}
-                </div>
+                </TruncatedText>
                 <div style={{ display: "flex", gap: 8 }}>
                   <Button
                     variant="primary"
@@ -3592,7 +3601,12 @@ function ProjectsTab({
               )}
             </div>
             <div className="project-body">
-              <div className="project-title ds-type-project-card-title">{p.title || "Untitled"}</div>
+              <TruncatedText
+                className="project-title ds-type-project-card-title"
+                text={p.title || "Untitled"}
+              >
+                {p.title || "Untitled"}
+              </TruncatedText>
               <div className="project-meta">{metaLine}</div>
               <div className="project-genre">
                 {/* .attr-pill matches the collapsed-state genre chips in
@@ -3603,7 +3617,9 @@ function ProjectsTab({
                   <span key={g} className="attr-pill" data-genre={g}>{g.toUpperCase()}</span>
                 ))}
               </div>
-              <div className="project-summary">{c.logline || "No logline yet"}</div>
+              <TruncatedText className="project-summary" text={c.logline || "No logline yet"}>
+                {c.logline || "No logline yet"}
+              </TruncatedText>
             </div>
             {isCollab && (leftChar || rightChar) && (
               <span
@@ -4135,7 +4151,9 @@ function MomentsTab({
                   style={{ cursor: "pointer" }}
                 >
                   <div className="moment-type ds-type-body">{m.type}</div>
-                  <div className="moment-text ds-type-body">{m.text}</div>
+                  <TruncatedText className="moment-text ds-type-body" text={m.text}>
+                    {m.text}
+                  </TruncatedText>
                   {m.tags.length > 0 && (
                     <div className="moment-tags">
                       {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
@@ -4155,7 +4173,9 @@ function MomentsTab({
                   style={{ cursor: "pointer" }}
                 >
                   <div className="moment-type ds-type-body">{m.type}</div>
-                  <div className="moment-text ds-type-body">{m.text}</div>
+                  <TruncatedText className="moment-text ds-type-body" text={m.text}>
+                    {m.text}
+                  </TruncatedText>
                   {m.tags.length > 0 && (
                     <div className="moment-tags">
                       {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
@@ -4176,7 +4196,9 @@ function MomentsTab({
               style={{ cursor: "pointer" }}
             >
               <div className="moment-type ds-type-body">{m.type}</div>
-              <div className="moment-text ds-type-body">{m.text}</div>
+              <TruncatedText className="moment-text ds-type-body" text={m.text}>
+                {m.text}
+              </TruncatedText>
               {m.tags.length > 0 && (
                 <div className="moment-tags">
                   {m.tags.map(t => <span key={t} className="moment-tag">{t}</span>)}
