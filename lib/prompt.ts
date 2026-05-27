@@ -155,15 +155,48 @@ export interface ActionRequest {
   payload: Record<string, any>;
 }
 
-// Route actions to models — Haiku for fast/mechanical, Sonnet for prose/reasoning.
+// Route actions to models — three tiers:
+//
+//   OPUS    — screenplay-writing only. The thing the writer actually
+//             reads end-to-end. Dialogue voice consistency across
+//             multiple characters, subtext that doesn't crack into
+//             on-the-nose exposition, scene architecture that
+//             compounds across beats. ~5× the cost of Sonnet per
+//             token, justified because the user-facing artifact is
+//             the screenplay.
+//   SONNET  — structural reasoning + long-source comprehension. Arcs,
+//             episode structure, season-wide continuity, concept fill
+//             from a long script. ~4× the cost of Haiku, justified
+//             because structure mistakes compound across a season.
+//   HAIKU   — single-field generation, mechanical syncs, anything
+//             where output is short and the input is the project
+//             bible. Cheap by default.
 export function modelForAction(type: ActionType): string {
   switch (type) {
+    // ── OPUS tier — screenplay prose only ────────────────────────────
+    // The user reads this end-to-end. Dialogue must sound like real
+    // people who don't sound like each other; scene transitions need
+    // to compound; subtext needs to land. Opus handles this in a way
+    // Sonnet noticeably can't — especially across multi-page scenes
+    // with multiple characters.
     case "generate_scene":
-    case "rewrite_beat":
-    // Sync → script is long-form prose — match generate_scene routing.
+    // Sync → script writes screenplay prose from upstream layers.
+    // Same craft as generate_scene; same tier.
     case "sync_concept_to_script":
     case "sync_characters_to_script":
     case "sync_story_to_script":
+    // The highlighter rewrite is small in scope (one passage) but
+    // ENORMOUS in stakes — the user picked exactly this line and is
+    // judging the result against their own taste. Opus.
+    case "rewrite_highlighted_range":
+    // The pilot screenplay step of the TV-import pipeline is the
+    // payoff the user actually reads. Everything else in the pipeline
+    // is scaffolding; this one IS the thing.
+    case "tv_import_pilot":
+      return "claude-opus-4-5";
+
+    // ── SONNET tier — structural + long-source comprehension ─────────
+    case "rewrite_beat":
     // Easy-mode concept expansion: writing a coherent logline, summary,
     // tone, themes, and endingTypes from just title+genre is creative
     // work — Sonnet handles tonal nuance better than Haiku.
@@ -173,10 +206,6 @@ export function modelForAction(type: ActionType): string {
     // and per-scene summarization over the full script is dense work.
     case "import_extract_scenes":
     case "import_summarize_scenes":
-    // Highlighter rewrite is short but craft-heavy — picks words that
-    // have to sit seamlessly inside surrounding prose. Sonnet handles
-    // the tonal continuity better than Haiku.
-    case "rewrite_highlighted_range":
     // generate_episode produces title + logline + 5–8 beats grounded in
     // the season arc and prior episodes — structural reasoning + tone
     // continuity work, Sonnet-grade.
@@ -184,17 +213,17 @@ export function modelForAction(type: ActionType): string {
     // check_continuity reads the entire season and surfaces issues.
     // Long-context + nuanced reasoning ⇒ Sonnet.
     case "check_continuity":
-    // TV-only "Upload Script" pipeline — each step ingests a long
-    // source document (script + notes) and writes structured output
-    // grounded in it. Concept-fill, characters, arcs, full season
-    // of episodes, full pilot script — every one is high-recall +
-    // tonal-continuity work. Sonnet across the board.
+    // TV-only "Upload Script" pipeline — steps 1-4 ingest a long
+    // source document (script + notes) and write STRUCTURED output
+    // grounded in it (concept fields, character roster, season arcs,
+    // episode skeletons). The pilot step (5) is on Opus above. These
+    // four are structural — Sonnet handles them well at a fraction
+    // of Opus cost.
     case "tv_import_concept":
     case "tv_import_characters":
     case "tv_import_arcs":
     case "tv_import_episodes":
-    case "tv_import_pilot":
-      return "claude-sonnet-4-5"; // quality matters for prose
+      return "claude-sonnet-4-5"; // structural reasoning
     case "generate_beats":
     case "swap_ingredient":
     case "add_twist":
