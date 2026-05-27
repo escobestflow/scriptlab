@@ -1387,6 +1387,11 @@ export function Studio({
         } catch { /* non-JSON body */ }
         console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId}: ${message}`);
         sceneImagesFailed.current.add(beatId);
+        // Clear the optimistic imageGenAttempted=true on the beat so
+        // the next session retries instead of being stuck.
+        setBeats(bs => bs.map(b =>
+          b.id === beatId && b.imageGenAttempted ? { ...b, imageGenAttempted: false } : b
+        ));
         return;
       }
       const data = await res.json();
@@ -1394,6 +1399,9 @@ export function Studio({
       if (!thumb) {
         console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId}: API returned no thumbnail`);
         sceneImagesFailed.current.add(beatId);
+        setBeats(bs => bs.map(b =>
+          b.id === beatId && b.imageGenAttempted ? { ...b, imageGenAttempted: false } : b
+        ));
         return;
       }
       setBeats(bs => bs.map(b =>
@@ -1405,6 +1413,9 @@ export function Studio({
         : (err?.message || String(err));
       console.error(`[autoGenerateSceneImage] beat="${beat.name}" id=${beatId} threw:`, msg);
       sceneImagesFailed.current.add(beatId);
+      setBeats(bs => bs.map(b =>
+        b.id === beatId && b.imageGenAttempted ? { ...b, imageGenAttempted: false } : b
+      ));
     } finally {
       clearTimeout(timeoutId);
       sceneImagesInFlight.current.delete(beatId);
@@ -1487,6 +1498,7 @@ export function Studio({
         } catch { /* non-JSON body */ }
         console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId}: ${message}`);
         episodeImagesFailed.current.add(episodeId);
+        clearEpisodeImageGenAttempted(episodeId);
         return;
       }
       const data = await res.json();
@@ -1494,6 +1506,7 @@ export function Studio({
       if (!thumb) {
         console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId}: API returned no thumbnail`);
         episodeImagesFailed.current.add(episodeId);
+        clearEpisodeImageGenAttempted(episodeId);
         return;
       }
       setStory(s => {
@@ -1510,6 +1523,7 @@ export function Studio({
         : (err?.message || String(err));
       console.error(`[autoGenerateEpisodeImage] ep="${ep.title}" id=${episodeId} threw:`, msg);
       episodeImagesFailed.current.add(episodeId);
+      clearEpisodeImageGenAttempted(episodeId);
     } finally {
       clearTimeout(timeoutId);
       episodeImagesInFlight.current.delete(episodeId);
@@ -1519,6 +1533,23 @@ export function Studio({
         return n;
       });
     }
+  }
+
+  // Counterpart to clearCharacterImageGenAttempted. Same purpose:
+  // undo the optimistic stamp on a failed gen so the autosave doesn't
+  // persist `attempted=true` and block the next-session retry.
+  function clearEpisodeImageGenAttempted(episodeId: string) {
+    setStory(s => {
+      const d = getActiveEpisodesDraft(s);
+      if (!d) return s;
+      const ep = d.episodes.find(e => e.id === episodeId) as Episode | undefined;
+      if (!ep || !(ep as any).imageGenAttempted) return s;
+      return updateEpisodesDraft(s, {
+        episodes: d.episodes.map(e =>
+          e.id === episodeId ? ({ ...e, imageGenAttempted: false } as Episode) : e,
+        ),
+      });
+    });
   }
 
   // Auto-fill loop — every story-state change, walk the episodes draft
@@ -1714,6 +1745,11 @@ export function Studio({
         } catch { /* non-JSON body */ }
         console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: ${message}`);
         characterImagesFailed.current.add(characterId);
+        // Clear the optimistic imageGenAttempted=true so the autosave
+        // debouncer doesn't overwrite the server's clear. Without
+        // this, the next session still sees attempted=true in the
+        // saved row and the auto-gen effect skips the retry.
+        clearCharacterImageGenAttempted(characterId);
         return;
       }
       const data = await res.json();
@@ -1721,6 +1757,7 @@ export function Studio({
       if (!thumb) {
         console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId}: API returned no thumbnail`);
         characterImagesFailed.current.add(characterId);
+        clearCharacterImageGenAttempted(characterId);
         return;
       }
       setStory(s => {
@@ -1741,6 +1778,7 @@ export function Studio({
         : (err?.message || String(err));
       console.error(`[autoGenerateCharacterImage] character="${ch.name}" id=${characterId} threw:`, msg);
       characterImagesFailed.current.add(characterId);
+      clearCharacterImageGenAttempted(characterId);
     } finally {
       clearTimeout(timeoutId);
       characterImagesInFlight.current.delete(characterId);
@@ -1750,6 +1788,26 @@ export function Studio({
         return next;
       });
     }
+  }
+
+  // Clear the optimistic imageGenAttempted=true stamp on a character.
+  // Used by the error paths in autoGenerateCharacterImage so a failed
+  // call doesn't permanently mark the character "already attempted"
+  // and block the next session's auto-gen retry. Server route clears
+  // the DB row in its !attempt.ok branch; this one clears the live
+  // state + lets autosave persist the false value.
+  function clearCharacterImageGenAttempted(characterId: string) {
+    setStory(s => {
+      const live = getActiveCharactersDraft(s);
+      if (!live) return s;
+      const ch = live.characters.find(c => c.id === characterId);
+      if (!ch || !ch.imageGenAttempted) return s;
+      return updateCharactersDraft(s, {
+        characters: live.characters.map(c =>
+          c.id === characterId ? { ...c, imageGenAttempted: false } : c,
+        ),
+      });
+    });
   }
 
   // Call /api/generate with detect_character_gender and patch the

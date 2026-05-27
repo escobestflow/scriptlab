@@ -10,11 +10,14 @@
 
 import sharp from "sharp";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
-import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
 import { logUsage } from "@/lib/usageLog";
-import { markBeatAttempted, setBeatThumbnail } from "@/lib/projectImagePersist";
+import {
+  markBeatAttempted,
+  setBeatThumbnail,
+  clearBeatAttempted,
+} from "@/lib/projectImagePersist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,21 +104,21 @@ export async function POST(req: Request) {
       typeof genre === "string" ? genre : undefined,
       typeof tone === "string" ? tone : undefined,
     );
-    const isV2 = isV2User(userEmail);
 
-    // Image gen — landscape with automatic fallback. gpt-image-2 first
-    // for v2 users; dall-e-3 fallback if it fails. dall-e-3's nearest
-    // landscape is 1792x1024 (16:9, slightly wider than 7:5 but
-    // acceptable; sharp will center-crop to 7:5).
+    // Server default: dall-e-3. The "Premium Image Quality" toggle in
+    // Settings is the only path that flips this — it sends
+    // `model: "gpt-image-2"` explicitly. preferV2 stays false here so a
+    // client that omits `model` still gets the cheap default.
     const sizes = { gptImage2: "1536x1024" as const, dallE3: "1792x1024" as const };
     const attempt = await generateImageWithFallback({
       apiKey,
       prompt,
       sizes,
       context: "generate-scene-image",
-      preferV2: isV2,
+      preferV2: false,
       forceModel,
     });
+    const attemptedModel = forceModel ?? "dall-e-3";
     if (!attempt.ok) {
       void logUsage({
         userEmail,
@@ -127,11 +130,16 @@ export async function POST(req: Request) {
         draftLabel: draftLabel ?? null,
         provider: "openai",
         kind: "image",
-        model: isV2 ? "gpt-image-2" : "dall-e-3",
+        model: attemptedModel,
         action: "generate_scene_image",
-        image: { count: 1, size: isV2 ? sizes.gptImage2 : sizes.dallE3 },
+        image: { count: 1, size: attemptedModel === "gpt-image-2" ? sizes.gptImage2 : sizes.dallE3 },
         error: `${attempt.code ?? "error"}: ${attempt.error}`,
       });
+      // Undo the pre-call markBeatAttempted=true stamp so auto-gen
+      // can retry on the next session.
+      if (projectId && beatId) {
+        await clearBeatAttempted(projectId, beatId);
+      }
       return new Response(JSON.stringify({
         error: attempt.error,
         code: attempt.code,

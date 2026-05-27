@@ -10,11 +10,14 @@
 
 import sharp from "sharp";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
-import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
 import { logUsage } from "@/lib/usageLog";
-import { markCharacterAttempted, setCharacterThumbnail } from "@/lib/projectImagePersist";
+import {
+  markCharacterAttempted,
+  setCharacterThumbnail,
+  clearCharacterAttempted,
+} from "@/lib/projectImagePersist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,21 +126,24 @@ export async function POST(req: Request) {
       typeof genre === "string" ? genre : undefined,
       typeof tone === "string" ? tone : undefined,
     );
-    const isV2 = isV2User(userEmail);
 
-    // Image gen — vertical 4:5 portrait with automatic fallback.
-    // gpt-image-2 first for v2 users; dall-e-3 fallback if it fails.
-    // dall-e-3's nearest portrait is 1024x1792 (9:16, slightly taller
-    // than 4:5 but acceptable; sharp will center-crop).
+    // Server default: dall-e-3. We do NOT route V2 users to gpt-image-2
+    // automatically — the "Premium Image Quality" toggle in Settings is
+    // the only path that flips this, and it sends `model: "gpt-image-2"`
+    // explicitly via the client. preferV2 stays false here so a client
+    // that omits `model` for any reason still gets the cheap default.
     const sizes = { gptImage2: "1024x1280" as const, dallE3: "1024x1792" as const };
     const attempt = await generateImageWithFallback({
       apiKey,
       prompt,
       sizes,
       context: "generate-character-image",
-      preferV2: isV2,
+      preferV2: false,
       forceModel,
     });
+    // The model we actually tried (for usage_log + UI display).
+    // Matches the server's behavior: forceModel wins, else dall-e-3.
+    const attemptedModel = forceModel ?? "dall-e-3";
     if (!attempt.ok) {
       void logUsage({
         userEmail,
@@ -149,11 +155,22 @@ export async function POST(req: Request) {
         draftLabel: draftLabel ?? null,
         provider: "openai",
         kind: "image",
-        model: isV2 ? "gpt-image-2" : "dall-e-3",
+        // Use the model we ACTUALLY tried, not the V2-routed default.
+        // This stops the admin dashboard from mis-attributing failed
+        // dall-e-3 attempts as gpt-image-2 charges.
+        model: attemptedModel,
         action: "generate_character_image",
-        image: { count: 1, size: isV2 ? sizes.gptImage2 : sizes.dallE3 },
+        image: { count: 1, size: attemptedModel === "gpt-image-2" ? sizes.gptImage2 : sizes.dallE3 },
         error: `${attempt.code ?? "error"}: ${attempt.error}`,
       });
+      // Undo the pre-call markCharacterAttempted=true stamp so the
+      // client's next session can auto-retry. Without this, a one-off
+      // transient failure burned the character's auto-gen budget
+      // permanently — the user had to manually regenerate from the
+      // edit sheet to unstick.
+      if (projectId && characterId) {
+        await clearCharacterAttempted(projectId, characterId);
+      }
       return new Response(JSON.stringify({
         error: attempt.error,
         code: attempt.code,

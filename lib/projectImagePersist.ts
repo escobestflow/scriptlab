@@ -136,6 +136,47 @@ export async function markEpisodeAttempted(
   });
 }
 
+// ── Clear-on-failure helpers ────────────────────────────────────
+// Called from the route's `!attempt.ok` branch to undo the pre-call
+// `imageGenAttempted=true` stamp when the OpenAI call definitively
+// failed. Without these, a one-off transient failure (network blip,
+// rate limit) marks the row "permanently attempted" → the client's
+// auto-gen effect skips it on every subsequent session → user is
+// stuck without a thumbnail unless they manually regenerate.
+//
+// The clear is safe because by the time we call it the route is
+// returning an error response — there's no in-flight gen to dedupe
+// against anymore. If the user kicks off another gen later (auto or
+// manual), the pre-call stamp re-applies the protection for that
+// new attempt.
+
+export async function clearCharacterAttempted(
+  projectId: string,
+  characterId: string,
+): Promise<boolean> {
+  return mutateCharacter(projectId, characterId, (c) => {
+    c.imageGenAttempted = false;
+  });
+}
+
+export async function clearBeatAttempted(
+  projectId: string,
+  beatId: string,
+): Promise<boolean> {
+  return mutateBeat(projectId, beatId, (b) => {
+    b.imageGenAttempted = false;
+  });
+}
+
+export async function clearEpisodeAttempted(
+  projectId: string,
+  episodeId: string,
+): Promise<boolean> {
+  return mutateEpisode(projectId, episodeId, (e) => {
+    e.imageGenAttempted = false;
+  });
+}
+
 // ── Internals ────────────────────────────────────────────────────
 
 type AnyRecord = Record<string, unknown>;

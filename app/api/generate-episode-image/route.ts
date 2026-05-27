@@ -10,11 +10,14 @@
 
 import sharp from "sharp";
 import { isBetaAllowed, BETA_FORBIDDEN_RESPONSE } from "@/lib/betaAccess";
-import { isV2User } from "@/lib/v2Access";
 import { generateImageWithFallback } from "@/lib/imageGenWithFallback";
 import { uploadJpegToStorage } from "@/lib/imageStorage";
 import { logUsage } from "@/lib/usageLog";
-import { markEpisodeAttempted, setEpisodeThumbnail } from "@/lib/projectImagePersist";
+import {
+  markEpisodeAttempted,
+  setEpisodeThumbnail,
+  clearEpisodeAttempted,
+} from "@/lib/projectImagePersist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,20 +104,22 @@ export async function POST(req: Request) {
       typeof genre === "string" ? genre : undefined,
       typeof tone === "string" ? tone : undefined,
     );
-    const isV2 = isV2User(userEmail);
 
-    // Wider than the scene image (16:9 vs 7:5) — episode thumbnails
-    // sit higher in the card hierarchy and benefit from key-art
-    // proportions. Both models support these sizes natively.
+    // Server default: dall-e-3. The "Premium Image Quality" toggle in
+    // Settings is the only path that flips this — it sends
+    // `model: "gpt-image-2"` explicitly via the client. preferV2 stays
+    // false here so a client that omits `model` still gets the cheap
+    // default.
     const sizes = { gptImage2: "1536x768" as const, dallE3: "1792x1024" as const };
     const attempt = await generateImageWithFallback({
       apiKey,
       prompt,
       sizes,
       context: "generate-episode-image",
-      preferV2: isV2,
+      preferV2: false,
       forceModel,
     });
+    const attemptedModel = forceModel ?? "dall-e-3";
     if (!attempt.ok) {
       void logUsage({
         userEmail,
@@ -126,11 +131,17 @@ export async function POST(req: Request) {
         draftLabel: draftLabel ?? null,
         provider: "openai",
         kind: "image",
-        model: forceModel ?? (isV2 ? "gpt-image-2" : "dall-e-3"),
+        model: attemptedModel,
         action: "generate_episode_image",
-        image: { count: 1, size: forceModel === "dall-e-3" ? sizes.dallE3 : (isV2 ? sizes.gptImage2 : sizes.dallE3) },
+        image: { count: 1, size: attemptedModel === "gpt-image-2" ? sizes.gptImage2 : sizes.dallE3 },
         error: `${attempt.code ?? "error"}: ${attempt.error}`,
       });
+      // Undo the pre-call markEpisodeAttempted=true stamp so auto-gen
+      // can retry on the next session. Otherwise a one-off transient
+      // failure burns the episode's auto-gen budget permanently.
+      if (projectId && episodeId) {
+        await clearEpisodeAttempted(projectId, episodeId);
+      }
       return new Response(JSON.stringify({
         error: attempt.error,
         code: attempt.code,
