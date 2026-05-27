@@ -804,12 +804,12 @@ export async function importTVProjectFromScript(
   profile?: WriterProfile | null,
 ): Promise<Story> {
   const { onStep, onPartialStory } = callbacks;
-  // Test mode forces episodeCount=2 regardless of what the user requested.
-  // Gives the smoke-test path a predictable shape so it always exits
-  // through the pilot step (1 pilot + 1 finale).
+  // Test mode forces episodeCount=1 (just the pilot) — minimum
+  // viable to validate the pipeline. Saves ~50% on the episodes
+  // step vs. the previous 2-episode test cadence.
   const testMode = input.testMode === true;
   const episodeCount = testMode
-    ? 2
+    ? 1
     : Math.max(1, Math.min(30, Number(input.episodeCount) || 8));
   let story = initial;
 
@@ -837,12 +837,16 @@ export async function importTVProjectFromScript(
     testMode,
   };
 
-  // Step 1 — Concept fill (no overwrite).
-  await runStep(
-    "concept",
-    { type: "tv_import_concept", payload: basePayload },
-    parsed => applyTVImportConceptResult(story, parsed),
-  );
+  // Step 1 — Concept fill (no overwrite). Skipped entirely in test
+  // mode — no API call, no progress label. The user can fill
+  // concept separately via the Easy-mode "Create Logline" CTA.
+  if (!testMode) {
+    await runStep(
+      "concept",
+      { type: "tv_import_concept", payload: basePayload },
+      parsed => applyTVImportConceptResult(story, parsed),
+    );
+  }
 
   // Step 2 — Characters.
   await runStep(

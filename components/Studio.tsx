@@ -787,32 +787,42 @@ export function Studio({
 
   // Determine which beats we're editing
   const isTV = story.projectType === "tv-show";
+  // Episodes are the canonical home for TV beats — they live on the
+  // EpisodesLayerDraft (`Story.episodesDrafts[].episodes[].beats`),
+  // NOT the legacy `StoryLayerDraft.episodes` field. The TV import
+  // pipeline (applyTVImportEpisodesResult / applyTVImportPilotResult)
+  // writes there; this reader must match. Previously this code read
+  // from activeStoryLayer.episodes — a back-compat field that's
+  // empty for any project created since the layered-drafts refactor.
+  // Symptom: imported pilot beats existed in the DB but the Story
+  // tab rendered the empty state, and clicking Add Scene tripped
+  // the "Add an episode first" guard because no episodes were
+  // visible in this layer.
+  const activeEpisodesDraft = isTV ? getActiveEpisodesDraft(story) : null;
   // For TV: prefer the explicitly-active episode, but fall back to
-  // the first episode in the active story-layer draft when no
-  // activeEpisodeId is set. Without this fallback, a TV user landing
-  // on the Story tab from the project level (no episode drilled in)
-  // would see beats=[] AND any setBeats call would land in the
-  // project-level beats array — a black hole, since the TV render
-  // path only reads from `activeEpisode?.beats`. Symptom: opening
-  // the Add Scene sheet rendered an empty popup because the just-
-  // inserted beat wasn't visible to the lookup that populates the
-  // sheet body.
+  // the first episode in the episodes draft when no activeEpisodeId
+  // is set (e.g. the user lands on the Story tab without drilling
+  // into a specific episode card).
   const effectiveEpisodeIdForBeats = isTV
-    ? (activeEpisodeId ?? activeStoryLayer.episodes?.[0]?.id ?? null)
+    ? (activeEpisodeId ?? activeEpisodesDraft?.episodes?.[0]?.id ?? null)
     : null;
   const activeEpisode = isTV
-    ? activeStoryLayer.episodes?.find(ep => ep.id === effectiveEpisodeIdForBeats)
+    ? activeEpisodesDraft?.episodes.find(ep => ep.id === effectiveEpisodeIdForBeats)
     : null;
   const beats = isTV
     ? (activeEpisode?.beats ?? [])
     : activeStoryLayer.beats;
   const setBeats = (updater: (bs: Beat[]) => Beat[]) => {
     if (isTV && effectiveEpisodeIdForBeats) {
-      setStory(s => updateStoryLayerDraft(s, {
-        episodes: getActiveStoryLayerDraft(s).episodes?.map(ep =>
-          ep.id === effectiveEpisodeIdForBeats ? { ...ep, beats: updater(ep.beats) } : ep
-        ),
-      }));
+      setStory(s => {
+        const epd = getActiveEpisodesDraft(s);
+        if (!epd) return s;
+        return updateEpisodesDraft(s, {
+          episodes: epd.episodes.map(ep =>
+            ep.id === effectiveEpisodeIdForBeats ? { ...ep, beats: updater(ep.beats) } : ep,
+          ),
+        });
+      });
     } else {
       setStory(s => updateStoryLayerDraft(s, { beats: updater(getActiveStoryLayerDraft(s).beats) }));
     }
@@ -909,10 +919,10 @@ export function Studio({
   };
   const openNewSceneSheet = (insertAt?: number) => {
     // For TV with no episodes at all, scene creation is meaningless
-    // — beats hang off episodes, not the project. Nudge the user to
-    // make an episode first instead of opening an empty sheet whose
-    // changes would land in a black hole.
-    if (isTV && (activeStoryLayer.episodes?.length ?? 0) === 0) {
+    // — beats hang off episodes, not the project. Check the canonical
+    // episodes draft (NOT the legacy storyLayer.episodes field, which
+    // is empty for any project newer than the layered-drafts refactor).
+    if (isTV && (activeEpisodesDraft?.episodes.length ?? 0) === 0) {
       if (typeof window !== "undefined") {
         window.alert("Add an episode first — TV scenes live inside episodes.");
       }
@@ -3919,36 +3929,36 @@ export function Studio({
             {/* Admin-only test mode toggle. Hidden from end users — only
                 renders for emails in the isAdmin allowlist. When on,
                 every pipeline step asks the model for the bare minimum
-                output (2 chars / 2 arcs / 2 episodes / 2 pilot beats +
-                scenes) so a full smoke test runs for ~$0.20 instead of
-                ~$2-3. Episode count input is locked to 2 while test
-                mode is active. */}
+                output (1 char / 1 arc / 1 episode / 1 pilot beat +
+                scene) and the concept step is skipped entirely — a
+                full smoke test runs for ~$0.10 instead of $2-3. */}
             {isAdmin(authedUser?.email) && (
-              <div className="v2-direction-prompt-field" style={{ marginTop: 4 }}>
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    cursor: "pointer",
-                    opacity: tvImporting ? 0.5 : 1,
-                  }}
+              <div
+                className="v2-direction-prompt-field"
+                style={{ marginTop: 4, display: "flex", alignItems: "flex-start", gap: 12 }}
+              >
+                <button
+                  type="button"
+                  className={`toggle-switch ${tvImportTestMode ? "on" : ""}`}
+                  onClick={() => !tvImporting && setTVImportTestMode(v => !v)}
+                  disabled={tvImporting}
+                  aria-pressed={tvImportTestMode}
+                  aria-label="Test mode"
+                  style={{ flexShrink: 0, opacity: tvImporting ? 0.5 : 1 }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={tvImportTestMode}
-                    onChange={e => setTVImportTestMode(e.target.checked)}
-                    disabled={tvImporting}
-                  />
-                  <span className="ds-type-body">
-                    <strong>Test mode (admin)</strong> — minimal output for cheap smoke testing.
-                    <br />
-                    <span style={{ opacity: 0.7, fontSize: 12 }}>
-                      Forces 2 characters / 2 arcs / 2 episodes / 2 pilot beats + scenes.
-                      Use this to verify the pipeline works end-to-end before a real run.
-                    </span>
-                  </span>
-                </label>
+                  <span className="toggle-switch-knob" aria-hidden="true" />
+                </button>
+                <div
+                  className="ds-type-body"
+                  style={{ flex: 1, opacity: tvImporting ? 0.5 : 1, cursor: tvImporting ? "default" : "pointer" }}
+                  onClick={() => !tvImporting && setTVImportTestMode(v => !v)}
+                >
+                  <strong>Test mode (admin)</strong> — minimal output for cheap smoke testing.
+                  <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>
+                    Skips Concept. Forces 1 character / 1 arc / 1 episode / 1 pilot beat + scene.
+                    ~$0.10 per run.
+                  </div>
+                </div>
               </div>
             )}
 
