@@ -12533,8 +12533,16 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .studio-empty-overlay[data-section="arcs"] {
     background-image: url("/v2/desktop-empty-state-arch.png");
   }
+  /* Empty state on desktop now scrolls when its inner content
+     overflows the viewport — previously locked to `overflow:hidden`
+     so the page couldn't scroll past the silhouette, but that also
+     hid CTAs / extra cards that sit below it on tabs with longer
+     empty-state composition. `overflow-y: auto` keeps the hidden-
+     scrollbar feel on mobile but unlocks vertical scrolling when
+     the empty overlay's content height exceeds the viewport. */
   html[data-design="v2"]:has(.studio-empty-overlay) .studio-scroll {
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
   /* Mobile uses opacity:0 to fade the layer-bar's draft pill out
      when the overlay mounts, but the bar still takes height — on
@@ -13194,10 +13202,25 @@ html[data-design="v2"] .menu-panel-utility svg {
      reference viewport. */
   html[data-design="v2"] .v2-episodes-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(280px, 1fr));
+    /* Card minimum reduced 280 → 249 per spec (each card ~31px
+       narrower, total grid ~123px narrower). The 1fr keeps cards
+       elastic on slightly narrower viewports. */
+    grid-template-columns: repeat(4, minmax(249px, 1fr));
     gap: 20px;
-    margin: 0 0 40px;
+    /* Reserve a 38px gutter so the grid's right edge lands 60px
+       from the viewport edge — 22px tab-content-wrap inline
+       padding-right + 38px margin-right = 60. Matches the layer-
+       bar right-slot alignment override below so the action chips
+       sit directly above the card column's right edge. */
+    margin: 0 38px 40px 0;
     padding: 0;
+  }
+  /* The "Add an Episode" / "Check Continuity" cluster lives in the
+     LayerBar's rightSlot. Same 38px reserved gutter so the chips
+     align with the card grid's right edge below (60px from
+     viewport). */
+  html[data-design="v2"] .tab-content-wrap-episodes > .layer-bar {
+    margin-right: 38px;
   }
   html[data-design="v2"] .v2-episodes-add-row {
     display: inline-flex;

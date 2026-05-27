@@ -787,15 +787,30 @@ export function Studio({
 
   // Determine which beats we're editing
   const isTV = story.projectType === "tv-show";
-  const activeEpisode = isTV ? activeStoryLayer.episodes?.find(ep => ep.id === activeEpisodeId) : null;
+  // For TV: prefer the explicitly-active episode, but fall back to
+  // the first episode in the active story-layer draft when no
+  // activeEpisodeId is set. Without this fallback, a TV user landing
+  // on the Story tab from the project level (no episode drilled in)
+  // would see beats=[] AND any setBeats call would land in the
+  // project-level beats array — a black hole, since the TV render
+  // path only reads from `activeEpisode?.beats`. Symptom: opening
+  // the Add Scene sheet rendered an empty popup because the just-
+  // inserted beat wasn't visible to the lookup that populates the
+  // sheet body.
+  const effectiveEpisodeIdForBeats = isTV
+    ? (activeEpisodeId ?? activeStoryLayer.episodes?.[0]?.id ?? null)
+    : null;
+  const activeEpisode = isTV
+    ? activeStoryLayer.episodes?.find(ep => ep.id === effectiveEpisodeIdForBeats)
+    : null;
   const beats = isTV
     ? (activeEpisode?.beats ?? [])
     : activeStoryLayer.beats;
   const setBeats = (updater: (bs: Beat[]) => Beat[]) => {
-    if (isTV && activeEpisodeId) {
+    if (isTV && effectiveEpisodeIdForBeats) {
       setStory(s => updateStoryLayerDraft(s, {
         episodes: getActiveStoryLayerDraft(s).episodes?.map(ep =>
-          ep.id === activeEpisodeId ? { ...ep, beats: updater(ep.beats) } : ep
+          ep.id === effectiveEpisodeIdForBeats ? { ...ep, beats: updater(ep.beats) } : ep
         ),
       }));
     } else {
@@ -893,6 +908,16 @@ export function Studio({
     setSceneSheetBeatId(id);
   };
   const openNewSceneSheet = (insertAt?: number) => {
+    // For TV with no episodes at all, scene creation is meaningless
+    // — beats hang off episodes, not the project. Nudge the user to
+    // make an episode first instead of opening an empty sheet whose
+    // changes would land in a black hole.
+    if (isTV && (activeStoryLayer.episodes?.length ?? 0) === 0) {
+      if (typeof window !== "undefined") {
+        window.alert("Add an episode first — TV scenes live inside episodes.");
+      }
+      return;
+    }
     setSceneSheetIsNew(true);
     const newBeat: Beat = {
       id: "b_" + Math.random().toString(36).slice(2),
@@ -10576,38 +10601,38 @@ function EpisodesTab({
           // here; the manual add is the big bottom-sticky bar below
           // (mirrors Characters / Story / Script's mobile pattern).
           isDesktop ? (
-            <div className="v2-episodes-add-row">
+            // Match the Characters tab's "Add a Character" cluster
+            // styling (.v2-add-one-actions + .add-one-chip / .add-one-
+            // chip-primary). Same component primitives so the layout +
+            // hover/disabled states stay consistent across tabs.
+            <div className="v2-add-one-actions">
               {episodes.length >= 2 && (
-                <Button
-                  variant="secondary"
-                  size="sm"
+                <button
+                  type="button"
+                  className="add-one-chip"
                   onClick={runContinuityCheck}
                   disabled={continuityBusy}
-                  icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
-                  className="ds-type-cta"
-                  style={{ marginRight: 4 }}
                 >
-                  {continuityBusy ? "Checking…" : "Check Continuity"}
-                </Button>
+                  <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                  <span>{continuityBusy ? "Checking…" : "Check Continuity"}</span>
+                </button>
               )}
-              <Button
-                variant="primary"
-                size="sm"
+              <button
+                type="button"
+                className="add-one-chip-primary"
                 onClick={() => openAddEpisodePrompt(false)}
-                icon={<img src="/icon-add-cta.svg" alt="" aria-hidden="true" />}
-                className="ds-type-cta"
               >
-                Add an Episode
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
+                <img src="/icon-add-cta.svg" alt="" aria-hidden="true" />
+                <span>Add an Episode</span>
+              </button>
+              <button
+                type="button"
+                className="add-one-chip"
                 onClick={() => openAddEpisodePrompt(true)}
-                icon={<img src="/icon-ai-cta.svg" alt="" aria-hidden="true" />}
-                className="empty-state-ai-btn ds-type-cta"
               >
-                Add an Episode
-              </Button>
+                <img src="/icon-ai-button.svg" alt="" aria-hidden="true" />
+                <span>Add an Episode</span>
+              </button>
             </div>
           ) : (
             <button
@@ -12575,11 +12600,7 @@ function StoryTab({
               /* On v2 DESKTOP, route the Create With AI button through
                  the direction-prompt popup so the user can write
                  optional guidance first. v1 + v2 mobile keep the
-                 legacy immediate-generate flow (the popup is a
-                 desktop-only surface; on a phone-sized screen the
-                 modal would crowd the empty state and the user
-                 already has a different way to set direction via
-                 the "Have direction in mind?" card below). */
+                 legacy immediate-generate flow. */
               onGenerate={
                 isV2 && isDesktop
                   ? () => setDirectionPromptOpen(true)
@@ -12589,56 +12610,6 @@ function StoryTab({
               generateLabel={isV2 ? "Create With AI" : "Write all with AI"}
               generatingLabel="Writing…"
             />
-
-            {/* Direction card — only in the Story-tab empty state. Lets the
-                user provide free-text guidance that the AI weights when
-                generating scenes. Persists on the active story-layer draft;
-                read by the prompt builder via getActiveStoryLayerDraft. */}
-            <div className="card import-script-card" style={{ marginTop: 47 }}>
-              <span className="eyebrow">Have direction in mind?</span>
-              <div className="caption" style={{ marginTop: 6, marginBottom: 12 }}>
-                Tell the AI how you want the scenes to play out — general or
-                specific. Your guidance steers scene generation when you tap
-                "Write all with AI."
-              </div>
-              <Button
-                variant="secondary"
-                size="lg"
-                block
-                onClick={() => setDirectionSheetOpen(true)}
-                icon={
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                }
-              >
-                {direction.trim() ? "Edit Direction" : "Add Direction"}
-              </Button>
-              {direction.trim() && (
-                <div
-                  className="caption"
-                  style={{
-                    marginTop: 10,
-                    fontStyle: "italic",
-                    overflow: "hidden",
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical" as const,
-                  }}
-                >
-                  &ldquo;{direction}&rdquo;
-                </div>
-              )}
-            </div>
           </>
         )}
 
