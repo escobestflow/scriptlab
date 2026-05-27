@@ -8427,13 +8427,14 @@ function ConceptTab({
                   type="button"
                   className={`v2-series-type-option${selected ? " is-selected" : ""}`}
                   onClick={() => {
-                    // Tap-to-toggle: tapping the same row clears it
-                    // (matches the existing Selector chip pattern).
+                    // Single-select — tapping the currently-selected
+                    // row is a no-op. We deliberately don't allow
+                    // clearing to null since the normalizer defaults
+                    // to "ongoing" and we want the picker's selected
+                    // state to match what the prompts will actually use.
+                    if (selected) return;
                     updateDraft({
-                      settings: {
-                        ...d.settings,
-                        seriesType: selected ? null : t,
-                      },
+                      settings: { ...d.settings, seriesType: t },
                     });
                   }}
                 >

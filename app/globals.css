@@ -7434,19 +7434,20 @@ html[data-design="v2"] .record-label {
      Genre, Sub-Genre. The `order` numbers don't need to be
      contiguous; flex sorts ascending. */
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Format"] { grid-column: 1; order: 1; }
-  /* Series Type sits between Format and Episode Count per spec —
-     it changes the WHOLE shape of how a TV project gets generated,
-     so it should read right under Format as the second-most-important
-     structural decision. Hidden by the JSX guard on non-TV projects. */
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Series Type"] { grid-column: 1; order: 1.5; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Count"] { grid-column: 1; order: 2; }
+  /* Series Type sits directly under Format (TV only) — it changes
+     the WHOLE shape of how a TV project gets generated, so it should
+     read as the second-most-important structural decision. Must be an
+     integer per the CSS spec (we earlier used 1.5 by mistake which
+     fell back to 0 and pushed the row above Format). */
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Series Type"] { grid-column: 1; order: 2; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Count"] { grid-column: 1; order: 3; }
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Title"],
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Show Title"] { grid-column: 1; order: 3; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 4; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 5; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Title"] { grid-column: 1; order: 6; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Genre"] { grid-column: 1; order: 7; }
-  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Sub-Genre"] { grid-column: 1; order: 8; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Show Title"] { grid-column: 1; order: 4; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Short Structure"] { grid-column: 1; order: 5; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Duration"] { grid-column: 1; order: 6; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Episode Title"] { grid-column: 1; order: 7; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Genre"] { grid-column: 1; order: 8; }
+  html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Sub-Genre"] { grid-column: 1; order: 9; }
   /* RIGHT column — Logline FIRST per spec, then Summary, Similar To,
      Writer Style, Tone, Themes, Story Framework, Ending. */
   html[data-design="v2"] .tab-content-wrap-concept .attr-row[data-label="Logline"] { grid-column: 2; order: 1; }

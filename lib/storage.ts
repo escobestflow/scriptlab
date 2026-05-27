@@ -168,13 +168,17 @@ function normalizeSettings(s: any): StorySettings {
       ? Math.round(s.episodeCount) : undefined,
     shortStructure: ALLOWED_SHORT_STRUCTURES.has(s?.shortStructure)
       ? (s.shortStructure as StorySettings["shortStructure"]) : null,
-    // TV-only — validate against the canonical SeriesType union and
-    // fall back to null when missing / unknown. Legacy rows that
-    // pre-date the field load as null and the prompts run in their
-    // neutral "let the concept dictate" mode until the writer picks
-    // a type explicitly.
+    // TV-only — validate against the canonical SeriesType union.
+    // When missing / unknown, default to "ongoing" (the most common
+    // production reality and the safest assumption: most prestige TV
+    // sold today is serialized / multi-season). Legacy TV rows that
+    // pre-date the field auto-migrate to ongoing on next load. The
+    // writer can override in the picker any time. Non-TV projects
+    // carry the value too but it's never read — the seriesType-aware
+    // prompts gate on projectType === "tv-show" before consulting
+    // the field.
     seriesType: ALLOWED_SERIES_TYPES.has(s?.seriesType)
-      ? (s.seriesType as StorySettings["seriesType"]) : null,
+      ? (s.seriesType as StorySettings["seriesType"]) : "ongoing",
     toneNote: typeof s?.toneNote === "string" ? s.toneNote : "",
     themesNote: typeof s?.themesNote === "string" ? s.themesNote : "",
     frameworkNote: typeof s?.frameworkNote === "string" ? s.frameworkNote : "",
