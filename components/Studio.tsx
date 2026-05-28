@@ -412,12 +412,29 @@ export function Studio({
   // to null every time the sheet closes.
   const [projectDraftsSide, setProjectDraftsSide] =
     useState<"mine" | "partner" | null>(null);
+  // Selection state for the partner's project-drafts list. Clicking a
+  // partner row used to immediately clone the whole 4-layer bundle into
+  // the user's pool — confusing because the click felt like "view this
+  // draft" but the side effect was "duplicate it." Now a click only
+  // SELECTS the row; the actual copy fires from an explicit
+  // "Duplicate to my drafts" footer CTA. Reset whenever the sheet
+  // closes or the user toggles back to "My drafts" side.
+  const [selectedPartnerProjectDraftId, setSelectedPartnerProjectDraftId] =
+    useState<string | null>(null);
   const isCollabProjectForSheets = !!partnerStory;
   useEffect(() => {
-    if (!draftsDropdownOpen) setProjectDraftsSide(null);
+    if (!draftsDropdownOpen) {
+      setProjectDraftsSide(null);
+      setSelectedPartnerProjectDraftId(null);
+    }
     // Solo projects: skip the picker, jump straight to the drafts list.
     else if (!isCollabProjectForSheets) setProjectDraftsSide("mine");
   }, [draftsDropdownOpen, isCollabProjectForSheets]);
+  // Clear partner-side selection when toggling back to "My drafts" so
+  // re-entering Partner's later doesn't show a stale highlight.
+  useEffect(() => {
+    if (projectDraftsSide !== "partner") setSelectedPartnerProjectDraftId(null);
+  }, [projectDraftsSide]);
   // Draft-picker presentation toggle. "sheet" = bottom-sheet (default,
   // current treatment); "popup" = inline dropdown menu that pops under
   // the trigger (legacy treatment preserved behind this preference).
@@ -3026,28 +3043,33 @@ export function Studio({
                           sourceStory.scriptDrafts.find(
                             x => x.id === draft.scriptDraftId,
                           )?.number ?? "?";
+                        // On the partner side, the row reflects
+                        // "selected for duplication" rather than
+                        // "currently active" — there's no concept of
+                        // an active partner draft on my side.
+                        const isPartnerSelected =
+                          showingPartner &&
+                          draft.id === selectedPartnerProjectDraftId;
                         return (
                           <button
                             key={draft.id}
-                            className={`drafts-dropdown-item ${isActive ? "active" : ""}`}
+                            className={`drafts-dropdown-item ${(isActive || isPartnerSelected) ? "active" : ""}`}
                             // Tapping one of MY project drafts switches
                             // my active to it (same as today). Tapping
-                            // one of the PARTNER's project drafts clones
-                            // the whole 4-layer bundle onto my side as
-                            // a fresh project draft and makes it active —
-                            // the project-level analog of how the per-
-                            // layer sheet handles partner rows.
+                            // one of the PARTNER's project drafts marks
+                            // it as the "selected" candidate for an
+                            // explicit Duplicate action in the footer
+                            // — clicking no longer side-effects a copy.
                             onClick={() => {
                               if (showingPartner) {
-                                if (partnerStory) {
-                                  setStory(s =>
-                                    copyPartnerProjectDraft(s, partnerStory, draft),
-                                  );
-                                }
+                                setSelectedPartnerProjectDraftId(draft.id);
+                                // Keep the sheet open so the user can
+                                // see their selection + tap the footer
+                                // Duplicate CTA.
                               } else {
                                 handleLoadProjectDraft(draft.id);
+                                setDraftsDropdownOpen(false);
                               }
-                              setDraftsDropdownOpen(false);
                             }}
                           >
                             <div style={{ display: "flex", flexDirection: "column", gap: 2, width: "100%" }}>
@@ -3073,7 +3095,7 @@ export function Studio({
                         </div>
                       )}
                     </div>
-                    {!showingPartner && (
+                    {!showingPartner ? (
                       <div className="sheet-sticky-footer">
                         <div className="draft-sheet-actions">
                           <Button
@@ -3097,6 +3119,59 @@ export function Studio({
                             style={{ flex: 1 }}
                           >
                             Duplicate Draft
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Partner-side footer. Two explicit actions so
+                      // a click on a partner row no longer side-effects
+                      // a duplicate by accident:
+                      //   - "Duplicate to my drafts" clones the selected
+                      //     partner project-draft (4-layer bundle) into
+                      //     my own pool via copyPartnerProjectDraft.
+                      //     Disabled until a row is selected.
+                      //   - "Create new empty" creates a fresh blank
+                      //     project-draft in my pool (identical action
+                      //     to the one available on the "My drafts"
+                      //     side; exposed here so the user doesn't
+                      //     have to toggle sides just to get an empty
+                      //     starting point while browsing partner's).
+                      <div className="sheet-sticky-footer">
+                        <div className="draft-sheet-actions">
+                          <Button
+                            variant="primary"
+                            size="lg"
+                            onClick={() => {
+                              if (!partnerStory || !selectedPartnerProjectDraftId) return;
+                              const partnerDraft = partnerStory.projectDrafts.find(
+                                d => d.id === selectedPartnerProjectDraftId,
+                              );
+                              if (!partnerDraft) return;
+                              setStory(s => copyPartnerProjectDraft(s, partnerStory, partnerDraft));
+                              setSelectedPartnerProjectDraftId(null);
+                              setDraftsDropdownOpen(false);
+                            }}
+                            disabled={!selectedPartnerProjectDraftId}
+                            style={{ flex: 1 }}
+                          >
+                            Duplicate to my drafts
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="lg"
+                            onClick={() => {
+                              handleCreateNewProjectDraft();
+                              setSelectedPartnerProjectDraftId(null);
+                            }}
+                            style={{ flex: 1 }}
+                            icon={
+                              <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <rect x="3.5" width="2" height="9" />
+                                <rect y="5.5" width="2" height="9" transform="rotate(-90 0 5.5)" />
+                              </svg>
+                            }
+                          >
+                            New Empty Draft
                           </Button>
                         </div>
                       </div>
