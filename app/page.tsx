@@ -3390,11 +3390,27 @@ function ProjectsTab({
         {/* v1: rotating poster-stack illustration. v2: the door graphic is
              painted as the screen background via CSS, no inline element. */}
         {!isV2 && <EmptyPosterStack />}
-        {/* Page-level header — desktop only. Matches the populated
-            tab's `.projects-tab-heading` so navigating between
-            empty/populated reads as the same surface. Mobile keeps
-            the door-graphic full-bleed treatment (no heading). */}
-        <h1 className="projects-empty-page-heading ds-type-tab-header">Projects</h1>
+        {/* Heading + New Project button — same flex row pattern (and
+            same class names) as the populated ProjectsTab header so the
+            desktop CSS renders them in exactly the same screen
+            position. Mobile hides the row via the
+            `.projects-empty .projects-empty-header-row` rule in
+            globals.css. */}
+        <div
+          className="projects-empty-header-row"
+          style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 25 }}
+        >
+          <h1 className="display projects-tab-heading ds-type-tab-header">Projects</h1>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onNew}
+            icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
+            style={{ transform: "translateY(-7px)", background: "#fff" }}
+          >
+            New Project
+          </Button>
+        </div>
         {/* Copy stack wrapped so desktop CSS can position the whole
             block absolutely on the graphic (top:627, horizontally
             centered to the 963-wide image). Mobile flexes normally. */}
@@ -3952,15 +3968,35 @@ function IdeasCarousel({
  */
 function IdeasEmptyState({
   onStartRecording,
+  onNew,
 }: {
   onStartRecording: () => void;
+  onNew: () => void;
 }) {
   return (
     <div className="projects-empty" data-tab="ideas">
-      {/* Same `.projects-empty-page-heading` treatment as the Projects
-          empty state — desktop-only via CSS. Mobile keeps the
-          full-bleed door layout without a top heading. */}
-      <h1 className="projects-empty-page-heading ds-type-tab-header">Ideas</h1>
+      {/* Heading + New Idea button — same flex row pattern (and same
+          class names) as the populated MomentsTab header so the
+          desktop CSS at the bottom of globals.css renders them in
+          exactly the same screen position. Mobile keeps the
+          full-bleed door layout: the row is hidden via the
+          existing `.projects-empty .projects-empty-header-row`
+          mobile-default CSS rule. */}
+      <div
+        className="projects-empty-header-row"
+        style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 25 }}
+      >
+        <h1 className="display ideas-tab-heading ds-type-tab-header">Ideas</h1>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onNew}
+          icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
+          style={{ transform: "translateY(-7px)", background: "#fff" }}
+        >
+          New Idea
+        </Button>
+      </div>
       {/* Same copy-stack wrapper as Projects empty — desktop CSS
           positions the wrapper on the 963×642 graphic; mobile
           flexes normally. */}
@@ -4057,7 +4093,7 @@ function MomentsTab({
   // button (not a pill) styled with `.projects-empty-cta-text`, followed
   // by the down-arrow glyph pointing at the red record FAB below.
   if (moments.length === 0) {
-    return <IdeasEmptyState onStartRecording={onStartRecording} />;
+    return <IdeasEmptyState onStartRecording={onStartRecording} onNew={onNew} />;
   }
 
   return (

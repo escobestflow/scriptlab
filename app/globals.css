@@ -332,6 +332,21 @@ html[data-theme="dark"] .topbar {
    a top heading. Default-hidden here; the desktop @media block
    further down flips it back to `display: block`. */
 .projects-empty-page-heading { display: none; }
+/* Empty-state heading + "New …" button row. The JSX uses an inline
+   `display: flex` so it renders correctly on desktop without any
+   override; mobile gets `display: none !important` here to keep
+   the door-graphic full-bleed treatment from being interrupted by
+   a heading + add-button bar. The desktop @media block below
+   doesn't need to flip this back — the inline display:flex is
+   already correct there. */
+.projects-empty-header-row { display: none !important; }
+@media (min-width: 1440px) {
+  html[data-design="v2"] .projects-empty-header-row {
+    /* Re-enable the inline display:flex on desktop. !important
+       because the mobile rule above sets !important too. */
+    display: flex !important;
+  }
+}
 /* Base styling for the copy wrapper added by the desktop empty-state
    redesign. On mobile it has no positioning of its own — desktop's
    @media block layers absolute positioning on top. Either way it
@@ -12715,21 +12730,23 @@ html[data-design="v2"] .menu-panel-utility svg {
        its own positioned graphic on the inner container below. */
     background-image: none;
   }
-  /* Strip the .screen-scroll's desktop padding-left: 60 AND the
-     mobile-default padding-top: 55 when an empty Projects/Ideas
-     state is rendered, so the inner .projects-empty starts flush
-     at viewport top-left (after the sidebar). Without these the
-     graphic painted at `background-position: 105px 132px` would
-     sit 60px further right + 55px further down than the spec
-     calls for. */
+  /* Strip the .screen-scroll's mobile-default padding-top: 55 when
+     an empty Projects/Ideas state is rendered. The desktop padding-
+     left: 60 stays — the empty-state header row inside .projects-
+     empty relies on it to land at the same x as the populated
+     header row (both end up 60px from the sidebar's right edge). */
   html[data-design="v2"] .screen-scroll:has(.projects-empty) {
-    padding-left: 0;
     padding-top: 0;
   }
   html[data-design="v2"] .projects-empty {
     background-image: url("/v2/desktop-empty-projects-graphic.png");
     background-size: 963px 642px;
-    background-position: 105px 132px;
+    /* x: 45 (= the original 105 minus the 60px padding-left that
+       the parent screen-scroll now provides — net result is the
+       same viewport-x: 105 as before).
+       y: 92 (was 132, moved up 40 per spec along with the copy
+       stack below). */
+    background-position: 45px 92px;
     background-repeat: no-repeat;
     /* Reset the mobile rule's flex stack + negative margins.
        Desktop uses absolute positioning on the copy wrapper. */
@@ -12747,29 +12764,15 @@ html[data-design="v2"] .menu-panel-utility svg {
   html[data-design="v2"] .projects-empty[data-tab="ideas"] {
     background-image: url("/v2/desktop-empty-ideas-graphic.png");
   }
-  /* Page-level header ("Projects" / "Ideas") on the empty states.
-     Desktop: pinned to the top-left of the .projects-empty
-     container, aligned visually with the graphic's left edge
-     (105px). Mobile keeps the full-bleed door layout so the
-     heading is `display: none` by default and only shown here. */
-  html[data-design="v2"] .projects-empty .projects-empty-page-heading {
-    display: block;
-    position: absolute;
-    top: 80px;
-    left: 105px;
-    margin: 0;
-    color: var(--ds-color-black);
-  }
   html[data-design="v2"] .projects-empty .projects-empty-copy {
-    /* Pinned to graphic.center_x (105 + 963/2 = 586.5) with
-       translateX(-50%) so the stack centers regardless of width.
-       Top 627 is measured from the screen top per spec — the
-       container starts at the screen top thanks to the .app-content
-       layout above, so the wrapper's top:627 lands on the screen
-       at the correct y. */
+    /* Pinned to (graphic.center_x - container.padding-left) with
+       translateX(-50%) so the stack centers regardless of width:
+       x: 526.5 (= original 586.5 minus the 60 we shifted left when
+       the screen-scroll padding-left: 60 was restored).
+       y: 587 (was 627, moved up 40 per spec). */
     position: absolute;
-    left: 586.5px;
-    top: 627px;
+    left: 526.5px;
+    top: 587px;
     transform: translateX(-50%);
     display: flex;
     flex-direction: column;
