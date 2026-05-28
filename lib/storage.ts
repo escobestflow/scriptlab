@@ -598,12 +598,20 @@ export async function loadProjectsFromDB(userId: string): Promise<Story[]> {
   // `collaborator_user_id` is nullable. On single-user projects it's
   // NULL and we never attach the optional field to the Story. On
   // shared projects we expose it as Story.collaboratorUserId so the
-  // UI can light up collab affordances (Phase 2). Nothing else about
-  // the existing load path changes.
+  // UI can light up collab affordances (the L/S initials chip on
+  // home cards is wired off this field).
+  //
+  // `.or()` clause matches every project where the signed-in user is
+  // EITHER the owner (user_id) OR the partner (collaborator_user_id).
+  // The RLS policy "Users can view own and shared projects" already
+  // allows both reads; this just stops the client-side filter from
+  // hiding shared rows. Previously a project granted via the invite
+  // RPC was visible to its accepter only by direct URL — never in
+  // the Projects list.
   const { data, error } = await supabase
     .from("projects")
-    .select("id, data, thumbnail, collaborator_user_id")
-    .eq("user_id", userId)
+    .select("id, data, thumbnail, collaborator_user_id, user_id")
+    .or(`user_id.eq.${userId},collaborator_user_id.eq.${userId}`)
     .order("updated_at", { ascending: false });
 
   if (error || !data) return [];
