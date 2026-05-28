@@ -7265,15 +7265,23 @@ html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="pro
   width: 17px;
   height: 15px;
 }
+/* Ideas icon — taller-than-wide lightbulb glyph; 12.56×17.23 per
+   spec. The `!important` is defensive: the v1 base rule
+   `.desktop-sidebar-icon img { width: 100%; height: 100% }` lives
+   inside the same desktop @media block and although our v2 selector
+   has higher specificity, any future rule with the same (or higher)
+   specificity could silently revert the icon to the parent's 22×22
+   footprint. Pinning with !important keeps the rendered size on
+   spec regardless. */
 html[data-design="v2"] .desktop-sidebar-item.active .desktop-sidebar-icon img[src*="ideas-icon-active"] {
   content: url("/icon-desktop-ideas-active.svg");
-  width: 12.56px;
-  height: 17.23px;
+  width: 12.56px !important;
+  height: 17.23px !important;
 }
 html[data-design="v2"] .desktop-sidebar-item .desktop-sidebar-icon img[src*="ideas-icon-inactive"] {
   content: url("/icon-desktop-ideas-inactive.svg");
-  width: 12.56px;
-  height: 17.23px;
+  width: 12.56px !important;
+  height: 17.23px !important;
 }
 
 /* Tabbar labels — apply ds-type-main-tab-nav-* type tokens. Mobile
