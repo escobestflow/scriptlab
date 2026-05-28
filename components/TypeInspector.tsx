@@ -147,7 +147,88 @@ export default function TypeInspector() {
     setTarget(t => (t ? { ...t, activeToken: next } : t));
   };
 
-  return <InspectorPanel target={target} originalToken={originalToken} applyToken={applyToken} onClose={() => setTarget(null)} />;
+  return (
+    <>
+      <SelectionHighlight el={target.el} activeToken={target.activeToken} />
+      <InspectorPanel target={target} originalToken={originalToken} applyToken={applyToken} onClose={() => setTarget(null)} />
+    </>
+  );
+}
+
+// Floating outline drawn over the currently-inspected element's
+// bounding rect. position:fixed so it shares the viewport coords
+// with the popup. Re-positions on window scroll + resize so the
+// outline tracks the element if the page moves under it. Updates
+// when the active token swaps (re-measures because new typography
+// can change line-box height). Never receives pointer events so
+// the user can still click through to make another selection.
+function SelectionHighlight({
+  el, activeToken,
+}: {
+  el: HTMLElement;
+  /** Threaded in so a re-render fires when the user swaps tokens
+   *  (different font-size → different bounding rect). */
+  activeToken: string | null;
+}) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    let rafId = 0;
+    const measure = () => {
+      // requestAnimationFrame so we don't fight other layout-reading
+      // listeners (some browsers thrash when getBoundingClientRect
+      // is called on every scroll tick).
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        setRect(el.getBoundingClientRect());
+      });
+    };
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    // ResizeObserver picks up class-driven font-size changes too —
+    // important when the user swaps tokens via the popup.
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+      ro.disconnect();
+    };
+    // Re-arm whenever target element or active token changes.
+  }, [el, activeToken]);
+
+  if (!rect || typeof document === "undefined") return null;
+  // 3px padding around the box so the outline doesn't hug glyph
+  // descenders too tightly + a slight inflation feels more like a
+  // "selection" affordance than a hard border.
+  const PAD = 3;
+  return createPortal(
+    <div
+      data-type-inspector-ui="highlight"
+      aria-hidden="true"
+      style={{
+        position: "fixed",
+        left: rect.left - PAD,
+        top: rect.top - PAD,
+        width: rect.width + PAD * 2,
+        height: rect.height + PAD * 2,
+        // Bright sky blue stroke + soft halo so the outline reads
+        // clearly on both light and dark surfaces.
+        border: "2px solid hsl(214 100% 58%)",
+        borderRadius: 4,
+        boxShadow: "0 0 0 3px hsl(214 100% 58% / 0.18), 0 0 14px hsl(214 100% 58% / 0.25)",
+        background: "hsl(214 100% 58% / 0.08)",
+        pointerEvents: "none",
+        zIndex: 99998,
+        // Smooth movement when the rect shifts (e.g. after a token
+        // swap changes line-height).
+        transition: "left 80ms ease-out, top 80ms ease-out, width 80ms ease-out, height 80ms ease-out",
+      }}
+    />,
+    document.body,
+  );
 }
 
 function InspectorPanel({
