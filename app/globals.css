@@ -14204,7 +14204,12 @@ html[data-design="v2"] .v2-mobile-header-episode-title {
    Renders via createPortal at document.body, positioned with inline
    styles by `components/TruncatedText.tsx`. Dark gray pill, small
    type, never wider than 320px. Pointer-events: none so it never
-   blocks clicks on the underlying card. */
+   blocks clicks on the underlying card.
+   No max-height cap — long strings need to display in full per
+   product direction. The component flips the tooltip ABOVE the
+   target when the target sits in the bottom half of the viewport
+   (and BELOW it when in the top half) so the tooltip never grows
+   past the visible viewport edge regardless of length. */
 .truncate-tooltip {
   background: #2a2a2a;
   color: #f4f4f4;
@@ -14215,8 +14220,6 @@ html[data-design="v2"] .v2-mobile-header-episode-title {
   font-weight: 400;
   letter-spacing: 0.01em;
   max-width: 320px;
-  max-height: 200px;
-  overflow: hidden;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   pointer-events: none;
   user-select: none;

@@ -77,16 +77,20 @@ export default function TruncatedText({
     // Re-measure if the text content changes.
   }, [children, text]);
 
-  // Tooltip position: anchored to the element's bottom-left, with
-  // viewport-flip when there's no room below. Recomputed on every
-  // mouse-enter so a scrolled-card always pins correctly.
+  // Tooltip position: anchored to the element's left edge, flipped
+  // ABOVE the element when the element's vertical center sits in
+  // the bottom half of the viewport, BELOW when in the top half.
+  // The tooltip has no max-height cap, so this is the only thing
+  // keeping long tooltips from running past the visible viewport
+  // edge — top-half elements have room going down, bottom-half
+  // elements have room going up.
   function handleEnter(e: React.MouseEvent<HTMLElement>) {
     const el = ref.current;
     if (el) {
       const r = el.getBoundingClientRect();
-      const tooltipMaxHeight = 200; // matches CSS max-height for the flip math
-      const spaceBelow = window.innerHeight - r.bottom;
-      const flipUp = spaceBelow < tooltipMaxHeight && r.top > tooltipMaxHeight;
+      const vh = window.innerHeight;
+      const elementMidY = r.top + r.height / 2;
+      const flipUp = elementMidY > vh / 2;
       setPos({
         left: r.left,
         top: flipUp ? r.top - 6 : r.bottom + 6,
