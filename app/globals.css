@@ -6659,7 +6659,10 @@ html[data-design="v2"] .ds-type-empty-header {
   font-family: var(--ds-font-display);
   font-weight: 400;
   font-size: 34px;
-  line-height: 1;
+  /* 49px line-height per spec — was `1` (= 34px at 34px font-size).
+     Looser leading gives the empty-state headlines breathing room
+     against the supporting body copy. */
+  line-height: 49px;
   letter-spacing: 0;
 }
 html[data-design="v2"] .ds-type-project-page-title-empty {
@@ -7203,14 +7206,12 @@ html[data-design="v2"] .screen-scroll:has(.projects-empty) {
 html[data-design="v2"] .projects-empty-title {
   margin: 0 0 8px;
 }
-/* Subtitle copy on v2 — Lato body weight + the gray-chip-label token
-   (the existing `--ink-mute` would inherit v1 colorways). */
+/* Subtitle copy on v2. Font metrics owned by the `.ds-type-body`
+   utility on the JSX — this rule only carries the color + the
+   surrounding margins so the design system token is the single
+   source of truth for type. */
 html[data-design="v2"] .projects-empty-sub {
   color: var(--ds-color-gray-chip-label);
-  font-family: var(--font-ui, inherit);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.55;
   margin: 6px 0 26px;
 }
 /* Desktop title scaling is now owned by the `.ds-type-empty-header`

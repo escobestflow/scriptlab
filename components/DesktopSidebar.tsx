@@ -73,7 +73,15 @@ export function DesktopSidebar({
               alt=""
             />
           </span>
-          <span className="desktop-sidebar-label">Projects</span>
+          {/* Typography from the design system: active vs inactive
+              nav tokens differ in weight (700 / 400 on desktop) and
+              the inspector reports them correctly so this stays in
+              sync with the rest of the system. */}
+          <span
+            className={`desktop-sidebar-label ${projectsActive ? "ds-type-main-tab-nav-active" : "ds-type-main-tab-nav-inactive"}`}
+          >
+            Projects
+          </span>
         </button>
         <button
           className={`desktop-sidebar-item ${ideasActive ? "active" : ""}`}
@@ -85,7 +93,11 @@ export function DesktopSidebar({
               alt=""
             />
           </span>
-          <span className="desktop-sidebar-label">Ideas</span>
+          <span
+            className={`desktop-sidebar-label ${ideasActive ? "ds-type-main-tab-nav-active" : "ds-type-main-tab-nav-inactive"}`}
+          >
+            Ideas
+          </span>
         </button>
       </nav>
       <div className="desktop-sidebar-foot">

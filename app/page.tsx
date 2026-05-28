@@ -3441,6 +3441,7 @@ function ProjectsTab({
             onClick={onNew}
             icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
             style={{ transform: "translateY(-7px)", background: "#fff" }}
+            labelClassName="ds-type-button-label"
           >
             New Project
           </Button>
@@ -3452,10 +3453,10 @@ function ProjectsTab({
           <h1 className="projects-empty-title ds-type-empty-header">
             Your story starts here
           </h1>
-          <p className="projects-empty-sub">
+          <p className="projects-empty-sub ds-type-body">
             Begin with an idea, shape the world around it,<br />and watch your story unfold.
           </p>
-          <Button variant="primary" size="lg" onClick={onNew} style={{ minWidth: 180 }}>
+          <Button variant="primary" size="lg" onClick={onNew} style={{ minWidth: 180 }} labelClassName="ds-type-button-label">
             GET STARTED
           </Button>
         </div>
@@ -4030,6 +4031,7 @@ function IdeasEmptyState({
           onClick={onNew}
           icon={<img src="/add-icon.svg" alt="" style={{ width: 9, height: 9 }} />}
           style={{ transform: "translateY(-7px)", background: "#fff" }}
+          labelClassName="ds-type-button-label"
         >
           New Idea
         </Button>
@@ -4041,10 +4043,10 @@ function IdeasEmptyState({
         <h1 className="projects-empty-title ds-type-empty-header">
           Ideas become stories
         </h1>
-        <p className="projects-empty-sub">
+        <p className="projects-empty-sub ds-type-body">
           Capture your moments, dreams and memories.<br />Build the story only you can tell.
         </p>
-        <Button variant="primary" size="lg" onClick={onStartRecording} style={{ minWidth: 180 }}>
+        <Button variant="primary" size="lg" onClick={onStartRecording} style={{ minWidth: 180 }} labelClassName="ds-type-button-label">
           SAVE AN IDEA
         </Button>
       </div>
