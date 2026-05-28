@@ -6047,8 +6047,15 @@ html[data-theme="dark"] .partner-preview-empty-notice {
     padding: 6px 10px 22px;
   }
   .desktop-sidebar-logo {
-    width: 86px;
-    height: 18.5px;
+    /* Bumped 86 → 91 (+5px wide) per spec. Height scaled
+       proportionally to preserve the native 86:18.5 aspect ratio:
+       91 * (18.5 / 86) ≈ 19.578 → rounded to 19.58.
+       Centering is handled by `.desktop-sidebar-brand`'s
+       `justify-content: center` (desktop @media block), so the
+       wordmark stays centered in the gray nav column regardless
+       of its width. */
+    width: 91px;
+    height: 19.58px;
   }
   html[data-theme="dark"] .desktop-sidebar-logo { filter: invert(1); }
   .desktop-sidebar-nav {

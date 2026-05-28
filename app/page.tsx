@@ -3392,13 +3392,16 @@ function ProjectsTab({
         {!isV2 && <EmptyPosterStack />}
         {/* Heading + New Project button — same flex row pattern (and
             same class names) as the populated ProjectsTab header so the
-            desktop CSS renders them in exactly the same screen
-            position. Mobile hides the row via the
-            `.projects-empty .projects-empty-header-row` rule in
+            desktop CSS renders them in the same horizontal slot.
+            Vertical: empty state intentionally sits 57px lower than
+            populated (marginTop 82 vs populated's 25) per spec — the
+            extra clearance balances against the floating bg graphic
+            that doesn't exist on the populated screen. Mobile hides
+            the row via the .projects-empty-header-row rule in
             globals.css. */}
         <div
           className="projects-empty-header-row"
-          style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 25 }}
+          style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 82 }}
         >
           <h1 className="display projects-tab-heading ds-type-tab-header">Projects</h1>
           <Button
@@ -3978,13 +3981,16 @@ function IdeasEmptyState({
       {/* Heading + New Idea button — same flex row pattern (and same
           class names) as the populated MomentsTab header so the
           desktop CSS at the bottom of globals.css renders them in
-          exactly the same screen position. Mobile keeps the
-          full-bleed door layout: the row is hidden via the
-          existing `.projects-empty .projects-empty-header-row`
-          mobile-default CSS rule. */}
+          the same horizontal slot. Vertical: empty state sits 57px
+          lower than populated (marginTop 82 vs 25) per spec to
+          balance against the floating bg graphic that doesn't exist
+          on the populated screen. Mobile keeps the full-bleed door
+          layout: the row is hidden via the
+          `.projects-empty-header-row` mobile-default rule in
+          globals.css. */}
       <div
         className="projects-empty-header-row"
-        style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 25 }}
+        style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 20, marginTop: 82 }}
       >
         <h1 className="display ideas-tab-heading ds-type-tab-header">Ideas</h1>
         <Button
