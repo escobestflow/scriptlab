@@ -8,6 +8,7 @@ const AUTOSAVE_KEY = "scriptlab:autosave";
 const DARKMODE_KEY = "scriptlab:darkmode";
 const DRAFT_PICKER_STYLE_KEY = "scriptlab:draftPickerStyle";
 const IMAGE_MODEL_KEY = "scriptlab:imageModel";
+const TYPE_INSPECTOR_KEY = "scriptlab:typeInspector";
 
 /** Read the autosave pref. SSR-safe — returns the default (true) on the server. */
 export function loadAutosave(): boolean {
@@ -254,6 +255,55 @@ export function useImageModelPref(): [ImageModelPref, (v: ImageModelPref) => voi
   const set = useCallback((next: ImageModelPref) => {
     setValue(next);
     saveImageModelPref(next);
+  }, []);
+
+  return [value, set];
+}
+
+// ── Type Inspector (admin dev tool) ───────────────────────────────
+// When on, clicks on any text in the app open a small popup that
+// reports which ds-type-* token the element is using and offers a
+// quick swap to any other token. Strictly a dev affordance —
+// hidden behind isAdmin in the Settings UI; nothing else reads it.
+
+/** Read the type-inspector pref. SSR-safe — returns false (off) on
+ *  the server so SSR-rendered markup never reflects an admin's
+ *  inspector state. */
+export function loadTypeInspectorPref(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(TYPE_INSPECTOR_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Persist the type-inspector pref. No-op on the server. */
+export function saveTypeInspectorPref(v: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(TYPE_INSPECTOR_KEY, v ? "1" : "0");
+  } catch {
+    /* localStorage may be disabled — fail silently */
+  }
+}
+
+/**
+ * React hook backing the type-inspector pref. SSR-renders false and
+ * reconciles with localStorage after mount. The inspector overlay
+ * itself reads this hook to decide whether to attach its capture-
+ * phase click listener.
+ */
+export function useTypeInspectorPref(): [boolean, (v: boolean) => void] {
+  const [value, setValue] = useState<boolean>(false);
+
+  useEffect(() => {
+    setValue(loadTypeInspectorPref());
+  }, []);
+
+  const set = useCallback((next: boolean) => {
+    setValue(next);
+    saveTypeInspectorPref(next);
   }, []);
 
   return [value, set];

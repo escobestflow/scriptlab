@@ -40,7 +40,8 @@ import PostLoginTransition from "@/components/PostLoginTransition";
 import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
 import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
-import { useAutosavePref, useDarkModePref, useDraftPickerStylePref, useImageModelPref } from "@/lib/prefs";
+import { useAutosavePref, useDarkModePref, useDraftPickerStylePref, useImageModelPref, useTypeInspectorPref } from "@/lib/prefs";
+import TypeInspector from "@/components/TypeInspector";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 
 type View =
@@ -170,6 +171,9 @@ function SettingsScreen({
   setForceEmptyState,
   premiumImages,
   setPremiumImages,
+  typeInspector,
+  setTypeInspector,
+  showTypeInspectorRow,
   onOpenStyleGuide,
 }: {
   email: string;
@@ -187,6 +191,11 @@ function SettingsScreen({
    *  Project covers are unaffected — always premium. */
   premiumImages: boolean;
   setPremiumImages: (v: boolean) => void;
+  /** Type Inspector dev tool — admin-only. Renders the row only
+   *  when `showTypeInspectorRow` is true. */
+  typeInspector: boolean;
+  setTypeInspector: (v: boolean) => void;
+  showTypeInspectorRow: boolean;
   onOpenStyleGuide: () => void;
 }) {
   // Preferences toggles — array-driven so the markup stays uniform
@@ -227,6 +236,15 @@ function SettingsScreen({
       value: forceEmptyState,
       onChange: v => setForceEmptyState(v),
     },
+    // Admin-only dev tool. Click any text in the app and a panel
+    // shows the active ds-type-* token + lets you swap to any other
+    // token in place to compare. Hidden for non-admin users.
+    ...(showTypeInspectorRow ? [{
+      label: "Type Inspector (admin)",
+      caption: "Click any text to see its ds-type-* token and swap to others. Dev tool — changes don't persist.",
+      value: typeInspector,
+      onChange: (v: boolean) => setTypeInspector(v),
+    }] : []),
   ];
 
   return (
@@ -414,6 +432,12 @@ export default function Page() {
   const [mainTab, setMainTab] = useState<MainTab>("projects");
   const [menuOpen, setMenuOpen] = useState(false);
   const [autosaveEnabled, setAutosaveEnabled] = useAutosavePref();
+  // Type Inspector dev tool — admin-only. The pref hook handles the
+  // SSR-safe load + localStorage persist; the TypeInspector overlay
+  // (mounted further down) reads the same hook to know whether to
+  // attach its capture-phase click handler. Settings row is gated
+  // by isAdmin so non-admin accounts never see the toggle.
+  const [typeInspector, setTypeInspector] = useTypeInspectorPref();
   const [imageModel, setImageModel] = useImageModelPref();
   const premiumImages = imageModel === "gpt-image-2";
   const [darkMode, setDarkMode] = useDarkModePref();
@@ -1940,6 +1964,9 @@ export default function Page() {
                 setForceEmptyState={setForceEmptyState}
                 premiumImages={premiumImages}
                 setPremiumImages={(v) => setImageModel(v ? "gpt-image-2" : "dall-e-3")}
+                typeInspector={typeInspector}
+                setTypeInspector={setTypeInspector}
+                showTypeInspectorRow={isAdmin(userEmailTrimmed)}
                 onOpenStyleGuide={() => {
                   if (typeof window !== "undefined") {
                     window.location.href = "/style-guide";
@@ -1985,6 +2012,10 @@ export default function Page() {
 
   return (
    <WriterProfileContext.Provider value={profileAPI}>
+    {/* Type Inspector dev tool — global capture-phase click handler.
+        Renders nothing when its pref is off, so the cost on the hot
+        path is one Set lookup + a useEffect cleanup. */}
+    <TypeInspector />
     <div className="app">
       <DesktopSidebar
         activeMain={view.kind === "main" ? mainTab : null}
