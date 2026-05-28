@@ -9,6 +9,7 @@ const DARKMODE_KEY = "scriptlab:darkmode";
 const DRAFT_PICKER_STYLE_KEY = "scriptlab:draftPickerStyle";
 const IMAGE_MODEL_KEY = "scriptlab:imageModel";
 const TYPE_INSPECTOR_KEY = "scriptlab:typeInspector";
+const AUTO_IMAGE_GEN_KEY = "scriptlab:autoImageGen";
 
 /** Read the autosave pref. SSR-safe — returns the default (true) on the server. */
 export function loadAutosave(): boolean {
@@ -304,6 +305,63 @@ export function useTypeInspectorPref(): [boolean, (v: boolean) => void] {
   const set = useCallback((next: boolean) => {
     setValue(next);
     saveTypeInspectorPref(next);
+  }, []);
+
+  return [value, set];
+}
+
+// ── Auto image generation kill switch ────────────────────────────
+// Gates every auto-fire image-gen path in the app: project covers
+// (app/page.tsx), character portraits, scene/beat thumbnails, and
+// TV episode thumbnails (all in components/Studio.tsx). Manual
+// "Regenerate" buttons inside edit popups stay live regardless —
+// those are explicit user opt-ins, the user knows they're spending.
+//
+// Default OFF: this was flipped off in May 2026 because per-image
+// costs were stacking up on auto-fill loops during heavy use.
+// Re-enable per session via the Settings toggle; the pref persists
+// so flipping back on stays on across reloads.
+
+/** Read the auto-image-gen pref. SSR-safe — returns the default
+ *  (false / off) on the server so SSR markup never reflects an
+ *  active gen state. */
+export function loadAutoImageGenPref(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(AUTO_IMAGE_GEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Persist the auto-image-gen pref. No-op on the server. */
+export function saveAutoImageGenPref(v: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(AUTO_IMAGE_GEN_KEY, v ? "1" : "0");
+  } catch {
+    /* localStorage may be disabled — fail silently */
+  }
+}
+
+/**
+ * React hook backing the auto-image-gen pref. SSR-renders the
+ * default (false) and reconciles with localStorage after mount.
+ * Settings UI binds to this hook; the auto-fire effects in
+ * Studio.tsx + app/page.tsx call `loadAutoImageGenPref` directly
+ * at call time so the latest value wins (no stale closure on
+ * deeply-mounted handlers).
+ */
+export function useAutoImageGenPref(): [boolean, (v: boolean) => void] {
+  const [value, setValue] = useState<boolean>(false);
+
+  useEffect(() => {
+    setValue(loadAutoImageGenPref());
+  }, []);
+
+  const set = useCallback((next: boolean) => {
+    setValue(next);
+    saveAutoImageGenPref(next);
   }, []);
 
   return [value, set];

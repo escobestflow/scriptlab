@@ -40,7 +40,10 @@ import PostLoginTransition from "@/components/PostLoginTransition";
 import { useWriterProfile, WriterProfileContext, useProfileCapture } from "@/lib/writerProfileStore";
 import type { WriterProfile } from "@/lib/writerProfile";
 import { Genre, ProjectType } from "@/lib/story";
-import { useAutosavePref, useDarkModePref, useDraftPickerStylePref, useImageModelPref, useTypeInspectorPref } from "@/lib/prefs";
+import {
+  useAutosavePref, useDarkModePref, useDraftPickerStylePref, useImageModelPref,
+  useTypeInspectorPref, useAutoImageGenPref, loadAutoImageGenPref,
+} from "@/lib/prefs";
 import TypeInspector from "@/components/TypeInspector";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 
@@ -171,6 +174,8 @@ function SettingsScreen({
   setForceEmptyState,
   premiumImages,
   setPremiumImages,
+  autoImageGen,
+  setAutoImageGen,
   typeInspector,
   setTypeInspector,
   showTypeInspectorRow,
@@ -191,6 +196,11 @@ function SettingsScreen({
    *  Project covers are unaffected — always premium. */
   premiumImages: boolean;
   setPremiumImages: (v: boolean) => void;
+  /** Kill switch — when off, every auto-fire image gen path (project
+   *  covers + character / scene / episode thumbnails) is suppressed.
+   *  Manual Regenerate buttons inside edit popups always work. */
+  autoImageGen: boolean;
+  setAutoImageGen: (v: boolean) => void;
   /** Type Inspector dev tool — admin-only. Renders the row only
    *  when `showTypeInspectorRow` is true. */
   typeInspector: boolean;
@@ -225,8 +235,14 @@ function SettingsScreen({
       onChange: v => setAutosaveEnabled(v),
     },
     {
+      label: "Auto Image Generation",
+      caption: "Auto-create cover, character, scene, and episode images when items are made or loaded without a thumbnail. Off = no auto image gen ($0 spend on images). Manual Regenerate buttons inside edit popups always work.",
+      value: autoImageGen,
+      onChange: v => setAutoImageGen(v),
+    },
+    {
       label: "Premium Image Quality",
-      caption: "Use gpt-image-2 for character / scene / episode generations (higher quality, ~5× cost). Off = DALL-E 3 (cheaper). Project covers always use premium.",
+      caption: "When auto image generation is on: use gpt-image-2 for character / scene / episode generations (higher quality, ~5× cost). Off = DALL-E 3 (cheaper). Project covers always use premium.",
       value: premiumImages,
       onChange: v => setPremiumImages(v),
     },
@@ -438,6 +454,12 @@ export default function Page() {
   // attach its capture-phase click handler. Settings row is gated
   // by isAdmin so non-admin accounts never see the toggle.
   const [typeInspector, setTypeInspector] = useTypeInspectorPref();
+  // Auto image generation kill switch. Default off — turned off in
+  // May 2026 to stop accidental spend on auto-fill loops. The
+  // auto-gen entry points in app/page.tsx + Studio.tsx read
+  // `loadAutoImageGenPref` at call time so this hook only drives
+  // the Settings toggle; the gate logic lives at each call site.
+  const [autoImageGen, setAutoImageGen] = useAutoImageGenPref();
   const [imageModel, setImageModel] = useImageModelPref();
   const premiumImages = imageModel === "gpt-image-2";
   const [darkMode, setDarkMode] = useDarkModePref();
@@ -1359,6 +1381,11 @@ export default function Page() {
   const accountLimitHit = useRef<boolean>(false);
   useEffect(() => {
     if (!user) return;
+    // Kill switch: when auto image gen is off (the default since
+    // May 2026), skip the entire fill loop. Manual regeneration
+    // from the Settings tab's cover-art Regenerate button still
+    // works — that's an explicit user opt-in.
+    if (!loadAutoImageGenPref()) return;
     for (const p of projects) {
       if (p.thumbnail) continue;
       // Only require a title — the API (lib/thumbnailPrompt.ts)
@@ -1964,6 +1991,8 @@ export default function Page() {
                 setForceEmptyState={setForceEmptyState}
                 premiumImages={premiumImages}
                 setPremiumImages={(v) => setImageModel(v ? "gpt-image-2" : "dall-e-3")}
+                autoImageGen={autoImageGen}
+                setAutoImageGen={setAutoImageGen}
                 typeInspector={typeInspector}
                 setTypeInspector={setTypeInspector}
                 showTypeInspectorRow={isAdmin(userEmailTrimmed)}

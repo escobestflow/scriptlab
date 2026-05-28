@@ -59,7 +59,7 @@ import type { ProfileExemplar } from "@/lib/writerProfile";
 import { Button, Input, Textarea, Selector, Tip } from "@/components/ui";
 import TruncatedText from "@/components/TruncatedText";
 import { SpeakButton } from "@/components/SpeakButton";
-import { useDraftPickerStylePref, type DraftPickerStyle, loadImageModelPref } from "@/lib/prefs";
+import { useDraftPickerStylePref, type DraftPickerStyle, loadImageModelPref, loadAutoImageGenPref } from "@/lib/prefs";
 import { useAuth } from "@/lib/auth";
 import { isAdmin } from "@/lib/adminEmails";
 import { isTerminalImageGenError } from "@/lib/imageGenWithFallback";
@@ -1416,6 +1416,11 @@ export function Studio({
   // together at the start, and both clear together in `finally` —
   // so "shimmering" is a precise signal that an API call is live.
   async function autoGenerateSceneImage(beatId: string): Promise<void> {
+    // Kill switch — see lib/prefs.ts:loadAutoImageGenPref. The
+    // Settings toggle "Auto Image Generation" controls this. Manual
+    // regen from the scene edit sheet stays available; that path
+    // goes through SceneEditForm.generateSceneImage, not here.
+    if (!loadAutoImageGenPref()) return;
     if (sceneImagesInFlight.current.has(beatId)) return;
     // Mirror the character circuit-breaker — one failed/aborted
     // attempt per beat per session, never re-fired.
@@ -1550,6 +1555,10 @@ export function Studio({
   // upsertEpisodeInActiveDraft so the card immediately picks up the
   // new image without a refresh.
   async function autoGenerateEpisodeImage(episodeId: string): Promise<void> {
+    // Kill switch — see autoGenerateSceneImage above. Same toggle
+    // gates every auto-gen path; manual regen from the episode
+    // edit popup is unaffected.
+    if (!loadAutoImageGenPref()) return;
     if (episodeImagesInFlight.current.has(episodeId)) return;
     if (episodeImagesFailed.current.has(episodeId)) return;
     const epd = getActiveEpisodesDraft(story);
@@ -1758,6 +1767,10 @@ export function Studio({
   // sheet in the meantime and manually regenerated, the most recent
   // setStory wins by virtue of React's normal update ordering.
   async function autoGenerateCharacterImage(characterId: string): Promise<void> {
+    // Kill switch — see autoGenerateSceneImage above. Manual
+    // regen from the character edit sheet stays available; that
+    // path goes through CharacterEditForm.generateImage, not here.
+    if (!loadAutoImageGenPref()) return;
     if (characterImagesInFlight.current.has(characterId)) return;
     // Hard skip — once a character fails (or is skipped/aborted),
     // don't keep retrying on every story-state change. The retry
