@@ -118,6 +118,22 @@ interface PartnerIdentity {
    *  render partner's draft read-only with a lock banner offering an
    *  explicit "Copy to my drafts" action. Undefined for solo projects. */
   onEnterPartnerPreview?: (layer: LayerKey, draftId: string) => void;
+  /** Enters partner-preview mode for an entire partner project draft
+   *  (all 4 layers locked to the partner's chosen bundle). Called
+   *  from the project-drafts sheet when the user taps a partner row.
+   *  Undefined for solo projects. */
+  onEnterPartnerProjectPreview?: (projectDraftId: string) => void;
+  /** Clears every partner-preview mode (layer-level + project-level)
+   *  so the studio returns to rendering the viewer's own active
+   *  drafts. The per-layer picker calls this when the viewer taps
+   *  one of THEIR OWN drafts while a preview is active — the natural
+   *  way to "exit preview." Undefined for solo projects. */
+  onExitPartnerPreview?: () => void;
+  /** Id of the partner project-draft currently being previewed, when
+   *  one is. Lets layer-level UI decide whether the read-only
+   *  indicator should reflect a full-project preview vs a single-
+   *  layer one. */
+  partnerProjectPreviewId?: string | null;
   /** True while Studio is rendering a partner draft via partner-preview
    *  mode. Drives the CollabInitials active-chip indicator: whichever
    *  side owns the draft currently on screen gets the inverted black-
@@ -583,6 +599,14 @@ export function Studio({
   const [partnerPreview, setPartnerPreview] = useState<
     { layer: LayerKey; draftId: string } | null
   >(null);
+  // Project-level partner preview — set when the viewer taps a row
+  // in the partner's PROJECT-drafts sheet (the top-level "Draft N"
+  // pill, not a per-layer one). When non-null, every tab pulls its
+  // content from the partner's bundle that this project-draft points
+  // to, locking the entire studio read-only. Mutually overrides the
+  // layer-level `partnerPreview` (whichever was set most recently
+  // takes precedence; the exit-preview helper clears both).
+  const [partnerProjectPreviewId, setPartnerProjectPreviewId] = useState<string | null>(null);
   // Read-through player sheet (Script tab): shows the full script formatted
   // for reading with per-character voice playback.
   const [readThroughOpen, setReadThroughOpen] = useState(false);
@@ -2449,14 +2473,32 @@ export function Studio({
       // Keeping the handler defined but not wired so the chip is a
       // pure display element for now.
       onOpenNameCapture: undefined,
-      // Enter partner-preview mode. The layer-drafts "Whose?" sheet
-      // calls this when the user taps a partner row instead of
-      // immediately cloning — the clone now happens explicitly from
-      // the lock banner's "Copy to my drafts" action.
+      // Enter partner-preview mode for ONE layer. Clears any
+      // project-level preview that was active so the two preview
+      // modes can't be on at the same time (they'd fight over which
+      // partner draft to show in each tab).
       onEnterPartnerPreview: (layer, draftId) => {
+        setPartnerProjectPreviewId(null);
         setPartnerPreview({ layer, draftId });
         setSection(layer);
       },
+      // Enter partner-preview mode for ALL FOUR layers at once.
+      // The viewer is now reading the partner's full project draft
+      // bundle. Tabs stay user-navigable; each one renders the
+      // partner's layer draft that this project draft points to.
+      onEnterPartnerProjectPreview: (projectDraftId) => {
+        setPartnerPreview(null);
+        setPartnerProjectPreviewId(projectDraftId);
+      },
+      // Clears every partner-preview flavor. Called from the layer
+      // picker when the viewer taps one of THEIR OWN drafts — the
+      // natural "exit preview" gesture — and from the lock banner's
+      // "Copy to my drafts" success path.
+      onExitPartnerPreview: () => {
+        setPartnerPreview(null);
+        setPartnerProjectPreviewId(null);
+      },
+      partnerProjectPreviewId,
       isPartnerPreviewing: !!partnerPreview,
       previewLayer: partnerPreview?.layer,
       // Per-item copy handlers from partner-preview. Only meaningful
@@ -3062,11 +3104,31 @@ export function Studio({
                             // — clicking no longer side-effects a copy.
                             onClick={() => {
                               if (showingPartner) {
+                                // Tapping a partner project-draft:
+                                //   1. Marks the row as selected (so
+                                //      the footer Duplicate CTA knows
+                                //      which draft to clone).
+                                //   2. Enters PROJECT-level preview so
+                                //      the studio renders the chosen
+                                //      bundle read-only across all
+                                //      four tabs.
+                                // The sheet closes — the user is now
+                                // viewing the draft. To pick another
+                                // partner draft (or exit preview), they
+                                // re-open the picker. CSS no longer
+                                // locks the layer-bar / project-pill
+                                // triggers during preview.
                                 setSelectedPartnerProjectDraftId(draft.id);
-                                // Keep the sheet open so the user can
-                                // see their selection + tap the footer
-                                // Duplicate CTA.
+                                setPartnerProjectPreviewId(draft.id);
+                                setPartnerPreview(null);
+                                setDraftsDropdownOpen(false);
                               } else {
+                                // Tapping one of MY project-drafts
+                                // exits any partner preview that was
+                                // active — the natural "back to my
+                                // own work" gesture.
+                                setPartnerPreview(null);
+                                setPartnerProjectPreviewId(null);
                                 handleLoadProjectDraft(draft.id);
                                 setDraftsDropdownOpen(false);
                               }
@@ -3291,13 +3353,28 @@ export function Studio({
             applies `pointer-events: none` so inputs can't be clicked /
             typed into — the banner above stays interactive. */}
         {(() => {
-          const previewActive = !!(
+          // Preview can be active in two flavors:
+          //   1. Layer-level — partnerPreview points at one layer +
+          //      draft. Only that tab renders the partner's content.
+          //   2. Project-level — partnerProjectPreviewId is set. Every
+          //      tab renders the partner's content, locked to the
+          //      partner project draft's layer ids.
+          // The flavors are mutually exclusive (the enter helpers
+          // clear the other when one fires).
+          const layerPreviewActive = !!(
             partnerPreview &&
             partnerStory &&
             partnerPreview.layer === section
           );
-          const previewStory = previewActive
+          const projectPreviewActive = !!(
+            partnerProjectPreviewId &&
+            partnerStory
+          );
+          const previewActive = layerPreviewActive || projectPreviewActive;
+          const previewStory = layerPreviewActive
             ? switchLayerDraft(partnerStory!, partnerPreview!.layer, partnerPreview!.draftId)
+            : projectPreviewActive
+            ? switchProjectDraft(partnerStory!, partnerProjectPreviewId!)
             : story;
           const tabStory  = previewActive ? previewStory : story;
           const tabSetStory: typeof setStory = previewActive ? (() => {}) : setStory;
@@ -4436,6 +4513,7 @@ function LayerDraftPicker({
     myEmail,
     partnerEmail,
     onEnterPartnerPreview,
+    onExitPartnerPreview,
   } = usePartnerIdentity();
   const isCollab = !!partnerStory;
   const [side, setSide] = useState<"mine" | "partner" | null>(null);
@@ -4738,11 +4816,15 @@ function LayerDraftPicker({
               // Studio swaps the tab content to render the selected
               // partner draft read-only with a lock banner offering an
               // explicit "Copy to my drafts" action. Tapping one of my
-              // own drafts switches my active to it, as today.
+              // OWN drafts switches my active to it AND exits any
+              // partner preview that was active (layer-level OR
+              // project-level) — the natural "back to my own work"
+              // gesture from inside the picker.
               const handleTap = (d: any) => {
                 if (showingPartner) {
                   onEnterPartnerPreview?.(layer, d.id);
                 } else {
+                  onExitPartnerPreview?.();
                   setStory(s => switchLayerDraft(s, layer, d.id));
                 }
                 setOpen(false);

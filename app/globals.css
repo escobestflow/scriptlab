@@ -5845,6 +5845,19 @@ html[data-theme="dark"] .drafts-whose-row {
   pointer-events: auto;
   opacity: 1;
 }
+/* The LayerBar (with its draft picker + read-only indicator) sits
+   inside the tab content wrapper because tabs own the bar layout.
+   Without this escape hatch the whole bar is dimmed + unclickable
+   during partner-preview mode — meaning the user can't open the
+   draft picker to switch to another draft (the natural way to
+   navigate between partner drafts, or to exit preview by picking
+   one of their own). Re-enable pointer events and restore full
+   opacity so the picker stays usable while the tab body below
+   stays locked. */
+.partner-preview-locked .layer-bar {
+  pointer-events: auto;
+  opacity: 1;
+}
 /* Per-character Copy pill overlaid on each character-card while
    partner-previewing. Positioned in the card's top-right corner. */
 .character-card {
