@@ -18,91 +18,113 @@ export const STYLE_PROFILE_VERSION = 1;
 // so editing these literally changes how variants read.
 
 export type AxisKey =
-  | "actionDialogue"
-  | "subtext"
-  | "density"
-  | "register"
-  | "emotion"
-  | "sensory"
-  | "surprise";
+  | "humor"
+  | "grit"
+  | "vulgarity"
+  | "unpredictability"
+  | "wit"
+  | "tension";
 
 export interface StyleAxis {
   key: AxisKey;
+  /** Short trait name in the writer's own language. */
   label: string;
+  /** One-line plain-English description of what the dial does, with a
+   *  reference touchstone so it's instantly graspable. Shown under the
+   *  slider in the UI. */
+  blurb: string;
   lowLabel: string;
   highLabel: string;
-  /** Directive fragments injected into the sample prompt at three
-   *  bands of the axis value. The sampler picks one by the coord. */
+  /** Directive fragments injected into the sample prompt at three bands
+   *  of the axis value. The sampler picks one by the coord. */
   low: string;
   mid: string;
   high: string;
 }
 
+// Axes grounded in the writer's stated taste — A24 grit, Breaking Bad
+// texture, Succession wit + vulgarity, Chappelle / Louie CK dark humor,
+// misdirection over cliché. Each is a 0–1 dial; the always-on "voice
+// DNA" (dark humor underneath, zero clichés) lives in the base preamble
+// (BASE_STYLE_DNA below) so it's present in every sample regardless of
+// where the dials sit.
 export const STYLE_AXES: StyleAxis[] = [
   {
-    key: "actionDialogue",
-    label: "Action ↔ Dialogue",
-    lowLabel: "Action-driven",
-    highLabel: "Dialogue-driven",
-    low: "Lean on action and description; sparse dialogue, let images carry the scene.",
-    mid: "Balance action lines and dialogue evenly.",
-    high: "Dialogue-forward; characters reveal the scene through what they say.",
+    key: "humor",
+    label: "Darkly funny",
+    blurb: "How hard the dark comedy hits — Chappelle / Louie CK energy.",
+    lowLabel: "Straight",
+    highLabel: "Darkly funny",
+    low: "Play it straight here — let the weight land without a joke.",
+    mid: "Let dark humor flicker through — wry and dry, never goofy.",
+    high: "Lean into the dark comedy — find the funny in the bleakness (Chappelle / Louie CK), but earn it; never silly.",
   },
   {
-    key: "subtext",
-    label: "On-the-nose ↔ Oblique",
-    lowLabel: "Direct",
-    highLabel: "High subtext",
-    low: "Characters say what they mean; intentions are explicit and clear.",
-    mid: "Mix direct statements with some unspoken tension.",
-    high: "Heavy subtext; characters talk around the real thing, meaning lives between the lines.",
+    key: "grit",
+    label: "Gritty",
+    blurb: "Polished and clean vs. raw and lived-in — A24, Breaking Bad.",
+    lowLabel: "Clean",
+    highLabel: "Gritty",
+    low: "Clean, composed prose.",
+    mid: "Some texture and grime under the surface.",
+    high: "Gritty and raw — A24 / Breaking Bad texture: lived-in, unglamorous, real.",
   },
   {
-    key: "density",
-    label: "Terse ↔ Lush",
-    lowLabel: "Terse",
-    highLabel: "Lush",
-    low: "Clipped, economical sentences. Short. Punchy. Lots of white space.",
-    mid: "Moderate sentence length with natural rhythm.",
-    high: "Flowing, layered sentences with rich clauses and momentum.",
+    key: "vulgarity",
+    label: "Vulgar",
+    blurb: "How crude the language gets — Succession-grade, but varied.",
+    lowLabel: "Clean",
+    highLabel: "Vulgar",
+    low: "Keep the language clean here.",
+    mid: "Curse sparingly, for impact — varied, never wallpaper.",
+    high: "Crude and profane — Succession-grade vulgarity, but make each one land, never filler.",
   },
   {
-    key: "register",
-    label: "Plain ↔ Literary",
-    lowLabel: "Plain",
-    highLabel: "Literary",
-    low: "Everyday, concrete vocabulary. Nothing showy.",
-    mid: "Accessible but precise word choice.",
-    high: "Elevated, literary diction; striking images and turns of phrase.",
-  },
-  {
-    key: "emotion",
-    label: "Restrained ↔ Heightened",
-    lowLabel: "Restrained",
-    highLabel: "Heightened",
-    low: "Cool, controlled emotional register. Underplay everything.",
-    mid: "Honest emotion without melodrama.",
-    high: "Heightened, operatic emotion; let feeling run hot.",
-  },
-  {
-    key: "sensory",
-    label: "Sparse ↔ Sensory",
-    lowLabel: "Sparse",
-    highLabel: "Sensory",
-    low: "Minimal sensory detail; just what the scene needs to function.",
-    mid: "Selective sensory texture at key moments.",
-    high: "Dense sensory detail — sound, light, smell, texture saturate the prose.",
-  },
-  {
-    key: "surprise",
-    label: "Conventional ↔ Unexpected",
+    key: "unpredictability",
+    label: "Unpredictable",
+    blurb: "Misdirection and twists — when they expect right, go left.",
     lowLabel: "Conventional",
-    highLabel: "Unexpected",
-    low: "Familiar, well-made choices; play the scene straight.",
-    mid: "Mostly grounded with an occasional fresh angle.",
-    high: "Subvert expectation; reach for the surprising image, line, or beat.",
+    highLabel: "Unpredictable",
+    low: "Play the expected beat cleanly.",
+    mid: "Bend one expectation; slip in a small turn.",
+    high: "Subvert it — misdirection, a hard turn they didn't see coming. When the audience leans right, go left.",
+  },
+  {
+    key: "wit",
+    label: "Witty",
+    blurb: "Razor-sharp cleverness in the lines — Succession-smart.",
+    lowLabel: "Earnest",
+    highLabel: "Witty",
+    low: "Earnest, plain-spoken.",
+    mid: "A flash of cleverness in the phrasing.",
+    high: "Razor-witted — Succession-sharp; the smartest person in the room is writing the line.",
+  },
+  {
+    key: "tension",
+    label: "Cliffhanger",
+    blurb: "Neat resolution vs. leave-them-hanging charge.",
+    lowLabel: "Settled",
+    highLabel: "Cliffhanger",
+    low: "Let the moment resolve and breathe.",
+    mid: "Leave a little charge in the air.",
+    high: "End on a held breath — an open loop, a cliffhanger that demands the next page.",
   },
 ];
+
+/** Always-on voice DNA — the writer's identity that holds at EVERY dial
+ *  setting. Sent from the Style Lab as the sample base so even round 1
+ *  reads like them; the per-coordinate directive layers the dials on
+ *  top. (Hardcoded to the owner's taste for now since the tool is
+ *  admin-only; would become per-user when ungated.) */
+export const BASE_STYLE_DNA =
+  "VOICE DNA — apply underneath everything, at every setting:\n" +
+  "- Gritty, creative, lived-in — an A24 sensibility.\n" +
+  "- A dark sense of humor runs under it all (Dave Chappelle, Louie CK): find the funny in the bleak, but earn it — never goofy.\n" +
+  "- Clever and unpredictable: misdirection and sharp turns; when the audience leans right, go left.\n" +
+  "- ZERO clichés — not in phrasing, not in image, not in beat. If a line feels familiar, cut it.\n" +
+  "- Wit in the dialogue, Succession-sharp.\n" +
+  "- Profanity is welcome but VARIED and purposeful — never constant filler.\n" +
+  "- Favor tension and cliffhangers over neat, tidy resolution.";
 
 export const AXIS_KEYS: AxisKey[] = STYLE_AXES.map(a => a.key);
 
@@ -113,6 +135,21 @@ export function neutralCoord(): StyleCoord {
   const c = {} as StyleCoord;
   for (const k of AXIS_KEYS) c[k] = 0.5;
   return c;
+}
+
+/** Seed coordinate reflecting the writer's stated leanings, so round 1
+ *  already starts near their taste and refines from there rather than
+ *  exploring from a blank neutral. Vulgarity sits mid ("varied, not
+ *  constant"); everything else leans high. */
+export function seedCoord(): StyleCoord {
+  return {
+    humor: 0.8,
+    grit: 0.8,
+    vulgarity: 0.55,
+    unpredictability: 0.85,
+    wit: 0.78,
+    tension: 0.7,
+  };
 }
 
 // ─── Locked profile (nests inside WriterProfile) ──────────────────────

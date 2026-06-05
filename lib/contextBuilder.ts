@@ -1455,21 +1455,24 @@ Scene-writing rules:
     // scene the writer calibrates against. Output is plain prose (NOT
     // JSON) — short, so the whole round is cheap on Haiku.
     case "style_sample": {
-      const p = action.payload as { brief?: string; directive?: string };
+      const p = action.payload as { brief?: string; directive?: string; baseStyle?: string };
       const brief = p.brief?.trim() || "A two-character scene: one wants something the other won't give. A single location. Mid-conversation.";
       const directive = p.directive?.trim() || "Write in a balanced, natural screenplay voice.";
-      return `Write a SHORT screenplay excerpt (roughly 120-180 words, 1 scene) for the brief below. This is a STYLE SAMPLE — its only job is to demonstrate a specific prose voice, so commit hard to the style directives.
+      const baseBlock = p.baseStyle?.trim()
+        ? `# Voice DNA (always apply)\n${p.baseStyle.trim()}\n\n`
+        : "";
+      return `Write a VERY SHORT screenplay excerpt — 35-75 words, one sharp moment or exchange — for the brief below. This is a STYLE SAMPLE: its only job is to show a specific voice, so commit HARD to the directives. Make it punchy and easy to compare against other samples.
 
-# Brief
+${baseBlock}# Brief
 ${brief}
 
-# Style directives (follow ALL of them — this is the point of the exercise)
+# This sample's dials (push these — it's the whole point)
 ${directive}
 
 Rules:
-- Real screenplay format: a slugline, action lines, character names in CAPS above their dialogue.
-- Keep it to one continuous moment — no time jumps.
-- Output ONLY the screenplay excerpt. No preamble, no commentary, no title.`;
+- Real screenplay format: a slugline, brief action, character names in CAPS above dialogue.
+- One continuous moment, no time jumps. Keep it tight — 35-75 words.
+- Output ONLY the excerpt. No preamble, no commentary, no title.`;
     }
 
     // ── Style Lab: distill the editable voice rubric on Lock ──
