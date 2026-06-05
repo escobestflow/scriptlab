@@ -234,15 +234,24 @@ export function updateVector(
 // ─── Measurement ──────────────────────────────────────────────────────
 
 /** Mean per-axis spread (avg absolute deviation from centroid) across a
- *  set of coords. 0 = identical picks, ~0.5 = maximally scattered. */
+ *  set of coords. 0 = identical picks, ~0.5 = maximally scattered.
+ *
+ *  Only axes that actually VARY across the picks are counted — a pinned
+ *  axis (identical in every pick, e.g. an inactive dial) contributes to
+ *  neither the numerator nor the denominator. Without this, scatter on
+ *  the one axis in play gets diluted to "converged" by the 6 stable
+ *  axes around it. */
 export function spread(coords: StyleCoord[]): number {
   if (coords.length < 2) return 0;
   const ctr = centroid(coords);
   let total = 0;
   let n = 0;
-  for (const co of coords) {
-    for (const k of AXIS_KEYS) {
-      total += Math.abs((co[k] ?? 0.5) - ctr[k]);
+  for (const k of AXIS_KEYS) {
+    const vals = coords.map(co => co[k] ?? 0.5);
+    const varies = Math.max(...vals) - Math.min(...vals) > 1e-9;
+    if (!varies) continue; // skip pinned axes — don't dilute real scatter
+    for (const v of vals) {
+      total += Math.abs(v - ctr[k]);
       n++;
     }
   }
