@@ -421,6 +421,38 @@ function SettingsScreen({
               </svg>
             </a>
           )}
+          {/* Admin-only — prose-voice calibration tool. Same isAdmin
+              gate; the /admin/style-lab page enforces it server-agnostic
+              by bouncing non-admins on load. */}
+          {isAdmin(email) && (
+            <a
+              href="/admin/style-lab"
+              className="v2-settings-row v2-settings-row--nav"
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <div className="v2-settings-row-avatar" aria-hidden="true" />
+              <div className="v2-settings-row-text">
+                <div className="v2-settings-row-label ds-type-body-bold">Style Lab</div>
+                <div className="v2-settings-row-caption ds-type-body">
+                  Train the app to write in your voice
+                </div>
+              </div>
+              <svg
+                className="v2-settings-row-chevron"
+                width="10"
+                height="16"
+                viewBox="0 0 10 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="2 2 8 8 2 14" />
+              </svg>
+            </a>
+          )}
         </div>
       </section>
     </div>

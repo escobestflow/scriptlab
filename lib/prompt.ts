@@ -148,7 +148,14 @@ export type ActionType =
   | "tv_import_characters"
   | "tv_import_arcs"
   | "tv_import_episodes"
-  | "tv_import_pilot";
+  | "tv_import_pilot"
+  // ── Style Lab (preference calibration) ──
+  // `style_sample` writes ONE short prose sample at a given style
+  // coordinate — fired 15× per training round (cheap, Haiku).
+  // `distill_style_rubric` reads the user's selected samples and
+  // writes the editable voice rubric on Lock (Sonnet, one call).
+  | "style_sample"
+  | "distill_style_rubric";
 
 export interface ActionRequest {
   type: ActionType;
@@ -223,6 +230,10 @@ export function modelForAction(type: ActionType): string {
     case "tv_import_characters":
     case "tv_import_arcs":
     case "tv_import_episodes":
+    // Distilling the style rubric is one reasoning call about taste —
+    // reading several samples + their coords and naming the pattern.
+    // Sonnet-grade; runs once per Lock, not in the hot loop.
+    case "distill_style_rubric":
       return "claude-sonnet-4-5"; // structural reasoning
     case "generate_beats":
     case "swap_ingredient":

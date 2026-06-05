@@ -85,6 +85,14 @@ export interface WriterProfile {
   style: StyleMetrics;
   /** Bounded LIFO of short verbatim snippets, newest first. */
   exemplars: ProfileExemplar[];
+  /** Locked prose-style calibration from the Style Lab. Optional —
+   *  absent until the user locks a profile. Nested here (rather than a
+   *  separate table) so it persists via the existing writer_profiles
+   *  round-trip AND ships to the server in the same `profile` request
+   *  param that prompts already read. Typed as `unknown` here to avoid
+   *  a circular import with lib/styleProfile.ts; callers cast to
+   *  StyleProfile. */
+  styleProfile?: import("./styleProfile").StyleProfile | null;
 }
 
 // ─── Constructors ─────────────────────────────────────────────────────

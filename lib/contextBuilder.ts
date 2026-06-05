@@ -24,8 +24,22 @@ import {
   // inject into every prompt.
   SERIES_TYPE_LABELS, SERIES_TYPE_DESCRIPTIONS, SERIES_TYPE_RULES,
 } from "./story";
-import { ActionRequest, SYSTEM_BRAIN } from "./prompt";
+import { ActionRequest, ActionType, SYSTEM_BRAIN } from "./prompt";
 import { WriterProfile, renderProfileForPrompt, isProfileMeaningful } from "./writerProfile";
+import { renderStyleProfileForPrompt } from "./styleProfile";
+
+// Actions that emit screenplay prose — the only ones a locked Style
+// Lab profile should steer. Structural/metadata actions are left
+// untouched so the voice calibration doesn't bleed into beat sheets
+// or concept fields.
+const STYLE_PROFILE_ACTIONS = new Set<ActionType>([
+  "generate_scene",
+  "sync_concept_to_script",
+  "sync_characters_to_script",
+  "sync_story_to_script",
+  "rewrite_highlighted_range",
+  "tv_import_pilot",
+]);
 
 export interface BuiltPrompt {
   system: Array<{ type: "text"; text: string; cache_control?: { type: "ephemeral" } }>;
@@ -51,6 +65,20 @@ export function buildPrompt(
       text: renderProfileForPrompt(profile),
       cache_control: { type: "ephemeral" },
     });
+  }
+  // Locked Style-Lab profile — only for script-prose actions (the
+  // artifact the writer calibrated against). This is the "memory":
+  // identical text every call ⇒ repeatable voice. Its own cached
+  // block since it changes only on Lock, not per-request.
+  if (STYLE_PROFILE_ACTIONS.has(action.type) && profile?.styleProfile) {
+    const styleBlock = renderStyleProfileForPrompt(profile.styleProfile);
+    if (styleBlock) {
+      system.push({
+        type: "text",
+        text: styleBlock,
+        cache_control: { type: "ephemeral" },
+      });
+    }
   }
   system.push({ type: "text", text: bible, cache_control: { type: "ephemeral" } });
   return { system, userMessage: ask };
@@ -1418,6 +1446,59 @@ Scene-writing rules:
 - The first scene is a true COLD OPEN — drop us in mid-tension, no establishing throat-clearing.
 - The final scene of the pilot per the TV-momentum principle: closing image / line / action MUST carry unresolved energy. The audience should HAVE to watch Episode 2.
 - No prose outside the JSON.`;
+    }
+
+    // ── Style Lab: one short prose sample at a given style coordinate ──
+    // Fired 15× per training round. The `directive` is rendered from the
+    // coordinate client-side (coordToDirective) and passed in so the
+    // server doesn't need the axis tables. The `brief` is the fixed test
+    // scene the writer calibrates against. Output is plain prose (NOT
+    // JSON) — short, so the whole round is cheap on Haiku.
+    case "style_sample": {
+      const p = action.payload as { brief?: string; directive?: string };
+      const brief = p.brief?.trim() || "A two-character scene: one wants something the other won't give. A single location. Mid-conversation.";
+      const directive = p.directive?.trim() || "Write in a balanced, natural screenplay voice.";
+      return `Write a SHORT screenplay excerpt (roughly 120-180 words, 1 scene) for the brief below. This is a STYLE SAMPLE — its only job is to demonstrate a specific prose voice, so commit hard to the style directives.
+
+# Brief
+${brief}
+
+# Style directives (follow ALL of them — this is the point of the exercise)
+${directive}
+
+Rules:
+- Real screenplay format: a slugline, action lines, character names in CAPS above their dialogue.
+- Keep it to one continuous moment — no time jumps.
+- Output ONLY the screenplay excerpt. No preamble, no commentary, no title.`;
+    }
+
+    // ── Style Lab: distill the editable voice rubric on Lock ──
+    // Reads the writer's selected samples (each tagged with the style
+    // lean it was generated at) and names the through-line. One Sonnet
+    // call. Output is strict JSON so the client can store + show it.
+    case "distill_style_rubric": {
+      const p = action.payload as {
+        samples?: { text: string; lean: string }[];
+      };
+      const samples = Array.isArray(p.samples) ? p.samples : [];
+      const block = samples.length
+        ? samples
+            .map((s, i) => `--- selection ${i + 1} (generated as: ${s.lean || "balanced"}) ---\n${(s.text || "").trim()}`)
+            .join("\n\n")
+        : "(no samples provided)";
+      return `The writer has been calibrating their prose voice by repeatedly selecting screenplay samples they like. Below are the samples they CHOSE. Find the through-line — what consistently characterizes the prose they're drawn to — and write a short, concrete style rubric an AI screenwriter can follow to reliably reproduce this voice.
+
+# The writer's selected samples
+${block}
+
+Write the rubric as 4-7 specific, actionable bullet points about the PROSE CRAFT (sentence rhythm, dialogue style, subtext, sensory detail, emotional register, vocabulary, what to avoid). Be concrete — "short declarative sentences, rarely over 12 words" not "punchy writing". Do NOT describe the content/plot of the samples; describe the VOICE.
+
+Return STRICT JSON:
+{
+  "rubric": string   // the bullet-point rubric as one string, newline-separated "- " bullets
+}
+
+No prose outside the JSON.`;
     }
 
     default:
