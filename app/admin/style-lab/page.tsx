@@ -24,14 +24,15 @@ import {
   seedCoord, sampleCoords, coordToDirective, coordSummary,
   updateVector, convergence, alphaForRound, spreadForRound,
   BASE_STYLE_DNA, type StyleProfile,
+  SAMPLE_KINDS, nextKind, kindByKey,
 } from "@/lib/styleProfile";
 
 const ROUND_SIZE = 15;
 const PICK_TARGET = 3;
 const CONCURRENCY = 6; // throttle parallel Haiku calls → far fewer rate-limit failures
 const ACCENT = "#d8b66b"; // cinematic warm gold
-const DEFAULT_BRIEF =
-  "Two people, one room. One is hiding something the other has just started to suspect. Mid-conversation — no setup, drop us in.";
+const DEFAULT_PREMISE =
+  "A washed-up fixer takes one last job to clear a debt — and it lands him babysitting the teenage daughter of the man he's about to betray.";
 
 interface Candidate {
   coord: StyleCoord;
@@ -66,7 +67,8 @@ export default function StyleLabPage() {
     if (!isAdmin(user?.email)) router.replace("/");
   }, [authLoading, user?.email, router]);
 
-  const [brief, setBrief] = useState(DEFAULT_BRIEF);
+  const [premise, setPremise] = useState(DEFAULT_PREMISE);
+  const [kindKey, setKindKey] = useState<string>(SAMPLE_KINDS[0].key);
   const [vector, setVector] = useState<StyleCoord>(() => seedCoord());
   const [spread, setSpread] = useState(0.3);
   const [round, setRound] = useState(0);
@@ -81,16 +83,23 @@ export default function StyleLabPage() {
   const synthStory = useMemo(() => newBlankProject(), []);
   const { userInitial, userAvatarUrl, userDisplayName } = deriveSidebarUserFields(user);
 
-  // Keep a live ref to brief so per-card regenerate reads the latest.
-  const briefRef = useRef(brief);
-  useEffect(() => { briefRef.current = brief; }, [brief]);
+  // Live refs so per-card regenerate reads the latest premise + kind.
+  const premiseRef = useRef(premise);
+  useEffect(() => { premiseRef.current = premise; }, [premise]);
+  const kindRef = useRef(kindKey);
+  useEffect(() => { kindRef.current = kindKey; }, [kindKey]);
 
   // Generate one sample for a coordinate, with one retry on failure.
   const genOne = useCallback(async (coord: StyleCoord, attempt = 0): Promise<string> => {
     try {
       const text = await callGenerate(
         synthStory,
-        { type: "style_sample", payload: { brief: briefRef.current, directive: coordToDirective(coord), baseStyle: BASE_STYLE_DNA } },
+        { type: "style_sample", payload: {
+          premise: premiseRef.current,
+          instruction: kindByKey(kindRef.current).instruction,
+          directive: coordToDirective(coord),
+          baseStyle: BASE_STYLE_DNA,
+        } },
         null,
       );
       if (!text.trim()) throw new Error("empty");
@@ -161,6 +170,12 @@ export default function StyleLabPage() {
     setVector(nextVec);            // sliders animate to the new learned position
     setSpread(spreadForRound(conv));
     setConvHistory(h => [...h, conv]);
+    // Advance to the next output form so each round trains a different
+    // artifact (logline → summary → arc → scene → dialogue → …). The
+    // kind ref updates synchronously for the generation that follows.
+    const nk = nextKind(kindRef.current);
+    kindRef.current = nk.key;
+    setKindKey(nk.key);
     startRound(nextVec, round + 1);
   };
 
@@ -239,35 +254,71 @@ export default function StyleLabPage() {
         </div>
       )}
 
-      {/* Control panel: brief + the 6 dials */}
+      {/* Control panel: premise + output type + the 6 dials */}
       <div style={{ background: "#1b1b1b", border: "1px solid #262626", borderRadius: 14, padding: 18, marginBottom: 22 }}>
-        <input
-          value={brief}
-          onChange={e => setBrief(e.target.value)}
-          placeholder="The moment to write…"
-          style={{ width: "100%", background: "#111", color: "#ededed", border: "1px solid #2c2c2c", borderRadius: 8, padding: "10px 12px", fontSize: 13, marginBottom: 18 }}
+        <label style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.45 }}>Premise — the specific story everything is written from</label>
+        <textarea
+          value={premise}
+          onChange={e => setPremise(e.target.value)}
+          rows={2}
+          placeholder="The specific story / situation to write from…"
+          style={{ width: "100%", marginTop: 6, background: "#111", color: "#ededed", border: "1px solid #2c2c2c", borderRadius: 8, padding: "10px 12px", fontSize: 13, resize: "vertical", lineHeight: 1.5 }}
         />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 28px" }}>
-          {STYLE_AXES.map(axis => (
-            <Dial
-              key={axis.key}
-              label={axis.label}
-              blurb={axis.blurb}
-              lowLabel={axis.lowLabel}
-              highLabel={axis.highLabel}
-              value={vector[axis.key] ?? 0.5}
-              onChange={v => setVector(prev => ({ ...prev, [axis.key]: v }))}
-            />
-          ))}
+
+        {/* Output-type selector */}
+        <div style={{ marginTop: 16 }}>
+          <label style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.45 }}>This round writes</label>
+          <div style={{ display: "flex", gap: 7, marginTop: 7, flexWrap: "wrap" }}>
+            {SAMPLE_KINDS.map(k => {
+              const on = k.key === kindKey;
+              return (
+                <button key={k.key} onClick={() => { setKindKey(k.key); kindRef.current = k.key; }}
+                  title={k.instruction}
+                  style={{
+                    fontSize: 12, padding: "6px 12px", borderRadius: 999, cursor: "pointer",
+                    border: `1px solid ${on ? ACCENT : "#333"}`,
+                    background: on ? "rgba(216,182,107,0.14)" : "transparent",
+                    color: on ? "#f0e2bf" : "#999",
+                  }}>{k.label}</button>
+              );
+            })}
+            <span style={{ fontSize: 11, opacity: 0.4, alignSelf: "center", marginLeft: 4 }}>
+              Each round advances to the next form — your voice is learned across all of them.
+            </span>
+          </div>
         </div>
+
+        {/* Dials */}
+        <div style={{ marginTop: 18 }}>
+          <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.45, marginBottom: 12 }}>
+            Your voice — the target each batch varies around (drag to steer; they move as you pick)
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 28px" }}>
+            {STYLE_AXES.map(axis => (
+              <Dial
+                key={axis.key}
+                label={axis.label}
+                blurb={axis.blurb}
+                lowLabel={axis.lowLabel}
+                highLabel={axis.highLabel}
+                value={vector[axis.key] ?? 0.5}
+                onChange={v => setVector(prev => ({ ...prev, [axis.key]: v }))}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Exploration + generate */}
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 20, paddingTop: 16, borderTop: "1px solid #262626" }}>
-          <span style={{ fontSize: 12, opacity: 0.55 }}>Variety</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>Exploration</span>
+            <span style={{ fontSize: 10.5, opacity: 0.4 }}>how far the batch strays from your dials — low refines, high explores</span>
+          </div>
           <input type="range" min={0.08} max={0.45} step={0.01} value={spread}
             onChange={e => setSpread(parseFloat(e.target.value))}
-            style={{ width: 160, accentColor: ACCENT }} />
+            style={{ width: 150, accentColor: ACCENT }} />
           <div style={{ flex: 1 }} />
-          <button onClick={round === 0 ? restart : restart} disabled={generating}
-            style={primaryBtn(generating)}>
+          <button onClick={restart} disabled={generating} style={primaryBtn(generating)}>
             {generating ? "Generating…" : round === 0 ? "Generate" : "Restart"}
           </button>
         </div>
@@ -290,13 +341,13 @@ export default function StyleLabPage() {
                     borderRadius: 12, padding: 13, minHeight: 124,
                     display: "flex", flexDirection: "column", gap: 9, transition: "border-color 150ms, background 150ms",
                   }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.45, lineHeight: 1.3 }}>{c.lean}</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+                    <span style={{ fontSize: 9.5, textTransform: "uppercase", letterSpacing: 0.4, opacity: 0.4, lineHeight: 1.3 }}>#{i + 1}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                       {sel && <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>{order + 1}</span>}
                       <button
                         onClick={e => { e.stopPropagation(); void regenerateOne(i); }}
-                        title="Regenerate this one (same dials)"
+                        title="Regenerate this one (same levels)"
                         style={{ background: "transparent", border: "none", color: "#777", cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1 }}
                       >↻</button>
                     </div>
@@ -304,6 +355,10 @@ export default function StyleLabPage() {
                   <div style={{ fontSize: 12.5, lineHeight: 1.5, whiteSpace: "pre-wrap", flex: 1, opacity: c.status === "done" ? 0.95 : 0.4, color: c.status === "error" ? "#c98" : undefined }}>
                     {c.status === "loading" ? "…" : c.text}
                   </div>
+                  {/* Per-option characteristic levels — exactly what dials
+                      produced this sample, so the writer can connect text
+                      to settings. */}
+                  <LevelBars coord={c.coord} />
                 </div>
               );
             })}
@@ -334,6 +389,27 @@ export default function StyleLabPage() {
         </div>
       )}
     </Shell>
+  );
+}
+
+// ─── Per-option characteristic levels — six tiny labeled bars showing
+//     exactly where this sample sits on each dial. Lets the writer read
+//     a sample and immediately see what produced it. ──
+function LevelBars({ coord }: { coord: StyleCoord }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 7px", alignItems: "center", paddingTop: 9, borderTop: "1px solid #242424" }}>
+      {STYLE_AXES.map(axis => {
+        const v = coord[axis.key] ?? 0.5;
+        return (
+          <div key={axis.key} style={{ display: "contents" }}>
+            <span title={`${axis.label}: ${Math.round(v * 100)}`} style={{ fontSize: 9, opacity: 0.5, whiteSpace: "nowrap" }}>{axis.label}</span>
+            <div style={{ height: 3, background: "#2a2a2a", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${Math.round(v * 100)}%`, background: ACCENT, opacity: 0.85, borderRadius: 999 }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

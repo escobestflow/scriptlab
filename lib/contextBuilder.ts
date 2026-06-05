@@ -28,17 +28,30 @@ import { ActionRequest, ActionType, SYSTEM_BRAIN } from "./prompt";
 import { WriterProfile, renderProfileForPrompt, isProfileMeaningful } from "./writerProfile";
 import { renderStyleProfileForPrompt } from "./styleProfile";
 
-// Actions that emit screenplay prose — the only ones a locked Style
-// Lab profile should steer. Structural/metadata actions are left
-// untouched so the voice calibration doesn't bleed into beat sheets
-// or concept fields.
+// Actions that emit writer-voice PROSE — the ones a locked Style Lab
+// profile should steer. Since the lab now trains across forms (logline,
+// summary, arc, scene, dialogue), the voice profile applies to the
+// prose-bearing concept + script actions too. Purely structural actions
+// (beat sheets, character metadata, episode skeletons) stay untouched so
+// the voice calibration doesn't distort structure.
 const STYLE_PROFILE_ACTIONS = new Set<ActionType>([
+  // Screenplay prose
   "generate_scene",
   "sync_concept_to_script",
   "sync_characters_to_script",
   "sync_story_to_script",
   "rewrite_highlighted_range",
   "tv_import_pilot",
+  // Concept prose (loglines / summaries / taglines / tone) — voice-bearing
+  "generate_concept_logline",
+  "generate_concept_summary",
+  "generate_concept_tagline",
+  "generate_concept_tone",
+  "generate_full_concept",
+  "sync_characters_to_concept",
+  "sync_story_to_concept",
+  "sync_script_to_concept",
+  "tv_import_concept",
 ]);
 
 export interface BuiltPrompt {
@@ -1455,24 +1468,26 @@ Scene-writing rules:
     // scene the writer calibrates against. Output is plain prose (NOT
     // JSON) — short, so the whole round is cheap on Haiku.
     case "style_sample": {
-      const p = action.payload as { brief?: string; directive?: string; baseStyle?: string };
-      const brief = p.brief?.trim() || "A two-character scene: one wants something the other won't give. A single location. Mid-conversation.";
-      const directive = p.directive?.trim() || "Write in a balanced, natural screenplay voice.";
+      const p = action.payload as { premise?: string; instruction?: string; directive?: string; baseStyle?: string };
+      const premise = p.premise?.trim() || "A washed-up fixer gets one last job that turns out to involve someone from the life he ran away from.";
+      const instruction = p.instruction?.trim() || "Write a very short screenplay excerpt — 35–75 words, one sharp moment.";
+      const directive = p.directive?.trim() || "Write in a balanced, natural voice.";
       const baseBlock = p.baseStyle?.trim()
         ? `# Voice DNA (always apply)\n${p.baseStyle.trim()}\n\n`
         : "";
-      return `Write a VERY SHORT screenplay excerpt — 35-75 words, one sharp moment or exchange — for the brief below. This is a STYLE SAMPLE: its only job is to show a specific voice, so commit HARD to the directives. Make it punchy and easy to compare against other samples.
+      return `${instruction}
 
-${baseBlock}# Brief
-${brief}
+This is a STYLE SAMPLE — its only job is to show a specific voice, so commit HARD to the dials below. Keep it tight and easy to compare against other samples.
+
+${baseBlock}# Premise (write from this)
+${premise}
 
 # This sample's dials (push these — it's the whole point)
 ${directive}
 
 Rules:
-- Real screenplay format: a slugline, brief action, character names in CAPS above dialogue.
-- One continuous moment, no time jumps. Keep it tight — 35-75 words.
-- Output ONLY the excerpt. No preamble, no commentary, no title.`;
+- Match the requested form exactly (logline / summary / arc / scene / dialogue).
+- Output ONLY the sample itself. No preamble, no commentary, no label, no title.`;
     }
 
     // ── Style Lab: distill the editable voice rubric on Lock ──

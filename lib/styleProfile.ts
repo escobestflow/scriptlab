@@ -128,6 +128,59 @@ export const BASE_STYLE_DNA =
 
 export const AXIS_KEYS: AxisKey[] = STYLE_AXES.map(a => a.key);
 
+// ─── Output kinds ─────────────────────────────────────────────────────
+// Each training round can target a different artifact the app produces.
+// The writer's voice shows up differently in a logline vs a scene vs an
+// arc — training across all of them builds one cohesive profile that
+// steers every kind of output, not just scene prose. The `instruction`
+// is sent to the style_sample action verbatim (keeps the prompt builder
+// generic). Rounds advance through this list so each round is a
+// different form.
+
+export interface SampleKind {
+  key: string;
+  label: string;
+  instruction: string;
+}
+
+export const SAMPLE_KINDS: SampleKind[] = [
+  {
+    key: "logline",
+    label: "Logline",
+    instruction: "Write ONE logline for the premise — 1–2 sentences, under 40 words. Protagonist + engine of the story + what's at stake.",
+  },
+  {
+    key: "summary",
+    label: "Summary",
+    instruction: "Write a 3–4 sentence summary of what this story IS — the world, the hook, the tension. ~70 words.",
+  },
+  {
+    key: "arc",
+    label: "Story arc",
+    instruction: "Sketch a short story arc as a progression — 4–6 quick beats (Setup → turn → escalation → reversal → land), 50–80 words total. Use arrows or short fragments, not full prose.",
+  },
+  {
+    key: "scene",
+    label: "Scene",
+    instruction: "Write a very short scene excerpt — 35–75 words, one sharp moment. Real screenplay format: slugline, brief action, character names in CAPS above dialogue.",
+  },
+  {
+    key: "dialogue",
+    label: "Dialogue",
+    instruction: "Write a short dialogue exchange from the premise — 4–8 lines, character names in CAPS above each line, no action description.",
+  },
+];
+
+/** The kind that follows `key` in the round cycle (wraps around). */
+export function nextKind(key: string): SampleKind {
+  const i = SAMPLE_KINDS.findIndex(k => k.key === key);
+  return SAMPLE_KINDS[(i + 1) % SAMPLE_KINDS.length];
+}
+
+export function kindByKey(key: string): SampleKind {
+  return SAMPLE_KINDS.find(k => k.key === key) ?? SAMPLE_KINDS[0];
+}
+
 export type StyleCoord = Record<AxisKey, number>;
 
 /** Neutral center of the space — every axis at 0.5. */
